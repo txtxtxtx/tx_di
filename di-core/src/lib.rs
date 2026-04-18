@@ -19,7 +19,6 @@ use std::sync::Arc;
 pub use linkme;
 
 use dashmap::DashMap;
-
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Scope
 // ─────────────────────────────────────────────────────────────────────────────
@@ -122,73 +121,56 @@ impl BuildContext {
     }
 
     /// 注入单例：factory 只调用一次，之后返回缓存的 Arc。
-    fn inject_singleton<T: Any + Send + Sync + 'static>(&mut self, tid: TypeId) -> Arc<T> {
-        // DashMap::remove 返回 Option<(TypeId, V)>，只需解构拿 V
-        let entry = self.store.remove(&tid).unwrap_or_else(|| {
-            panic!(
-                "[di] inject::<{}> 未找到，请确认 app!{{}} 中包含该组件",
-                std::any::type_name::<T>()
-            )
-        }).1;
-
-        match entry {
-            CompRef::Cached(any_arc) => {
-                // 从 Arc<dyn Any> downcast 回 Arc<T>
-                let arc_t: Arc<T> = any_arc
-                    .downcast::<T>()
-                    .unwrap_or_else(|_| {
-                        panic!("[di] inject singleton downcast 失败：{}", std::any::type_name::<T>())
-                    });
-                // 重新插入（克隆 Arc）
-                self.store.insert(tid, CompRef::Cached(arc_t.clone()));
-                arc_t
-            }
-            CompRef::Factory(factory_arc) => {
-                // 首次调用：调用闭包构造实例，然后存入 Cached
-                let any_arc: Arc<dyn Any + Send + Sync> = factory_arc(self);
-                let arc_t: Arc<T> = any_arc
-                    .downcast::<T>()
-                    .unwrap_or_else(|_| {
-                        panic!("[di] inject singleton factory downcast 失败：{}", std::any::type_name::<T>())
-                    });
-                // 存入 Cached
-                self.store.insert(tid, CompRef::Cached(arc_t.clone()));
-                arc_t
-            }
-        }
-    }
-
-    /// 注入原型：factory 每次都调用，构造新实例。
-    fn inject_prototype<T: Any + Send + Sync + 'static>(&mut self, tid: TypeId) -> Arc<T> {
-        // 获取 factory 的 Arc 引用（借用）
-        let factory_arc = match self.store.get(&tid) {
-            Some(cref) => match &*cref {
-                CompRef::Factory(arc) => Arc::clone(arc),
-                CompRef::Cached(_) => {
-                    panic!(
-                        "[di] inject::<{}> 的组件注册为 Singleton，不能用 prototype 语义注入",
-                        std::any::type_name::<T>()
-                    )
+    fn inject_singleton<T: Any + Send + Sync + 'static>(&self, tid: TypeId) -> Arc<T> {
+        self.store.get(&tid)
+            .map(|entry| {
+                match &*entry {
+                    CompRef::Cached(any_arc) => any_arc.clone(),
+                    CompRef::Factory(_) => {
+                        panic!(
+                            "[di] inject_singleton::<{}> 错误：组件注册为 Prototype",
+                            std::any::type_name::<T>()
+                        )
+                    }
                 }
-            },
-            None => {
+            })
+            .unwrap_or_else(|| {
                 panic!(
                     "[di] inject::<{}> 未找到，请确认 app!{{}} 中包含该组件",
                     std::any::type_name::<T>()
                 )
-            }
-        };
-
-        // 直接调用闭包构造新实例
-        let any_arc: Arc<dyn Any + Send + Sync> = factory_arc(self);
-
-        // 解 Arc<dyn Any> → Arc<T>
-        let arc_t: Arc<T> = any_arc
+            })
             .downcast::<T>()
             .unwrap_or_else(|_| {
-                panic!("[di] factory downcast 失败：{}", std::any::type_name::<T>())
+                panic!(
+                    "[di] inject singleton downcast 失败：{}",
+                    std::any::type_name::<T>()
+                )
+            })
+    }
+
+
+
+    /// 注入原型：factory 每次都调用，构造新实例。
+    fn inject_prototype<T: Any + Send + Sync + 'static>(&mut self, tid: TypeId) -> Arc<T> {
+        // 1. 先把 factory_arc 从 Ref 中提取出来
+        let factory_arc = self.store.get(&tid)
+            .map(|entry| {
+                match &*entry {
+                    CompRef::Factory(f) => Some(f.clone()),
+                    _ => None,
+                }
+            })
+            .flatten()
+            .unwrap_or_else(|| {
+                panic!("[di] inject::<{}> 未找到", std::any::type_name::<T>())
             });
-        arc_t
+        // 此时 Ref 已经 dropped，self 不再被不可变借用
+
+        // 3. 现在可以安全调用 factory_arc(self)
+        factory_arc(self)
+            .downcast::<T>()
+            .unwrap_or_else(|_| panic!("[di] downcast 失败：{}", std::any::type_name::<T>()))
     }
 
     // ── 兼容旧 API ───────────────────────────────────────────────────────────
