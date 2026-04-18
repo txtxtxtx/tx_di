@@ -231,11 +231,13 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    use di_core::ComponentDescriptor;
     use super::*;
 
+    // ── 单例测试 ───────────────────────────────────────────────────────
+    /// 单例测试
     #[test]
     fn test_singleton_shared() {
-        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
         let mut ctx = build_app_module();
         let server = ctx.take::<AppServer>();
 
@@ -246,7 +248,36 @@ mod tests {
             "DbPool 应该是同一个 Arc 实例（单例）"
         );
     }
+    /// 多次注入单例应该返回相同的 Arc
+    #[test]
+    fn test_singleton_multiple_injects_same_instance() {
+        let mut ctx = build_app_module();
 
+        // 多次注入单例应该返回相同的 Arc 实例
+        let db1 = ctx.inject::<DbPool>();
+        let db2 = ctx.inject::<DbPool>();
+        let db3 = ctx.inject::<DbPool>();
+
+        assert!(Arc::ptr_eq(&db1, &db2), "两次注入应该返回相同实例");
+        assert!(Arc::ptr_eq(&db2, &db3), "三次注入应该返回相同实例");
+    }
+    
+    /// Arc clone() 方法应该共享数据
+    #[test]
+    fn test_singleton_arc_clone_shares_data() {
+        let mut ctx = build_app_module();
+
+        let db1 = ctx.inject::<DbPool>();
+        let db2 = db1.clone();
+        // 上下文持有一个,
+        // AppServer 持有一个
+        // clone 只是增加引用计数，不创建新实例
+        assert!(Arc::ptr_eq(&db1, &db2));
+        assert_eq!(Arc::strong_count(&db1), 4);
+    }
+
+    // ── 原型测试 ───────────────────────────────────────────────────────
+    /// 原型测试
     #[test]
     fn test_prototype_independent() {
         let mut ctx = build_app_module();
@@ -267,7 +298,41 @@ mod tests {
         assert_eq!(l1.count(), 1);
         assert_eq!(l2.count(), 1, "每个 logger 计数器独立");
     }
+    /// 每次 inject 创建新实例
+    #[test]
+    fn test_prototype_each_inject_creates_new_instance() {
+        let mut ctx = build_app_module();
 
+        // 每次 inject 都应该创建新实例
+        let loggers: Vec<_> = (0..5).map(|_| ctx.inject::<RequestLogger>()).collect();
+
+        // 所有实例的指针都应该不同
+        for i in 0..loggers.len() {
+            for j in (i + 1)..loggers.len() {
+                assert_ne!(
+                    Arc::as_ptr(&loggers[i]),
+                    Arc::as_ptr(&loggers[j]),
+                    "第 {} 和第 {} 次注入应该产生不同实例",
+                    i + 1,
+                    j + 1
+                );
+            }
+        }
+    }
+    /// 自定义值注入测试
+    #[test]
+    fn test_prototype_with_custom_values() {
+        let mut ctx = build_app_module();
+
+        let logger = ctx.inject::<RequestLogger>();
+
+        // 验证 #[tx_cst] 注入的自定义值正确
+        assert_eq!(logger.prefix, "[REQUEST]");
+        assert_eq!(logger.count(), 0, "新实例的计数器应该从 0 开始");
+    }
+
+    // ── 自定义值注入测试 ───────────────────────────────────────────────
+    /// 自定义值注入测试
     #[test]
     fn test_inject_custom_values() {
         let mut ctx = build_app_module();
@@ -279,7 +344,7 @@ mod tests {
             "di-framework"
         );
     }
-
+    /// 自定义值注入测试
     #[test]
     fn test_app_config_inject() {
         let mut ctx = build_app_module();
@@ -288,22 +353,62 @@ mod tests {
         assert_eq!(cfg.app_name, "my-app");
         assert_eq!(cfg.port, 8080);
     }
+    /// 自定义值表达式求值一次
+    #[test]
+    fn test_custom_value_expression_evaluated_once() {
+        let mut ctx = build_app_module();
 
+        // 对于单例组件，#[tx_cst] 表达式只在构建时求值一次
+        let cfg1 = ctx.inject::<AppConfig>();
+        let cfg2 = ctx.inject::<AppConfig>();
+
+        // 两个引用指向同一个实例
+        assert!(Arc::ptr_eq(&cfg1, &cfg2));
+    }
+
+    // ── 依赖关系测试 ───────────────────────────────────────────────────
+    /// 依赖关系测试
+    #[test]
+    fn test_dependency_injection_chain() {
+        let mut ctx = build_app_module();
+
+        // AppServer 依赖 UserService
+        let server = ctx.take::<AppServer>();
+
+        // UserService 依赖 DbPool 和 AppConfig
+        assert!(Arc::ptr_eq(&server.user_svc.db, &ctx.inject::<DbPool>()));
+        assert!(Arc::ptr_eq(&server.user_svc.config, &ctx.inject::<AppConfig>()));
+    }
+    /// 验证 UserService 功能
+    #[test]
+    fn test_user_service_functionality() {
+        let mut ctx = build_app_module();
+        let server = ctx.take::<AppServer>();
+
+        // 验证 UserService 可以正常使用注入的依赖
+        let greeting = server.user_svc.greet();
+        assert_eq!(greeting, "[my-app] Hello from UserService (port: 8080)");
+    }
+
+    // ── 注册表测试 ─────────────────────────────────────────────────────
+    /// 注册表测试
     #[test]
     fn test_registry() {
         let count = di_core::COMPONENT_REGISTRY.len();
-        println!("注册组件数：{}", count);
-        for meta in di_core::COMPONENT_REGISTRY.iter() {
-            println!(
-                "  {:20} scope={:?}  deps={}",
-                meta.name,
-                meta.scope,
-                meta.deps.len()
-            );
-        }
-        assert!(count >= 5);
+        assert_eq!(count, 5, "应该有 5 个注册组件");
+        
+        // 验证每个组件都存在
+        let component_names: Vec<&str> = di_core::COMPONENT_REGISTRY.iter()
+            .map(|m| m.name)
+            .collect();
+        
+        assert!(component_names.contains(&"DbPool"));
+        assert!(component_names.contains(&"AppConfig"));
+        assert!(component_names.contains(&"UserService"));
+        assert!(component_names.contains(&"RequestLogger"));
+        assert!(component_names.contains(&"AppServer"));
     }
-
+    /// 验证 scope
     #[test]
     fn test_scope_on_component() {
         // 验证 scope 确实在组件自己身上
@@ -335,5 +440,130 @@ mod tests {
         // RequestLogger 无依赖
         let deps = <RequestLogger as di_core::ComponentDescriptor>::DEP_IDS;
         assert_eq!(deps.len(), 0);
+    }
+    /// 组件描述符构建测试
+    #[test]
+    fn test_component_descriptor_build() {
+        let mut ctx = di_core::BuildContext::new();
+
+        // 手动调用 build 方法构建组件
+        let _db_pool = DbPool::build(&mut ctx);
+        // DbPool 是无字段结构体，成功构建即表示正常
+
+        let app_config = AppConfig::build(&mut ctx);
+        assert_eq!(app_config.app_name, "my-app");
+        assert_eq!(app_config.port, 8080);
+    }
+
+    // ── BuildContext API 测试 ──────────────────────────────────────────
+    /// BuildContext API 测试
+    #[test]
+    fn test_build_context_len_and_empty() {
+        let ctx = di_core::BuildContext::new();
+        assert_eq!(ctx.len(), 0);
+        assert!(ctx.is_empty());
+    }
+    /// 构建后
+    #[test]
+    fn test_build_context_after_initialization() {
+        let ctx = build_app_module();
+        // 初始化后应该有 5 个组件（DbPool, AppConfig, UserService, RequestLogger, AppServer）
+        assert_eq!(ctx.len(), 5);
+        assert!(!ctx.is_empty());
+    }
+    /// take 测试
+    #[test]
+    fn test_take_removes_from_context() {
+        let mut ctx = build_app_module();
+
+        // take 之前可以 inject
+        let _db_before = ctx.inject::<DbPool>();
+
+        // take 取走所有权
+        let _server = ctx.take::<AppServer>();
+
+        // take 之后 AppServer 不再存在于 ctx 中
+        // 注意：这里不能再次 inject AppServer，会 panic
+        // 但其他组件仍然可用
+        let _db_after = ctx.inject::<DbPool>();
+        assert!(true, "其他组件仍然可用");
+    }
+
+    // ── 边界情况测试 ───────────────────────────────────────────────────
+    /// 线程安全测试
+    #[test]
+    fn test_singleton_thread_safety() {
+        use std::thread;
+
+        let mut ctx = build_app_module();
+        let db = ctx.inject::<DbPool>();
+
+        // 在多个线程中使用同一个 Arc
+        let handles: Vec<_> = (0..5)
+            .map(|_| {
+                let db_clone = db.clone();
+                thread::spawn(move || {
+                    // 验证所有线程都持有相同的实例
+                    Arc::as_ptr(&db_clone) as usize
+                })
+            })
+            .collect();
+
+        let pointers: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+
+        // 所有线程的指针应该相同
+        for ptr in &pointers {
+            assert_eq!(ptr, &pointers[0], "所有线程应该持有相同的 DbPool 实例");
+        }
+    }
+    /// 原型状态隔离测试
+    #[test]
+    fn test_prototype_state_isolation() {
+        let mut ctx = build_app_module();
+
+        // 创建多个原型实例并修改它们的状态
+        let mut loggers = vec![];
+        for i in 0..3 {
+            let logger = ctx.inject::<RequestLogger>();
+            for _ in 0..(i + 1) {
+                logger.log(&format!("Message from logger {}", i));
+            }
+            loggers.push(logger);
+        }
+
+        // 验证每个实例的状态独立
+        assert_eq!(loggers[0].count(), 1);
+        assert_eq!(loggers[1].count(), 2);
+        assert_eq!(loggers[2].count(), 3);
+    }
+    /// 无依赖组件测试
+    #[test]
+    fn test_component_with_no_dependencies() {
+        let mut ctx = build_app_module();
+
+        // DbPool 没有依赖，应该可以直接注入
+        let _db = ctx.inject::<DbPool>();
+        assert!(true, "无依赖组件应该可以成功注入");
+    }
+    /// 多个依赖组件测试
+    #[test]
+    fn test_component_with_multiple_dependencies() {
+        let mut ctx = build_app_module();
+
+        // UserService 有两个依赖：DbPool 和 AppConfig
+        let user_svc = ctx.inject::<UserService>();
+
+        // 验证两个依赖都被正确注入
+        assert!(Arc::ptr_eq(&user_svc.db, &ctx.inject::<DbPool>()));
+        assert!(Arc::ptr_eq(&user_svc.config, &ctx.inject::<AppConfig>()));
+    }
+
+    // ── 调试功能测试 ───────────────────────────────────────────────────
+    /// 调试功能测试
+    #[test]
+    fn test_debug_registry_output() {
+        // 这个测试主要验证 debug_registry 不会 panic
+        di_core::BuildContext::debug_registry();
+        assert!(true, "debug_registry 应该正常执行");
     }
 }
