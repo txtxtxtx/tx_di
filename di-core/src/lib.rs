@@ -246,12 +246,20 @@ impl BuildContext {
 
     /// 打印所有已注册的组件（调试用）
     pub fn debug_registry() {
+
         for meta in COMPONENT_REGISTRY.iter() {
+            let dep_names: Vec<&str> = meta.deps.iter().map(|dep_fn| {
+                COMPONENT_REGISTRY.iter()
+                    .find(|m| (m.type_id)() == dep_fn())
+                    .map(|m| m.name)
+                    .unwrap_or("unknown")
+            }).collect();
+
             println!(
-                "  {:20} scope={:?}  deps={}",
+                "  {:20} scope={:?}  deps=[{}]",
                 meta.name,
                 meta.scope,
-                meta.deps.len()
+                dep_names.join(", ")
             );
         }
     }

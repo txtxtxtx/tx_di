@@ -1,35 +1,21 @@
 //! # di-example
 //!
-//! 演示 di-framework 的全部特性：
+//! 演示 tx_di 的全部特性：
 //!
 //! ## 设计原则
 //!
 //! **scope 标记在被注入者上**，消费者字段写裸类型即可：
 //!
-//! ```text
-//! #[component]                        // DbPool 自己声明为单例
-//! pub struct DbPool { ... }
-//!
-//! #[component(scope = Prototype)]     // RequestLogger 自己声明为原型
-//! pub struct RequestLogger { ... }
-//!
-//! #[component]                        // AppServer 不需要知道依赖的 scope
-//! pub struct AppServer {
-//!     pub db:     Arc<DbPool>,        // 框架自动注入共享 Arc
-//!     pub logger: Arc<RequestLogger>, // 框架自动注入新实例
-//! }
-//! ```
-//!
 //! ## 依赖关系
 //!
 //! ```text
 //!  ┌──────────┐   ┌────────────┐
-//!  │  DbPool  │   │ AppConfig  │  ← #[component]（默认 Singleton）
+//!  │  DbPool  │   │ AppConfig  │  ← #[tx_comp]（默认 Singleton）
 //!  └────┬─────┘   └─────┬──────┘
 //!       │                    │
 //!       ▼ Singleton          ▼ Singleton (自动)
 //!  ┌──────────────────┐  ┌──────────────────────┐
-//!  │    UserService    │  │    RequestLogger     │← #[component(scope = Prototype)]
+//!  │    UserService   │  │    RequestLogger     │← #[tx_comp(scope = Prototype)]
 //!  │  db: Arc<DbPool> │  └──────────┬───────────┘
 //!  │  config: Arc<..> │              │ Prototype (自动)
 //!  └────────┬─────────┘              │
@@ -40,15 +26,15 @@
 //!              │  AppServer   │
 //!              │  user_svc    │
 //!              │  logger      │ ← Arc<RequestLogger>，每次注入新实例
-//!              │  extra       │ ← #[inject(expr)]
+//!              │  extra       │ ← #[tx_cst(expr)]
 //!              └──────────────┘
 //! ```
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use di_core::{app, tx_comp,tx_cst};
-
+use di_core::{app, tx_comp, BuildContext};
+use log::info;
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. 无依赖的单例组件
 // ─────────────────────────────────────────────────────────────────────────────
@@ -61,7 +47,7 @@ pub struct DbPool {
     // 无字段的组件：build() → Self {}
 }
 
-/// 应用配置（单例，通过 #[inject] 注入自定义值）
+/// 应用配置（单例，通过 #[tx_cst] 注入自定义值）
 #[derive(Clone, Debug)]
 #[tx_comp]
 pub struct AppConfig {
@@ -94,7 +80,7 @@ pub struct RequestLogger {
     #[tx_cst("[REQUEST]".to_string())]
     pub prefix: String,
 
-    /// 请求计数器（每个实例独立，通过 #[inject] 初始化）
+    /// 请求计数器（每个实例独立，通过 #[tx_cst] 初始化）
     #[tx_cst(Arc::new(Mutex::new(0u64)))]
     count: Arc<Mutex<u64>>,
 }
@@ -103,7 +89,7 @@ impl RequestLogger {
     pub fn log(&self, msg: &str) {
         let mut c = self.count.lock().unwrap();
         *c += 1;
-        println!("{} [#{}] {}", self.prefix, *c, msg);
+        info!("{} [#{}] {}", self.prefix, *c, msg);
     }
 
     pub fn count(&self) -> u64 {
@@ -174,30 +160,37 @@ pub fn default_headers() -> HashMap<String, String> {
 // 5. 声明 DI 模块
 // ─────────────────────────────────────────────────────────────────────────────
 
-app! {AppModule}
+app! {
+    AppModule
+    [
+        DbPool,
+        AppConfig,
+        RequestLogger,
+        UserService,
+        AppServer
+    ]
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 6. main
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default()
-        .default_filter_or("debug"))
-        .init();
-    println!("=== di-framework v3 演示（scope 在被注入者上）===\n");
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
+    info!("🚀 tx_di 启动");
 
     let mut ctx = build_app_module();
-
+    info!("构建完成");
     // ── 取出 AppServer ──────────────────────────────────────────────────
     let server = ctx.take::<AppServer>();
 
-    println!("✅ AppServer 构建完成");
-    println!("   bind_addr  = {}", server.bind_addr);
-    println!("   headers    = {:?}", server.default_headers);
+    info!("✅ AppServer 构建完成");
+    info!("   bind_addr  = {}", server.bind_addr);
+    info!("   headers    = {:?}", server.default_headers);
 
     // ── 验证单例共享 ────────────────────────────────────────────────────
     let greeting = server.user_svc.greet();
-    println!("\n📢 UserService.greet() = {}", greeting);
+    info!("   UserService.greet() = {}", greeting);
 
     // server.user_svc.db 是 Arc<DbPool>，Arc derefs → 可以直接比较指针
     let db_in_ctx = ctx.inject::<DbPool>();
@@ -205,7 +198,7 @@ fn main() {
     println!(
         "   DbPool Arc 共享 = {}（{} vs {}）",
         if Arc::as_ptr(&server.user_svc.db) == db_in_ctx_ptr {
-            "✅ 同一家"
+            "✅ 同实例"
         } else {
             "❌ 不同实例"
         },
@@ -221,17 +214,15 @@ fn main() {
     // 从 ctx 再次 inject Prototype 组件 → 构造新实例
     let another_logger = ctx.inject::<RequestLogger>();
     another_logger.log("另一个 logger 的第一条");
-    println!("   server.logger.count = {}（独立）", server.logger.count());
-    println!(
-        "   another_logger.count = {}（独立，从 0 开始）",
-        another_logger.count()
-    );
+    info!("   another_logger.count = {}（独立，从 0 开始）", another_logger.count());
+    info!("   server.logger.count = {}（独立）", server.logger.count());
 
     // ── 验证 AppConfig ─────────────────────────────────────────────────
-    println!("\n⚙️  AppConfig（#[inject] 自定义值）：");
+    info!("\n⚙️  AppConfig（#[tx_cst] 自定义值）：");
     let cfg_arc = ctx.inject::<AppConfig>();
-    println!("   app_name = {}", cfg_arc.app_name);
-    println!("   port     = {}", cfg_arc.port);
+    info!("   app_name = {}", cfg_arc.app_name);
+    info!("   port     = {}", cfg_arc.port);
+    BuildContext::debug_registry();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -244,9 +235,7 @@ mod tests {
 
     #[test]
     fn test_singleton_shared() {
-        env_logger::Builder::from_env(env_logger::Env::default()
-            .default_filter_or("debug"))
-        .init();
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
         let mut ctx = build_app_module();
         let server = ctx.take::<AppServer>();
 

@@ -116,6 +116,7 @@ dependencies = [
  "di-core",
  "env_logger",
  "linkme",
+ "log",
 ]
 
 [[package]]

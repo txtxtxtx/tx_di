@@ -1,0 +1,2 @@
+[build]
+#jobs = 4  # 使用 CPU 核心数
