@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "di-core",
+    "di-macros",
+    "di-example",
+]
+resolver = "2"

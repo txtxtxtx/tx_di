@@ -1,0 +1,9 @@
+[package]
+name = "di-example"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+di-core   = { path = "../di-core" }
+di-macros = { path = "../di-macros" }
+linkme    = "0.3"

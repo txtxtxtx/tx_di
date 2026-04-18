@@ -1,0 +1,12 @@
+[package]
+name = "di-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# linkme 用于跨 crate 在链接期收集静态数组切片
+# 基于 ELF/Mach-O/PE 的自定义 link section，完全零运行时开销
+linkme = "0.3"
+
+# DashMap：无锁并发 HashMap，支持跨线程共享的组件注册表
+dashmap = "6"

@@ -1,0 +1,19 @@
+[package]
+name = "di-macros"
+version = "0.1.0"
+edition = "2021"
+
+# 必须声明为 proc-macro crate
+[lib]
+proc-macro = true
+
+[dependencies]
+# syn：解析 Rust AST
+syn = { version = "2", features = ["full", "extra-traits"] }
+# quote：生成 TokenStream
+quote = "1"
+# proc-macro2：提供 Span 等工具
+proc-macro2 = "1"
+
+# 运行期依赖（宏展开后生成的代码需要这些）
+di-core = { path = "../di-core" }
