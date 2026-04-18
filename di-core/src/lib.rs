@@ -50,9 +50,9 @@ pub enum CompRef {
 
 pub struct ComponentMeta {
     pub type_id: fn() -> TypeId,
-    pub deps:    &'static [fn() -> TypeId],
-    pub name:    &'static str,
-    pub scope:   Scope,
+    pub deps: &'static [fn() -> TypeId],
+    pub name: &'static str,
+    pub scope: Scope,
     /// 原始工厂函数（用于 `debug_registry` 诊断；运行时不使用）
     pub factory_fn: Option<fn(&mut BuildContext) -> Box<dyn Any + Send + Sync>>,
 }
@@ -72,7 +72,9 @@ pub struct BuildContext {
 impl BuildContext {
     // #[inline]
     pub fn new() -> Self {
-        Self { store: DashMap::new() }
+        Self {
+            store: DashMap::new(),
+        }
     }
 
     // ── 注册 ─────────────────────────────────────────────────────────────────
@@ -91,7 +93,8 @@ impl BuildContext {
             Scope::Singleton => {
                 // 单例：立即调用 factory，构造 Arc<T> 后缓存
                 let instance: Arc<T> = Arc::new(*factory(self));
-                self.store.insert(TypeId::of::<T>(), CompRef::Cached(instance));
+                self.store
+                    .insert(TypeId::of::<T>(), CompRef::Cached(instance));
             }
             Scope::Prototype => {
                 // 原型：存闭包，每次调用时构造新实例
@@ -100,7 +103,8 @@ impl BuildContext {
                     let boxed: Box<T> = (factory_fn)(ctx);
                     Arc::new(*boxed) as Arc<dyn Any + Send + Sync>
                 };
-                self.store.insert(TypeId::of::<T>(), CompRef::Factory(Arc::new(closure)));
+                self.store
+                    .insert(TypeId::of::<T>(), CompRef::Factory(Arc::new(closure)));
             }
         }
     }
@@ -123,7 +127,8 @@ impl BuildContext {
                     let boxed: Box<dyn Any + Send + Sync> = (factory_fn)(ctx);
                     Arc::from(boxed)
                 };
-                self.store.insert(type_id, CompRef::Factory(Arc::new(closure)));
+                self.store
+                    .insert(type_id, CompRef::Factory(Arc::new(closure)));
             }
         }
     }
@@ -145,16 +150,15 @@ impl BuildContext {
 
     /// 注入单例：factory 只调用一次，之后返回缓存的 Arc。
     fn inject_singleton<T: Any + Send + Sync + 'static>(&self, tid: TypeId) -> Arc<T> {
-        self.store.get(&tid)
-            .map(|entry| {
-                match &*entry {
-                    CompRef::Cached(any_arc) => any_arc.clone(),
-                    CompRef::Factory(_) => {
-                        panic!(
-                            "[di] inject_singleton::<{}> 错误：组件注册为 Prototype",
-                            std::any::type_name::<T>()
-                        )
-                    }
+        self.store
+            .get(&tid)
+            .map(|entry| match &*entry {
+                CompRef::Cached(any_arc) => any_arc.clone(),
+                CompRef::Factory(_) => {
+                    panic!(
+                        "[di] inject_singleton::<{}> 错误：组件注册为 Prototype",
+                        std::any::type_name::<T>()
+                    )
                 }
             })
             .unwrap_or_else(|| {
@@ -172,22 +176,18 @@ impl BuildContext {
             })
     }
 
-
-
     /// 注入原型：factory 每次都调用，构造新实例。
     fn inject_prototype<T: Any + Send + Sync + 'static>(&mut self, tid: TypeId) -> Arc<T> {
         // 1. 先把 factory_arc 从 Ref 中提取出来
-        let factory_arc = self.store.get(&tid)
-            .map(|entry| {
-                match &*entry {
-                    CompRef::Factory(f) => Some(f.clone()),
-                    _ => None,
-                }
+        let factory_arc = self
+            .store
+            .get(&tid)
+            .map(|entry| match &*entry {
+                CompRef::Factory(f) => Some(f.clone()),
+                _ => None,
             })
             .flatten()
-            .unwrap_or_else(|| {
-                panic!("[di] inject::<{}> 未找到", std::any::type_name::<T>())
-            });
+            .unwrap_or_else(|| panic!("[di] inject::<{}> 未找到", std::any::type_name::<T>()));
         // 此时 Ref 已经 dropped，self 不再被不可变借用
 
         // 3. 现在可以安全调用 factory_arc(self)
@@ -205,17 +205,17 @@ impl BuildContext {
 
     /// 从上下文中取出并移除单例（所有权）。
     pub fn take<T: Any + Send + Sync + 'static>(&mut self) -> T {
-        let entry = self.store.remove(&TypeId::of::<T>()).unwrap_or_else(|| {
-            panic!("[di] take::<{}> 未找到", std::any::type_name::<T>())
-        }).1;
+        let entry = self
+            .store
+            .remove(&TypeId::of::<T>())
+            .unwrap_or_else(|| panic!("[di] take::<{}> 未找到", std::any::type_name::<T>()))
+            .1;
 
         match entry {
             CompRef::Cached(any_arc) => {
-                let arc_t: Arc<T> = any_arc
-                    .downcast::<T>()
-                    .unwrap_or_else(|_| {
-                        panic!("[di] take downcast 失败：{}", std::any::type_name::<T>())
-                    });
+                let arc_t: Arc<T> = any_arc.downcast::<T>().unwrap_or_else(|_| {
+                    panic!("[di] take downcast 失败：{}", std::any::type_name::<T>())
+                });
                 Arc::try_unwrap(arc_t).unwrap_or_else(|_| {
                     panic!(
                         "[di] take::<{}> 失败：仍有其他强引用（Arc 计数 > 1）",
@@ -224,29 +224,42 @@ impl BuildContext {
                 })
             }
             _ => {
-                panic!("[di] take::<{}> 只能用于单例组件", std::any::type_name::<T>())
+                panic!(
+                    "[di] take::<{}> 只能用于单例组件",
+                    std::any::type_name::<T>()
+                )
             }
         }
     }
 
     // ── 调试辅助 ────────────────────────────────────────────────────────────
 
-    #[inline] pub fn len(&self) -> usize  { self.store.len() }
-    #[inline] pub fn is_empty(&self) -> bool { self.store.is_empty() }
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.store.len()
+    }
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.store.is_empty()
+    }
 
     /// 打印所有已注册的组件（调试用）
     pub fn debug_registry() {
         for meta in COMPONENT_REGISTRY.iter() {
             println!(
                 "  {:20} scope={:?}  deps={}",
-                meta.name, meta.scope, meta.deps.len()
+                meta.name,
+                meta.scope,
+                meta.deps.len()
             );
         }
     }
 }
 
 impl Default for BuildContext {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -255,7 +268,7 @@ impl Default for BuildContext {
 
 pub trait ComponentDescriptor: Any + Sized + Send + Sync + 'static {
     const DEP_IDS: &'static [fn() -> TypeId];
-    const SCOPE:   Scope;
+    const SCOPE: Scope;
     fn build(ctx: &mut BuildContext) -> Self;
 }
 
@@ -268,10 +281,7 @@ pub fn topo_sort(metas: &[&ComponentMeta]) -> Vec<TypeId> {
 
     let n = metas.len();
 
-    let id_to_name: HashMap<TypeId, &str> = metas
-        .iter()
-        .map(|m| ((m.type_id)(), m.name))
-        .collect();
+    let id_to_name: HashMap<TypeId, &str> = metas.iter().map(|m| ((m.type_id)(), m.name)).collect();
 
     let id_to_idx: HashMap<TypeId, usize> = metas
         .iter()
@@ -288,9 +298,13 @@ pub fn topo_sort(metas: &[&ComponentMeta]) -> Vec<TypeId> {
             if let Some(&j) = id_to_idx.get(&one_type_id) {
                 adj[j].push(i);
                 in_degree[i] += 1;
-            }else {
-                panic!("[di] 组件 '{}' 依赖的类型 {:?} {:?} 未在注册表中找到",
-                       meta.name, id_to_name.get(&one_type_id), &one_type_id);
+            } else {
+                panic!(
+                    "[di] 组件 '{}' 依赖的类型 {:?} {:?} 未在注册表中找到",
+                    meta.name,
+                    id_to_name.get(&one_type_id),
+                    &one_type_id
+                );
             }
         }
     }
@@ -302,19 +316,31 @@ pub fn topo_sort(metas: &[&ComponentMeta]) -> Vec<TypeId> {
         result.push((metas[i].type_id)());
         for &j in &adj[i] {
             in_degree[j] -= 1;
-            if in_degree[j] == 0 { queue.push_back(j); }
+            if in_degree[j] == 0 {
+                queue.push_back(j);
+            }
         }
     }
 
     if result.len() != n {
-        let cycles: Vec<&str> = metas.iter().enumerate()
+        let cycles: Vec<&str> = metas
+            .iter()
+            .enumerate()
             .filter(|(i, _)| in_degree[*i] > 0)
             .map(|(_, m)| m.name)
             .collect();
         panic!("[di] 循环依赖：{:?}", cycles);
     }
-    
-    debug!("[di] 拓扑排序结果：{:?}", result);
+
+    let sorted_names: Vec<&str> = result
+        .iter()
+        .map(|t| {
+            id_to_name.get(t).copied().unwrap_or_else(|| {
+                panic!("[di] 拓扑排序内部错误：TypeId {:?} 未在名称映射中找到", t)
+            })
+        })
+        .collect();
+    debug!("[di] 拓扑排序结果：\n[\n{}\n]", sorted_names.join(",\n"));
 
     result
 }
