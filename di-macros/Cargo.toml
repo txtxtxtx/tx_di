@@ -16,4 +16,4 @@ quote = "1"
 proc-macro2 = "1"
 
 # 运行期依赖（宏展开后生成的代码需要这些）
-di-core = { path = "../di-core" }
+#di-core = { path = "../di-core" }

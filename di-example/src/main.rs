@@ -47,7 +47,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use di_macros::{app, component};
+use di_core::{app, component};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. 无依赖的单例组件

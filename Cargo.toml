@@ -4,4 +4,4 @@ members = [
     "di-macros",
     "di-example",
 ]
-resolver = "2"
+resolver = "3"

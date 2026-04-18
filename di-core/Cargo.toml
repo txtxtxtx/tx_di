@@ -11,3 +11,4 @@ linkme = "0.3"
 # DashMap：无锁并发 HashMap，支持跨线程共享的组件注册表
 dashmap = "6"
 log = "0.4.29"
+di-macros = { path = "../di-macros"}

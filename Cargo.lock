@@ -104,6 +104,7 @@ name = "di-core"
 version = "0.1.0"
 dependencies = [
  "dashmap",
+ "di-macros",
  "linkme",
  "log",
 ]
@@ -113,7 +114,6 @@ name = "di-example"
 version = "0.1.0"
 dependencies = [
  "di-core",
- "di-macros",
  "env_logger",
  "linkme",
 ]
@@ -122,7 +122,6 @@ dependencies = [
 name = "di-macros"
 version = "0.1.0"
 dependencies = [
- "di-core",
  "proc-macro2",
  "quote",
  "syn",

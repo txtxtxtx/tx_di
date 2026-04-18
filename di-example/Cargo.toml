@@ -5,6 +5,6 @@ edition = "2021"
 
 [dependencies]
 di-core   = { path = "../di-core" }
-di-macros = { path = "../di-macros" }
+#di-macros = { path = "../di-macros" }
 linkme    = "0.3"
 env_logger = {version = "0.11.8"}

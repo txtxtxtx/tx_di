@@ -17,6 +17,7 @@ use std::any::{Any, TypeId};
 use std::sync::Arc;
 
 pub use linkme;
+pub use di_macros::{component, app};
 
 use dashmap::DashMap;
 use log::debug;
@@ -344,3 +345,4 @@ pub fn topo_sort(metas: &[&ComponentMeta]) -> Vec<TypeId> {
 
     result
 }
+
