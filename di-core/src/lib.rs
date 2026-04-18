@@ -19,6 +19,7 @@ use std::sync::Arc;
 pub use linkme;
 
 use dashmap::DashMap;
+use log::debug;
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Scope
 // ─────────────────────────────────────────────────────────────────────────────
@@ -103,7 +104,29 @@ impl BuildContext {
             }
         }
     }
-
+    /// 注册已擦除类型的工厂函数（用于从 COMPONENT_REGISTRY 批量注册）。
+    pub fn register_factory_boxed(
+        &mut self,
+        type_id: TypeId,
+        scope: Scope,
+        factory: fn(&mut BuildContext) -> Box<dyn Any + Send + Sync>,
+    ) {
+        match scope {
+            Scope::Singleton => {
+                let instance: Box<dyn Any + Send + Sync> = factory(self);
+                let arc: Arc<dyn Any + Send + Sync> = Arc::from(instance);
+                self.store.insert(type_id, CompRef::Cached(arc));
+            }
+            Scope::Prototype => {
+                let factory_fn = factory;
+                let closure = move |ctx: &mut BuildContext| -> Arc<dyn Any + Send + Sync> {
+                    let boxed: Box<dyn Any + Send + Sync> = (factory_fn)(ctx);
+                    Arc::from(boxed)
+                };
+                self.store.insert(type_id, CompRef::Factory(Arc::new(closure)));
+            }
+        }
+    }
     // ── 统一注入入口 ─────────────────────────────────────────────────────────
 
     /// 统一注入入口。根据被注入组件 T 的 scope 自动选择：
@@ -240,10 +263,16 @@ pub trait ComponentDescriptor: Any + Sized + Send + Sync + 'static {
 // 6. 拓扑排序（debug 辅助）
 // ─────────────────────────────────────────────────────────────────────────────
 
-pub fn topo_sort(metas: &[ComponentMeta]) -> Vec<TypeId> {
+pub fn topo_sort(metas: &[&ComponentMeta]) -> Vec<TypeId> {
     use std::collections::{HashMap, VecDeque};
 
     let n = metas.len();
+
+    let id_to_name: HashMap<TypeId, &str> = metas
+        .iter()
+        .map(|m| ((m.type_id)(), m.name))
+        .collect();
+
     let id_to_idx: HashMap<TypeId, usize> = metas
         .iter()
         .enumerate()
@@ -255,9 +284,13 @@ pub fn topo_sort(metas: &[ComponentMeta]) -> Vec<TypeId> {
 
     for (i, meta) in metas.iter().enumerate() {
         for dep_fn in meta.deps {
-            if let Some(&j) = id_to_idx.get(&dep_fn()) {
+            let one_type_id = dep_fn();
+            if let Some(&j) = id_to_idx.get(&one_type_id) {
                 adj[j].push(i);
                 in_degree[i] += 1;
+            }else {
+                panic!("[di] 组件 '{}' 依赖的类型 {:?} {:?} 未在注册表中找到",
+                       meta.name, id_to_name.get(&one_type_id), &one_type_id);
             }
         }
     }
@@ -280,6 +313,8 @@ pub fn topo_sort(metas: &[ComponentMeta]) -> Vec<TypeId> {
             .collect();
         panic!("[di] 循环依赖：{:?}", cycles);
     }
+    
+    debug!("[di] 拓扑排序结果：{:?}", result);
 
     result
 }

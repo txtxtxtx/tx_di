@@ -39,9 +39,8 @@ use syn::{
     parse_macro_input,
     punctuated::Punctuated,
     token::Comma,
-    Attribute, Expr, Ident, ItemStruct,
-    Path, PathArguments, Result as SynResult, Token, Type,
-    GenericArgument,
+    Attribute, Expr, GenericArgument, Ident, ItemStruct, Path, PathArguments, Result as SynResult,
+    Token, Type,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -93,7 +92,9 @@ fn parse_component_attr(attr_tokens: TokenStream) -> SynResult<ScopeAttr> {
         return Ok(ScopeAttr::Singleton);
     }
 
-    struct ScopeKv { value: Expr }
+    struct ScopeKv {
+        value: Expr,
+    }
     impl Parse for ScopeKv {
         fn parse(input: ParseStream) -> SynResult<Self> {
             let key: Ident = input.parse()?;
@@ -112,7 +113,10 @@ fn parse_component_attr(attr_tokens: TokenStream) -> SynResult<ScopeAttr> {
     let kv: ScopeKv = syn::parse(attr_tokens)?;
     // 解析 scope 值：支持裸 Ident（Prototype）和完整路径（di_core::Scope::Prototype）
     let ident_str = match &kv.value {
-        Expr::Path(p) => p.path.segments.last()
+        Expr::Path(p) => p
+            .path
+            .segments
+            .last()
             .map(|s| s.ident.to_string())
             .unwrap_or_default(),
         _ => kv.value.to_token_stream().to_string(),
@@ -168,16 +172,19 @@ fn component_impl(scope_attr: ScopeAttr, input: ItemStruct) -> SynResult<TokenSt
     }
 
     for field in &input.fields {
-        let ident = field.ident.as_ref().ok_or_else(|| {
-            syn::Error::new_spanned(&field.ty, "#[component] 只支持具名字段")
-        })?;
+        let ident = field
+            .ident
+            .as_ref()
+            .ok_or_else(|| syn::Error::new_spanned(&field.ty, "#[component] 只支持具名字段"))?;
 
         let inject_expr = extract_inject_expr(&field.attrs)?;
         let kind = if let Some(expr) = inject_expr {
             FieldKind::Custom { expr }
         } else {
             // 裸字段（Arc<T> 或 T），统一走 ctx.inject::<T>()
-            FieldKind::Inject { ty: field.ty.clone() }
+            FieldKind::Inject {
+                ty: field.ty.clone(),
+            }
         };
 
         fields_info.push((ident.clone(), kind));
@@ -212,7 +219,8 @@ fn component_impl(scope_attr: ScopeAttr, input: ItemStruct) -> SynResult<TokenSt
         .filter_map(|(_, kind)| {
             match kind {
                 FieldKind::Inject { ty } => {
-                    Some(quote! { || ::std::any::TypeId::of::<#ty>() })
+                    let inject_ty = strip_arc(ty);
+                    Some(quote! { || ::std::any::TypeId::of::<#inject_ty>() })
                 }
                 FieldKind::Custom { .. } => None, // #[inject] 不计入依赖图
             }
@@ -289,13 +297,24 @@ struct AppInput {
 impl Parse for AppInput {
     fn parse(input: ParseStream) -> SynResult<Self> {
         let module_name: Ident = input.parse()?;
-        let content;
-        syn::bracketed!(content in input);
-        let components: Punctuated<Path, Comma> =
-            content.parse_terminated(Path::parse, Token![,])?;
+
+        let components = if input.peek(syn::token::Bracket) {
+            let content;
+            syn::bracketed!(content in input);
+            if content.is_empty() {
+                vec![]
+            } else {
+                let components: Punctuated<Path, Comma> =
+                    content.parse_terminated(Path::parse, Token![,])?;
+                components.into_iter().collect()
+            }
+        } else {
+            vec![]
+        };
+
         Ok(AppInput {
             module_name,
-            components: components.into_iter().collect(),
+            components,
         })
     }
 }
@@ -324,7 +343,7 @@ fn app_impl(module_name: Ident, components: Vec<Path>) -> SynResult<TokenStream2
         let snake = camel_to_snake(&module_name.to_string());
         format_ident!("build_{}", snake, span = Span::call_site())
     };
-    
+
     let component_count = components.len();
 
     // 为每个组件生成 register_factory 调用
@@ -369,7 +388,20 @@ fn app_impl(module_name: Ident, components: Vec<Path>) -> SynResult<TokenStream2
             }
 
             let mut ctx = ::di_core::BuildContext::new();
-            #( #build_stmts )*
+                        if #component_count == 0 {
+                let metas: ::std::vec::Vec<&::di_core::ComponentMeta> = ::di_core::COMPONENT_REGISTRY.iter().collect();
+                let sorted_ids = ::di_core::topo_sort(&metas);
+
+                for tid in &sorted_ids {
+                    if let Some(meta) = metas.iter().find(|m| (m.type_id)() == *tid) {
+                        if let Some(factory_fn) = meta.factory_fn {
+                            ctx.register_factory_boxed((meta.type_id)(), meta.scope, factory_fn);
+                        }
+                    }
+                }
+            } else {
+                #( #build_stmts )*
+            }
             ctx
         }
     };
@@ -412,7 +444,7 @@ fn strip_arc(ty: &Type) -> TokenStream2 {
 /// # 返回值
 ///
 /// 转换后的蛇形命名法字符串
-/// 
+///
 /// case `DbPool` -> `db_pool`
 fn camel_to_snake(s: &str) -> String {
     let mut result = String::new();
@@ -425,7 +457,6 @@ fn camel_to_snake(s: &str) -> String {
     }
     result
 }
-
 
 /// 将驼峰命名法字符串转换为大写蛇形命名法（SCREAMING_SNAKE_CASE）。
 ///
@@ -442,4 +473,3 @@ fn camel_to_snake(s: &str) -> String {
 fn camel_to_screaming_snake(s: &str) -> String {
     camel_to_snake(s).to_uppercase()
 }
-

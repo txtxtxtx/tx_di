@@ -7,3 +7,4 @@ edition = "2021"
 di-core   = { path = "../di-core" }
 di-macros = { path = "../di-macros" }
 linkme    = "0.3"
+env_logger = {version = "0.11.8"}

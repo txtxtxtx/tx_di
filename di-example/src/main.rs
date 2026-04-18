@@ -175,17 +175,7 @@ pub fn default_headers() -> HashMap<String, String> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 app! {
-    AppModule [
-        // 无依赖的先放
-        DbPool,
-        AppConfig,
-        // 原型组件（无 ctx 依赖）
-        RequestLogger,
-        // 依赖上面组件
-        UserService,
-        // 最终聚合层
-        AppServer,
-    ]
+    AppModule
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -193,6 +183,9 @@ app! {
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn main() {
+    env_logger::Builder::from_env(env_logger::Env::default()
+        .default_filter_or("debug"))
+        .init();
     println!("=== di-framework v3 演示（scope 在被注入者上）===\n");
 
     let mut ctx = build_app_module();
@@ -212,9 +205,14 @@ fn main() {
     let db_in_ctx = ctx.inject::<DbPool>();
     let db_in_ctx_ptr = Arc::as_ptr(&db_in_ctx);
     println!(
-       "   DbPool Arc 共享 = {}（{} vs {}）",
-       if Arc::as_ptr(&server.user_svc.db) == db_in_ctx_ptr { "✅ 同一家" } else { "❌ 不同实例" },
-       Arc::as_ptr(&server.user_svc.db) as usize, db_in_ctx_ptr as usize
+        "   DbPool Arc 共享 = {}（{} vs {}）",
+        if Arc::as_ptr(&server.user_svc.db) == db_in_ctx_ptr {
+            "✅ 同一家"
+        } else {
+            "❌ 不同实例"
+        },
+        Arc::as_ptr(&server.user_svc.db) as usize,
+        db_in_ctx_ptr as usize
     );
 
     // ── 验证原型独立性 ─────────────────────────────────────────────────
@@ -225,10 +223,7 @@ fn main() {
     // 从 ctx 再次 inject Prototype 组件 → 构造新实例
     let another_logger = ctx.inject::<RequestLogger>();
     another_logger.log("另一个 logger 的第一条");
-    println!(
-        "   server.logger.count = {}（独立）",
-        server.logger.count()
-    );
+    println!("   server.logger.count = {}（独立）", server.logger.count());
     println!(
         "   another_logger.count = {}（独立，从 0 开始）",
         another_logger.count()
@@ -251,6 +246,9 @@ mod tests {
 
     #[test]
     fn test_singleton_shared() {
+        env_logger::Builder::from_env(env_logger::Env::default()
+            .default_filter_or("debug"))
+        .init();
         let mut ctx = build_app_module();
         let server = ctx.take::<AppServer>();
 
@@ -275,7 +273,8 @@ mod tests {
 
         // 两个 logger 的计数器相互独立
         assert_ne!(
-            Arc::as_ptr(&l1), Arc::as_ptr(&l2),
+            Arc::as_ptr(&l1),
+            Arc::as_ptr(&l2),
             "Prototype 实例应该相互独立（不同 Arc 指针）"
         );
         assert_eq!(l1.count(), 1);
@@ -308,7 +307,12 @@ mod tests {
         let count = di_core::COMPONENT_REGISTRY.len();
         println!("注册组件数：{}", count);
         for meta in di_core::COMPONENT_REGISTRY.iter() {
-            println!("  {:20} scope={:?}  deps={}", meta.name, meta.scope, meta.deps.len());
+            println!(
+                "  {:20} scope={:?}  deps={}",
+                meta.name,
+                meta.scope,
+                meta.deps.len()
+            );
         }
         assert!(count >= 5);
     }
@@ -316,11 +320,26 @@ mod tests {
     #[test]
     fn test_scope_on_component() {
         // 验证 scope 确实在组件自己身上
-        assert_eq!(di_core::Scope::Singleton, <DbPool as di_core::ComponentDescriptor>::SCOPE);
-        assert_eq!(di_core::Scope::Singleton, <AppConfig as di_core::ComponentDescriptor>::SCOPE);
-        assert_eq!(di_core::Scope::Singleton, <UserService as di_core::ComponentDescriptor>::SCOPE);
-        assert_eq!(di_core::Scope::Singleton, <AppServer as di_core::ComponentDescriptor>::SCOPE);
-        assert_eq!(di_core::Scope::Prototype, <RequestLogger as di_core::ComponentDescriptor>::SCOPE);
+        assert_eq!(
+            di_core::Scope::Singleton,
+            <DbPool as di_core::ComponentDescriptor>::SCOPE
+        );
+        assert_eq!(
+            di_core::Scope::Singleton,
+            <AppConfig as di_core::ComponentDescriptor>::SCOPE
+        );
+        assert_eq!(
+            di_core::Scope::Singleton,
+            <UserService as di_core::ComponentDescriptor>::SCOPE
+        );
+        assert_eq!(
+            di_core::Scope::Singleton,
+            <AppServer as di_core::ComponentDescriptor>::SCOPE
+        );
+        assert_eq!(
+            di_core::Scope::Prototype,
+            <RequestLogger as di_core::ComponentDescriptor>::SCOPE
+        );
 
         // UserService 依赖 DbPool 和 AppConfig
         let deps = <UserService as di_core::ComponentDescriptor>::DEP_IDS;
