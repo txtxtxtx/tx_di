@@ -17,7 +17,7 @@ use std::any::{Any, TypeId};
 use std::sync::Arc;
 
 pub use linkme;
-pub use di_macros::{component, app};
+pub use di_macros::{tx_comp, app, tx_cst};
 
 use dashmap::DashMap;
 use log::debug;

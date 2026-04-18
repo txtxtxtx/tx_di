@@ -47,7 +47,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use di_core::{app, component};
+use di_core::{app, tx_comp,tx_cst};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. 无依赖的单例组件
@@ -55,7 +55,7 @@ use di_core::{app, component};
 
 /// 数据库连接池（单例，全局共享）
 #[derive(Clone, Debug)]
-#[component]
+#[tx_comp]
 pub struct DbPool {
     // 实际项目中这里是 sea_orm::DatabaseConnection
     // 无字段的组件：build() → Self {}
@@ -63,14 +63,14 @@ pub struct DbPool {
 
 /// 应用配置（单例，通过 #[inject] 注入自定义值）
 #[derive(Clone, Debug)]
-#[component]
+#[tx_comp]
 pub struct AppConfig {
     /// 应用名称（自定义值注入）
-    #[inject("my-app".to_string())]
+    #[tx_cst("my-app".to_string())]
     pub app_name: String,
 
     /// 监听端口（函数调用注入）
-    #[inject(default_port())]
+    #[tx_cst(default_port())]
     pub port: u16,
 }
 
@@ -88,14 +88,14 @@ pub fn default_port() -> u16 {
 /// 注意：count 字段使用 Arc<Mutex<u64>> 实现 interior mutability，
 /// 因为 inject() 返回 Arc<T>，不支持 &mut T。
 #[derive(Clone, Debug)]
-#[component(scope = di_core::Prototype)]
+#[tx_comp(scope = di_core::Prototype)]
 pub struct RequestLogger {
     /// 日志前缀
-    #[inject("[REQUEST]".to_string())]
+    #[tx_cst("[REQUEST]".to_string())]
     pub prefix: String,
 
     /// 请求计数器（每个实例独立，通过 #[inject] 初始化）
-    #[inject(Arc::new(Mutex::new(0u64)))]
+    #[tx_cst(Arc::new(Mutex::new(0u64)))]
     count: Arc<Mutex<u64>>,
 }
 
@@ -120,7 +120,7 @@ impl RequestLogger {
 /// 字段类型是 `Arc<T>`：inject() 返回 Arc<T>，Arc derefs 到 T，
 /// 所以 `.greet()` 和 `.config.app_name` 可以直接调用。
 #[derive(Clone, Debug)]
-#[component]
+#[tx_comp]
 pub struct UserService {
     /// 共享的 DbPool（Arc<T> derefs，方法调用透明）
     pub db: Arc<DbPool>,
@@ -144,7 +144,7 @@ impl UserService {
 
 /// HTTP 服务器（单例，聚合多种依赖）
 #[derive(Debug)]
-#[component]
+#[tx_comp]
 pub struct AppServer {
     /// 共享的 UserService
     pub user_svc: Arc<UserService>,
@@ -154,11 +154,11 @@ pub struct AppServer {
     pub logger: Arc<RequestLogger>,
 
     /// 自定义值注入：HashMap 不通过 ctx，直接用表达式构造
-    #[inject(default_headers())]
+    #[tx_cst(default_headers())]
     pub default_headers: HashMap<String, String>,
 
     /// 自定义值注入
-    #[inject("0.0.0.0:8080".to_string())]
+    #[tx_cst("0.0.0.0:8080".to_string())]
     pub bind_addr: String,
 }
 
@@ -174,9 +174,7 @@ pub fn default_headers() -> HashMap<String, String> {
 // 5. 声明 DI 模块
 // ─────────────────────────────────────────────────────────────────────────────
 
-app! {
-    AppModule
-}
+app! {AppModule}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 6. main

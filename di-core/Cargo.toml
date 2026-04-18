@@ -1,7 +1,7 @@
 [package]
 name = "di-core"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 # linkme 用于跨 crate 在链接期收集静态数组切片

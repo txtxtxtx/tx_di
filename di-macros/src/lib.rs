@@ -1,35 +1,3 @@
-//! # di-macros
-//!
-//! 提供两个宏：
-//!
-//! ## `#[component]` / `#[component(scope = X)]`
-//!
-//! 标注一个结构体，使其成为可注入的 DI 组件。
-//!
-//! **scope 标记在被注入者上**，消费者不需要知道是单例还是原型。
-//!
-//! ```rust,ignore
-//! #[component]                        // 默认 Singleton
-//! pub struct DbPool { ... }
-//!
-//! #[component(scope = Prototype)]
-//! pub struct RequestLogger { ... }
-//!
-//! #[component]
-//! pub struct AppServer {
-//!     // 字段写裸类型，框架根据 DbPool 自身的 scope 自动注入
-//!     pub db: Arc<DbPool>,
-//!     // 同上，RequestLogger 是 Prototype，每次注入构造新实例
-//!     pub logger: Arc<RequestLogger>,
-//!
-//!     #[inject(HashMap::new())]        // 自定义值，不走 ctx
-//!     pub config: HashMap<String, String>,
-//! }
-//! ```
-//!
-//! ## `app!{ ModuleName [ Type1, Type2, ... ] }`
-//!
-//! 声明 DI 模块，生成 `build_<module_name>()` 初始化函数。
 
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
@@ -43,14 +11,15 @@ use syn::{
     Token, Type,
 };
 
+const TX_CST: &str = "tx_cst";
 // ─────────────────────────────────────────────────────────────────────────────
 // 辅助函数
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// 从字段属性中提取 `#[inject(expr)]` 的表达式
+/// 从字段属性中提取 `#[tx_cst(expr)]` 的表达式
 fn extract_inject_expr(attrs: &[Attribute]) -> SynResult<Option<Expr>> {
     for attr in attrs {
-        if attr.path().is_ident("inject") {
+        if attr.path().is_ident(TX_CST) {
             let expr: Expr = attr.parse_args()?;
             return Ok(Some(expr));
         }
@@ -101,7 +70,7 @@ fn parse_component_attr(attr_tokens: TokenStream) -> SynResult<ScopeAttr> {
             if key != "scope" {
                 return Err(syn::Error::new_spanned(
                     key,
-                    "#[component] 只支持 scope 参数，例如：#[component(scope = Prototype)]",
+                    "#[tx_comp] 只支持 scope 参数，例如：#[tx_comp(scope = Prototype)]",
                 ));
             }
             let _eq: Token![=] = input.parse()?;
@@ -135,8 +104,23 @@ fn parse_component_attr(attr_tokens: TokenStream) -> SynResult<ScopeAttr> {
 // 1. #[component] 宏
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// 组件宏,标注一个结构体为组件
+/// ```rust,ignore
+/// #[tx_comp] // 默认 Singleton,可选 Prototype
+/// pub struct DbPool { ... }
+///
+/// #[tx_comp(scope = Prototype)]
+/// pub struct XxxServer {
+///     db: <DbPool>, // 自动注入
+///     #[tx_cst(build_count())] // 自定义值
+///     count: u32,
+/// }
+///
+/// fn build_count() -> u32 {
+///     0
+/// }
 #[proc_macro_attribute]
-pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn tx_comp(attr: TokenStream, item: TokenStream) -> TokenStream {
     // 解析作用域参数
     let scope_attr = match parse_component_attr(attr) {
         Ok(s) => s,
@@ -149,6 +133,25 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 }
 
+/// 自定义值宏
+///
+/// 调用自定义方法生成自定义值
+/// ```rust,ignore
+/// #[tx_comp(scope = Prototype)]
+/// pub struct XxxServer {
+///     db: <DbPool>, // 自动注入
+///     #[tx_cst(build_count())] // 自定义值
+///     count: u32,
+/// }
+///
+/// fn build_count() -> u32 {
+///     0
+/// }
+#[proc_macro_attribute]
+pub fn tx_cst(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    // 空操作：直接返回原始项，不做任何修改
+    item
+}
 fn component_impl(scope_attr: ScopeAttr, input: ItemStruct) -> SynResult<TokenStream2> {
     let struct_name = &input.ident;
     let vis = &input.vis;
@@ -168,14 +171,14 @@ fn component_impl(scope_attr: ScopeAttr, input: ItemStruct) -> SynResult<TokenSt
     // 过滤掉 #[inject(...)] 属性（避免 rustc 报错）
     let mut clean_fields = input.fields.clone();
     for field in &mut clean_fields {
-        field.attrs.retain(|a| !a.path().is_ident("inject"));
+        field.attrs.retain(|a| !a.path().is_ident(TX_CST));
     }
 
     for field in &input.fields {
         let ident = field
             .ident
             .as_ref()
-            .ok_or_else(|| syn::Error::new_spanned(&field.ty, "#[component] 只支持具名字段"))?;
+            .ok_or_else(|| syn::Error::new_spanned(&field.ty, "#[tx_comp] 只支持具名字段"))?;
 
         let inject_expr = extract_inject_expr(&field.attrs)?;
         let kind = if let Some(expr) = inject_expr {
@@ -321,10 +324,13 @@ impl Parse for AppInput {
 
 /// 声明一个 DI 模块，生成 `build_<module_name>()` 初始化函数。
 ///
-/// # 生成逻辑
-/// - 所有组件：调用 `ctx.register_factory::<T>(scope, factory_fn)`
-/// - scope 来自 `<T as ComponentDescriptor>::SCOPE`（编译期常量）
-/// - factory_fn 调用 `T::build(&ctx)` 并擦除类型
+/// case:
+/// ```rust.ignore
+/// app!{
+///   MyModule
+///   [xxx,xxx] // 可以没有，没有自动扫描
+/// }
+///
 #[proc_macro]
 pub fn app(input: TokenStream) -> TokenStream {
     let AppInput {
@@ -364,31 +370,13 @@ fn app_impl(module_name: Ident, components: Vec<Path>) -> SynResult<TokenStream2
         })
         .collect();
 
-    let type_id_array: Vec<TokenStream2> = components
-        .iter()
-        .map(|ty| quote! { ::std::any::TypeId::of::<#ty>() })
-        .collect();
-
     let output = quote! {
-        /// 由 `app!{}` 宏自动生成的初始化函数。
+        // 由 `app!{}` 宏自动生成的初始化函数。
         #[allow(non_snake_case, dead_code)]
         pub fn #fn_name() -> ::di_core::BuildContext {
-            #[cfg(debug_assertions)]
-            {
-                let all_ids: &[::std::any::TypeId] = &[ #( #type_id_array ),* ];
-                let metas: ::std::vec::Vec<_> = ::di_core::COMPONENT_REGISTRY
-                    .iter()
-                    .filter(|m| all_ids.contains(&(m.type_id)()))
-                    .collect();
-                debug_assert_eq!(
-                    metas.len(),
-                    #component_count,
-                    "[di] app!{{}} 中有组件未用 #[component] 标注"
-                );
-            }
-
             let mut ctx = ::di_core::BuildContext::new();
                         if #component_count == 0 {
+                // 获取所有注册的组件
                 let metas: ::std::vec::Vec<&::di_core::ComponentMeta> = ::di_core::COMPONENT_REGISTRY.iter().collect();
                 let sorted_ids = ::di_core::topo_sort(&metas);
 
