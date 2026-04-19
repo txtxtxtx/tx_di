@@ -123,6 +123,7 @@ dependencies = [
 name = "di-macros"
 version = "0.1.0"
 dependencies = [
+ "di-core",
  "proc-macro2",
  "quote",
  "syn",
