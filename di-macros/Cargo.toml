@@ -2,7 +2,9 @@
 name = "di-macros"
 version.workspace = true
 edition.workspace = true
-
+license.workspace = true
+description = "宏支持 di-core"
+repository.workspace = true
 # 必须声明为 proc-macro crate
 [lib]
 proc-macro = true

@@ -5,8 +5,16 @@ members = [
     "di-example", "plugins/tx_di_axum", "examples/gb_cams",
 ]
 resolver = "3"
-
-package = { version = "0.1.0",edition = "2024" }
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+authors = ["845360351@qq.com"]
+license = "MIT"
+readme = "README.md"
+repository = "https://gitee.com/tian_xiong/tx_di"
+#description = """
+#
+#"""
 
 [workspace.dependencies]
 # linkme 用于跨 crate 在链接期收集静态数组切片

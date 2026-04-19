@@ -2,7 +2,8 @@
 name = "di-core"
 version.workspace = true
 edition.workspace = true
-
+license.workspace = true
+readme.workspace = true
 [dependencies]
 # linkme 用于跨 crate 在链接期收集静态数组切片
 # 基于 ELF/Mach-O/PE 的自定义 link section，完全零运行时开销
