@@ -1,0 +1,6 @@
+[package]
+name = "tx_di_axum"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]

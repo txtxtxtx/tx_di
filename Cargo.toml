@@ -2,7 +2,7 @@
 members = [
     "di-core",
     "di-macros",
-    "di-example",
+    "di-example", "plugins/tx_di_axum",
 ]
 resolver = "3"
 
