@@ -19,5 +19,5 @@ pub use linkme;
 pub use di_macros::{tx_comp, app, tx_cst};
 pub use di::{BuildContext,scopes::Scope,
              comp::{ComponentMeta,topo_sort,COMPONENT_REGISTRY},
-             comp::comp_ref::{CompRef,ComponentDescriptor,}};
+             comp::comp_ref::{CompRef,ComponentDescriptor,CompInit}};
 

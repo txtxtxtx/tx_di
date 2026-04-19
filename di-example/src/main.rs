@@ -33,8 +33,8 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use di_core::{app, tx_comp, BuildContext};
-use log::info;
+use di_core::{app, tx_comp, BuildContext, CompInit};
+use log::{debug, info};
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. 无依赖的单例组件
 // ─────────────────────────────────────────────────────────────────────────────
@@ -130,7 +130,7 @@ impl UserService {
 
 /// HTTP 服务器（单例，聚合多种依赖）
 #[derive(Debug)]
-#[tx_comp]
+#[tx_comp(init)]
 pub struct AppServer {
     /// 共享的 UserService
     pub user_svc: Arc<UserService>,
@@ -148,6 +148,19 @@ pub struct AppServer {
     pub bind_addr: String,
 }
 
+impl CompInit for AppServer {
+    fn async_init(ctx: &mut BuildContext) -> impl std::future::Future<Output = ()> + Send  {
+        async {
+            debug!("AppServer::async_init")
+        }
+    }
+    fn init(ctx: &mut BuildContext) {
+        debug!("AppServer::init")
+    }
+    fn init_sort() -> i32 {
+        1000
+    }
+}
 /// 构造默认响应头
 pub fn default_headers() -> HashMap<String, String> {
     let mut m = HashMap::new();

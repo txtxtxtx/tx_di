@@ -34,70 +34,100 @@ enum ScopeAttr {
     Prototype,
 }
 
-/// 解析 `#[component]` 属性的作用域参数
-///
-/// 从过程宏的属性令牌流中解析出组件的作用域类型。支持以下语法：
-/// - `#[component]` - 无参数时默认为 Singleton
-/// - `#[component(scope = Singleton)]` - 显式指定单例作用域
-/// - `#[component(scope = Prototype)]` - 指定原型作用域（每次获取创建新实例）
-///
-/// # 参数
-///
-/// * `attr_tokens` - 宏属性中的令牌流，即 `#[component(...)]` 括号内的内容
-///
-/// # 返回值
-///
-/// * `Ok(ScopeAttr::Singleton)` - 解析成功，返回单例作用域
-/// * `Ok(ScopeAttr::Prototype)` - 解析成功，返回原型作用域
-/// * `Err(syn::Error)` - 解析失败，包含详细的错误信息和源码位置
-///
-/// # 错误情况
-///
-/// * 提供了非 `scope` 的参数名
-/// * `scope` 的值不是 `Singleton` 或 `Prototype`
-/// * 语法格式不正确（缺少等号等）
-fn parse_component_attr(attr_tokens: TokenStream) -> SynResult<ScopeAttr> {
+/// `#[tx_comp(...)]` 的完整参数解析结果
+#[derive(Debug)]
+struct CompAttr {
+    /// 作用域，默认 Singleton
+    scope: ScopeAttr,
+    /// 是否有 `init` flag：
+    /// - false → 宏自动生成空 `impl CompInit`
+    /// - true  → 用户自己写 `impl CompInit`，宏不生成
+    has_init: bool,
+}
+
+fn parse_component_attr(attr_tokens: TokenStream) -> SynResult<CompAttr> {
     if attr_tokens.is_empty() {
-        return Ok(ScopeAttr::Singleton);
+        return Ok(CompAttr {
+            scope: ScopeAttr::Singleton,
+            has_init: false,
+        });
     }
 
-    struct ScopeKv {
-        value: Expr,
+    struct AttrArgs {
+        scope: ScopeAttr,
+        has_init: bool,
     }
-    impl Parse for ScopeKv {
+
+    impl Parse for AttrArgs {
         fn parse(input: ParseStream) -> SynResult<Self> {
-            let key: Ident = input.parse()?;
-            if key != "scope" {
-                return Err(syn::Error::new_spanned(
-                    key,
-                    "#[tx_comp] 只支持 scope 参数，例如：#[tx_comp(scope = Prototype)]",
-                ));
+            let mut scope = ScopeAttr::Singleton;
+            let mut has_init = false;
+
+            // 解析逗号分隔的参数列表
+            loop {
+                if input.is_empty() {
+                    break;
+                }
+
+                let key: Ident = input.parse()?;
+
+                if key == "scope" {
+                    if input.peek(Token![=]) {
+                        let _eq: Token![=] = input.parse()?;
+                        let value: Expr = input.parse()?;
+                        let ident_str = match &value {
+                            Expr::Path(p) => p
+                                .path
+                                .segments
+                                .last()
+                                .map(|s| s.ident.to_string())
+                                .unwrap_or_default(),
+                            _ => value.to_token_stream().to_string(),
+                        };
+                        scope = match ident_str.as_str() {
+                            "Singleton" => ScopeAttr::Singleton,
+                            "Prototype" => ScopeAttr::Prototype,
+                            other => {
+                                return Err(syn::Error::new_spanned(
+                                    &value,
+                                    format!(
+                                        "未知的 scope `{}`，只支持 Singleton 或 Prototype",
+                                        other
+                                    ),
+                                ))
+                            }
+                        };
+                    } else {
+                        scope = ScopeAttr::Prototype;
+                    }
+                } else if key == "init" {
+                    // 裸 flag，不带 = value
+                    has_init = true;
+                } else {
+                    return Err(syn::Error::new_spanned(
+                        key,
+                        "#[tx_comp] 只支持 scope 和 init 参数，\
+                         例如：#[tx_comp(scope = Prototype, init)]",
+                    ));
+                }
+
+                // 消耗可选的逗号分隔符
+                if input.peek(Token![,]) {
+                    let _: Token![,] = input.parse()?;
+                } else {
+                    break;
+                }
             }
-            let _eq: Token![=] = input.parse()?;
-            let value: Expr = input.parse()?;
-            Ok(ScopeKv { value })
+
+            Ok(AttrArgs { scope, has_init })
         }
     }
 
-    let kv: ScopeKv = syn::parse(attr_tokens)?;
-    // 解析 scope 值：支持裸 Ident（Prototype）和完整路径（di_core::Scope::Prototype）
-    let ident_str = match &kv.value {
-        Expr::Path(p) => p
-            .path
-            .segments
-            .last()
-            .map(|s| s.ident.to_string())
-            .unwrap_or_default(),
-        _ => kv.value.to_token_stream().to_string(),
-    };
-    match ident_str.as_str() {
-        "Singleton" => Ok(ScopeAttr::Singleton),
-        "Prototype" => Ok(ScopeAttr::Prototype),
-        other => Err(syn::Error::new_spanned(
-            &kv.value,
-            format!("未知的 scope `{}`，只支持 Singleton 或 Prototype", other),
-        )),
-    }
+    let args: AttrArgs = syn::parse(attr_tokens)?;
+    Ok(CompAttr {
+        scope: args.scope,
+        has_init: args.has_init,
+    })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -109,7 +139,7 @@ fn parse_component_attr(attr_tokens: TokenStream) -> SynResult<ScopeAttr> {
 /// #[tx_comp] // 默认 Singleton,可选 Prototype
 /// pub struct DbPool { ... }
 ///
-/// #[tx_comp(scope = Prototype)]
+/// #[tx_comp(scope,init)] init 表示有自定义的初始化方法 只有 scope 表示原型
 /// pub struct XxxServer {
 ///     db: <DbPool>, // 自动注入
 ///     #[tx_cst(build_count())] // 自定义值
@@ -152,7 +182,7 @@ pub fn tx_cst(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // 空操作：直接返回原始项，不做任何修改
     item
 }
-fn component_impl(scope_attr: ScopeAttr, input: ItemStruct) -> SynResult<TokenStream2> {
+fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStream2> {
     let struct_name = &input.ident;
     let vis = &input.vis;
 
@@ -232,7 +262,7 @@ fn component_impl(scope_attr: ScopeAttr, input: ItemStruct) -> SynResult<TokenSt
 
     // ── scope ─────────────────────────────────────────────────────────────
 
-    let scope_const = match scope_attr {
+    let scope_const = match &comp_attr.scope {
         ScopeAttr::Singleton => quote! { ::di_core::Scope::Singleton },
         ScopeAttr::Prototype => quote! { ::di_core::Scope::Prototype },
     };
@@ -248,9 +278,24 @@ fn component_impl(scope_attr: ScopeAttr, input: ItemStruct) -> SynResult<TokenSt
         ..input.clone()
     };
 
+
+    let comp_init_impl = if comp_attr.has_init {
+        // 用户自己写，宏不生成
+        quote! {}
+    } else {
+        // 宏生成默认空实现
+        quote! {
+            impl ::di_core::CompInit for #struct_name {}
+        }
+    };
+
     let output = quote! {
         // ── 原始结构体定义（已去掉 #[inject] 属性） ───────────────────────
         #clean_input
+
+        // ── CompInit impl（默认空实现，用户可手动覆盖） ───────────────────
+        // impl ::di_core::CompInit for #struct_name {}
+        # comp_init_impl
 
         // ── ComponentDescriptor impl ──────────────────────────────────────
         impl ::di_core::ComponentDescriptor for #struct_name {

@@ -70,3 +70,42 @@ pub trait ComponentDescriptor: Any + Sized + Send + Sync + 'static {
     /// 不应该手动调用此方法，应该通过 `BuildContext::inject::<T>()` 来获取组件实例。
     fn build(ctx: &mut BuildContext) -> Self;
 }
+
+/// 组件初始化 trait，用于在依赖注入完成后执行自定义初始化逻辑。
+///
+/// 该 trait 允许组件在构建完成后执行同步或异步的初始化操作，例如：
+/// - 建立数据库连接池
+/// - 加载配置文件
+/// - 注册事件监听器
+/// - 预热缓存等
+///
+/// # Trait 约束
+///
+/// - `Any`: 支持运行时类型识别
+/// - `Sized`: 编译期已知大小
+/// - `Send + Sync`: 支持跨线程安全传递和共享
+/// - `'static`: 生命周期为静态，确保可以长期存活
+///
+/// # 初始化顺序
+///
+/// 通过实现 `init_sort()` 方法可以控制组件的初始化顺序，
+/// 返回值越小越先初始化。默认值为 10000。
+pub trait CompInit :Any + Sized + Send + Sync + 'static{
+
+    /// 同步初始化方法
+    #[allow(unused_variables)]
+    fn init(ctx: &mut BuildContext) {
+
+    }
+
+    /// 异步初始化方法
+    #[allow(unused_variables)]
+    fn async_init(ctx: &mut BuildContext) -> impl std::future::Future<Output = ()> + Send {
+        async {}
+    }
+
+    /// 初始化排序方法
+    fn init_sort() -> i32 {
+        10000
+    }
+}

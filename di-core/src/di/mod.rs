@@ -211,6 +211,10 @@ impl crate::BuildContext {
             );
         }
     }
+
+    pub fn init(&mut self) {
+        // self.store
+    }
 }
 
 impl Default for crate::BuildContext {
