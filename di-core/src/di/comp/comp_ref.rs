@@ -1,6 +1,9 @@
 use std::any::{Any, TypeId};
+use std::pin::Pin;
 use std::sync::Arc;
 use crate::{BuildContext, Scope};
+
+pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// 存储单元：
 /// - `Factory(Arc<dyn Fn>)` → 存工厂闭包，prototype 每次注入时调用
@@ -26,7 +29,7 @@ pub enum CompRef {
 /// - `Sized`: 编译期已知大小，确保可以存储在栈上
 /// - `Send + Sync`: 支持跨线程安全传递和共享，因为组件会被存入 `Arc`
 /// - `'static`: 生命周期为静态，确保组件可以长期存活
-pub trait ComponentDescriptor: Any + Sized + Send + Sync + 'static {
+pub trait ComponentDescriptor: CompInit {
     /// 组件的依赖列表，存储为返回 `TypeId` 的函数指针数组。
     ///
     /// 每个元素是一个返回依赖类型 `TypeId` 的函数，用于在运行时解析依赖关系。
@@ -100,8 +103,8 @@ pub trait CompInit :Any + Sized + Send + Sync + 'static{
 
     /// 异步初始化方法
     #[allow(unused_variables)]
-    fn async_init(ctx: &mut BuildContext) -> impl std::future::Future<Output = ()> + Send {
-        async {}
+    fn async_init(ctx: &mut BuildContext) -> BoxFuture<'static, ()> {
+        Box::pin(async {})
     }
 
     /// 初始化排序方法

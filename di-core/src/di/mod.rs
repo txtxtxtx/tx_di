@@ -11,7 +11,7 @@ pub mod comp;
 use std::any::{Any, TypeId};
 use std::sync::Arc;
 use dashmap::DashMap;
-use crate::{CompRef, ComponentDescriptor, Scope, COMPONENT_REGISTRY};
+use crate::{CompRef, ComponentDescriptor, ComponentMeta, Scope, COMPONENT_REGISTRY};
 
 pub struct BuildContext {
     /// TypeId → CompRef（使用 DashMap 支持并发访问）
@@ -212,8 +212,41 @@ impl crate::BuildContext {
         }
     }
 
-    pub fn init(&mut self) {
-        // self.store
+    fn init(&mut self) {
+        let mut metas: Vec<&ComponentMeta> = COMPONENT_REGISTRY
+            .iter()
+            .filter(|m| m.async_init_fn.is_some())
+            .collect();
+
+        metas.sort_by_key(|m| (m.init_sort_fn)());
+
+        for meta in metas {
+            if let Some(init_fn) = meta.init_fn {
+                // 直接调函数指针，传入 &mut self（DashMap 的 owner）
+                init_fn(self);
+            }
+        }
+    }
+
+    async fn async_init(&mut self) {
+        let mut metas: Vec<&ComponentMeta> = COMPONENT_REGISTRY
+            .iter()
+            .filter(|m| m.async_init_fn.is_some())
+            .collect();
+
+        metas.sort_by_key(|m| (m.init_sort_fn)());
+
+        for meta in metas {
+            if let Some(async_init_fn) = meta.async_init_fn {
+                async_init_fn(self).await;
+            }
+        }
+    }
+    pub async fn run(&mut self){
+        // 同步初始化
+        self.init();
+        // 异步初始化
+        self.async_init().await
     }
 }
 

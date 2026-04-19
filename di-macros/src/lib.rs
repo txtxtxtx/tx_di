@@ -327,6 +327,10 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
                     <#struct_name as ::di_core::ComponentDescriptor>::build(ctx)
                 )
             }),
+            init_sort_fn: <#struct_name as ::di_core::CompInit>::init_sort,
+            init_fn: Some(<#struct_name as ::di_core::CompInit>::init),
+            async_init_fn: Some(<#struct_name as ::di_core::CompInit>::async_init),
+       
         };
     };
 

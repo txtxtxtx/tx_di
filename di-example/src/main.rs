@@ -33,7 +33,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use di_core::{app, tx_comp, BuildContext, CompInit};
+use di_core::{app, tx_comp, BoxFuture, BuildContext, CompInit};
 use log::{debug, info};
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. 无依赖的单例组件
@@ -149,13 +149,14 @@ pub struct AppServer {
 }
 
 impl CompInit for AppServer {
-    fn async_init(ctx: &mut BuildContext) -> impl std::future::Future<Output = ()> + Send  {
-        async {
-            debug!("AppServer::async_init")
-        }
+    fn async_init(ctx: &mut BuildContext) -> BoxFuture<'static, ()> {
+        let len = ctx.len();
+        Box::pin(async move {
+            debug!("AppServer::async_init:{}",len);
+        })
     }
     fn init(ctx: &mut BuildContext) {
-        debug!("AppServer::init")
+        debug!("AppServer::init:{}",ctx.len())
     }
     fn init_sort() -> i32 {
         1000
@@ -188,11 +189,13 @@ app! {
 // 6. main
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn main() {
+#[tokio::main]
+async fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
     info!("🚀 tx_di 启动");
 
     let mut ctx = build_app_module();
+    ctx.run().await;
     info!("构建完成");
     // ── 取出 AppServer ──────────────────────────────────────────────────
     let server = ctx.take::<AppServer>();

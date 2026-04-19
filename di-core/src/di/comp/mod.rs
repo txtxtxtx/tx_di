@@ -47,6 +47,10 @@ pub struct ComponentMeta {
     /// 该字段为可选，主要用于调试和开发阶段的组件信息查看。
     /// 在正式运行时，组件构建通过 `ComponentDescriptor::build` 方法完成。
     pub factory_fn: Option<fn(&mut BuildContext) -> Box<dyn Any + Send + Sync>>,
+
+    pub init_sort_fn: fn() -> i32,
+    pub init_fn: Option<fn(&mut BuildContext)>,
+    pub async_init_fn: Option<fn(&mut BuildContext)-> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>> ,
 }
 
 /// 对组件元数据进行拓扑排序，确定组件的构建顺序。 `Kahn算法`
