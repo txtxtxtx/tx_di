@@ -16,4 +16,4 @@ log.workspace = true
 tx-di-macros = {version = "0.1"}
 
 #[dev-dependencies]
-#tx-di-macros = { path = "../di-macros"}
+#tx-tx-di-macros = { path = "../tx-di-macros"}

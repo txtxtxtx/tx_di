@@ -313,7 +313,7 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
         }
 
         // ── linkme 注册条目 ───────────────────────────────────────────────
-        // factory 返回 Box<T>，di-core 的 call_factory 内部包 Arc<T>
+        // factory 返回 Box<T>，tx-di-core 的 call_factory 内部包 Arc<T>
         #[::tx_di_core::linkme::distributed_slice(::tx_di_core::COMPONENT_REGISTRY)]
         #[linkme(crate = ::tx_di_core::linkme)]
         #[allow(non_upper_case_globals)]
