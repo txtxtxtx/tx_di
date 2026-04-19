@@ -1773,17 +1773,7 @@ dependencies = [
  "dashmap",
  "linkme",
  "log",
- "tx-di-macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "tx-di-macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
- "tx-di-core",
+ "tx-di-macros 0.1.0",
 ]
 
 [[package]]
@@ -1795,6 +1785,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "tx-di-macros"
+version = "0.1.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "tx-di-core",
 ]
 
 [[package]]
