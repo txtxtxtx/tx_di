@@ -2,7 +2,7 @@
 members = [
     "di-core",
     "di-macros",
-    "di-example", "plugins/tx_di_axum",
+    "di-example", "plugins/tx_di_axum", "examples/gb_cams",
 ]
 resolver = "3"
 
