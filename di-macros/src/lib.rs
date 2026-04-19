@@ -263,8 +263,8 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
     // ── scope ─────────────────────────────────────────────────────────────
 
     let scope_const = match &comp_attr.scope {
-        ScopeAttr::Singleton => quote! { ::di_core::Scope::Singleton },
-        ScopeAttr::Prototype => quote! { ::di_core::Scope::Prototype },
+        ScopeAttr::Singleton => quote! { ::tx_di_core::Scope::Singleton },
+        ScopeAttr::Prototype => quote! { ::tx_di_core::Scope::Prototype },
     };
 
     let meta_ident = format_ident!(
@@ -285,7 +285,7 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
     } else {
         // 宏生成默认空实现
         quote! {
-            impl ::di_core::CompInit for #struct_name {}
+            impl ::tx_di_core::CompInit for #struct_name {}
         }
     };
 
@@ -294,18 +294,18 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
         #clean_input
 
         // ── CompInit impl（默认空实现，用户可手动覆盖） ───────────────────
-        // impl ::di_core::CompInit for #struct_name {}
+        // impl ::tx_di_core::CompInit for #struct_name {}
         # comp_init_impl
 
         // ── ComponentDescriptor impl ──────────────────────────────────────
-        impl ::di_core::ComponentDescriptor for #struct_name {
+        impl ::tx_di_core::ComponentDescriptor for #struct_name {
             const DEP_IDS: &'static [fn() -> ::std::any::TypeId] = &[
                 #( #dep_type_ids ),*
             ];
 
-            const SCOPE: ::di_core::Scope = #scope_const;
+            const SCOPE: ::tx_di_core::Scope = #scope_const;
 
-            fn build(ctx: &mut ::di_core::BuildContext) -> Self {
+            fn build(ctx: &mut ::tx_di_core::BuildContext) -> Self {
                 Self {
                     #( #build_fields ),*
                 }
@@ -314,22 +314,22 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
 
         // ── linkme 注册条目 ───────────────────────────────────────────────
         // factory 返回 Box<T>，di-core 的 call_factory 内部包 Arc<T>
-        #[::di_core::linkme::distributed_slice(::di_core::COMPONENT_REGISTRY)]
-        #[linkme(crate = ::di_core::linkme)]
+        #[::tx_di_core::linkme::distributed_slice(::tx_di_core::COMPONENT_REGISTRY)]
+        #[linkme(crate = ::tx_di_core::linkme)]
         #[allow(non_upper_case_globals)]
-        #vis static #meta_ident: ::di_core::ComponentMeta = ::di_core::ComponentMeta {
+        #vis static #meta_ident: ::tx_di_core::ComponentMeta = ::tx_di_core::ComponentMeta {
             type_id: || ::std::any::TypeId::of::<#struct_name>(),
             deps: &[ #( #dep_type_ids ),* ],
             name: ::std::stringify!(#struct_name),
             scope: #scope_const,
-            factory_fn: Some(|ctx: &mut ::di_core::BuildContext| {
+            factory_fn: Some(|ctx: &mut ::tx_di_core::BuildContext| {
                 ::std::boxed::Box::new(
-                    <#struct_name as ::di_core::ComponentDescriptor>::build(ctx)
+                    <#struct_name as ::tx_di_core::ComponentDescriptor>::build(ctx)
                 )
             }),
-            init_sort_fn: <#struct_name as ::di_core::CompInit>::init_sort,
-            init_fn: Some(<#struct_name as ::di_core::CompInit>::init),
-            async_init_fn: Some(<#struct_name as ::di_core::CompInit>::async_init),
+            init_sort_fn: <#struct_name as ::tx_di_core::CompInit>::init_sort,
+            init_fn: Some(<#struct_name as ::tx_di_core::CompInit>::init),
+            async_init_fn: Some(<#struct_name as ::tx_di_core::CompInit>::async_init),
        
         };
     };
@@ -408,10 +408,10 @@ fn app_impl(module_name: Ident, components: Vec<Path>) -> SynResult<TokenStream2
         .map(|ty| {
             quote! {
                 ctx.register_factory::<#ty>(
-                    <#ty as ::di_core::ComponentDescriptor>::SCOPE,
-                    |ctx: &mut ::di_core::BuildContext| {
+                    <#ty as ::tx_di_core::ComponentDescriptor>::SCOPE,
+                    |ctx: &mut ::tx_di_core::BuildContext| {
                         ::std::boxed::Box::new(
-                            <#ty as ::di_core::ComponentDescriptor>::build(ctx)
+                            <#ty as ::tx_di_core::ComponentDescriptor>::build(ctx)
                         )
                     },
                 );
@@ -422,12 +422,12 @@ fn app_impl(module_name: Ident, components: Vec<Path>) -> SynResult<TokenStream2
     let output = quote! {
         // 由 `app!{}` 宏自动生成的初始化函数。
         #[allow(non_snake_case, dead_code)]
-        pub fn #fn_name() -> ::di_core::BuildContext {
-            let mut ctx = ::di_core::BuildContext::new();
+        pub fn #fn_name() -> ::tx_di_core::BuildContext {
+            let mut ctx = ::tx_di_core::BuildContext::new();
                         if #component_count == 0 {
                 // 获取所有注册的组件
-                let metas: ::std::vec::Vec<&::di_core::ComponentMeta> = ::di_core::COMPONENT_REGISTRY.iter().collect();
-                let sorted_ids = ::di_core::topo_sort(&metas);
+                let metas: ::std::vec::Vec<&::tx_di_core::ComponentMeta> = ::tx_di_core::COMPONENT_REGISTRY.iter().collect();
+                let sorted_ids = ::tx_di_core::topo_sort(&metas);
 
                 for tid in &sorted_ids {
                     if let Some(meta) = metas.iter().find(|m| (m.type_id)() == *tid) {

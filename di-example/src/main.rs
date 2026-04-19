@@ -247,7 +247,7 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
-    use di_core::ComponentDescriptor;
+    use tx_di_core::ComponentDescriptor;
     use super::*;
 
     // ── 单例测试 ───────────────────────────────────────────────────────
