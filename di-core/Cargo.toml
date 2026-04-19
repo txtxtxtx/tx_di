@@ -1,5 +1,5 @@
 [package]
-name = "di-core"
+name = "tx-di-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,4 +12,4 @@ linkme.workspace = true
 # DashMap：无锁并发 HashMap，支持跨线程共享的组件注册表
 dashmap.workspace = true
 log.workspace = true
-di-macros = { path = "../di-macros"}
+tx-di-macros = { path = "../di-macros"}

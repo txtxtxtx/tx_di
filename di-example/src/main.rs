@@ -33,7 +33,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use di_core::{app, tx_comp, BoxFuture, BuildContext, CompInit};
+use tx_di_core::{app, tx_comp, BoxFuture, BuildContext, CompInit};
 use log::{debug, info};
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. 无依赖的单例组件

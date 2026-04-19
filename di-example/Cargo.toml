@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-di-core   = { path = "../di-core" }
+tx-di-core   = { path = "../di-core" }
 #di-macros = { path = "../di-macros" }
 linkme.workspace = true
 env_logger.workspace = true

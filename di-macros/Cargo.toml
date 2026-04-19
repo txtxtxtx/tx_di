@@ -1,5 +1,5 @@
 [package]
-name = "di-macros"
+name = "tx-di-macros"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -19,4 +19,4 @@ proc-macro2.workspace = true
 
 [dev-dependencies]
 # 运行期依赖（宏展开后生成的代码需要这些）
-di-core = { path = "../di-core" }
+tx-di-core = { path = "../di-core" }

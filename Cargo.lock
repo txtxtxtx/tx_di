@@ -335,34 +335,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "di-core"
-version = "0.1.0"
-dependencies = [
- "dashmap",
- "di-macros",
- "linkme",
- "log",
-]
-
-[[package]]
 name = "di-example"
 version = "0.1.0"
 dependencies = [
- "di-core",
  "env_logger",
  "linkme",
  "log",
  "tokio",
-]
-
-[[package]]
-name = "di-macros"
-version = "0.1.0"
-dependencies = [
- "di-core",
- "proc-macro2",
- "quote",
- "syn",
+ "tx-di-core",
 ]
 
 [[package]]
@@ -1784,6 +1764,26 @@ dependencies = [
  "rand 0.9.4",
  "sha1",
  "thiserror",
+]
+
+[[package]]
+name = "tx-di-core"
+version = "0.1.0"
+dependencies = [
+ "dashmap",
+ "linkme",
+ "log",
+ "tx-di-macros",
+]
+
+[[package]]
+name = "tx-di-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "tx-di-core",
 ]
 
 [[package]]
