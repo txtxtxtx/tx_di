@@ -7,61 +7,122 @@ use crate::{BuildContext, Scope};
 #[linkme::distributed_slice]
 pub static COMPONENT_REGISTRY: [ComponentMeta] = [..];
 
+/// 组件元数据，存储组件的运行时信息和依赖关系。
+///
+/// 该结构体由 `#[tx_comp]` 宏自动生成并注册到 `COMPONENT_REGISTRY` 中，
+/// 用于在运行时进行依赖解析、拓扑排序和组件构建。
+///
+/// # 字段说明
+///
+/// - `type_id`: 返回组件类型 `TypeId` 的函数指针，用于唯一标识组件类型
+/// - `deps`: 组件的依赖列表，每个元素是返回依赖类型 `TypeId` 的函数指针
+/// - `name`: 组件的类型名称字符串，用于调试和错误提示
+/// - `scope`: 组件的作用域（Singleton 或 Prototype），决定实例的生命周期
+/// - `factory_fn`: 可选的工厂函数，仅用于调试诊断，运行时不使用
 pub struct ComponentMeta {
+    /// 返回组件类型 `TypeId` 的函数指针。
+    ///
+    /// 用于在运行时唯一标识组件类型，支持类型安全的依赖查找和向下转型。
     pub type_id: fn() -> TypeId,
+
+    /// 组件的依赖列表，存储为返回 `TypeId` 的函数指针数组。
+    ///
+    /// 该数组包含所有通过 `Arc<T>` 注入的依赖项（不包括 `#[tx_cst]` 标记的字段）。
+    /// 在拓扑排序阶段用于构建依赖图，检测循环依赖。
     pub deps: &'static [fn() -> TypeId],
+
+    /// 组件的类型名称字符串。
+    ///
+    /// 用于调试输出、错误消息和日志记录，提高可读性。
     pub name: &'static str,
+
+    /// 组件的作用域，决定实例的生命周期管理策略。
+    ///
+    /// - `Scope::Singleton`: 全局单例，首次注入时构建并缓存
+    /// - `Scope::Prototype`: 原型模式，每次注入都创建新实例
     pub scope: Scope,
-    /// 原始工厂函数（用于 `debug_registry` 诊断；运行时不使用）
+
+    /// 原始工厂函数，仅用于 `debug_registry` 诊断；运行时不使用。
+    ///
+    /// 该字段为可选，主要用于调试和开发阶段的组件信息查看。
+    /// 在正式运行时，组件构建通过 `ComponentDescriptor::build` 方法完成。
     pub factory_fn: Option<fn(&mut BuildContext) -> Box<dyn Any + Send + Sync>>,
 }
 
-/// 拓扑排序
+/// 对组件元数据进行拓扑排序，确定组件的构建顺序。 `Kahn算法`
+///
+/// 该函数基于组件的依赖关系图执行拓扑排序，确保在构建组件时，
+/// 其所有依赖项已经被构建并可用。如果检测到循环依赖，将触发 panic。
+///
+/// # 参数
+///
+/// - `metas`: 组件元数据切片引用，包含所有需要排序的组件信息。
+///   每个元素是指向 `ComponentMeta` 的引用，提供类型 ID、依赖列表等关键信息。
+///
+/// # 返回值
+///
+/// 返回按拓扑顺序排列的 `TypeId` 向量。向量中的类型 ID 顺序保证了：
+/// 对于任意组件，其所有依赖项都出现在该组件之前。
+///
+/// # Panics
+///
+/// 以下情况会触发 panic：
+/// - 某个组件依赖的类型未在注册表中找到
+/// - 检测到循环依赖（即存在无法解析的依赖环）
+/// - 内部错误：TypeId 在名称映射中未找到
+///
+/// # 性能
+///
+/// 使用 Kahn 算法实现拓扑排序，时间复杂度为 O(V + E)，
+/// 其中 V 是组件数量，E 是依赖关系数量。
+/// 函数会记录排序结果和耗时到 debug 日志中。
 pub fn topo_sort(metas: &[&ComponentMeta]) -> Vec<TypeId> {
+    let start = std::time::Instant::now();
+    
     use std::collections::{HashMap, VecDeque};
 
     let n = metas.len();
 
-    let id_to_name: HashMap<TypeId, &str> = metas
-        .iter()
-        .map(|m| ((m.type_id)(), m.name))
-        .collect();
-
-    let id_to_idx: HashMap<TypeId, usize> = metas
+    let id_to_idx: HashMap<TypeId, (usize,&str)> = metas
         .iter()
         .enumerate()
-        .map(|(i, m)| ((m.type_id)(), i))
+        .map(|(i, m)| ((m.type_id)(), (i,m.name)))
         .collect();
-
+    // 入度数组：记录每个组件被多少其他组件依赖
     let mut in_degree = vec![0usize; n];
+    // 邻接表：adj[j] 存储所有依赖组件 j 的组件索引
     let mut adj: Vec<Vec<usize>> = vec![vec![]; n];
-
+    // 遍历每个组件 i
     for (i, meta) in metas.iter().enumerate() {
+        // 遍历组件 i 的所有依赖
         for dep_fn in meta.deps {
+            // 获取依赖的类型ID
             let one_type_id = dep_fn();
             if let Some(&j) = id_to_idx.get(&one_type_id) {
-                adj[j].push(i);
+                adj[j.0].push(i);  // 建立边：j → i（j 被 i 依赖）
                 in_degree[i] += 1;
             } else {
                 panic!(
                     "[di] 组件 '{}' 依赖的类型 {:?} {:?} 未在注册表中找到",
                     meta.name,
-                    id_to_name.get(&one_type_id),
+                    id_to_idx.get(&one_type_id),
                     &one_type_id
-                );
+                );  // 依赖未注册，报错
             }
         }
     }
-
+    // 将所有入度为 0 的节点加入队列（无依赖的组件）
     let mut queue: VecDeque<usize> = (0..n).filter(|&i| in_degree[i] == 0).collect();
     let mut result = Vec::with_capacity(n);
 
     while let Some(i) = queue.pop_front() {
+        // 将当前组件加入结果
         result.push((metas[i].type_id)());
+        // 遍历所有依赖当前组件 i 的其他组件 j
         for &j in &adj[i] {
-            in_degree[j] -= 1;
-            if in_degree[j] == 0 {
-                queue.push_back(j);
+            in_degree[j] -= 1; // j 的一个依赖已满足，入度 -1
+            if in_degree[j] == 0 { // 如果 j 的所有依赖都满足了
+                queue.push_back(j);  // 将 j 加入队列等待处理
             }
         }
     }
@@ -79,12 +140,15 @@ pub fn topo_sort(metas: &[&ComponentMeta]) -> Vec<TypeId> {
     let sorted_names: Vec<&str> = result
         .iter()
         .map(|t| {
-            id_to_name.get(t).copied().unwrap_or_else(|| {
+            id_to_idx.get(t).copied().unwrap_or_else(|| {
                 panic!("[di] 拓扑排序内部错误：TypeId {:?} 未在名称映射中找到", t)
             })
         })
+        .map(|(_, name)| name)
         .collect();
     debug!("[di] 拓扑排序结果：\n[\n{}\n]", sorted_names.join(",\n"));
+    let elapsed = start.elapsed();
+    debug!("[di] 拓扑排序耗时: {:?}", elapsed);
 
     result
 }

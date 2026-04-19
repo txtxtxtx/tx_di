@@ -162,13 +162,13 @@ pub fn default_headers() -> HashMap<String, String> {
 
 app! {
     AppModule
-    [
-        DbPool,
-        AppConfig,
-        RequestLogger,
-        UserService,
-        AppServer
-    ]
+    // [
+    //     DbPool,
+    //     AppConfig,
+    //     RequestLogger,
+    //     UserService,
+    //     AppServer
+    // ]
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
