@@ -125,6 +125,48 @@ pub struct MyComponent {
 
 **关键原则**：scope 标记在**被注入者**上，消费者不需要知道依赖是单例还是原型。
 
+### 组件初始化（CompInit）
+
+组件可以实现 `CompInit` trait 来执行自定义的初始化逻辑（同步或异步）：
+
+```rust
+use di_core::{CompInit, BuildContext, BoxFuture};
+
+#[derive(Debug)]
+#[tx_comp(init)]  // 启用 init 支持
+pub struct AppServer {
+    pub user_svc: Arc<UserService>,
+    pub logger: Arc<RequestLogger>,
+}
+
+impl CompInit for AppServer {
+    /// 同步初始化：在所有依赖注入完成后调用
+    fn init(ctx: &mut BuildContext) {
+        println!("AppServer 同步初始化，当前组件数: {}", ctx.len());
+    }
+
+    /// 异步初始化：用于需要 async/await 的场景
+    /// 注意：返回的 Future 必须是 'static，不能持有 ctx 引用
+    fn async_init(ctx: &mut BuildContext) -> BoxFuture<'static, ()> {
+        let len = ctx.len();  // 先提取数据
+        Box::pin(async move {
+            println!("AppServer 异步初始化，组件数: {}", len);
+            // 可以执行异步操作，如连接数据库、加载远程配置等
+        })
+    }
+
+    /// 初始化顺序：数值越小越先初始化，默认 10000
+    fn init_sort() -> i32 {
+        1000  // 较晚初始化，确保依赖都已就绪
+    }
+}
+```
+
+**重要提示**：
+- `async_init` 返回的 `BoxFuture<'static, ()>` 要求生命周期为 `'static`
+- 不能在 async 块中直接借用 `ctx`，需要先提取所需数据再移动进 async 块
+- `init()` 和 `async_init()` 会在所有依赖构建完成后按 `init_sort()` 排序依次调用
+
 ### `#[tx_cst(expr)]`
 
 用于标记字段使用自定义表达式初始化，而不是从 DI 容器注入。
@@ -195,6 +237,10 @@ let owned: AppServer = ctx.take::<AppServer>();
 
 // 调试：打印所有注册的组件及其依赖
 BuildContext::debug_registry();
+
+// 获取组件数量
+println!("已注册组件数: {}", ctx.len());
+println!("是否为空: {}", ctx.is_empty());
 ```
 
 ## 关键设计决策
@@ -228,6 +274,7 @@ BuildContext::debug_registry();
 | 无字段组件自动构建为 `Self {}` | 需要 struct 可默认构造 |
 | `take()` 只能用于单例 | 原型组件没有缓存，无法 take |
 | 避免循环依赖 | 框架会在运行时检测并 panic |
+| `async_init` 返回 `'static` Future | 异步任务不能持有 `ctx` 引用，需先提取数据 |
 
 ## 测试
 
