@@ -1,4 +1,4 @@
-# di-framework
+# tx_di
 
 基于 `proc_macro` + `linkme` 的编译期依赖注入框架。
 
@@ -9,7 +9,7 @@
 ```rust
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use di_core::{app, tx_comp, tx_cst};
+use tx_di_core::{app, tx_comp, tx_cst};
 
 // ── 单例组件（默认）──────────────────────────────────────
 #[derive(Clone, Debug)]
@@ -130,7 +130,7 @@ pub struct MyComponent {
 组件可以实现 `CompInit` trait 来执行自定义的初始化逻辑（同步或异步）：
 
 ```rust
-use di_core::{CompInit, BuildContext, BoxFuture};
+use tx_di_core::{CompInit, BuildContext, BoxFuture};
 
 #[derive(Debug)]
 #[tx_comp(init)]  // 启用 init 支持
@@ -207,7 +207,7 @@ pub struct Config {
          │
          │ proc_macro 展开
          ▼
-di-macros
+tx-di-macros
   1. 解析 scope 参数 → Scope::Singleton / Scope::Prototype
   2. 解析字段：Arc<T>（DI 注入） / #[tx_cst(expr)]（自定义值）
   3. 生成 ComponentDescriptor impl（含 DEP_IDS + SCOPE + build()）
@@ -216,7 +216,7 @@ di-macros
          │
          │ 链接器合并 link section
          ▼
-di-core
+tx-di-core
   - BuildContext：TypeId → CompRef 映射，支持并发访问（DashMap）
   - CompRef：内部类型擦除（Cached(Arc<dyn Any>) / Factory(fn)）
   - COMPONENT_REGISTRY：全局组件元数据切片（linkme 收集）
