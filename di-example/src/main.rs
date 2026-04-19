@@ -74,7 +74,7 @@ pub fn default_port() -> u16 {
 /// 注意：count 字段使用 Arc<Mutex<u64>> 实现 interior mutability，
 /// 因为 inject() 返回 Arc<T>，不支持 &mut T。
 #[derive(Clone, Debug)]
-#[tx_comp(scope = di_core::Prototype)]
+#[tx_comp(scope = Prototype)]
 pub struct RequestLogger {
     /// 日志前缀
     #[tx_cst("[REQUEST]".to_string())]
@@ -248,6 +248,7 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use tx_di_core::ComponentDescriptor;
+    use tx_tx_di_core::ComponentDescriptor;
     use super::*;
 
     // ── 单例测试 ───────────────────────────────────────────────────────
@@ -410,11 +411,11 @@ mod tests {
     /// 注册表测试
     #[test]
     fn test_registry() {
-        let count = di_core::COMPONENT_REGISTRY.len();
+        let count = tx_di_core::COMPONENT_REGISTRY.len();
         assert_eq!(count, 5, "应该有 5 个注册组件");
         
         // 验证每个组件都存在
-        let component_names: Vec<&str> = di_core::COMPONENT_REGISTRY.iter()
+        let component_names: Vec<&str> = tx_di_core::COMPONENT_REGISTRY.iter()
             .map(|m| m.name)
             .collect();
         
@@ -429,38 +430,38 @@ mod tests {
     fn test_scope_on_component() {
         // 验证 scope 确实在组件自己身上
         assert_eq!(
-            di_core::Scope::Singleton,
-            <DbPool as di_core::ComponentDescriptor>::SCOPE
+            tx_di_core::Scope::Singleton,
+            <DbPool as tx_di_core::ComponentDescriptor>::SCOPE
         );
         assert_eq!(
-            di_core::Scope::Singleton,
-            <AppConfig as di_core::ComponentDescriptor>::SCOPE
+            tx_di_core::Scope::Singleton,
+            <AppConfig as tx_di_core::ComponentDescriptor>::SCOPE
         );
         assert_eq!(
-            di_core::Scope::Singleton,
-            <UserService as di_core::ComponentDescriptor>::SCOPE
+            tx_di_core::Scope::Singleton,
+            <UserService as tx_di_core::ComponentDescriptor>::SCOPE
         );
         assert_eq!(
-            di_core::Scope::Singleton,
-            <AppServer as di_core::ComponentDescriptor>::SCOPE
+            tx_di_core::Scope::Singleton,
+            <AppServer as tx_di_core::ComponentDescriptor>::SCOPE
         );
         assert_eq!(
-            di_core::Scope::Prototype,
-            <RequestLogger as di_core::ComponentDescriptor>::SCOPE
+            tx_di_core::Scope::Prototype,
+            <RequestLogger as tx_di_core::ComponentDescriptor>::SCOPE
         );
 
         // UserService 依赖 DbPool 和 AppConfig
-        let deps = <UserService as di_core::ComponentDescriptor>::DEP_IDS;
+        let deps = <UserService as tx_di_core::ComponentDescriptor>::DEP_IDS;
         assert_eq!(deps.len(), 2);
 
         // RequestLogger 无依赖
-        let deps = <RequestLogger as di_core::ComponentDescriptor>::DEP_IDS;
+        let deps = <RequestLogger as tx_di_core::ComponentDescriptor>::DEP_IDS;
         assert_eq!(deps.len(), 0);
     }
     /// 组件描述符构建测试
     #[test]
     fn test_component_descriptor_build() {
-        let mut ctx = di_core::BuildContext::new();
+        let mut ctx = tx_di_core::BuildContext::new();
 
         // 手动调用 build 方法构建组件
         let _db_pool = DbPool::build(&mut ctx);
@@ -475,7 +476,7 @@ mod tests {
     /// BuildContext API 测试
     #[test]
     fn test_build_context_len_and_empty() {
-        let ctx = di_core::BuildContext::new();
+        let ctx = tx_di_core::BuildContext::new();
         assert_eq!(ctx.len(), 0);
         assert!(ctx.is_empty());
     }
@@ -579,7 +580,7 @@ mod tests {
     #[test]
     fn test_debug_registry_output() {
         // 这个测试主要验证 debug_registry 不会 panic
-        di_core::BuildContext::debug_registry();
+        tx_di_core::BuildContext::debug_registry();
         assert!(true, "debug_registry 应该正常执行");
     }
 }
