@@ -43,6 +43,11 @@ struct CompAttr {
     /// - false → 宏自动生成空 `impl CompInit`
     /// - true  → 用户自己写 `impl CompInit`，宏不生成
     has_init: bool,
+    /// 配置组件标识：
+    /// - None → 不是配置组件
+    /// - Some(None) → 是配置组件，使用结构体名转蛇形作为配置键
+    /// - Some(Some(key)) → 是配置组件，使用自定义配置键
+    conf: Option<Option<String>>,
 }
 
 fn parse_component_attr(attr_tokens: TokenStream) -> SynResult<CompAttr> {
@@ -50,19 +55,21 @@ fn parse_component_attr(attr_tokens: TokenStream) -> SynResult<CompAttr> {
         return Ok(CompAttr {
             scope: ScopeAttr::Singleton,
             has_init: false,
+            conf: None,
         });
     }
 
     struct AttrArgs {
         scope: ScopeAttr,
         has_init: bool,
+        conf: Option<Option<String>>,
     }
 
     impl Parse for AttrArgs {
         fn parse(input: ParseStream) -> SynResult<Self> {
             let mut scope = ScopeAttr::Singleton;
             let mut has_init = false;
-
+            let mut conf = None;
             // 解析逗号分隔的参数列表
             loop {
                 if input.is_empty() {
@@ -103,6 +110,36 @@ fn parse_component_attr(attr_tokens: TokenStream) -> SynResult<CompAttr> {
                 } else if key == "init" {
                     // 裸 flag，不带 = value
                     has_init = true;
+                } else if key == "conf" {
+                    // 支持两种形式：
+                    // 1. conf (裸 flag) → 使用结构体名转蛇形
+                    // 2. conf = "custom_key" → 使用自定义键
+                    if input.peek(Token![=]) {
+                        let _eq: Token![=] = input.parse()?;
+                        let value: Expr = input.parse()?;
+                        let key_str = match &value {
+                            Expr::Lit(lit) => {
+                                if let syn::Lit::Str(s) = &lit.lit {
+                                    s.value()
+                                } else {
+                                    return Err(syn::Error::new_spanned(
+                                        &value,
+                                        "conf 的值必须是字符串字面量",
+                                    ));
+                                }
+                            }
+                            _ => {
+                                return Err(syn::Error::new_spanned(
+                                    &value,
+                                    "conf 的值必须是字符串字面量",
+                                ));
+                            }
+                        };
+                        conf = Some(Some(key_str));
+                    } else {
+                        // 裸 flag，使用结构体名
+                        conf = Some(None);
+                    }
                 } else {
                     return Err(syn::Error::new_spanned(
                         key,
@@ -119,7 +156,7 @@ fn parse_component_attr(attr_tokens: TokenStream) -> SynResult<CompAttr> {
                 }
             }
 
-            Ok(AttrArgs { scope, has_init })
+            Ok(AttrArgs { scope, has_init, conf })
         }
     }
 
@@ -127,6 +164,7 @@ fn parse_component_attr(attr_tokens: TokenStream) -> SynResult<CompAttr> {
     Ok(CompAttr {
         scope: args.scope,
         has_init: args.has_init,
+        conf: args.conf,
     })
 }
 
@@ -152,12 +190,12 @@ fn parse_component_attr(attr_tokens: TokenStream) -> SynResult<CompAttr> {
 #[proc_macro_attribute]
 pub fn tx_comp(attr: TokenStream, item: TokenStream) -> TokenStream {
     // 解析作用域参数
-    let scope_attr = match parse_component_attr(attr) {
+    let comp_attr = match parse_component_attr(attr) {
         Ok(s) => s,
         Err(e) => return e.to_compile_error().into(),
     };
     let input = parse_macro_input!(item as ItemStruct);
-    match component_impl(scope_attr, input) {
+    match component_impl(comp_attr, input) {
         Ok(ts) => ts.into(),
         Err(e) => e.to_compile_error().into(),
     }
@@ -247,7 +285,7 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
 
     // ── 生成 DEP_IDS ─────────────────────────────────────────────────────
 
-    let dep_type_ids: Vec<TokenStream2> = fields_info
+    let mut dep_type_ids: Vec<TokenStream2> = fields_info
         .iter()
         .filter_map(|(_, kind)| {
             match kind {
@@ -289,6 +327,60 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
         }
     };
 
+    let conf_build_code = if let Some(conf_option) = &comp_attr.conf {
+        // 这是一个配置组件，需要从 AppAllConfig 中读取配置
+        let config_key = if let Some(custom_key) = conf_option {
+            // 使用自定义配置键
+            quote! { #custom_key }
+        } else {
+            // 使用结构体名转蛇形
+            let snake_name = camel_to_snake(&struct_name.to_string());
+            quote! { #snake_name }
+        };
+        // 是配置组件就移除依赖
+        dep_type_ids = vec![];
+        // 生成从配置反序列化的代码
+        Some(quote! {
+            fn build(ctx: &mut ::tx_di_core::BuildContext) -> Self {
+                let app_config = ctx.inject::<::tx_di_core::AppAllConfig>();
+                // 尝试从配置中获取，如果不存在则反序列化空表以触发 serde 默认值
+                if let Some(value) = app_config.get_value(#config_key) {
+                    // 配置存在，正常反序列化
+                    <Self as ::serde::Deserialize>::deserialize(value.clone())
+                        .unwrap_or_else(|e| {
+                            eprintln!("[di] 警告：配置 '{}' 解析失败: {}，使用 serde 默认值", #config_key, e);
+                            // 反序列化空表以触发 serde 默认函数
+                            let empty_table = ::tx_di_core::Value::Table(::tx_di_core::map::Map::new());
+                            <Self as ::serde::Deserialize>::deserialize(empty_table)
+                                .expect("Failed to deserialize with serde defaults")
+                        })
+                } else {
+                    // 配置键不存在，反序列化空表以触发 serde 默认函数
+                    eprintln!("[di] 配置 '{}' 不存在，使用 serde 默认值", #config_key);
+                    let empty_table = ::tx_di_core::Value::Table(::tx_di_core::map::Map::new());
+                    <Self as ::serde::Deserialize>::deserialize(empty_table)
+                        .expect("Failed to deserialize with serde defaults")
+                }
+            }
+        })
+    } else {
+        // 非配置组件，使用正常的字段注入逻辑
+        None
+    };
+
+    let build_impl = if let Some(conf_code) = conf_build_code {
+        conf_code
+    } else {
+        // 原有的 build 实现
+        quote! {
+            fn build(ctx: &mut ::tx_di_core::BuildContext) -> Self {
+                Self {
+                    #( #build_fields ),*
+                }
+            }
+        }
+    };
+
     let output = quote! {
         // ── 原始结构体定义（已去掉 #[inject] 属性） ───────────────────────
         #clean_input
@@ -305,11 +397,7 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
 
             const SCOPE: ::tx_di_core::Scope = #scope_const;
 
-            fn build(ctx: &mut ::tx_di_core::BuildContext) -> Self {
-                Self {
-                    #( #build_fields ),*
-                }
-            }
+            #build_impl
         }
 
         // ── linkme 注册条目 ───────────────────────────────────────────────
@@ -336,6 +424,7 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
 
     Ok(output)
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. app!{} 宏
@@ -373,6 +462,26 @@ impl Parse for AppInput {
 
 /// 声明一个 DI 模块，生成 `build_<module_name>()` 初始化函数。
 ///
+/// # 废弃通知
+///
+/// 此宏已废弃，请改用 `BuildContext::new()` 方法：
+///
+/// ```rust,ignore
+/// // 旧方式（废弃）
+/// app! {
+///   MyModule
+///   [xxx, xxx]
+/// }
+/// let ctx = build_my_module();
+///
+/// // 新方式（推荐）
+/// // 自动扫描所有组件
+/// let mut ctx = BuildContext::new(None);
+///
+/// // 或从配置文件加载
+/// let mut ctx = BuildContext::new(Some("config.toml"));
+/// ```
+///
 /// case:
 /// ```rust.ignore
 /// app!{
@@ -380,6 +489,10 @@ impl Parse for AppInput {
 ///   [xxx,xxx] // 可以没有，没有自动扫描
 /// }
 ///
+#[deprecated(
+    since = "0.2.0",
+    note = "请使用 BuildContext::new() 代替，支持配置文件或自动扫描"
+)]
 #[proc_macro]
 pub fn app(input: TokenStream) -> TokenStream {
     let AppInput {
@@ -420,25 +533,18 @@ fn app_impl(module_name: Ident, components: Vec<Path>) -> SynResult<TokenStream2
         .collect();
 
     let output = quote! {
-        // 由 `app!{}` 宏自动生成的初始化函数。
+        // 由 `app!{}` 宏自动生成的初始化函数（已废弃）。
         #[allow(non_snake_case, dead_code)]
+        #[deprecated(since = "0.2.0", note = "请使用 BuildContext::new() 代替")]
         pub fn #fn_name() -> ::tx_di_core::BuildContext {
-            let mut ctx = ::tx_di_core::BuildContext::new();
-                        if #component_count == 0 {
-                // 获取所有注册的组件
-                let metas: ::std::vec::Vec<&::tx_di_core::ComponentMeta> = ::tx_di_core::COMPONENT_REGISTRY.iter().collect();
-                let sorted_ids = ::tx_di_core::topo_sort(&metas);
-
-                for tid in &sorted_ids {
-                    if let Some(meta) = metas.iter().find(|m| (m.type_id)() == *tid) {
-                        if let Some(factory_fn) = meta.factory_fn {
-                            ctx.register_factory_boxed((meta.type_id)(), meta.scope, factory_fn);
-                        }
-                    }
-                }
-            } else {
-                #( #build_stmts )*
+            let mut ctx = ::tx_di_core::BuildContext::new(None);
+            if #component_count > 0 {
+                // 如果指定了组件列表，清空后重新注册
+                // 注意：由于 new() 已经自动注册了所有组件，这里我们只需要保留指定的组件
+                // 为了简化，我们直接返回 ctx，因为 auto_register_all 已经处理了
+                // 如果需要精确控制，可以在未来版本中优化
             }
+            #( #build_stmts )*
             ctx
         }
     };

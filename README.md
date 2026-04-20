@@ -167,6 +167,73 @@ impl CompInit for AppServer {
 - 不能在 async 块中直接借用 `ctx`，需要先提取所需数据再移动进 async 块
 - `init()` 和 `async_init()` 会在所有依赖构建完成后按 `init_sort()` 排序依次调用
 
+### 配置文件加载
+
+tx_di 支持从 TOML 配置文件加载组件配置。使用 `#[tx_comp(conf)]` 标记的组件会自动从配置文件中读取对应的配置段。
+
+#### 配置文件示例
+
+```toml
+# local/di-config.toml
+[app_config]
+app_name = "my-app"
+port = 8080
+
+[database]
+host = "localhost"
+port = 5432
+name = "mydb"
+```
+
+#### 配置组件定义
+
+```rust
+use serde::Deserialize;
+
+/// 应用配置（从配置文件加载）
+#[derive(Clone, Debug, Deserialize, Default)]
+#[tx_comp(conf)]  // 自动从配置文件的 [app_config] 段加载
+pub struct AppConfig {
+    pub app_name: String,
+    pub port: u16,
+}
+```
+
+#### 使用配置文件
+
+```rust
+// 方式 1：从配置文件加载
+let mut ctx = BuildContext::new(Some("local/di-config.toml"));
+
+// 方式 2：自动扫描（不使用配置文件）
+let mut ctx = BuildContext::new::<PathBuf>(None);
+
+ctx.run().await;
+
+// 注入配置组件
+let config = ctx.inject::<AppConfig>();
+println!("App: {}, Port: {}", config.app_name, config.port);
+```
+
+#### 访问全局配置对象
+
+框架会自动创建 `AppAllConfig` 单例，可以直接访问原始 TOML 数据：
+
+```rust
+let global_config = ctx.inject::<AppAllConfig>();
+
+// 获取配置值
+if let Some(app_name) = global_config.get::<String>("app_config.app_name") {
+    println!("App name: {}", app_name);
+}
+
+// 带默认值的获取
+let port = global_config.get_or_default("app_config.port", 8080);
+
+// 访问嵌套配置
+let db_host = global_config.get::<String>("database.host");
+```
+
 ### `#[tx_cst(expr)]`
 
 用于标记字段使用自定义表达式初始化，而不是从 DI 容器注入。
@@ -284,7 +351,7 @@ cargo test
 
 ### 测试覆盖范围
 
-项目包含 **20+ 个测试用例**，全面覆盖框架的核心功能：
+项目包含 **30+ 个测试用例**，全面覆盖框架的核心功能：
 
 #### 单例测试 (3个)
 - `test_singleton_shared` - 验证单例在不同组件间共享
@@ -322,6 +389,17 @@ cargo test
 
 #### 调试功能测试 (1个)
 - `test_debug_registry_output` - 验证调试输出不 panic
+
+#### 配置文件加载测试 (9个)
+- `test_load_from_config_file` - 测试从配置文件加载组件
+- `test_config_file_values_loaded_to_app_config` - 验证配置文件中的值被正确加载到 AppConfig
+- `test_global_config_access_raw_toml` - 测试全局配置对象 AppAllConfig 可以访问原始 TOML 数据
+- `test_missing_config_file_uses_defaults` - 测试配置文件不存在时使用默认值
+- `test_config_get_or_default` - 测试 get_or_default 方法
+- `test_complex_config_nested_access` - 测试复杂配置文件的多层级访问
+- `test_config_value_type_conversion` - 测试配置值的类型转换
+- `test_app_all_config_is_singleton` - 测试 AppAllConfig 在上下文中是单例
+- `test_auto_scan_mode` - 测试自动扫描模式
 
 ### 运行示例
 

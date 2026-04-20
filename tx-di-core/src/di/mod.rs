@@ -11,7 +11,10 @@ pub mod comp;
 use std::any::{Any, TypeId};
 use std::sync::Arc;
 use dashmap::DashMap;
-use crate::{CompRef, ComponentDescriptor, ComponentMeta, Scope, COMPONENT_REGISTRY};
+use crate::{topo_sort, CompRef, ComponentDescriptor, ComponentMeta, Scope, COMPONENT_REGISTRY};
+use std::fs;
+use std::path::{Path, PathBuf};
+use crate::di::comp::config::AppAllConfig;
 
 pub struct BuildContext {
     /// TypeId → CompRef（使用 DashMap 支持并发访问）
@@ -19,10 +22,42 @@ pub struct BuildContext {
 }
 
 impl crate::BuildContext {
-    // #[inline]
-    pub fn new() -> Self {
-        Self {
+    /// 创建一个新的 BuildContext。
+    ///
+    /// # 参数
+    ///
+    /// * `config_path` - 可选的配置文件路径。
+    ///
+    /// # 配置文件格式 (TOML)
+    /// ```
+    #[inline]
+    pub fn new<P: Into<PathBuf>>(config_path: Option<P>) -> Self {
+        let mut ctx = Self {
             store: DashMap::new(),
+        };
+        // 加载配置文件并放入全局上下文
+        let app_configs = AppAllConfig::new(config_path);
+        ctx.store.insert(TypeId::of::<AppAllConfig>(), CompRef::Cached(Arc::new(app_configs)));
+
+        // 自动扫描并注册所有组件（通过拓扑排序）
+        ctx.auto_register_all();
+
+        ctx
+    }
+
+
+
+    /// 自动注册所有通过 #[tx_comp] 标记的组件
+    fn auto_register_all(&mut self) {
+        let metas: Vec<&ComponentMeta> = COMPONENT_REGISTRY.iter().collect();
+        let sorted_ids = topo_sort(&metas);
+
+        for tid in &sorted_ids {
+            if let Some(meta) = metas.iter().find(|m| (m.type_id)() == *tid) {
+                if let Some(factory_fn) = meta.factory_fn {
+                    self.register_factory_boxed((meta.type_id)(), meta.scope, factory_fn);
+                }
+            }
         }
     }
 
@@ -112,7 +147,7 @@ impl crate::BuildContext {
             })
             .unwrap_or_else(|| {
                 panic!(
-                    "[di] inject::<{}> 未找到，请确认 app!{{}} 中包含该组件",
+                    "[di] inject::<{}> 未找到，请确认该组件已注册（使用 #[tx_comp] 注解）",
                     std::any::type_name::<T>()
                 )
             })
@@ -252,6 +287,6 @@ impl crate::BuildContext {
 
 impl Default for crate::BuildContext {
     fn default() -> Self {
-        Self::new()
+        Self::new::<PathBuf>(None)
     }
 }

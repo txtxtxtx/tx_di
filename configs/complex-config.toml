@@ -1,0 +1,15 @@
+# 复杂配置示例
+# 演示多层级配置结构
+
+[app_config]
+app_name = "production-app"
+port = 3000
+
+[database]
+host = "localhost"
+port = 5432
+name = "mydb"
+
+[logging]
+level = "info"
+format = "json"

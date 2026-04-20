@@ -24,6 +24,7 @@ linkme = "0.3"
 # DashMap：无锁并发 HashMap，支持跨线程共享的组件注册表
 dashmap = "6"
 log = "0.4.29"
+toml = "1.1"
 
 # syn：解析 Rust AST
 syn = { version = "2", features = ["full", "extra-traits"] }
@@ -33,4 +34,6 @@ quote = "1"
 proc-macro2 = "1"
 tokio = {version = "1.49",features = ["full"]}
 env_logger = "0.11"
+
+serde = { version = "1.0", features = ["derive"]}
 rsipstack = { version = "0.5",features = ["default"]}

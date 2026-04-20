@@ -1,8 +1,9 @@
 pub mod comp_ref;
+pub mod config;
 
 use std::any::{Any, TypeId};
 use log::debug;
-use crate::{BuildContext, Scope};
+use crate::{BoxFuture, BuildContext, Scope};
 
 #[linkme::distributed_slice]
 pub static COMPONENT_REGISTRY: [ComponentMeta] = [..];
@@ -50,7 +51,7 @@ pub struct ComponentMeta {
 
     pub init_sort_fn: fn() -> i32,
     pub init_fn: Option<fn(&mut BuildContext)>,
-    pub async_init_fn: Option<fn(&mut BuildContext)-> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>> ,
+    pub async_init_fn: Option<fn(&mut BuildContext)-> BoxFuture<()>>,
 }
 
 /// 对组件元数据进行拓扑排序，确定组件的构建顺序。 `Kahn算法`

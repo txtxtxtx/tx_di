@@ -1,0 +1,6 @@
+# tx_di 配置文件示例
+# 此文件用于演示从配置文件加载组件配置
+
+[app_config]
+app_name = "my-app-from-config"
+port = 9090
