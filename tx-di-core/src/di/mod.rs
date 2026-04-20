@@ -8,13 +8,12 @@
 pub mod scopes;
 pub mod comp;
 
-use std::any::{Any, TypeId};
-use std::sync::Arc;
-use dashmap::DashMap;
-use crate::{topo_sort, CompRef, ComponentDescriptor, ComponentMeta, Scope, COMPONENT_REGISTRY};
-use std::fs;
-use std::path::{Path, PathBuf};
 use crate::di::comp::config::AppAllConfig;
+use crate::{topo_sort, CompRef, ComponentDescriptor, ComponentMeta, Scope, COMPONENT_REGISTRY};
+use dashmap::DashMap;
+use std::any::{Any, TypeId};
+use std::path::PathBuf;
+use std::sync::Arc;
 
 pub struct BuildContext {
     /// TypeId → CompRef（使用 DashMap 支持并发访问）

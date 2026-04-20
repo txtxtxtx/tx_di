@@ -1825,18 +1825,7 @@ dependencies = [
  "log",
  "serde",
  "toml",
- "tx-di-macros 0.1.1",
-]
-
-[[package]]
-name = "tx-di-macros"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f425d06c4ce3e364de35a820d288cbb6ede42ccdc75363d4ac835b5930f2cc2"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
+ "tx-di-macros 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1847,6 +1836,17 @@ dependencies = [
  "quote",
  "syn",
  "tx-di-core",
+]
+
+[[package]]
+name = "tx-di-macros"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fded2ddfe7c7e9e803eb436392cfd857077937e50dec89779ff5f87ee1266cdf"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

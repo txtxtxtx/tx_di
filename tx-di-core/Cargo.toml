@@ -15,5 +15,5 @@ dashmap.workspace = true
 log.workspace = true
 toml.workspace = true
 serde.workspace = true
-tx-di-macros = {version = "0.1"}
+tx-di-macros = {version = "0.1.2"}
 #tx-di-macros = { path = "../tx-di-macros"}

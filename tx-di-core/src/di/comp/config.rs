@@ -87,7 +87,7 @@ impl ComponentDescriptor for AppAllConfig {
     const DEP_IDS: &'static [fn() -> TypeId] = &[];
     const SCOPE: Scope = Scope::Singleton;
 
-    fn build(ctx: &mut BuildContext) -> Self {
+    fn build(_ctx: &mut BuildContext) -> Self {
         panic!("AppAllConfig should not be built via ComponentDescriptor::build. It is manually created in BuildContext::new().")
     }
 }
