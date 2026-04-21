@@ -2,7 +2,7 @@
 members = [
     "tx-di-core",
     "tx-di-macros",
-    "di-example", "plugins/tx_di_axum", "examples/gb_cams",
+    "di-example", "plugins/tx_di_axum", "examples/gb_cams", "plugins/tx_di_sip",
 ]
 resolver = "3"
 [workspace.package]
@@ -17,6 +17,7 @@ repository = "https://gitee.com/tian_xiong/tx_di"
 #"""
 
 [workspace.dependencies]
+tx-di-core = { path = "tx-di-core" }
 # linkme 用于跨 crate 在链接期收集静态数组切片
 # 基于 ELF/Mach-O/PE 的自定义 link section，完全零运行时开销
 linkme = "0.3"

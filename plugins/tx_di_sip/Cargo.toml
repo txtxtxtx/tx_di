@@ -1,0 +1,13 @@
+[package]
+name = "tx_di_sip"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+
+[dependencies]
+rsipstack.workspace = true
+tx-di-core.workspace = true
+serde.workspace = true

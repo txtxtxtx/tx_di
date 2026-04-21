@@ -1854,6 +1854,15 @@ name = "tx_di_axum"
 version = "0.1.0"
 
 [[package]]
+name = "tx_di_sip"
+version = "0.1.0"
+dependencies = [
+ "rsipstack",
+ "serde",
+ "tx-di-core",
+]
+
+[[package]]
 name = "typenum"
 version = "1.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
