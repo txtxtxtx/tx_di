@@ -115,6 +115,7 @@ impl crate::BuildContext {
             }
         }
     }
+
     // ── 统一注入入口 ─────────────────────────────────────────────────────────
 
     /// 统一注入入口。根据被注入组件 T 的 scope 自动选择：
@@ -179,6 +180,10 @@ impl crate::BuildContext {
             .unwrap_or_else(|_| panic!("[di] downcast 失败：{}", std::any::type_name::<T>()))
     }
 
+    /// 检查组件是否存在
+    pub fn check<T:Any + Send + Sync + 'static>(&mut self) -> bool {
+        todo!()
+    }
     // ── 兼容旧 API ───────────────────────────────────────────────────────────
 
     /// 取出单例的 Arc。
@@ -276,6 +281,7 @@ impl crate::BuildContext {
             }
         }
     }
+
     pub async fn run(&mut self){
         // 同步初始化
         self.init();

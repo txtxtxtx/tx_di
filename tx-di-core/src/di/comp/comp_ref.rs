@@ -94,17 +94,21 @@ pub trait ComponentDescriptor: CompInit {
 /// 通过实现 `init_sort()` 方法可以控制组件的初始化顺序，
 /// 返回值越小越先初始化。默认值为 10000。
 pub trait CompInit :Any + Sized + Send + Sync + 'static{
-
+    /// 组件内部初始化方法
+    ///
+    /// 在主键完成构建后、注入全局上下文之前执行
+    #[allow(unused_variables)]
+    fn inner_init(&mut self, ctx: &mut BuildContext){}
     /// 同步初始化方法
     #[allow(unused_variables)]
-    fn init(ctx: &mut BuildContext) {
-
-    }
+    fn init(ctx: &mut BuildContext) {}
 
     /// 异步初始化方法
     #[allow(unused_variables)]
     fn async_init(ctx: &mut BuildContext) -> BoxFuture<'static, ()> {
-        Box::pin(async {})
+        Box::pin(async {
+
+        })
     }
 
     /// 初始化排序方法
