@@ -1,0 +1,18 @@
+[package]
+name = "tx_di_log"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+
+[dependencies]
+log.workspace = true
+serde.workspace = true
+tx-di-core.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender.workspace = true
+anyhow.workspace = true
+time.workspace = true
