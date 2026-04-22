@@ -1,6 +1,16 @@
 [package]
 name = "tx_di_axum"
-version = "0.1.0"
-edition = "2024"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
 
 [dependencies]
+tx-di-core.workspace = true
+axum.workspace = true
+tokio.workspace = true
+serde.workspace = true
+anyhow.workspace = true
+tracing.workspace = true

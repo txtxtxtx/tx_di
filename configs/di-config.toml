@@ -4,3 +4,13 @@
 [app_config]
 app_name = "my-app-from-config"
 port = 9090
+
+[web_config]
+# IPv4 配置
+host = "127.0.0.1"
+# IPv6 配置（取消注释使用）
+# host = "::1"          # IPv6 localhost
+# host = "::"           # 监听所有 IPv6 接口
+port = 8080
+enable_cors = true
+max_body_size = 10485760

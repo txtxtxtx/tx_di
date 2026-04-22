@@ -179,6 +179,7 @@ pub fn default_headers() -> HashMap<String, String> {
 // 5. main
 // ─────────────────────────────────────────────────────────────────────────────
 use tx_di_log;
+use tx_di_axum;  // 导入 web 插件以触发组件注册
 #[tokio::main]
 async fn main() {
     
@@ -193,6 +194,9 @@ async fn main() {
     
     ctx.run().await;
     info!("构建完成");
+    
+    // WebPlugin 已自动启动 web 服务器
+    // 可以通过 http://127.0.0.1:8080/health 访问健康检查端点
     // ── 取出 AppServer ──────────────────────────────────────────────────
     let server = ctx.take::<AppServer>();
 
