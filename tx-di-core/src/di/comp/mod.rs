@@ -4,6 +4,7 @@ pub mod config;
 use std::any::{Any, TypeId};
 use log::debug;
 use crate::{BoxFuture, BuildContext, Scope};
+use crate::di::common::RIE;
 
 #[linkme::distributed_slice]
 pub static COMPONENT_REGISTRY: [ComponentMeta] = [..];
@@ -50,11 +51,11 @@ pub struct ComponentMeta {
     pub factory_fn: Option<fn(&mut BuildContext) -> Box<dyn Any + Send + Sync>>,
 
     pub init_sort_fn: fn() -> i32,
-    pub init_fn: Option<fn(&mut BuildContext)>,
-    pub async_init_fn: Option<fn(&mut BuildContext)-> BoxFuture<()>>,
+    pub init_fn: Option<fn(&mut BuildContext) -> RIE<()>>,
+    pub async_init_fn: Option<fn(&mut BuildContext)-> BoxFuture<'static, RIE<()>>>,
 }
 
-/// 对组件元数据进行拓扑排序，确定组件的构建顺序。 `Kahn算法`
+/// 对组件元数据进行拓扑排序，确定组件的构建顺序。 `Kahn算法` todo 不但拓扑排序，还要满足定义的初始化顺序排序
 ///
 /// 该函数基于组件的依赖关系图执行拓扑排序，确保在构建组件时，
 /// 其所有依赖项已经被构建并可用。如果检测到循环依赖，将触发 panic。

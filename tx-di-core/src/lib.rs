@@ -23,5 +23,7 @@ pub use toml::map;
 pub use tx_di_macros::{tx_comp, tx_cst};
 pub use di::{BuildContext,scopes::Scope,
              comp::{ComponentMeta,topo_sort,COMPONENT_REGISTRY,config::AppAllConfig},
-             comp::comp_ref::{CompRef,ComponentDescriptor,CompInit,BoxFuture}};
+             comp::comp_ref::{CompRef,ComponentDescriptor,CompInit,BoxFuture},
+common::*
+};
 

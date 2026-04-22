@@ -2,6 +2,7 @@ use std::any::{Any, TypeId};
 use std::pin::Pin;
 use std::sync::Arc;
 use crate::{BuildContext, Scope};
+use crate::di::common::RIE;
 
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
@@ -9,9 +10,7 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 /// - `Factory(Arc<dyn Fn>)` → 存工厂闭包，prototype 每次注入时调用
 /// - `Cached(Arc<dyn Any>)` → 已实例化的单例（擦除类型）
 pub enum CompRef {
-    /// 尚未实例化的工厂（prototype），直接存闭包
     Factory(Arc<dyn Fn(&mut BuildContext) -> Arc<dyn Any + Send + Sync> + Send + Sync>),
-    /// 已实例化并缓存的单例
     Cached(Arc<dyn Any + Send + Sync>),
 }
 
@@ -98,16 +97,20 @@ pub trait CompInit :Any + Sized + Send + Sync + 'static{
     ///
     /// 在主键完成构建后、注入全局上下文之前执行
     #[allow(unused_variables)]
-    fn inner_init(&mut self, ctx: &mut BuildContext){}
+    fn inner_init(&mut self, ctx: &mut BuildContext) -> RIE<()>{
+        Ok(())
+    }
     /// 同步初始化方法
     #[allow(unused_variables)]
-    fn init(ctx: &mut BuildContext) {}
+    fn init(ctx: &mut BuildContext) ->RIE<()> {
+        Ok(())
+    }
 
     /// 异步初始化方法
     #[allow(unused_variables)]
-    fn async_init(ctx: &mut BuildContext) -> BoxFuture<'static, ()> {
+    fn async_init(ctx: &mut BuildContext) -> BoxFuture<'static, RIE<()>> {
         Box::pin(async {
-
+            Ok(())
         })
     }
 

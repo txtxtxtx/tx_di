@@ -7,6 +7,7 @@
 
 pub mod scopes;
 pub mod comp;
+pub mod common;
 
 use crate::di::comp::config::AppAllConfig;
 use crate::{topo_sort, CompRef, ComponentDescriptor, ComponentMeta, Scope, COMPONENT_REGISTRY};
