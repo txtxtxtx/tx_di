@@ -5,7 +5,7 @@
 **核心特性**：Singleton / Prototype 作用域、`#[tx_cst(expr)]` 自定义值注入、自动依赖拓扑排序。
 
 github: https://github.com/txtxtxtx/tx_di.git
-gitee: https://gitee.com/tian_xiong/tx_di.git git@github.com:txtxtxtx/tx_di.git 还没上传，明天上传
+gitee: https://gitee.com/tian_xiong/tx_di.git
 
 ## 快速上手
 
