@@ -204,7 +204,7 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
                     <Self as ::serde::Deserialize>::deserialize(empty_table)
                         .expect("[di] 错误：没有实现默认方法，没有默认值")
                 };
-                <Self as ::tx_di_core::CompInit>::inner_init(&mut config, ctx);
+                <Self as ::tx_di_core::CompInit>::inner_init(&mut config,ctx);
                 config
             }
         })
@@ -223,7 +223,6 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
                 let mut comp = Self {
                     #( #build_fields ),*
                 };
-                // comp.inner_init(ctx);
                 <Self as ::tx_di_core::CompInit>::inner_init(&mut comp, ctx);
                 comp
             }

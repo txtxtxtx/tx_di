@@ -2,7 +2,7 @@
 members = [
     "tx-di-core",
     "tx-di-macros",
-    "di-example", "plugins/tx_di_axum", "examples/gb_cams", "plugins/tx_di_sip",
+    "di-example", "plugins/tx_di_axum", "examples/gb_cams", "plugins/tx_di_sip", "plugins/tx_di_log",
 ]
 resolver = "3"
 [workspace.package]
@@ -24,7 +24,7 @@ linkme = "0.3"
 
 # DashMap：无锁并发 HashMap，支持跨线程共享的组件注册表
 dashmap = "6"
-log = "0.4.29"
+
 toml = "1.1"
 
 # syn：解析 Rust AST
@@ -36,5 +36,20 @@ proc-macro2 = "1"
 tokio = {version = "1.49",features = ["full"]}
 env_logger = "0.11"
 
-serde = { version = "1.0", features = ["derive"]}
+# 序列化
+serde = { version = "1.0", features = ["derive","serde_derive"]}
+serde_json = "1.0"
+
 rsipstack = { version = "0.5",features = ["default"]}
+
+# 日志
+time = {version = "0.3"}
+log = {version = "0.4",features = ["serde"]}
+tracing = {version = "0.1"}
+tracing-subscriber = {version = "0.3",features = ["env-filter","local-time"]}
+# 用于文件输出
+tracing-appender = {version = "0.2"}
+
+# 错误处理
+thiserror = "2.0"
+anyhow = "1.0"
