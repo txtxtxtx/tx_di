@@ -344,6 +344,7 @@ dependencies = [
  "serde",
  "tokio",
  "tx-di-core",
+ "tx_di_log",
 ]
 
 [[package]]

@@ -34,7 +34,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use tx_di_core::{tx_comp, BoxFuture, BuildContext, CompInit};
+use tx_di_core::{tx_comp, BoxFuture, BuildContext, CompInit, IE, RIE};
 use log::{debug, info};
 use serde::Deserialize;
 // ─────────────────────────────────────────────────────────────────────────────
@@ -152,14 +152,16 @@ pub struct AppServer {
 }
 
 impl CompInit for AppServer {
-    fn async_init(ctx: &mut BuildContext) -> BoxFuture<'static, ()> {
+    fn async_init(ctx: &mut BuildContext) -> BoxFuture<'static, RIE<()>> {
         let len = ctx.len();
         Box::pin(async move {
             debug!("AppServer::async_init:{}",len);
+            Ok(())
         })
     }
-    fn init(ctx: &mut BuildContext) {
-        debug!("AppServer::init:{}",ctx.len())
+    fn init(ctx: &mut BuildContext) ->RIE<()> {
+        debug!("AppServer::init:{}",ctx.len());
+        Ok(())
     }
     fn init_sort() -> i32 {
         1000
@@ -179,11 +181,11 @@ pub fn default_headers() -> HashMap<String, String> {
 
 #[tokio::main]
 async fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
+    // env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
     info!("🚀 tx_di 启动");
 
     // 方式 1：自动扫描所有注册的组件（无需配置文件）
-    let mut ctx = BuildContext::new::<PathBuf>(None);
+    let mut ctx = BuildContext::new(Some("D:/proj/tx_di/configs/test_log.toml"));
     
     // 方式 2：从配置文件加载指定组件（取消注释使用）
     // let mut ctx = BuildContext::new(Some("../configs/di-config.toml"));

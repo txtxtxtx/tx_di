@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 tx-di-core   = { path = "../tx-di-core" }
+tx_di_log = { path = "../plugins/tx_di_log" }
 linkme.workspace = true
 env_logger.workspace = true
 log.workspace = true
