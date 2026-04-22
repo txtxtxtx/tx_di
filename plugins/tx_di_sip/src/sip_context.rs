@@ -2,7 +2,7 @@ use std::sync::Arc;
 use rsipstack::EndpointBuilder;
 use rsipstack::transaction::Endpoint;
 use serde::Deserialize;
-use tx_di_core::{tx_comp, BoxFuture, BuildContext, CompInit};
+use tx_di_core::{tx_comp, BoxFuture, BuildContext, CompInit, RIE};
 
 #[tx_comp(init)]
 pub struct SipContext{
@@ -18,18 +18,14 @@ impl SipContext {
 
 }
 impl CompInit for SipContext {
-    fn inner_init(&mut self,ctx: &mut BuildContext)  {
+    fn inner_init(&mut self, ctx: &mut BuildContext) ->RIE<()>  {
         self.end_point = Some(EndpointBuilder::new()
             .with_user_agent("tx-di-sip/v0.1.0")
             // .with_option()
             .build());
-    }
-    fn init(ctx: &mut BuildContext) {
+        Ok(())
     }
 
-    fn async_init(ctx: &mut BuildContext) -> BoxFuture<'static, ()> {
-        todo!()
-    }
 
     fn init_sort() -> i32 {
         todo!()

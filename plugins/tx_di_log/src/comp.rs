@@ -13,6 +13,7 @@ use crate::LogConfig;
 
 // 全局变量存储 日志 guard
 static LOG_GUARD: OnceLock<tracing_appender::non_blocking::WorkerGuard> = OnceLock::new();
+#[derive(Clone,Debug)]
 #[tx_comp(init)]
 pub struct LogPlugins{
     /// 日志配置

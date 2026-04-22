@@ -178,14 +178,15 @@ pub fn default_headers() -> HashMap<String, String> {
 // ─────────────────────────────────────────────────────────────────────────────
 // 5. main
 // ─────────────────────────────────────────────────────────────────────────────
-
+use tx_di_log;
 #[tokio::main]
 async fn main() {
+    
     // env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
     info!("🚀 tx_di 启动");
 
     // 方式 1：自动扫描所有注册的组件（无需配置文件）
-    let mut ctx = BuildContext::new(Some("D:/proj/tx_di/configs/test_log.toml"));
+    let mut ctx = BuildContext::new(Some(r"C:\a_me\proj\rust\tx_di\configs\test_log.toml"));
     
     // 方式 2：从配置文件加载指定组件（取消注释使用）
     // let mut ctx = BuildContext::new(Some("../configs/di-config.toml"));
