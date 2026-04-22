@@ -5,6 +5,8 @@ use std::any::{Any, TypeId};
 use log::debug;
 use crate::{BoxFuture, BuildContext, Scope};
 use crate::di::common::RIE;
+use std::collections::{BinaryHeap, HashMap};
+use std::cmp::Reverse;
 
 #[linkme::distributed_slice]
 pub static COMPONENT_REGISTRY: [ComponentMeta] = [..];
@@ -55,7 +57,7 @@ pub struct ComponentMeta {
     pub async_init_fn: Option<fn(&mut BuildContext)-> BoxFuture<'static, RIE<()>>>,
 }
 
-/// 对组件元数据进行拓扑排序，确定组件的构建顺序。 `Kahn算法` todo 不但拓扑排序，还要满足定义的初始化顺序排序
+/// 对组件元数据进行拓扑排序，确定组件的构建顺序。 `Kahn算法`
 ///
 /// 该函数基于组件的依赖关系图执行拓扑排序，确保在构建组件时，
 /// 其所有依赖项已经被构建并可用。如果检测到循环依赖，将触发 panic。
@@ -84,8 +86,6 @@ pub struct ComponentMeta {
 /// 函数会记录排序结果和耗时到 debug 日志中。
 pub fn topo_sort(metas: &[&ComponentMeta]) -> Vec<TypeId> {
     let start = std::time::Instant::now();
-    
-    use std::collections::{HashMap, VecDeque};
 
     let n = metas.len();
 
@@ -117,18 +117,22 @@ pub fn topo_sort(metas: &[&ComponentMeta]) -> Vec<TypeId> {
             }
         }
     }
-    // 将所有入度为 0 的节点加入队列（无依赖的组件）
-    let mut queue: VecDeque<usize> = (0..n).filter(|&i| in_degree[i] == 0).collect();
+    // 将所有入度为 0 的节点加入优先队列（无依赖的组件）
+    // 使用 BinaryHeap + Reverse 实现最小堆，按 init_sort_fn 值排序（值越小优先级越高）
+    let mut heap: BinaryHeap<Reverse<(i32, usize)>> = (0..n)
+        .filter(|&i| in_degree[i] == 0)
+        .map(|i| Reverse(((metas[i].init_sort_fn)(), i)))
+        .collect();
     let mut result = Vec::with_capacity(n);
 
-    while let Some(i) = queue.pop_front() {
+    while let Some(Reverse((_sort_key, i))) = heap.pop() {
         // 将当前组件加入结果
         result.push((metas[i].type_id)());
         // 遍历所有依赖当前组件 i 的其他组件 j
         for &j in &adj[i] {
             in_degree[j] -= 1; // j 的一个依赖已满足，入度 -1
             if in_degree[j] == 0 { // 如果 j 的所有依赖都满足了
-                queue.push_back(j);  // 将 j 加入队列等待处理
+                heap.push(Reverse(((metas[j].init_sort_fn)(), j)));  // 将 j 加入优先队列等待处理
             }
         }
     }

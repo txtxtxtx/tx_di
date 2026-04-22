@@ -3,3 +3,4 @@
 log_level = "debug"
 prefix = "di-example"
 dir = "C:/a_me/proj/rust/tx_di/logs"
+console_output = true
