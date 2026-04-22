@@ -4,12 +4,18 @@
 
 **核心特性**：Singleton / Prototype 作用域、`#[tx_cst(expr)]` 自定义值注入、自动依赖拓扑排序。
 
+github: https://github.com/txtxtxtx/tx_di.git
+gitee: https://gitee.com/tian_xiong/tx_di.git git@github.com:txtxtxtx/tx_di.git 还没上传，明天上传
+
 ## 快速上手
 
 ```rust
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tx_di_core::{app, tx_comp, tx_cst};
+
+// 使用插件只需要引入即可，会自动注入和配置
+use tx_di_log;
 
 // ── 单例组件（默认）──────────────────────────────────────
 #[derive(Clone, Debug)]
