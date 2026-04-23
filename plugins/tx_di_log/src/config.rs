@@ -5,7 +5,7 @@ use std::{env, fmt};
 use time::format_description::well_known;
 use tracing_subscriber::fmt::format::Writer;
 use tracing_subscriber::fmt::time::{FormatTime, LocalTime, UtcTime};
-use tx_di_core::tx_comp;
+use tx_di_core::{tx_comp, CompInit};
 
 /// 日志配置结构体
 ///
@@ -18,7 +18,7 @@ use tx_di_core::tx_comp;
 /// level = "info"  # 可选值: "off", "error", "warn", "info", "debug", "trace"（不区分大小写）
 /// ```
 #[derive(Debug, Clone, Deserialize)]
-#[tx_comp(conf)]
+#[tx_comp(conf,init)]
 pub struct LogConfig {
     /// 全局日志级别过滤器
     ///
@@ -80,6 +80,12 @@ pub struct LogConfig {
     /// 该字段在 TOML 配置文件中对应 `log_config.time_format`。
     #[serde(default)]
     pub time_format: TimeFormat,
+}
+
+impl CompInit for LogConfig {
+    fn init_sort() -> i32 {
+        i32::MIN
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
