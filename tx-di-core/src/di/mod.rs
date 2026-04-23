@@ -10,11 +10,12 @@ pub mod comp;
 pub mod common;
 
 use crate::di::comp::config::AppAllConfig;
-use crate::{topo_sort, CompRef, ComponentDescriptor, ComponentMeta, Scope, COMPONENT_REGISTRY};
+use crate::{topo_sort, CompRef, ComponentDescriptor, ComponentMeta, Scope, COMPONENT_REGISTRY, RIE};
 use dashmap::DashMap;
 use std::any::{Any, TypeId};
 use std::path::PathBuf;
 use std::sync::Arc;
+use log::debug;
 
 pub struct BuildContext {
     /// TypeId → CompRef（使用 DashMap 支持并发访问）
@@ -243,7 +244,7 @@ impl crate::BuildContext {
                     .unwrap_or("unknown")
             }).collect();
 
-            println!(
+            debug!(
                 "  {:20} scope={:?}  deps=[{}]",
                 meta.name,
                 meta.scope,
@@ -252,7 +253,7 @@ impl crate::BuildContext {
         }
     }
 
-    fn init(&mut self) {
+    fn init(&mut self) ->RIE<()> {
         let mut metas: Vec<&ComponentMeta> = COMPONENT_REGISTRY
             .iter()
             .filter(|m| m.async_init_fn.is_some())
@@ -263,12 +264,13 @@ impl crate::BuildContext {
         for meta in metas {
             if let Some(init_fn) = meta.init_fn {
                 // 直接调函数指针，传入 &mut self（DashMap 的 owner）
-                init_fn(self);
+                init_fn(self)?;
             }
         }
+        Ok(())
     }
 
-    async fn async_init(&mut self) {
+    async fn async_init(&mut self) -> RIE<()> {
         let mut metas: Vec<&ComponentMeta> = COMPONENT_REGISTRY
             .iter()
             .filter(|m| m.async_init_fn.is_some())
@@ -278,16 +280,18 @@ impl crate::BuildContext {
 
         for meta in metas {
             if let Some(async_init_fn) = meta.async_init_fn {
-                async_init_fn(self).await;
+                async_init_fn(self).await?;
             }
         }
+        Ok(())
     }
 
-    pub async fn run(&mut self){
+    pub async fn run(&mut self) -> RIE<()>{
         // 同步初始化
-        self.init();
+        self.init()?;
         // 异步初始化
-        self.async_init().await
+        self.async_init().await?;
+        Ok(())
     }
 }
 
