@@ -1,6 +1,6 @@
 # tx_di
 
-基于 `proc_macro` + `linkme` 的编译期依赖注入框架。
+基于 `proc_macro` + `linkme` 的依赖注入框架，**编译期收集元数据，运行期执行注入**。
 
 **核心特性**：Singleton / Prototype 作用域、`#[tx_cst(expr)]` 自定义值注入、自动依赖拓扑排序。
 
