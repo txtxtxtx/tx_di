@@ -187,19 +187,18 @@ async fn main() {
     info!("🚀 tx_di 启动");
 
     // 方式 1：自动扫描所有注册的组件（无需配置文件）
-    let mut ctx = BuildContext::new(Some(r"C:\a_me\proj\rust\tx_di\configs\test_log.toml"));
+    let mut ctx = BuildContext::new(Some("configs/test_log.toml"));
     
     // 方式 2：从配置文件加载指定组件（取消注释使用）
     // let mut ctx = BuildContext::new(Some("../configs/di-config.toml"));
     
-    ctx.run().await;
+    ctx.run().await.expect("TODO: panic message");
     info!("构建完成");
     
     // WebPlugin 已自动启动 web 服务器
     // 可以通过 http://127.0.0.1:8080/health 访问健康检查端点
     // ── 取出 AppServer ──────────────────────────────────────────────────
     let server = ctx.take::<AppServer>();
-
     info!("✅ AppServer 构建完成");
     info!("   bind_addr  = {}", server.bind_addr);
     info!("   headers    = {:?}", server.default_headers);
