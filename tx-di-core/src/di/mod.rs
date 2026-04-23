@@ -135,6 +135,57 @@ impl crate::BuildContext {
         }
     }
 
+    /// 获取单例组件的不可变引用版本。
+    ///
+    /// 此方法不需要 `&mut self`，但只能用于 Singleton 作用域的组件。
+    /// 如果尝试获取 Prototype 组件，将会 panic。
+    ///
+    /// # Panics
+    ///
+    /// - 如果组件是 Prototype 作用域
+    /// - 如果组件未注册
+    /// - 如果类型转换失败
+    pub fn get<T: ComponentDescriptor>(&self) -> Arc<T> {
+        let tid = TypeId::of::<T>();
+        let scope = <T as ComponentDescriptor>::SCOPE;
+
+        match scope {
+            Scope::Singleton => self.inject_singleton::<T>(tid),
+            Scope::Prototype => {
+                panic!(
+                    "[di] get::<{}> 不能用于 Prototype 组件，请使用 inject() 方法",
+                    std::any::type_name::<T>()
+                )
+            }
+        }
+    }
+
+    /// 通过 `Arc<BuildContext>` 获取已缓存的单例组件（无需 `ComponentDescriptor` 约束）。
+    ///
+    /// 适用于 axum handler 等场景：持有 `Arc<BuildContext>` 时只能拿 `&self`，
+    /// 而 `inject` 需要 `&mut self`。此方法绕过该限制，直接从 store 读取已缓存的 Arc。
+    ///
+    /// # Panics
+    ///
+    /// - 组件未注册或未缓存（Prototype 组件无法通过此方法获取）
+    /// - downcast 失败
+    pub fn get_singleton<T: Any + Send + Sync + 'static>(&self) -> Arc<T> {
+        self.inject_singleton::<T>(TypeId::of::<T>())
+    }
+
+    /// 尝试获取已缓存的单例组件，未找到时返回 `None`（不 panic）。
+    ///
+    /// 适合在 axum handler 等不能 panic 的场景中使用。
+    pub fn try_get_singleton<T: Any + Send + Sync + 'static>(&self) -> Option<Arc<T>> {
+        let tid = TypeId::of::<T>();
+        self.store.get(&tid).and_then(|entry| match &*entry {
+            CompRef::Cached(any_arc) => any_arc.clone().downcast::<T>().ok(),
+            CompRef::Factory(_) => None,
+        })
+    }
+
+
+
     /// 注入单例：factory 只调用一次，之后返回缓存的 Arc。
     fn inject_singleton<T: Any + Send + Sync + 'static>(&self, tid: TypeId) -> Arc<T> {
         self.store
@@ -183,15 +234,14 @@ impl crate::BuildContext {
             .unwrap_or_else(|_| panic!("[di] downcast 失败：{}", std::any::type_name::<T>()))
     }
 
-    /// 检查组件是否存在
-    pub fn check<T:Any + Send + Sync + 'static>(&mut self) -> bool {
-        todo!()
-    }
-    // ── 兼容旧 API ───────────────────────────────────────────────────────────
-
     /// 取出单例的 Arc。
-    pub fn get_arc<T: Any + Send + Sync + 'static + ComponentDescriptor>(&mut self) -> Arc<T> {
+    pub fn get_arc<T: ComponentDescriptor>(&mut self) -> Arc<T> {
         self.inject::<T>()
+    }
+
+    /// 获取单例的 Arc。
+    pub fn get_arc_ref<T: ComponentDescriptor>(& self) -> Arc<T> {
+        self.get::<T>()
     }
 
     /// 从上下文中取出并移除单例（所有权）。
