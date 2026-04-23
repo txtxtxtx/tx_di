@@ -15,9 +15,10 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let ctx = BuildContext::new(Some("configs/test_log.toml"));
+        // Some(r"D:\proj\tx_di\configs\test_log.toml")
+        //
+        let ctx = BuildContext::new(Some(r"D:\proj\tx_di\configs\test_log.toml"));
         BuildContext::debug_registry();
-        sleep(std::time::Duration::from_secs(1));
         debug!("测试日志框架加载");
         info!("测试日志框架加载");
         warn!("测试日志框架加载");
