@@ -1,0 +1,8 @@
+# tx_di Web 插件 IPv6 配置示例
+
+[web_config]
+# IPv6 本地回环地址
+host = "::1"
+port = 8080
+enable_cors = true
+max_body_size = 10485760
