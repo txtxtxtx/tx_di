@@ -70,10 +70,34 @@ impl CompInit for LogPlugins{
             .with_target(true) // 显示模块路径
             .with_file(true) // 显示文件名
             .with_line_number(true) // 显示行号
-            .pretty();
+            .compact(); // pretty json compact
         // 环境过滤器
-        let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&self.config.level.as_str().to_lowercase()));
+        // let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&self.config.level.as_str().to_lowercase()));
+        // 构建环境过滤器，支持模块级别的日志覆盖
+        let env_filter = if self.config.modules.is_empty() {
+            // 如果没有模块级别的配置，使用全局级别
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new(&self.config.level.as_str().to_lowercase()))
+        } else {
+            // 从全局级别开始
+            let mut filter = EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new(&self.config.level.as_str().to_lowercase()));
 
+            // 添加模块级别的覆盖配置
+            for (module, level) in &self.config.modules {
+                let directive_str = format!("{}={}", module, level.as_str().to_lowercase());
+                match directive_str.parse() {
+                    Ok(directive) => {
+                        filter = filter.add_directive(directive);
+                    }
+                    Err(e) => {
+                        error!("无效的日志指令 '{}': {}，已跳过该模块配置", directive_str, e);
+                    }
+                }
+            }
+
+            filter
+        };
         // 注册全局订阅者
         let subscriber = tracing_subscriber::registry()
             .with(env_filter)

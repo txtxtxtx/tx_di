@@ -56,4 +56,4 @@ thiserror = "2.0"
 anyhow = "1.0"
 
 # Web 框架
-axum = {version = "0.7", features = ["macros"]}
+axum = {version = "0.8", features = ["macros"]}

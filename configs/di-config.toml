@@ -13,6 +13,6 @@ host = "127.0.0.1"
 # IPv6 配置（取消注释使用）
 # host = "::1"          # IPv6 localhost
 # host = "::"           # 监听所有 IPv6 接口
-port = 8080
+port = 8888
 enable_cors = true
 max_body_size = 10485760
