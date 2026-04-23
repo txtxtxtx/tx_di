@@ -204,7 +204,9 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
                     <Self as ::serde::Deserialize>::deserialize(empty_table)
                         .expect("[di] 错误：没有实现默认方法，没有默认值")
                 };
-                <Self as ::tx_di_core::CompInit>::inner_init(&mut config,ctx);
+                if let Err(e) = <Self as ::tx_di_core::CompInit>::inner_init(&mut config, ctx) {
+                    panic!("[di] 配置组件 '{}' 初始化失败: {}", stringify!(#struct_name), e);
+                }
                 config
             }
         })
@@ -223,7 +225,10 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
                 let mut comp = Self {
                     #( #build_fields ),*
                 };
-                <Self as ::tx_di_core::CompInit>::inner_init(&mut comp, ctx);
+                if let Err(e) = <Self as ::tx_di_core::CompInit>::inner_init(&mut comp, ctx) {
+                    panic!("[di] 组件 '{}' 初始化失败: {}", stringify!(#struct_name), e);
+                }
+                ::log::debug!("{} build 成功",stringify!(#struct_name));
                 comp
             }
         }
