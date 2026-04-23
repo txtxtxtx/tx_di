@@ -156,7 +156,7 @@ pub fn topo_sort(metas: &[&ComponentMeta]) -> Vec<TypeId> {
         })
         .map(|(_, name)| name)
         .collect();
-    debug!("[di] 拓扑排序结果：\n[\n{}\n]", sorted_names.join(",\n"));
+    debug!("[di] 拓扑排序结果：[{}]", sorted_names.join(", "));
     let elapsed = start.elapsed();
     debug!("[di] 拓扑排序耗时: {:?}", elapsed);
 
