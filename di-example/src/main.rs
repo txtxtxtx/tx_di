@@ -37,6 +37,7 @@ use std::sync::{Arc, Mutex};
 use tx_di_core::{tx_comp, BoxFuture, BuildContext, CompInit, IE, RIE};
 use log::{debug, info};
 use serde::Deserialize;
+use tracing::error;
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. 无依赖的单例组件
 // ─────────────────────────────────────────────────────────────────────────────
@@ -180,8 +181,13 @@ pub fn default_headers() -> HashMap<String, String> {
 // ─────────────────────────────────────────────────────────────────────────────
 use tx_di_log;
 use tx_di_axum;  // 导入 web 插件以触发组件注册
+
 #[tokio::main]
 async fn main() {
+    run().await.map_err(|e| error!("{}", e)).expect("启动失败")
+}
+
+async fn run() ->RIE<()> {
     
     // env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
     info!("🚀 tx_di 启动");
@@ -198,7 +204,7 @@ async fn main() {
     // WebPlugin 已自动启动 web 服务器
     // 可以通过 http://127.0.0.1:8080/health 访问健康检查端点
     // ── 取出 AppServer ──────────────────────────────────────────────────
-    let server = ctx.take::<AppServer>();
+    let server = ctx.take::<AppServer>()?;
     info!("✅ AppServer 构建完成");
     info!("   bind_addr  = {}", server.bind_addr);
     info!("   headers    = {:?}", server.default_headers);
@@ -249,6 +255,7 @@ async fn main() {
     }
     
     BuildContext::debug_registry();
+    Ok(())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -11,3 +11,4 @@ repository.workspace = true
 rsipstack.workspace = true
 tx-di-core.workspace = true
 serde.workspace = true
+tracing.workspace = true
