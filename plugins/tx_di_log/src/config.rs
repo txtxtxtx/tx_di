@@ -1,14 +1,11 @@
-use std::collections::HashMap;
-use std::{env, fmt};
-use std::path::{Path, PathBuf};
 use serde::Deserialize;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::{env, fmt};
 use time::format_description::well_known;
-use tracing::Subscriber;
 use tracing_subscriber::fmt::format::Writer;
-use tracing_subscriber::fmt::Layer;
 use tracing_subscriber::fmt::time::{FormatTime, LocalTime, UtcTime};
 use tx_di_core::tx_comp;
-use crate::TimeFormat::Utc;
 
 /// 日志配置结构体
 ///

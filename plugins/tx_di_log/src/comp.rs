@@ -1,15 +1,15 @@
-use std::{fs, panic};
+use crate::LogConfig;
+use anyhow::{anyhow};
+use log::{error};
 use std::sync::{Arc, OnceLock};
-use anyhow::{anyhow, Context};
-use log::{debug, error};
+use std::{fs, panic};
 use tracing::info;
 use tracing_appender::non_blocking::NonBlocking;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
-use tracing_subscriber::{fmt, EnvFilter};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{fmt, EnvFilter};
 use tx_di_core::{tx_comp, BuildContext, CompInit, RIE};
-use crate::LogConfig;
 
 // 全局变量存储 日志 guard
 static LOG_GUARD: OnceLock<tracing_appender::non_blocking::WorkerGuard> = OnceLock::new();
