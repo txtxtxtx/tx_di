@@ -2,7 +2,7 @@ use serde::Deserialize;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use axum::extract::Path;
-use tx_di_core::{tx_comp, RIE};
+use tx_di_core::{tx_comp, CompInit, RIE};
 
 /// Web 服务器配置结构体
 ///
@@ -25,7 +25,7 @@ use tx_di_core::{tx_comp, RIE};
 /// port = 8080
 /// ```
 #[derive(Debug, Clone, Deserialize)]
-#[tx_comp(conf)]
+#[tx_comp(conf,init)]
 pub struct WebConfig {
     /// 服务器监听地址
     ///
@@ -65,6 +65,12 @@ pub struct WebConfig {
     /// 静态文件目录
     #[serde(default = "default_static_dir")]
     pub static_dir: String,
+}
+
+impl CompInit for WebConfig {
+    fn init_sort() -> i32 {
+        i32::MAX
+    }
 }
 
 impl WebConfig {

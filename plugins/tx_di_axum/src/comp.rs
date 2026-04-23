@@ -2,7 +2,7 @@ use std::sync::Arc;
 use axum::{Router, routing::get};
 use tokio::net::TcpListener;
 use tracing::{info, error};
-use tx_di_core::{tx_comp, BuildContext, CompInit, RIE};
+use tx_di_core::{tx_comp, BoxFuture, BuildContext, CompInit, RIE};
 use crate::WebConfig;
 
 /// Web 服务器插件组件
@@ -21,31 +21,24 @@ pub struct WebPlugin {
 }
 
 impl CompInit for WebPlugin {
-    fn inner_init(&mut self, ctx: &mut BuildContext) -> RIE<()> {
+    fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
         info!("Web 服务器插件初始化中...");
-
-        // 添加一个默认的健康检查路由
         self.router = self.router.clone()
             .route("/health", get(health_check));
-
-        // 在后台启动服务器
-        let config = self.config.clone();
-        let router = self.router.clone();
-
-        tokio::spawn(async move {
-            match start_server(config, router).await {
-                Ok(_) => info!("Web 服务器已停止"),
-                Err(e) => error!("Web 服务器运行出错: {}", e),
-            }
-        });
-
-        info!("Web 服务器插件初始化完成");
         Ok(())
     }
+    fn async_init(ctx: &mut BuildContext) -> BoxFuture<'static, RIE<()>> {
+        let config = ctx.inject::<WebConfig>();
+        let web = ctx.inject::<WebPlugin>();
+        Box::pin(async move {
+            start_server(config, web).await?;
+            Ok(())
+        })
+    }
 
-    /// 插件初始化排序，在日志之后初始化
+    /// 插件初始化排序，最后初始化
     fn init_sort() -> i32 {
-        0
+        i32::MAX
     }
 }
 
@@ -66,16 +59,17 @@ async fn health_check() -> &'static str {
 /// # Errors
 ///
 /// 如果服务器绑定失败或运行出错，将返回错误
-async fn start_server(config: Arc<WebConfig>, router: Router) -> anyhow::Result<()> {
+async fn start_server(config: Arc<WebConfig>, web: Arc<WebPlugin>) -> RIE<()> {
     let addr = config.socket_addr()?;
     
     info!("Web 服务器正在监听: {}", addr);
     info!("CORS 启用状态: {}", config.enable_cors);
     info!("最大请求体大小: {} bytes", config.max_body_size);
+    info!("静态文件夹路径:{}",config.static_dir);
 
     let listener = TcpListener::bind(addr).await?;
     
-    axum::serve(listener, router)
+    axum::serve(listener, web.router.clone())
         .await
         .map_err(|e| anyhow::anyhow!("Web 服务器运行失败: {}", e))?;
 
