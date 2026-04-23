@@ -49,7 +49,7 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
         /// #[inject(expr)]：直接用表达式，不计入依赖图
         Custom { expr: Expr },
         /// ctx 获取不到注入 None
-        Optional { ty: Type },
+        Optional { #[allow(dead_code)] ty: Type },
         /// 不自动注入，用户手动创建该字段或是使用默认值
         Skip,
     }
