@@ -1,5 +1,7 @@
 use serde::Deserialize;
 use std::net::SocketAddr;
+use std::path::PathBuf;
+use axum::extract::Path;
 use tx_di_core::{tx_comp, RIE};
 
 /// Web 服务器配置结构体
@@ -60,6 +62,9 @@ pub struct WebConfig {
     /// 该字段在 TOML 配置文件中对应 `web_config.max_body_size`。
     #[serde(default = "default_max_body_size")]
     pub max_body_size: usize,
+    /// 静态文件目录
+    #[serde(default = "default_static_dir")]
+    pub static_dir: String,
 }
 
 impl WebConfig {
@@ -91,6 +96,10 @@ impl WebConfig {
             .map_err(|e| anyhow::anyhow!("无效的地址格式 '{}': {}", self.address(), e))?;
         Ok(addr)
     }
+    
+    pub fn static_dir(&self) -> PathBuf {
+        PathBuf::from(self.static_dir.clone())
+    }
 }
 
 /// 提供默认的监听地址
@@ -106,4 +115,8 @@ fn default_port() -> u16 {
 /// 提供默认的最大请求体大小（10MB）
 fn default_max_body_size() -> usize {
     10 * 1024 * 1024
+}
+
+fn default_static_dir() -> String {
+    "./static".to_string()
 }

@@ -228,7 +228,7 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
                 if let Err(e) = <Self as ::tx_di_core::CompInit>::inner_init(&mut comp, ctx) {
                     panic!("[di] 组件 '{}' 初始化失败: {}", stringify!(#struct_name), e);
                 }
-                ::log::debug!("{} build 成功",stringify!(#struct_name));
+                ::tracing::debug!("{} build 成功",stringify!(#struct_name));
                 comp
             }
         }

@@ -45,7 +45,7 @@ impl CompInit for WebPlugin {
 
     /// 插件初始化排序，在日志之后初始化
     fn init_sort() -> i32 {
-        i32::MIN + 100
+        0
     }
 }
 

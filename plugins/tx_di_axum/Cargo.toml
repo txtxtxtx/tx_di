@@ -9,8 +9,11 @@ repository.workspace = true
 
 [dependencies]
 tx-di-core.workspace = true
+linkme.workspace = true
+tx_di_log.workspace = true
 axum.workspace = true
 tokio.workspace = true
 serde.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
+
