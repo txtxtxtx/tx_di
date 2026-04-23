@@ -10,9 +10,10 @@ pub mod comp;
 pub mod common;
 
 use crate::di::comp::config::AppAllConfig;
-use crate::{topo_sort, CompRef, ComponentDescriptor, ComponentMeta, Scope, COMPONENT_REGISTRY, RIE};
+use crate::{topo_sort, CompRef, ComponentDescriptor, ComponentMeta, Scope, COMPONENT_REGISTRY, IE, RIE};
 use dashmap::DashMap;
 use std::any::{Any, TypeId};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use log::debug;
@@ -234,23 +235,33 @@ impl crate::BuildContext {
     }
 
     /// 打印所有已注册的组件（调试用）
-    pub fn debug_registry() {
+    pub fn debug_registry() ->RIE<()> {
+        let metas: Vec<&ComponentMeta> = COMPONENT_REGISTRY.iter().collect();
+        let id_to_idx: HashMap<TypeId, (usize,&str)> = metas
+            .iter()
+            .enumerate()
+            .map(|(i, m)| ((m.type_id)(), (i,m.name)))
+            .collect();
+        let ans = topo_sort(&metas);
 
-        for meta in COMPONENT_REGISTRY.iter() {
+        debug!("组件注册表：");
+        debug!("{:20} scope  deps", "name");
+        for meta in ans.iter() {
+            let meta = metas[id_to_idx.get(meta).ok_or_else(||IE::Other("组件注册表错误".to_string()))?.0];
             let dep_names: Vec<&str> = meta.deps.iter().map(|dep_fn| {
                 COMPONENT_REGISTRY.iter()
                     .find(|m| (m.type_id)() == dep_fn())
                     .map(|m| m.name)
                     .unwrap_or("unknown")
             }).collect();
-
             debug!(
-                "  {:20} scope={:?}  deps=[{}]",
+                "{:20} {:?}  [{}]",
                 meta.name,
                 meta.scope,
                 dep_names.join(", ")
-            );
+            )
         }
+        Ok(())
     }
 
     fn init(&mut self) ->RIE<()> {
