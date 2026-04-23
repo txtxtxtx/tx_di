@@ -94,6 +94,7 @@ impl crate::BuildContext {
             }
         }
     }
+
     /// 注册已擦除类型的工厂函数（用于从 COMPONENT_REGISTRY 批量注册）。
     pub fn register_factory_boxed(
         &mut self,
@@ -234,22 +235,13 @@ impl crate::BuildContext {
             .unwrap_or_else(|_| panic!("[di] downcast 失败：{}", std::any::type_name::<T>()))
     }
 
-    /// 取出单例的 Arc。
-    pub fn get_arc<T: ComponentDescriptor>(&mut self) -> Arc<T> {
-        self.inject::<T>()
-    }
-
-    /// 获取单例的 Arc。
-    pub fn get_arc_ref<T: ComponentDescriptor>(& self) -> Arc<T> {
-        self.get::<T>()
-    }
-
     /// 从上下文中取出并移除单例（所有权）。
-    pub fn take<T: Any + Send + Sync + 'static>(&mut self) -> T {
+    pub fn take<T: Any + Send + Sync + 'static>(&mut self) -> RIE<T> {
+        let name = std::any::type_name::<T>();
         let entry = self
             .store
             .remove(&TypeId::of::<T>())
-            .unwrap_or_else(|| panic!("[di] take::<{}> 未找到", std::any::type_name::<T>()))
+            .ok_or_else(|| IE::Other(format!("取出组件失败,未找到该组件:{name}")))?
             .1;
 
         match entry {
@@ -257,18 +249,11 @@ impl crate::BuildContext {
                 let arc_t: Arc<T> = any_arc.downcast::<T>().unwrap_or_else(|_| {
                     panic!("[di] take downcast 失败：{}", std::any::type_name::<T>())
                 });
-                Arc::try_unwrap(arc_t).unwrap_or_else(|_| {
-                    panic!(
-                        "[di] take::<{}> 失败：仍有其他强引用（Arc 计数 > 1）",
-                        std::any::type_name::<T>()
-                    )
-                })
+                Arc::try_unwrap(arc_t)
+                    .map_err(|_| IE::Other(format!("取出组件失败,无法获取所有权:{name}")))
             }
             _ => {
-                panic!(
-                    "[di] take::<{}> 只能用于单例组件",
-                    std::any::type_name::<T>()
-                )
+                Err(IE::Other(format!("取出组件失败,该组件不是单例:{name}")))
             }
         }
     }
