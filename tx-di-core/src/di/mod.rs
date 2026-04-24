@@ -16,7 +16,7 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use log::debug;
+use tracing::debug;
 
 pub struct BuildContext {
     /// TypeId → CompRef（使用 DashMap 支持并发访问）

@@ -2,7 +2,7 @@ pub mod comp_ref;
 pub mod config;
 
 use std::any::{Any, TypeId};
-use log::debug;
+use tracing::debug;
 use crate::{App, BoxFuture, BuildContext, Scope};
 use crate::di::common::RIE;
 use std::collections::{BinaryHeap, HashMap};
