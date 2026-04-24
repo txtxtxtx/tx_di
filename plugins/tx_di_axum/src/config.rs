@@ -1,7 +1,6 @@
 use serde::Deserialize;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use axum::extract::Path;
 use tx_di_core::{tx_comp, CompInit, RIE};
 
 /// Web 服务器配置结构体
