@@ -21,6 +21,7 @@ use log::debug;
 pub struct BuildContext {
     /// TypeId → CompRef（使用 DashMap 支持并发访问）
     store: DashMap<TypeId, CompRef>,
+    metas: Vec<&'static ComponentMeta>
 }
 
 impl crate::BuildContext {
@@ -36,6 +37,7 @@ impl crate::BuildContext {
     pub fn new<P: Into<PathBuf>>(config_path: Option<P>) -> Self {
         let mut ctx = Self {
             store: DashMap::new(),
+            metas: vec![]
         };
         // 加载配置文件并放入全局上下文
         let app_configs = AppAllConfig::new(config_path);
@@ -59,6 +61,7 @@ impl crate::BuildContext {
                 if let Some(factory_fn) = meta.factory_fn {
                     self.register_factory_boxed((meta.type_id)(), meta.scope, factory_fn);
                 }
+                self.metas.push(meta);
             }
         }
     }
@@ -280,7 +283,7 @@ impl crate::BuildContext {
         let ans = topo_sort(&metas);
 
         debug!("组件注册表：");
-        debug!("{:20} scope  deps", "name");
+        debug!("{:20} scope      deps", "name");
         for meta in ans.iter() {
             let meta = metas[id_to_idx.get(meta).ok_or_else(||IE::Other("组件注册表错误".to_string()))?.0];
             let dep_names: Vec<&str> = meta.deps.iter().map(|dep_fn| {
@@ -297,6 +300,120 @@ impl crate::BuildContext {
             )
         }
         Ok(())
+    }
+
+    /// 构建 App 实例，完成所有初始化并将 store 转移
+    ///
+    /// 该方法会按顺序执行：
+    /// 1. 同步初始化：调用所有组件的 init() 函数
+    /// 2. 异步初始化：调用所有组件的 async_init() 函数
+    /// 3. 转移所有权：使用 std::mem::replace 将 self.store 移动到 App
+    ///
+    /// # 返回值
+    ///
+    /// 返回包含所有已初始化组件的 App 实例
+    ///
+    /// # 注意
+    ///
+    /// 调用此方法后，self.store 会被替换为空的 DashMap，
+    /// 此 BuildContext 实例不应再继续使用。
+    pub async fn build(&mut self) -> RIE<App>{
+        // 使用 std::mem::replace 将 self.store 替换为空的 DashMap，取出原来的 store
+        // 这样可以在不获取 self 所有权的情况下，将 store 移动出去
+        let store = std::mem::replace(&mut self.store, DashMap::new());
+        let metas: Vec<&ComponentMeta> = std::mem::replace(&mut self.metas, Vec::new());
+        Ok(App{
+            store,
+            metas
+        })
+    }
+}
+
+impl Default for crate::BuildContext {
+    fn default() -> Self {
+        Self::new::<PathBuf>(None)
+    }
+}
+
+/// 固定的组件上下文
+pub struct App {
+    pub store: DashMap<TypeId, CompRef>,
+    pub metas: Vec<&'static ComponentMeta>
+}
+
+impl App {
+    /// 获取单例,原型再固定期就不能直接获取了
+    pub fn inject<T: Any + Send + Sync + 'static + ComponentDescriptor>(&self) -> Arc<T> {
+        let tid = TypeId::of::<T>();
+        self.store
+            .get(&tid)
+            .map(|entry| match &*entry {
+                CompRef::Cached(any_arc) => any_arc.clone(),
+                CompRef::Factory(one) => {
+                    panic!(
+                        "[di] inject_singleton::<{}> 错误：组件注册为 Prototype",
+                        std::any::type_name::<T>()
+                    )
+                }
+            })
+            .unwrap_or_else(|| {
+                panic!(
+                    "[di] inject::<{}> 未找到，请确认该组件已注册（使用 #[tx_comp] 注解）",
+                    std::any::type_name::<T>()
+                )
+            })
+            .downcast::<T>()
+            .unwrap_or_else(|_| {
+                panic!(
+                    "[di] inject singleton downcast 失败：{}",
+                    std::any::type_name::<T>()
+                )
+            })
+    }
+    
+    /// 尝试获取单例组件，失败时返回 None
+    ///
+    /// 该方法用于安全地获取已缓存的单例组件，不会 panic。
+    /// 适用于运行时可能不存在某些组件的场景。
+    ///
+    /// # 返回值
+    ///
+    /// - `Some(Arc<T>)`: 组件存在且类型匹配
+    /// - `None`: 组件未注册、是 Prototype 类型、或类型转换失败
+    ///
+    /// # 注意
+    ///
+    /// - 只能获取 Singleton 类型的组件，Prototype 组件始终返回 None
+    /// - 不进行类型检查的 panic，失败时静默返回 None
+    pub fn try_inject<T: Any + Send + Sync + 'static + ComponentDescriptor>(&self) -> Option<Arc<T>> {
+        let tid = TypeId::of::<T>();
+        self.store
+            .get(&tid)
+            .map(|entry| match &*entry {
+                // 单例：克隆 Arc 引用
+                CompRef::Cached(any_arc) => Some(any_arc.clone()),
+                // 原型组件：App 阶段不支持动态创建，返回 None
+                CompRef::Factory(one) => {
+                    None
+                }
+            })
+            .flatten()
+            .and_then(|any_arc| {
+                // 尝试向下转型为目标类型，失败则返回 None
+                any_arc.downcast::<T>().ok()
+            })
+    }
+
+    /// 获取组件的总数
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.store.len()
+    }
+
+    /// 检查App是否为空
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.store.is_empty()
     }
 
     fn init(&mut self) ->RIE<()> {
@@ -332,17 +449,10 @@ impl crate::BuildContext {
         Ok(())
     }
 
+    /// 运行 App
     pub async fn run(&mut self) -> RIE<()>{
-        // 同步初始化
         self.init()?;
-        // 异步初始化
         self.async_init().await?;
         Ok(())
-    }
-}
-
-impl Default for crate::BuildContext {
-    fn default() -> Self {
-        Self::new::<PathBuf>(None)
     }
 }
