@@ -1,7 +1,7 @@
 use std::any::{Any, TypeId};
 use std::pin::Pin;
 use std::sync::Arc;
-use crate::{BuildContext, Scope};
+use crate::{App, BuildContext, Scope};
 use crate::di::common::RIE;
 
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -9,6 +9,11 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 /// 存储单元：
 /// - `Factory(Arc<dyn Fn>)` → 存工厂闭包，prototype 每次注入时调用
 /// - `Cached(Arc<dyn Any>)` → 已实例化的单例（擦除类型）
+///
+/// # 线程安全性
+///
+/// `Factory` 中的闭包必须实现 `Send + Sync`，以确保 `CompRef` 可以安全地
+/// 在多线程环境中使用（存储在 DashMap 中）。
 pub enum CompRef {
     Factory(Arc<dyn Fn(&mut BuildContext) -> Arc<dyn Any + Send + Sync> + Send + Sync>),
     Cached(Arc<dyn Any + Send + Sync>),
@@ -102,13 +107,13 @@ pub trait CompInit :Any + Sized + Send + Sync + 'static{
     }
     /// 同步初始化方法
     #[allow(unused_variables)]
-    fn init(ctx: &mut BuildContext) ->RIE<()> {
+    fn init(ctx: &mut App) ->RIE<()> {
         Ok(())
     }
 
     /// 异步初始化方法
     #[allow(unused_variables)]
-    fn async_init(ctx: &mut BuildContext) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(ctx: &mut App) -> BoxFuture<'static, RIE<()>> {
         Box::pin(async {
             Ok(())
         })
