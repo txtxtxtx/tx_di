@@ -349,7 +349,7 @@ impl App {
             .get(&tid)
             .map(|entry| match &*entry {
                 CompRef::Cached(any_arc) => any_arc.clone(),
-                CompRef::Factory(one) => {
+                CompRef::Factory(_) => {
                     panic!(
                         "[di] inject_singleton::<{}> 错误：组件注册为 Prototype",
                         std::any::type_name::<T>()
@@ -393,7 +393,7 @@ impl App {
                 // 单例：克隆 Arc 引用
                 CompRef::Cached(any_arc) => Some(any_arc.clone()),
                 // 原型组件：App 阶段不支持动态创建，返回 None
-                CompRef::Factory(one) => {
+                CompRef::Factory(_) => {
                     None
                 }
             })
