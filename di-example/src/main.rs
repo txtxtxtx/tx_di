@@ -198,7 +198,7 @@ async fn run() ->RIE<()> {
     // 方式 2：从配置文件加载指定组件（取消注释使用）
     // let mut ctx = BuildContext::new(Some("../configs/di-config.toml"));
     
-    ctx.run().await.expect("TODO: panic message");
+    ctx.build().await.expect("TODO: panic message");
     info!("构建完成");
     
     // WebPlugin 已自动启动 web 服务器
