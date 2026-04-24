@@ -2,12 +2,13 @@ mod config;
 mod comp;
 mod bound;
 mod e;
+mod r;
 
 use tx_di_core::BuildContext;
 use tx_di_log;
 pub use config::*;
 pub use comp::*;
-
+pub use r::R;
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -18,9 +19,11 @@ mod tests {
         // tx_di_log::LogConfig::init_sort();
         // D:\proj\tx_di\configs\di-config.toml
         // C:\a_me\proj\rust\tx_di\configs\di-config.toml
-        let mut ctx = BuildContext::new(Some(r"C:\a_me\proj\rust\tx_di\configs\di-config.toml"));
+        let mut ctx = BuildContext::new(Some(r"D:\proj\tx_di\configs\di-config.toml"));
         BuildContext::debug_registry().expect("TODO: panic message");
-        ctx.run().await.expect("TODO: panic message")
+        let mut app = ctx.build().await.expect("TODO: panic message");
+        app.run().await.expect("TODO: panic message");
+
     }
 
     #[tokio::test]

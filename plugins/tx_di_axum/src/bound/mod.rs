@@ -3,11 +3,11 @@ use std::ops::Deref;
 use std::sync::Arc;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
-use tx_di_core::{BuildContext, ComponentDescriptor, IE, RIE};
+use tx_di_core::{App, BuildContext, ComponentDescriptor, IE, RIE};
 use crate::e::WebErr;
 
 pub struct AppStatus {
-    pub di_context: Arc<BuildContext>,
+    pub app: Arc<App>,
 }
 
 pub trait RequestPartsExt {
@@ -24,8 +24,8 @@ impl RequestPartsExt for Parts {
 
     fn get_comp<T: ComponentDescriptor>(&self) -> RIE<Arc<T>> {
         self.app_status()
-            .di_context
-            .try_get_singleton::<T>()
+            .app
+            .try_inject::<T>()
             .ok_or_else(|| IE::Other(format!(
                 "组件 {} 未在 DI 容器中找到，请确认已用 #[tx_comp] 注解并完成初始化",
                 std::any::type_name::<T>()
