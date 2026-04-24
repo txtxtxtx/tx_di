@@ -1,11 +1,14 @@
 use std::any::Any;
 use std::ops::Deref;
 use std::sync::Arc;
-use axum::extract::FromRequestParts;
+use axum::extract::{FromRequestParts, State};
+use axum::http::Request;
 use axum::http::request::Parts;
+use axum::middleware::Next;
 use tx_di_core::{App, BuildContext, ComponentDescriptor, IE, RIE};
 use crate::e::WebErr;
 
+#[derive(Clone)]
 pub struct AppStatus {
     pub app: Arc<App>,
 }

@@ -1,11 +1,16 @@
 use std::any::{type_name, Any};
 use std::sync::{Arc, LazyLock, RwLock};
 use axum::{Router, routing::get};
+use axum::extract::State;
+use axum::http::Request;
 use axum::response::IntoResponse;
 use tokio::net::TcpListener;
+use tower::util::ServiceFn;
 use tracing::{info, error, debug};
 use tx_di_core::{tx_comp, ApiR, ApiRes, App, BoxFuture, BuildContext, CompInit, FormattedDateTime, RIE};
+use tx_di_log::LogPlugins;
 use crate::{WebConfig, R};
+use crate::bound::{AppStatus, DiComp};
 
 /// 全局路由器注册表
 ///
@@ -46,14 +51,25 @@ impl CompInit for WebPlugin {
     fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
         info!("Web 服务器插件初始化中...");
         self.router = WebPlugin::merge_routers()
-            .route("/health", get(health_check));
+            .route("/health", get(health_check))
+            .route("/di", get(hello_di));
+
         Ok(())
     }
-    fn async_init(ctx: &mut App) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(ctx: Arc<App>) -> BoxFuture<'static, RIE<()>> {
         let config = ctx.inject::<WebConfig>();
         let web = ctx.inject::<WebPlugin>();
+        let app_status = AppStatus { app: ctx.clone() };
+        let router = web.router.clone()
+            // 吧 app 注入到 extensions
+            .layer(tower::ServiceBuilder::new()
+            .map_request(move |mut req: Request<_>| {
+                req.extensions_mut().insert(app_status.clone());
+                req
+            })
+            .into_inner());
         Box::pin(async move {
-            start_server(config, web).await?;
+            start_server(config, router).await?;
             Ok(())
         })
     }
@@ -223,6 +239,9 @@ async fn health_check() -> R<FormattedDateTime> {
     ApiR::success(FormattedDateTime::now()).into()
 }
 
+async fn hello_di(log_plugins: DiComp<LogPlugins>) -> R<String> {
+    R::from(ApiR::success(log_plugins.config.level.as_str().into()))
+}
 /// 启动 web 服务器
 ///
 /// # Arguments
@@ -233,17 +252,15 @@ async fn health_check() -> R<FormattedDateTime> {
 /// # Errors
 ///
 /// 如果服务器绑定失败或运行出错，将返回错误
-async fn start_server(config: Arc<WebConfig>, web: Arc<WebPlugin>) -> RIE<()> {
+async fn start_server(config: Arc<WebConfig>, router: Router) -> RIE<()> {
     let addr = config.socket_addr()?;
-    
-    info!("Web 服务器正在监听: {}", addr);
+
     info!("CORS 启用状态: {}", config.enable_cors);
     info!("最大请求体大小: {} bytes", config.max_body_size);
     info!("静态文件夹路径:{}",config.static_dir);
-
+    info!("Web 服务器正在监听: {}", addr);
     let listener = TcpListener::bind(addr).await?;
-    
-    axum::serve(listener, web.router.clone())
+    axum::serve(listener, router)
         .await
         .map_err(|e| anyhow::anyhow!("Web 服务器运行失败: {}", e))?;
 
