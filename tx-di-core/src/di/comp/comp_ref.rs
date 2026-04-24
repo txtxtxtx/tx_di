@@ -107,13 +107,13 @@ pub trait CompInit :Any + Sized + Send + Sync + 'static{
     }
     /// 同步初始化方法
     #[allow(unused_variables)]
-    fn init(ctx: &mut App) ->RIE<()> {
+    fn init(ctx: Arc<App>) ->RIE<()> {
         Ok(())
     }
 
     /// 异步初始化方法
     #[allow(unused_variables)]
-    fn async_init(ctx: &mut App) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(ctx: Arc<App>) -> BoxFuture<'static, RIE<()>> {
         Box::pin(async {
             Ok(())
         })

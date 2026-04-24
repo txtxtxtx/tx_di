@@ -7,6 +7,7 @@ use crate::{App, BoxFuture, BuildContext, Scope};
 use crate::di::common::RIE;
 use std::collections::{BinaryHeap, HashMap};
 use std::cmp::Reverse;
+use std::sync::Arc;
 
 #[linkme::distributed_slice]
 pub static COMPONENT_REGISTRY: [ComponentMeta] = [..];
@@ -53,8 +54,8 @@ pub struct ComponentMeta {
     pub factory_fn: Option<fn(&mut BuildContext) -> Box<dyn Any + Send + Sync>>,
 
     pub init_sort_fn: fn() -> i32,
-    pub init_fn: Option<fn(&mut App) -> RIE<()>>,
-    pub async_init_fn: Option<fn(&mut App)-> BoxFuture<'static, RIE<()>>>,
+    pub init_fn: Option<fn(Arc<App>) -> RIE<()>>,
+    pub async_init_fn: Option<fn(Arc<App>)-> BoxFuture<'static, RIE<()>>>,
 }
 
 /// 对组件元数据进行拓扑排序，确定组件的构建顺序。 `Kahn算法`

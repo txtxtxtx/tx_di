@@ -327,6 +327,11 @@ impl crate::BuildContext {
             metas
         })
     }
+    /// 构建 App 运行
+    pub async fn build_and_run(&mut self) -> RIE<()> {
+        let app = self.build().await?;
+        App::run(Arc::new(app)).await
+    }
 }
 
 impl Default for crate::BuildContext {
@@ -416,7 +421,7 @@ impl App {
         self.store.is_empty()
     }
 
-    fn init(&mut self) ->RIE<()> {
+    fn init(app: Arc<App>) ->RIE<()> {
         let mut metas: Vec<&ComponentMeta> = COMPONENT_REGISTRY
             .iter()
             .filter(|m| m.async_init_fn.is_some())
@@ -427,13 +432,13 @@ impl App {
         for meta in metas {
             if let Some(init_fn) = meta.init_fn {
                 // 直接调函数指针，传入 &mut self（DashMap 的 owner）
-                init_fn(self)?;
+                init_fn(app.clone())?;
             }
         }
         Ok(())
     }
 
-    async fn async_init(&mut self) -> RIE<()> {
+    async fn async_init(app: Arc<App>) -> RIE<()> {
         let mut metas: Vec<&ComponentMeta> = COMPONENT_REGISTRY
             .iter()
             .filter(|m| m.async_init_fn.is_some())
@@ -443,16 +448,16 @@ impl App {
 
         for meta in metas {
             if let Some(async_init_fn) = meta.async_init_fn {
-                async_init_fn(self).await?;
+                async_init_fn(app.clone()).await?;
             }
         }
         Ok(())
     }
 
     /// 运行 App
-    pub async fn run(&mut self) -> RIE<()>{
-        self.init()?;
-        self.async_init().await?;
+    pub async fn run(app: Arc<App>) -> RIE<()>{
+        App::init(app.clone())?;
+        App::async_init(app).await?;
         Ok(())
     }
 }
