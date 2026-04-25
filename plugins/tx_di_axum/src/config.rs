@@ -3,6 +3,8 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use tracing::info;
 use tx_di_core::{tx_comp, BuildContext, CompInit, RIE};
+use crate::layers::{add_layer};
+use crate::layers::api_log::ApiLogLayer;
 
 /// Web 服务器配置结构体
 ///
@@ -70,8 +72,14 @@ pub struct WebConfig {
 }
 
 impl CompInit for WebConfig {
-    fn inner_init(&mut self, ctx: &mut BuildContext) -> RIE<()>{
-        info!("WebConfig init:{:?}",&self);
+    fn inner_init(&mut self, ctx: &mut BuildContext) -> RIE<()> {
+        // 使用 clone() 复制 layers 的值，避免借用问题
+        // if let Some(layers) = &self.layers.clone() {
+        //     for (priority, layer) in layers {
+        //         add_layer(layer, *priority)?;
+        //     }
+        // }
+        add_layer(ApiLogLayer, 2);
         Ok(())
     }
     fn init_sort() -> i32 {
