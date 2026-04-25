@@ -32,15 +32,18 @@ pub trait DynMiddleware: Send + Sync {
 }
 
 /// 为任何满足条件的 Layer 自动实现 DynMiddleware
-impl<L, S> DynMiddleware for L
+///
+/// 支持所有可以应用到 axum::routing::Route 上的 Layer，
+/// 包括 tower-http 提供的各种中间件（TraceLayer、CorsLayer、CompressionLayer 等）
+impl<L> DynMiddleware for L
 where
-    L: Layer<Route, Service = S> + Clone + Send + Sync + 'static,
-    S: tower::Service<
-        Request<Body>,
-        Response = Response<Body>,
-        Error = std::convert::Infallible,
-    > + Clone + Send + Sync + 'static,
-    <S as tower::Service<Request<Body>>>::Future: Send + 'static,
+// 条件1: L 必须是一个能作用于 Route 的 Layer，且可克隆、线程安全、生命周期足够长
+    L: Layer<Route> + Clone + Send + Sync + 'static,
+// 条件2: Layer 处理后产生的 Service 必须是 tower 的服务
+    <L as Layer<Route>>::Service: tower::Service<Request<Body>> + Clone + Send + Sync + 'static,
+    <<L as Layer<Route>>::Service as tower::Service<Request<Body>>>::Future: Send + 'static,
+    <<L as Layer<Route>>::Service as tower::Service<Request<Body>>>::Response: axum::response::IntoResponse + 'static,
+    <<L as Layer<Route>>::Service as tower::Service<Request<Body>>>::Error: Into<std::convert::Infallible> + 'static,
 {
     fn apply_to_router(&self, router: Router) -> Router {
         router.layer(self.clone())
@@ -88,6 +91,19 @@ pub fn get_layer_by_name(name: impl Into<String>) -> Option<Arc<dyn DynMiddlewar
     match name.as_str() {
         "api_log" => {
             Some(Arc::new(api_log::ApiLogLayer))
+        }
+        "cors" => {
+            Some(Arc::new(tower_http::cors::CorsLayer::permissive()))
+        }
+        "trace" => {
+            Some(Arc::new(tower_http::trace::TraceLayer::new_for_http()))
+        }
+        "timeout" => {
+            use std::time::Duration;
+            Some(Arc::new(tower_http::timeout::TimeoutLayer::new(Duration::from_secs(30))))
+        }
+        "compression" => {
+            Some(Arc::new(tower_http::compression::CompressionLayer::new()))
         }
         _ => {
             error!("无法获取中间件: {}", name);

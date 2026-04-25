@@ -73,7 +73,7 @@ pub struct WebConfig {
 
 impl CompInit for WebConfig {
     fn inner_init(&mut self, ctx: &mut BuildContext) -> RIE<()> {
-        // 使用 clone() 复制 layers 的值，避免借用问题
+        // 注册配置的中间件
         if let Some(layers) = &self.layers.clone() {
             for (priority, layer) in layers {
                 add_layer_by_name(layer, *priority);
