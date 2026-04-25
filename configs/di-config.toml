@@ -2,17 +2,22 @@
 # 此文件用于演示从配置文件加载组件配置
 
 [log_config]
-level = "debug"
-prefix = "di-axum"
-dir = "./logs"
-console_output = true
+level = "debug"             # 日志级别
+prefix = "di-axum"          # 日志前缀
+dir = "./logs"              # 日志目录
+console_output = true       # 控制台输出日志
 
 [web_config]
 # IPv4 配置
 host = "127.0.0.1"
 # IPv6 配置（取消注释使用）
-# host = "::1"          # IPv6 localhost
-# host = "::"           # 监听所有 IPv6 接口
+# host = "::1"              # IPv6 localhost
+# host = "::"               # 监听所有 IPv6 接口
 port = 8888
-enable_cors = true
-max_body_size = 10485760
+enable_cors = true          # 允许跨域
+max_body_size = 10485760    # 10M
+layers = [                  # 中间件配置
+    [1,"auth"],
+    [2,"api_log"],
+    [3,"zip"]
+]

@@ -13,6 +13,7 @@ linkme.workspace = true
 tx_di_log.workspace = true
 axum.workspace = true
 tokio.workspace = true
+socket2.workspace = true
 serde.workspace = true
 anyhow.workspace = true
 tracing.workspace = true

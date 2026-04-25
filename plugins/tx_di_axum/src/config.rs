@@ -1,7 +1,8 @@
 use serde::Deserialize;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use tx_di_core::{tx_comp, CompInit, RIE};
+use tracing::info;
+use tx_di_core::{tx_comp, BuildContext, CompInit, RIE};
 
 /// Web 服务器配置结构体
 ///
@@ -64,13 +65,23 @@ pub struct WebConfig {
     /// 静态文件目录
     #[serde(default = "default_static_dir")]
     pub static_dir: String,
+    /// 中间件列表
+    pub layers: Option<Vec<(i32,String)>>
 }
 
 impl CompInit for WebConfig {
+    fn inner_init(&mut self, ctx: &mut BuildContext) -> RIE<()>{
+        info!("WebConfig init:{:?}",&self);
+        Ok(())
+    }
     fn init_sort() -> i32 {
         i32::MAX
     }
 }
+
+
+
+
 
 impl WebConfig {
     /// 获取完整的监听地址

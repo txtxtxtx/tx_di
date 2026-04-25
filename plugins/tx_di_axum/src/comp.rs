@@ -1,16 +1,13 @@
-use std::any::{type_name, Any};
-use std::sync::{Arc, LazyLock, RwLock};
-use axum::{Router, routing::get};
-use axum::extract::State;
-use axum::http::Request;
-use axum::response::IntoResponse;
-use tokio::net::TcpListener;
-use tower::util::ServiceFn;
-use tracing::{info, error, debug};
-use tx_di_core::{tx_comp, ApiR, ApiRes, App, BoxFuture, BuildContext, CompInit, FormattedDateTime, RIE};
-use tx_di_log::LogPlugins;
-use crate::{WebConfig, R};
+use std::net::{SocketAddr, TcpListener};
 use crate::bound::{AppStatus, DiComp};
+use crate::{WebConfig, R};
+use axum::http::Request;
+use axum::{routing::get, Router};
+use std::sync::{Arc, LazyLock, RwLock};
+use socket2::{Domain, Protocol, Socket, Type};
+use tokio::net::TcpListener as TokioTcpListener;
+use tracing::{debug, error, info};
+use tx_di_core::{tx_comp, ApiR, App, BoxFuture, BuildContext, CompInit, FormattedDateTime, RIE};
 
 /// 全局路由器注册表
 ///
@@ -232,6 +229,45 @@ impl WebPlugin {
     }
 }
 
+fn create_tcp_listener(addr: SocketAddr) -> RIE<TokioTcpListener> {
+    // 根据地址类型选择 socket 域
+    let domain = if addr.is_ipv6() {
+        Domain::IPV6
+    } else {
+        Domain::IPV4
+    };
+    // 创建一个 IPv6 socket
+    let socket = Socket::new(domain, Type::STREAM, Some(Protocol::TCP))?;
+
+    // 仅在 IPv6 时禁用 IPV6_V6ONLY，使 IPv6 socket 也能接受 IPv4 连接（双栈）
+    if addr.is_ipv6() {
+        socket.set_only_v6(false)?;
+    }
+
+    // 允许地址重用（可选，便于重启）
+    socket.set_reuse_address(true)?;
+
+    #[cfg(unix)]
+    socket.set_reuse_port(true)?; // Windows 不支持 SO_REUSEPORT
+
+    // 绑定地址
+    socket.bind(&addr.into())?;
+
+    // 设置监听队列长度（以系统的最大值限制）
+    socket.listen(65536)?;
+
+    // 设置为非阻塞
+    socket.set_nonblocking(true)?;
+
+    // 转换为标准库的 TcpListener
+    let listener: TcpListener = socket.into();
+
+    // 转换为 Tokio 的 TcpListener
+    let tokio_listener = TokioTcpListener::from_std(listener)?;
+
+    Ok(tokio_listener)
+}
+
 /// 健康检查端点
 ///
 /// 返回简单的 OK 响应，用于负载均衡器或监控系统的健康检查
@@ -239,8 +275,8 @@ async fn health_check() -> R<FormattedDateTime> {
     ApiR::success(FormattedDateTime::now()).into()
 }
 
-async fn hello_di(log_plugins: DiComp<LogPlugins>) -> R<String> {
-    R::from(ApiR::success(log_plugins.config.level.as_str().into()))
+async fn hello_di(web_config: DiComp<WebConfig>) -> R<String> {
+    R::from(ApiR::success(web_config.address()))
 }
 /// 启动 web 服务器
 ///
@@ -259,7 +295,7 @@ async fn start_server(config: Arc<WebConfig>, router: Router) -> RIE<()> {
     info!("最大请求体大小: {} bytes", config.max_body_size);
     info!("静态文件夹路径:{}",config.static_dir);
     info!("Web 服务器正在监听: {}", addr);
-    let listener = TcpListener::bind(addr).await?;
+    let listener = create_tcp_listener(addr)?;
     axum::serve(listener, router)
         .await
         .map_err(|e| anyhow::anyhow!("Web 服务器运行失败: {}", e))?;

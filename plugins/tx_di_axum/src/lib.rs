@@ -3,20 +3,19 @@ mod comp;
 mod bound;
 mod e;
 mod r;
+mod layers;
 
-use tx_di_core::BuildContext;
-use tx_di_log;
 pub use config::*;
 pub use comp::*;
 pub use r::R;
 #[cfg(test)]
 mod tests {
-    use tx_di_core::App;
+    use tx_di_core::{BuildContext,App};
+    use tx_di_log;
     use super::*;
 
     #[tokio::test]
     async fn it_works() {
-        use tx_di_log;
         // tx_di_log::LogConfig::init_sort();
         // D:\proj\tx_di\configs\di-config.toml
         // C:\a_me\proj\rust\tx_di\configs\di-config.toml
@@ -33,6 +32,7 @@ mod tests {
             enable_cors: false,
             max_body_size: 10485760,
             static_dir: "./static".to_string(),
+            layers: None
         };
         assert_eq!(config.address(), "127.0.0.1:8080");
         assert!(config.socket_addr().is_ok());
@@ -46,6 +46,7 @@ mod tests {
             enable_cors: false,
             max_body_size: 10485760,
             static_dir: "./static".to_string(),
+            layers: None
         };
         
         // IPv6 地址应该自动添加方括号
@@ -61,6 +62,7 @@ mod tests {
             enable_cors: false,
             max_body_size: 10485760,
             static_dir: "./static".to_string(),
+            layers: None
         };
         
         assert_eq!(config.address(), "[::]:3000");
@@ -75,6 +77,7 @@ mod tests {
             enable_cors: false,
             max_body_size: 10485760,
             static_dir: "./static".to_string(),
+            layers: None
         };
         
         assert_eq!(config.address(), "[2001:db8::1]:9090");
