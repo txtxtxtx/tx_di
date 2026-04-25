@@ -47,7 +47,7 @@ impl CompInit for WebPlugin {
         let config = ctx.inject::<WebConfig>();
         let web = ctx.inject::<WebPlugin>();
         let app_status = AppStatus { app: ctx.clone() };
-        let router = web.router.clone()
+        let mut router = web.router.clone()
             // 吧 app 注入到 extensions
             .layer(tower::ServiceBuilder::new()
             .map_request(move |mut req: Request<_>| {
@@ -55,6 +55,8 @@ impl CompInit for WebPlugin {
                 req
             })
             .into_inner());
+        // 添加中间件
+        router = WebPlugin::layer_with_router(router);
         Box::pin(async move {
             start_server(config, router).await?;
             Ok(())
@@ -117,22 +119,28 @@ impl WebPlugin {
         } else {
             error!("无法获取路由器注册表的读锁");
         }
-        
+
+        main_router
+    }
+
+    /// 应用所有中间件层
+    pub fn layer_with_router(router: Router) -> Router {
+        let mut router = router;
         // 应用所有中间件层（按优先级排序）sort 大的在外层，sort 小的在内层
         if let Ok(layers) = LAYER_REGISTRY.read() {
             let mut sorted_layers: Vec<_> = layers.iter().collect();
             sorted_layers.sort_by_key(|(sort, _)| *sort);
 
             for (_, middleware) in &sorted_layers {
-                main_router = middleware.apply_to_router(main_router);
+                router = middleware.apply_to_router(router);
             }
             debug!("已应用 {} 个中间件层（已按优先级排序）", sorted_layers.len());
         } else {
             error!("无法获取中间件注册表的读锁");
         }
-        
-        main_router
+        router
     }
+
 
     /// 清空所有已注册的路由器
     ///

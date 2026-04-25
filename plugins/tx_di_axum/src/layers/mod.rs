@@ -67,3 +67,32 @@ where
         error!("无法获取中间件注册表的写锁");
     }
 }
+
+pub fn add_arc_layer(middleware: Arc<dyn DynMiddleware>, sort: i32)
+{
+    if let Ok(mut layers) = LAYER_REGISTRY.write() {
+        layers.push((sort, middleware));
+        info!("中间件层已注册到全局注册表: sort={}", sort);
+    } else {
+        error!("无法获取中间件注册表的写锁");
+    }
+}
+pub fn add_layer_by_name(name: impl Into<String>, sort: i32){
+    if let Some(middleware) = get_layer_by_name(name) {
+        add_arc_layer(middleware, sort);
+    }
+}
+/// 通过名称获取中间件
+pub fn get_layer_by_name(name: impl Into<String>) -> Option<Arc<dyn DynMiddleware>> {
+    let name = name.into();
+    match name.as_str() {
+        "api_log" => {
+            Some(Arc::new(api_log::ApiLogLayer))
+        }
+        _ => {
+            error!("无法获取中间件: {}", name);
+            None
+        }
+    }
+
+}
