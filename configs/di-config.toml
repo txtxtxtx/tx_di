@@ -6,7 +6,7 @@ level = "debug"             # 日志级别
 prefix = "di-axum"          # 日志前缀
 dir = "./logs"              # 日志目录
 console_output = true       # 控制台输出日志
-
+time_format = "local"       # local / utc
 [web_config]
 # IPv4 配置
 host = "127.0.0.1"
@@ -19,7 +19,7 @@ max_body_size = 10485760    # 10M
 layers = [
     [1,"auth"],           # 最内层，最靠近 Handler
     [2,"api_log"],        #
-    [3,"trace"],          #
+#    [3,"trace"],          #
     [4,"compression"],    # 同一优先级，顺序不确定
     [5,"static"],         #
     [6,"json"],           #

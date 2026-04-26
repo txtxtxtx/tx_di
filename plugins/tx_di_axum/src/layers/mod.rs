@@ -19,7 +19,8 @@ use axum::http::{Request, Response};
 use axum::Router;
 use axum::routing::Route;
 use tower::Layer;
-use tracing::{error, info};
+use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer};
+use tracing::{error, info, Level};
 
 pub mod api_log;
 
@@ -96,7 +97,21 @@ pub fn get_layer_by_name(name: impl Into<String>) -> Option<Arc<dyn DynMiddlewar
             Some(Arc::new(tower_http::cors::CorsLayer::permissive()))
         }
         "trace" => {
-            Some(Arc::new(tower_http::trace::TraceLayer::new_for_http()))
+            // 创建自定义的 TraceLayer，配置日志输出格式
+            let trace_layer = TraceLayer::new_for_http()
+                .make_span_with(
+                    DefaultMakeSpan::new()
+                        .level(Level::INFO)
+                        .include_headers(true)
+                )
+                .on_request(
+                    DefaultOnRequest::new().level(Level::INFO)
+                )
+                .on_response(
+                    DefaultOnResponse::new().level(Level::INFO)
+                );
+
+            Some(Arc::new(trace_layer))
         }
         "timeout" => {
             use std::time::Duration;

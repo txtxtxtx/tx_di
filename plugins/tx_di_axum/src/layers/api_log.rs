@@ -4,8 +4,9 @@ use axum::{
 };
 use std::future::Future;
 use std::pin::Pin;
+use tokio::time::Instant;
 use tower::{Layer, Service};
-use tracing::{info, warn};
+use tracing::{info, warn, Span};
 
 
 /// API 日志中间件 Layer
@@ -69,6 +70,9 @@ where
             .to_string();
 
         Box::pin(async move {
+            // 记录请求开始时间
+            let start_time = Instant::now();
+
             // 判断是否需要读取请求体内容（仅文本和 JSON 类型）
             let need_log_request_body = should_log_body(&content_type);
             
@@ -90,10 +94,17 @@ where
                 rebuilt_req = Request::from_parts(parts, body);
             }
 
-            // 记录请求日志（不包含具体 body 内容时只显示类型提示）
+            // 获取当前 span 并记录请求日志
+            // 如果存在 TraceLayer 创建的 span，日志会自动关联到该 span
+            let current_span = Span::current();
+            let _guard = current_span.enter();
             info!(
-                "Request: {} {} | Query: {} | Content-Type: {} | Body: {}",
-                method, uri, query, content_type, request_body
+                method = %method,
+                uri = %uri,
+                query = %query,
+                content_type = %content_type,
+                body = %request_body,
+                "REQ "
             );
 
             // 调用内部服务处理请求（传递原始或重建的 body）
@@ -130,20 +141,42 @@ where
             }
 
             let status = final_response.status();
+            // 计算请求耗时
+            let elapsed = start_time.elapsed();
+            let elapsed_nanos = elapsed.as_nanos();
 
+            // 根据耗时大小选择合适的单位
+            let latency_str = if elapsed_nanos >= 1_000_000 {
+                // 大于等于 1,000,000 纳秒，使用毫秒
+                format!("{:.2}ms", elapsed_nanos as f64 / 1_000_000.0)
+            } else if elapsed_nanos >= 1_000 {
+                // 大于等于 1,000 纳秒，使用微秒
+                format!("{:.2}μs", elapsed_nanos as f64 / 1_000.0)
+            } else {
+                // 小于 1,000 纳秒，使用纳秒
+                format!("{}ns", elapsed_nanos)
+            };
+            // 在同一个 span 中记录响应日志
+            let current_span = Span::current();
+            let _guard = current_span.enter();
             // 根据响应状态码选择日志级别：成功用 info，失败用 warn
             if status.is_success() {
                 info!(
-                    "📤 Response: {} | Content-Type: {} | Body: {}",
-                    status, response_content_type, response_body_str
+                    status = %status,
+                    latency = latency_str,
+                    content_type = %response_content_type,
+                    body = %response_body_str,
+                    "RESP"
                 );
             } else {
                 warn!(
-                    "📤 Response: {} | Content-Type: {} | Body: {}",
-                    status, response_content_type, response_body_str
+                    status = %status,
+                    latency = latency_str,
+                    content_type = %response_content_type,
+                    body = %response_body_str,
+                    "RESP"
                 );
             }
-
             Ok(final_response)
         })
     }
