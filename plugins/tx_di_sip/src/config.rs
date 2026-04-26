@@ -134,14 +134,14 @@ impl SipConfig {
     }
 }
 
-fn default_host() -> String {
+pub(crate) fn default_host() -> String {
     "0.0.0.0".to_string()
 }
 
-fn default_port() -> u16 {
+pub(crate) fn default_port() -> u16 {
     5060
 }
 
-fn default_user_agent() -> String {
+pub(crate) fn default_user_agent() -> String {
     "tx-di-sip/0.1.0".to_string()
 }

@@ -81,7 +81,6 @@ impl CompInit for SipPlugin {
             transport = ?self.config.transport,
             "SIP 插件初始化中..."
         );
-        // Endpoint 的 transport 绑定在 async_init 中完成（需要 .await）
         Ok(())
     }
 

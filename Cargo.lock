@@ -2334,6 +2334,7 @@ dependencies = [
  "serde",
  "tokio",
  "tokio-util",
+ "toml",
  "tracing",
  "tx-di-core",
 ]
