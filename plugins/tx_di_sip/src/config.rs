@@ -92,6 +92,19 @@ pub struct SipConfig {
     pub log_messages: bool,
 }
 
+impl Default for SipConfig {
+    fn default() -> Self {
+        Self {
+            host: default_host(),
+            port: default_port(),
+            transport: SipTransport::default(),
+            user_agent: default_user_agent(),
+            external_ip: None,
+            log_messages: false,
+        }
+    }
+}
+
 impl CompInit for SipConfig {
     fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
         Ok(())

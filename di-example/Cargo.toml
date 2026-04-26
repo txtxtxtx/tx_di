@@ -5,11 +5,15 @@ edition.workspace = true
 
 [dependencies]
 tx-di-core   = { path = "../tx-di-core" }
-tx_di_log = { path = "../plugins/tx_di_log" }
-tx_di_axum = { path = "../plugins/tx_di_axum" }
+tx_di_log    = { path = "../plugins/tx_di_log" }
+tx_di_axum   = { path = "../plugins/tx_di_axum" }
+tx_di_sip    = { path = "../plugins/tx_di_sip" }
 linkme.workspace = true
 tracing.workspace = true
 #env_logger.workspace = true
 log.workspace = true
 tokio.workspace = true
 serde = { version = "1.0.228", features = ["derive"] }
+
+[dev-dependencies]
+toml.workspace = true

@@ -82,6 +82,21 @@ pub struct LogConfig {
     pub time_format: TimeFormat,
 }
 
+impl Default for LogConfig {
+    fn default() -> Self {
+        Self {
+            level: default_level(),
+            modules: HashMap::new(),
+            format: default_format(),
+            dir: default_dir(),
+            retention_days: default_retention_days(),
+            console_output: false,
+            prefix: default_prefix(),
+            time_format: TimeFormat::default(),
+        }
+    }
+}
+
 impl CompInit for LogConfig {
     fn init_sort() -> i32 {
         i32::MIN

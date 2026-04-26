@@ -80,6 +80,21 @@ pub struct WebConfig {
     pub layers: Option<Vec<(i32,String)>>
 }
 
+impl Default for WebConfig {
+    fn default() -> Self {
+        Self {
+            host: default_host(),
+            port: default_port(),
+            enable_cors: false,
+            max_body_size: default_max_body_size(),
+            static_dir: default_static_dir(),
+            spa_apps: None,
+            timeout_secs: default_timeout_secs(),
+            layers: None,
+        }
+    }
+}
+
 impl CompInit for WebConfig {
     fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
         // 设置超时时间

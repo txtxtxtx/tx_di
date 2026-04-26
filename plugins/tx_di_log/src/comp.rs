@@ -13,6 +13,12 @@ use tx_di_core::{tx_comp, BuildContext, CompInit, RIE};
 
 // 全局变量存储 日志 guard
 static LOG_GUARD: OnceLock<tracing_appender::non_blocking::WorkerGuard> = OnceLock::new();
+
+/// 检查日志系统是否已经初始化过
+fn is_log_initialized() -> bool {
+    LOG_GUARD.get().is_some()
+}
+
 #[derive(Clone,Debug)]
 #[tx_comp(init)]
 pub struct LogPlugins{
@@ -22,6 +28,12 @@ pub struct LogPlugins{
 
 impl CompInit for LogPlugins{
     fn inner_init(&mut self, _: &mut BuildContext) -> RIE<()>{
+        // 如果全局守卫已经初始化（例如并行测试场景），跳过重复设置
+        if is_log_initialized() {
+            info!("日志系统已初始化，跳过重复初始化");
+            return Ok(());
+        }
+
         if !self.config.dir.exists() {
             fs::create_dir_all(&self.config.dir)?;
         }
@@ -45,8 +57,11 @@ impl CompInit for LogPlugins{
 
         let (non_blocking_appender, guard) = NonBlocking::new(file_appender);
 
-        LOG_GUARD.set(guard)
-            .map_err(|_| anyhow!("日志全局守卫已被初始化，不允许重复设置"))?;
+        if LOG_GUARD.set(guard).is_err() {
+            // 竞态条件：另一个线程在我们检查后完成了初始化，直接返回
+            info!("日志全局守卫已被其他线程设置，跳过");
+            return Ok(());
+        }
 
         let timer = self.config.time_format.to_timer();
         let file_layer = fmt::layer()
@@ -98,16 +113,16 @@ impl CompInit for LogPlugins{
 
             filter
         };
-        // 注册全局订阅者
+        // 注册全局订阅者（使用 try_init 避免重复初始化 panic）
         let subscriber = tracing_subscriber::registry()
             .with(env_filter)
             .with(file_layer);
         if self.config.console_output {
-            subscriber
+            let _ = subscriber
                 .with(console_layer)
-                .init();
+                .try_init();
         }else {
-            subscriber.init();
+            let _ = subscriber.try_init();
         }
 
         // 设置 panic hook
