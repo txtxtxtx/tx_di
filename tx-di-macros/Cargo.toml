@@ -1,6 +1,6 @@
 [package]
 name = "tx-di-macros"
-version = "0.1.4"
+version = "0.1.6"
 edition.workspace = true
 license.workspace = true
 description = "宏支持 di-core"
