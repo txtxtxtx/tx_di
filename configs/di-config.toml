@@ -26,3 +26,19 @@ layers = [
 ]
 [web_config.spa_apps]
 "/mood" = "./static/mood/dist"
+
+# ── SIP 服务配置 ────────────────────────────────────────────────
+[sip_config]
+# 监听地址（IPv4 / IPv6 双栈）
+# "0.0.0.0"  → 仅 IPv4
+# "::"        → 所有 IPv6 接口（大多数系统同时支持 IPv4，即双栈）
+# "127.0.0.1" → 仅本地回环（测试用）
+host     = "0.0.0.0"
+port     = 5060
+# 传输协议: "udp"(默认) | "tcp" | "both"
+transport = "udp"
+user_agent = "tx-di-sip/0.1.0"
+# 对外可见 IP（NAT 穿透时使用，不填则自动使用 host）
+# external_ip = ""
+# 开启 SIP 消息日志（调试用）
+log_messages = false

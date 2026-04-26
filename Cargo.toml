@@ -46,6 +46,7 @@ serde = { version = "1.0", features = ["derive","serde_derive"]}
 serde_json = "1.0"
 
 rsipstack = { version = "0.5",features = ["default"]}
+tokio-util = { version = "0.7", features = ["rt"] }
 
 # 日志
 time = {version = "0.3"}

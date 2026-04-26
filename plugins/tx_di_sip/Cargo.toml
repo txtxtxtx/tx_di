@@ -12,3 +12,6 @@ rsipstack.workspace = true
 tx-di-core.workspace = true
 serde.workspace = true
 tracing.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+tokio-util = { workspace = true }
