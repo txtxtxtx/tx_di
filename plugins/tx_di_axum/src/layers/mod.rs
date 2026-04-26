@@ -15,7 +15,7 @@
 
 use std::sync::{Arc, LazyLock, OnceLock, RwLock};
 use axum::body::Body;
-use axum::http::{Request, Response};
+use axum::http::{Request};
 use axum::Router;
 use axum::routing::Route;
 use tower::Layer;
@@ -46,6 +46,7 @@ pub fn add_static_path_prefix(prefix: impl Into<String>) {
 }
 
 /// 批量添加静态文件路径前缀
+#[allow(unused)]
 pub fn add_static_path_prefixes(prefixes: Vec<String>) {
     if let Ok(mut path_list) = INIT_PATH_PREFIXES.write() {
         for prefix in prefixes {
@@ -84,6 +85,7 @@ static STATIC_PATH_PREFIXES: OnceLock<Vec<String>> = OnceLock::new();
 
 
 /// 获取所有静态文件路径前缀（用于调试）
+#[allow(unused)]
 pub fn get_static_path_prefixes() -> Vec<String> {
     INIT_PATH_PREFIXES.read().map(|p| p.clone()).unwrap_or_default()
 }
@@ -157,6 +159,7 @@ pub static LAYER_REGISTRY: LazyLock<Arc<RwLock<Vec<SortLayer>>>> =
     LazyLock::new(|| Arc::new(RwLock::new(Vec::new())));
 
 /// 添加中间件到全局中间件
+#[allow(unused)]
 pub fn add_layer<M>(middleware: M, sort: i32)
 where
     M: DynMiddleware + 'static,

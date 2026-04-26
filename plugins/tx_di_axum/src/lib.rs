@@ -10,9 +10,10 @@ pub use comp::*;
 pub use r::R;
 #[cfg(test)]
 mod tests {
-    use tx_di_core::{BuildContext,App};
+    use tx_di_core::{BuildContext};
+    #[allow(unused)]
     use tx_di_log;
-    use super::*;
+    // use super::*;
 
     #[tokio::test]
     async fn it_works() {

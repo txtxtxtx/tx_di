@@ -1,17 +1,13 @@
-use std::any::type_name;
 use std::net::{SocketAddr, TcpListener};
 use crate::bound::{AppStatus, DiComp};
 use crate::{WebConfig, R};
-use axum::http::{Request, Response};
+use axum::http::{Request};
 use axum::{routing::get, Router};
 use std::sync::{Arc, LazyLock, RwLock};
-use axum::body::Body;
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::TcpListener as TokioTcpListener;
-use tower::Layer;
 use tracing::{debug, error, info};
 use tx_di_core::{tx_comp, ApiR, App, BoxFuture, BuildContext, CompInit, FormattedDateTime, RIE};
-use crate::layers::api_log::ApiLogLayer;
 use crate::layers::{add_static_path_prefix, freeze_static_path_prefixes, LAYER_REGISTRY};
 
 /// 全局路由器注册表

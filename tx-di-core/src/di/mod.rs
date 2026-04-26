@@ -446,12 +446,37 @@ impl App {
 
         metas.sort_by_key(|m| (m.init_sort_fn)());
 
-        for meta in metas {
-            if let Some(async_init_fn) = meta.async_init_fn {
-                async_init_fn(app.clone()).await?;
+        // 收集所有异步初始化任务并并行执行
+        let futures: Vec<_> = metas
+            .iter()
+            .filter_map(|meta| meta.async_init_fn.map(|init_fn| init_fn(app.clone())))
+            .collect();
+
+        if futures.is_empty() {
+            return Ok(());
+        }
+
+        // 使用 tokio::spawn 并行执行所有任务
+        let handles: Vec<_> = futures
+            .into_iter()
+            .map(|future| tokio::spawn(future))
+            .collect();
+
+        // 等待所有任务完成并收集结果
+        let mut errors = Vec::new();
+        for handle in handles {
+            match handle.await {
+                Ok(Ok(_)) => {},
+                Ok(Err(e)) => errors.push(e),
+                Err(e) => errors.push(IE::Other(format!("Task panicked: {}", e))),
             }
         }
-        Ok(())
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors.remove(0)) // 返回第一个错误
+        }
     }
 
     /// 运行 App

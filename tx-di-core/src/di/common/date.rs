@@ -169,13 +169,14 @@ pub mod as_timestamp {
     use super::*;
     use serde::{Serializer, Deserializer};
 
+    #[allow(dead_code)]
     pub fn serialize<S>(dt: &FormattedDateTime, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         serializer.serialize_i64(dt.as_timestamp())
     }
-
+    #[allow(dead_code)]
     pub fn deserialize<'de, D>(deserializer: D) -> Result<FormattedDateTime, D::Error>
     where
         D: Deserializer<'de>,
@@ -190,14 +191,14 @@ pub mod as_timestamp {
 pub mod as_timestamp_millis {
     use super::*;
     use serde::{Serializer, Deserializer};
-
+    #[allow(dead_code)]
     pub fn serialize<S>(dt: &FormattedDateTime, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         serializer.serialize_i64(dt.as_timestamp_millis())
     }
-
+    #[allow(dead_code)]
     pub fn deserialize<'de, D>(deserializer: D) -> Result<FormattedDateTime, D::Error>
     where
         D: Deserializer<'de>,

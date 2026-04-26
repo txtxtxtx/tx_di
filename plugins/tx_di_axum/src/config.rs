@@ -2,10 +2,9 @@ use std::collections::HashMap;
 use serde::Deserialize;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use tracing::info;
 use tx_di_core::{tx_comp, BuildContext, CompInit, RIE};
-use crate::layers::{add_layer, add_layer_by_name};
-use crate::layers::api_log::ApiLogLayer;
+use crate::layers::{add_layer_by_name};
+
 
 /// Web 服务器配置结构体
 ///
@@ -82,7 +81,7 @@ pub struct WebConfig {
 }
 
 impl CompInit for WebConfig {
-    fn inner_init(&mut self, ctx: &mut BuildContext) -> RIE<()> {
+    fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
         // 设置超时时间
         crate::layers::set_timeout_secs(self.timeout_secs);
         // 注册配置的中间件
