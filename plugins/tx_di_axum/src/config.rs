@@ -67,12 +67,21 @@ pub struct WebConfig {
     /// 静态文件目录
     #[serde(default = "default_static_dir")]
     pub static_dir: String,
+    /// 请求超时时间（秒）
+    ///
+    /// 默认为 `30` 秒。
+    ///
+    /// 该字段在 TOML 配置文件中对应 `web_config.timeout_secs`。
+    #[serde(default = "default_timeout_secs")]
+    pub timeout_secs: u64,
     /// 中间件列表
     pub layers: Option<Vec<(i32,String)>>
 }
 
 impl CompInit for WebConfig {
     fn inner_init(&mut self, ctx: &mut BuildContext) -> RIE<()> {
+        // 设置超时时间
+        crate::layers::set_timeout_secs(self.timeout_secs);
         // 注册配置的中间件
         if let Some(layers) = &self.layers.clone() {
             for (priority, layer) in layers {
@@ -142,4 +151,9 @@ fn default_max_body_size() -> usize {
 
 fn default_static_dir() -> String {
     "./static".to_string()
+}
+
+/// 提供默认的超时时间（30秒）
+fn default_timeout_secs() -> u64 {
+    30
 }

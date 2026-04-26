@@ -20,9 +20,27 @@ use axum::Router;
 use axum::routing::Route;
 use tower::Layer;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer};
-use tracing::{error, info, Level};
+use tracing::{debug, error, info, Level};
 
 pub mod api_log;
+
+
+/// 超时配置（秒）
+static TIMEOUT_SECS: LazyLock<Arc<RwLock<u64>>> =
+    LazyLock::new(|| Arc::new(RwLock::new(30)));
+
+/// 设置超时时间（秒）
+pub fn set_timeout_secs(secs: u64) {
+    if let Ok(mut timeout) = TIMEOUT_SECS.write() {
+        *timeout = secs;
+        debug!("超时时间已设置为: {} 秒", secs);
+    }
+}
+
+/// 获取超时时间（秒）
+fn get_timeout_secs() -> u64 {
+    TIMEOUT_SECS.read().map(|t| *t).unwrap_or(30)
+}
 
 /// 动态中间件层 trait
 ///
@@ -30,6 +48,8 @@ pub mod api_log;
 pub trait DynMiddleware: Send + Sync {
     /// 应用中间件到 Router
     fn apply_to_router(&self, router: Router) -> Router;
+    
+    fn name(&self) -> &str;
 }
 
 /// 为任何满足条件的 Layer 自动实现 DynMiddleware
@@ -49,6 +69,9 @@ where
     fn apply_to_router(&self, router: Router) -> Router {
         router.layer(self.clone())
     }
+    fn name(&self) -> &str {
+        std::any::type_name::<L>()
+    }
 }
 
 /// 带排序的中间件层
@@ -66,7 +89,7 @@ where
     if let Ok(mut layers) = LAYER_REGISTRY.write() {
         let middleware = Arc::new(middleware);
         layers.push((sort, middleware));
-        info!("中间件层已注册到全局注册表: sort={}", sort);
+        debug!("中间件层已注册到全局注册表: sort={}", sort);
     } else {
         error!("无法获取中间件注册表的写锁");
     }
@@ -76,7 +99,7 @@ pub fn add_arc_layer(middleware: Arc<dyn DynMiddleware>, sort: i32)
 {
     if let Ok(mut layers) = LAYER_REGISTRY.write() {
         layers.push((sort, middleware));
-        info!("中间件层已注册到全局注册表: sort={}", sort);
+        debug!("中间件层已注册到全局注册表: sort={}", sort);
     } else {
         error!("无法获取中间件注册表的写锁");
     }
@@ -115,8 +138,11 @@ pub fn get_layer_by_name(name: impl Into<String>) -> Option<Arc<dyn DynMiddlewar
         }
         "timeout" => {
             use std::time::Duration;
-            Some(Arc::new(tower_http::timeout::TimeoutLayer::new(Duration::from_secs(30))))
-        }
+            let timeout_secs = get_timeout_secs();
+            Some(Arc::new(tower_http::timeout::TimeoutLayer::with_status_code(
+                http::StatusCode::REQUEST_TIMEOUT,
+                Duration::from_secs(timeout_secs),
+            )))        }
         "compression" => {
             Some(Arc::new(tower_http::compression::CompressionLayer::new()))
         }

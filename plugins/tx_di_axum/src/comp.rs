@@ -130,11 +130,12 @@ impl WebPlugin {
         if let Ok(layers) = LAYER_REGISTRY.read() {
             let mut sorted_layers: Vec<_> = layers.iter().collect();
             sorted_layers.sort_by_key(|(sort, _)| *sort);
-
+            let mut names = Vec::with_capacity(sorted_layers.len());
             for (_, middleware) in &sorted_layers {
                 router = middleware.apply_to_router(router);
+                names.push(middleware.name());
             }
-            debug!("已应用 {} 个中间件层（已按优先级排序）", sorted_layers.len());
+            info!("已应用 {} 个中间件层（已按优先级排序）:[{}]", sorted_layers.len(),names.join(", "));
         } else {
             error!("无法获取中间件注册表的读锁");
         }

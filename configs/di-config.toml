@@ -16,13 +16,11 @@ host = "127.0.0.1"
 port = 8888
 enable_cors = true          # 允许跨域
 max_body_size = 10485760    # 10M
+timeout_secs = 6            # 请求超时时间
 layers = [
-    [1,"auth"],           # 最内层，最靠近 Handler
-    [2,"api_log"],        #
-#    [3,"trace"],          #
-    [4,"compression"],    # 同一优先级，顺序不确定
-    [5,"static"],         #
-    [6,"json"],           #
-    [7,"router"],         #
-    [8,"cors"]            # 最外层，最先接收请求
+#    [1,"auth"],           # 最内层，最靠近 Handler todo 还未实现,请在业务模块实现并注册
+    [10,"api_log"],        # 请求日志，包含请求和返回信息的日志
+#    [3,"trace"],          # 链路追踪，包含链路追踪信息的日志
+    [100,"compression"],    # 压缩
+    [10000,"cors"]   # 允许跨域,最外层,最先接收请求
 ]

@@ -64,3 +64,4 @@ axum = {version = "0.8", features = ["macros"]}
 tower = {version = "0.5", features = ["full"]}
 hyper = {version =  "1.9.0",features = ["full"]}
 tower-http = {version = "0.6", features = ["full"]}
+http = { version = "1.4.0"}
