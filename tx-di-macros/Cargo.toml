@@ -20,4 +20,4 @@ proc-macro2.workspace = true
 
 [dev-dependencies]
 # 运行期依赖（宏展开后生成的代码需要这些）
-tx-di-core = { path = "../tx-di-core" }
+#tx-di-core = { path = "../tx-di-core" }
