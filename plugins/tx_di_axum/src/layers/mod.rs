@@ -13,7 +13,7 @@
 //!
 //! 响应相反
 
-use std::sync::{Arc, LazyLock, RwLock};
+use std::sync::{Arc, LazyLock, OnceLock, RwLock};
 use axum::body::Body;
 use axum::http::{Request, Response};
 use axum::Router;
@@ -24,6 +24,81 @@ use tracing::{debug, error, info, Level};
 
 pub mod api_log;
 
+/// 静态文件路径前缀列表（用于日志过滤）
+///
+/// 包含所有需要跳过日志记录的路径前缀，例如：
+/// - "/static" - 传统静态文件目录
+/// - "/app1", "/app2" - SPA 应用路径
+static INIT_PATH_PREFIXES: LazyLock<Arc<RwLock<Vec<String>>>> =
+    LazyLock::new(|| Arc::new(RwLock::new(vec!["/static".to_string()])));
+
+/// 添加静态文件路径前缀到过滤列表
+pub fn add_static_path_prefix(prefix: impl Into<String>) {
+    if let Ok(mut prefixes) = INIT_PATH_PREFIXES.write() {
+        let prefix = prefix.into();
+        if !prefixes.contains(&prefix) {
+            prefixes.push(prefix.clone());
+            debug!("已添加静态文件路径前缀: {}", prefix);
+        }
+    } else {
+        error!("无法获取静态文件路径前缀列表的写锁");
+    }
+}
+
+/// 批量添加静态文件路径前缀
+pub fn add_static_path_prefixes(prefixes: Vec<String>) {
+    if let Ok(mut path_list) = INIT_PATH_PREFIXES.write() {
+        for prefix in prefixes {
+            if !path_list.contains(&prefix) {
+                path_list.push(prefix);
+            }
+        }
+        debug!("已批量添加静态文件路径前缀，当前总数: {}", path_list.len());
+    } else {
+        error!("无法获取静态文件路径前缀列表的写锁");
+    }
+}
+
+/// 检查路径是否应该被日志过滤
+///
+/// 如果路径以任何一个静态文件路径前缀开头，则返回 true
+#[inline]
+pub fn should_filter_path(path: &str) -> bool {
+    if let Some(prefixes) = STATIC_PATH_PREFIXES.get() {
+        for prefix in prefixes.iter() {
+            if path.starts_with(prefix.as_str()) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+
+/// 静态文件路径前缀列表（用于日志过滤）
+///
+/// 使用 OnceLock 实现零成本抽象：
+/// - 初始化阶段：通过 RwLock 收集所有路径前缀
+/// - 运行阶段：冻结为不可变的 Vec，无锁访问
+static STATIC_PATH_PREFIXES: OnceLock<Vec<String>> = OnceLock::new();
+
+
+/// 获取所有静态文件路径前缀（用于调试）
+pub fn get_static_path_prefixes() -> Vec<String> {
+    INIT_PATH_PREFIXES.read().map(|p| p.clone()).unwrap_or_default()
+}
+
+
+/// 冻结静态文件路径前缀
+pub fn freeze_static_path_prefixes() {
+    if let Ok(prefixes) = INIT_PATH_PREFIXES.read() {
+        let frozen = prefixes.clone();
+        // 尝试设置，如果已经设置过则忽略
+        let _ = STATIC_PATH_PREFIXES.set(frozen);
+        info!("静态文件路径前缀列表已冻结，共 {} 个前缀", 
+              STATIC_PATH_PREFIXES.get().map(|v| v.len()).unwrap_or(0));
+    }
+}
 
 /// 超时配置（秒）
 static TIMEOUT_SECS: LazyLock<Arc<RwLock<u64>>> =

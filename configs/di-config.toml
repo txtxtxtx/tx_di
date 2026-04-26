@@ -18,9 +18,11 @@ enable_cors = true          # 允许跨域
 max_body_size = 10485760    # 10M
 timeout_secs = 6            # 请求超时时间
 layers = [
-#    [1,"auth"],           # 最内层，最靠近 Handler todo 还未实现,请在业务模块实现并注册
+#    [1,"auth"],           # 最内层，最靠近 Handler 请在业务模块实现并注册
     [10,"api_log"],        # 请求日志，包含请求和返回信息的日志
 #    [3,"trace"],          # 链路追踪，包含链路追踪信息的日志
     [100,"compression"],    # 压缩
     [10000,"cors"]   # 允许跨域,最外层,最先接收请求
 ]
+[web_config.spa_apps]
+"/mood" = "./static/mood/dist"

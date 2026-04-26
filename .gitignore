@@ -3,3 +3,4 @@ target/
 local/
 logs
 .workbuddy
+plugins/tx_di_axum/static

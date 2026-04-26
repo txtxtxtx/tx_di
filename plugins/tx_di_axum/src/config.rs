@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use serde::Deserialize;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -67,6 +68,8 @@ pub struct WebConfig {
     /// 静态文件目录
     #[serde(default = "default_static_dir")]
     pub static_dir: String,
+    /// SPA 应用列表
+    pub spa_apps: Option<HashMap<String,String>>,
     /// 请求超时时间（秒）
     ///
     /// 默认为 `30` 秒。

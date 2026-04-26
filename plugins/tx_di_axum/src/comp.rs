@@ -12,7 +12,7 @@ use tower::Layer;
 use tracing::{debug, error, info};
 use tx_di_core::{tx_comp, ApiR, App, BoxFuture, BuildContext, CompInit, FormattedDateTime, RIE};
 use crate::layers::api_log::ApiLogLayer;
-use crate::layers::LAYER_REGISTRY;
+use crate::layers::{add_static_path_prefix, freeze_static_path_prefixes, LAYER_REGISTRY};
 
 /// 全局路由器注册表
 ///
@@ -39,8 +39,6 @@ impl CompInit for WebPlugin {
     fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
         info!("Web 服务器插件初始化中...");
         self.router = WebPlugin::merge_routers();
-            // .layer(ApiLogLayer);
-
         Ok(())
     }
     fn async_init(ctx: Arc<App>) -> BoxFuture<'static, RIE<()>> {
@@ -55,6 +53,20 @@ impl CompInit for WebPlugin {
                 req
             })
             .into_inner());
+        // 如果配置了静态文件目录，添加静态文件服务
+        let static_dir = config.static_dir();
+        if static_dir.exists() {
+            info!("静态文件目录已配置: {:?}", static_dir);
+            router = router.nest_service(
+                "/static",
+                tower_http::services::ServeDir::new(&static_dir)
+                    .precompressed_gzip()
+                    .precompressed_br()
+            );
+        } else {
+            debug!("静态文件目录不存在，跳过静态文件服务: {:?}", static_dir);
+        }
+        router = WebPlugin::setup_spa_apps(router, &config);
         // 添加中间件
         router = WebPlugin::layer_with_router(router);
         Box::pin(async move {
@@ -71,6 +83,35 @@ impl CompInit for WebPlugin {
 
 
 impl WebPlugin {
+    /// 配置静态文件服务（支持 SPA 和多前端项目）
+    fn setup_spa_apps(mut router: Router, config: &WebConfig) -> Router {
+        // 如果配置了 spa_apps，使用多前端项目模式
+        if let Some(spa_apps) = &config.spa_apps {
+            info!("检测到 {} 个 SPA 应用配置", spa_apps.len());
+            for (path_prefix, dist_dir) in spa_apps {
+                let dist_path = std::path::PathBuf::from(dist_dir);
+                if dist_path.exists() {
+                    info!("注册 SPA 应用: {} -> {:?}", path_prefix, dist_path);
+                    // 创建 fallback 服务，用于 SPA 路由
+                    let fallback = tower_http::services::ServeFile::new(dist_path.join("index.html"));
+
+                    router = router.nest_service(
+                        path_prefix,
+                        tower_http::services::ServeDir::new(&dist_path)
+                            .precompressed_gzip()
+                            .precompressed_br()
+                            .fallback(fallback)
+                    );
+                    add_static_path_prefix(path_prefix)
+                } else {
+                    error!("SPA 应用目录不存在: {:?}，已跳过", dist_path);
+                }
+            }
+            freeze_static_path_prefixes();
+        }
+        router
+    }
+
     /// 添加路由器
     ///
     /// 该方法用于添加一个新的路由器，该路由器将合并到 Web 插件的路由器中。
