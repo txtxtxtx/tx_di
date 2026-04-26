@@ -2269,18 +2269,7 @@ dependencies = [
  "tokio",
  "toml",
  "tracing",
- "tx-di-macros 0.1.4",
-]
-
-[[package]]
-name = "tx-di-macros"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce5c0e3607a6152b5ec9189df2b285286891345a69719020301d0024822a17e1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
+ "tx-di-macros",
 ]
 
 [[package]]
@@ -2290,7 +2279,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
- "tx-di-core",
 ]
 
 [[package]]

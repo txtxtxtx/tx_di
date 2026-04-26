@@ -6,8 +6,8 @@ license.workspace = true
 readme.workspace = true
 description = "DI framwork,依赖自动注入框架，运行时使用拓扑排序，排序依赖关系"
 [dependencies]
-tx-di-macros = {version = "0.1.6"}
-#tx-di-macros = { path = "../tx-di-macros"}
+#tx-di-macros = {version = "0.1.6"}
+tx-di-macros = { path = "../tx-di-macros"}
 # linkme 用于跨 crate 在链接期收集静态数组切片
 # 基于 ELF/Mach-O/PE 的自定义 link section，完全零运行时开销
 linkme.workspace = true
