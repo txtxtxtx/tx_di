@@ -28,7 +28,7 @@ impl CompInit for SipContext {
 
 
     fn init_sort() -> i32 {
-        todo!()
+        i32::MAX - 1
     }
 }
 
