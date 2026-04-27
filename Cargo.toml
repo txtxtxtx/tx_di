@@ -2,7 +2,13 @@
 members = [
     "tx-di-core",
     "tx-di-macros",
-    "di-example", "plugins/tx_di_axum", "examples/gb_cams", "plugins/tx_di_sip", "plugins/tx_di_log",
+    "di-example",
+    "plugins/tx_di_axum",
+    "plugins/tx_di_sip",
+    "plugins/tx_di_log",
+    "plugins/tx_di_gb28181",
+    "plugins/tx_di_gb28181_client",
+    "examples/gb_cams",
 ]
 resolver = "3"
 [workspace.package]

@@ -739,7 +739,14 @@ dependencies = [
 name = "gb_cams"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "rsipstack",
+ "serde",
+ "tokio",
+ "tracing",
+ "tx-di-core",
+ "tx_di_log",
+ "tx_di_sip",
 ]
 
 [[package]]
@@ -2311,6 +2318,39 @@ dependencies = [
  "tracing",
  "tx-di-core",
  "tx_di_log",
+]
+
+[[package]]
+name = "tx_di_gb28181"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "dashmap",
+ "rsipstack",
+ "serde",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tx-di-core",
+ "tx_di_sip",
+]
+
+[[package]]
+name = "tx_di_gb28181_client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "dashmap",
+ "rsipstack",
+ "serde",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tx-di-core",
+ "tx_di_gb28181",
+ "tx_di_sip",
 ]
 
 [[package]]

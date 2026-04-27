@@ -1,0 +1,22 @@
+[package]
+name = "tx_di_gb28181"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+description = "GB28181 server plugin for tx-di framework (SIP registration center, catalog, playback control)"
+
+[dependencies]
+tx-di-core.workspace = true
+tx_di_sip       = { path = "../tx_di_sip" }
+
+rsipstack.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+serde.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+dashmap.workspace = true
+chrono.workspace = true

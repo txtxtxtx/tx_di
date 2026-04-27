@@ -1,0 +1,44 @@
+# GB28181 设备模拟器配置文件
+# 路径：configs/gb28181.toml
+
+# ── 日志配置 ────────────────────────────────────────────────────────────────
+[log_config]
+level          = "debug"
+prefix         = "gb28181"
+dir            = "./logs"
+console_output = true
+time_format    = "local"
+
+# ── SIP 传输配置 ─────────────────────────────────────────────────────────────
+# host 填写本机 SIP 地址（设备 IP）
+[sip_config]
+host         = "192.168.1.100"   # 本机 IP，设备注册源地址
+port         = 5060
+transport    = "udp"             # GB28181 标准使用 UDP
+user_agent   = "IPC-Simulator/1.0"
+log_messages = true              # 开启 SIP 消息日志（调试用）
+
+# ── GB28181 设备参数 ─────────────────────────────────────────────────────────
+[gb_config]
+# 设备编号（20 位，格式：省+市+企业+类型+序号）
+device_id     = "34020000001320000001"
+
+# 上级平台编号（20 位）
+platform_id   = "34020000002000000001"
+
+# 上级平台地址
+platform_ip   = "192.168.1.200"
+platform_port = 5060
+
+# SIP 域（通常是平台编号前 10 位）
+realm         = "3402000000"
+
+# 注册认证（通常 username = device_id）
+username      = "34020000001320000001"
+password      = "12345678"
+
+# 心跳间隔（秒），GB28181 规范推荐 60s
+heartbeat_secs = 60
+
+# 注册有效期（秒），规范推荐 3600s
+register_ttl   = 3600

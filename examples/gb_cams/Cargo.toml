@@ -3,5 +3,16 @@ name = "gb_cams"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "gb_cams"
+path = "src/main.rs"
+
 [dependencies]
+tx-di-core    = { path = "../../tx-di-core" }
+tx_di_sip     = { path = "../../plugins/tx_di_sip" }
+tx_di_log     = { path = "../../plugins/tx_di_log" }
 rsipstack.workspace = true
+tokio.workspace     = true
+anyhow.workspace    = true
+tracing.workspace   = true
+serde.workspace     = true

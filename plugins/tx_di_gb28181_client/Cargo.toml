@@ -1,0 +1,23 @@
+[package]
+name = "tx_di_gb28181_client"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+description = "GB28181 device client plugin for tx-di framework (register, keepalive, playback response)"
+
+[dependencies]
+tx-di-core.workspace = true
+tx_di_sip       = { path = "../tx_di_sip" }
+tx_di_gb28181   = { path = "../tx_di_gb28181" }
+
+rsipstack.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+serde.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+dashmap.workspace = true
+chrono.workspace = true
