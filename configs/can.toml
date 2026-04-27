@@ -1,0 +1,42 @@
+# tx_di_can 配置文件模板
+# 复制到 configs/can.toml 后按需修改
+
+# ─── 总线适配器 ───────────────────────────────────────────
+# 可选值：socketcan | pcan | kvaser | simbus
+# socketcan: Linux 原生 CAN (can0/vcan0)
+# pcan:      PEAK PCAN USB/PCI（需安装 PCAN-Basic SDK）
+# kvaser:    Kvaser 设备（占位实现）
+# simbus:    内存仿真总线，无需硬件即可测试
+adapter = "simbus"
+
+# 接口名称（socketcan: can0/vcan0；simbus: 任意标识符）
+interface = "vcan0"
+
+# 仲裁段波特率（bps）
+bitrate = 500_000
+
+# CANFD 数据段波特率（bps），仅 enable_fd = true 时生效
+fd_bitrate = 2_000_000
+
+# 是否启用 CANFD
+enable_fd = false
+
+# ─── ISO-TP 通道参数 ─────────────────────────────────────
+# 上位机发送 CAN ID（ECU 物理寻址，通常 0x7E0）
+isotp_tx_id = 0x7E0
+
+# ECU 响应 CAN ID（通常 0x7E8）
+isotp_rx_id = 0x7E8
+
+# 块大小 BS（0 = ECU 决定，不限制）
+isotp_block_size = 0
+
+# 帧间隔 ST_min（ms，0 = 尽快发送）
+isotp_st_min_ms = 0
+
+# ─── UDS 诊断参数 ─────────────────────────────────────────
+# P2 超时（ms）：ECU 首次响应等待时间
+uds_p2_timeout_ms = 150
+
+# P2* 超时（ms）：pendingResponse (0x78) 后最长等待
+uds_p2_star_timeout_ms = 5000
