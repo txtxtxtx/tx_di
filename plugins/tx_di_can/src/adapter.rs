@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::task::JoinSet;
-
+use crate::adapter::pcan_impl::get_pcan;
 // ─────────────────────────────────────────────────────────────────────────────
 // Trait 定义
 // ─────────────────────────────────────────────────────────────────────────────
@@ -577,7 +577,7 @@ mod pcan_impl {
     /// 全局 PCAN DLL（延迟加载）
     static PCAN_DLL: std::sync::OnceLock<PcanDll> = std::sync::OnceLock::new();
 
-    fn get_pcan() -> &'static PcanDll {
+    pub fn get_pcan() -> &'static PcanDll {
         PCAN_DLL.get_or_init(|| PcanDll::load().expect("[pcan] 加载 pcanbasic.dll 失败"))
     }
 

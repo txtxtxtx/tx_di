@@ -9,7 +9,7 @@ repository.workspace = true
 description = "CAN/CANFD upper-machine plugin for tx-di framework (ISO-TP, UDS flash programming, multi-adapter)"
 
 [features]
-default = ["simbus"]
+default = ["pcan"] # simbus
 # Linux SocketCAN（使用 libc PF_CAN，无第三方依赖）
 socketcan = []
 # PEAK PCAN USB（FFI，Windows only）
