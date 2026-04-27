@@ -1,0 +1,25 @@
+# GB28181 上级平台（服务端）配置
+# 使用 tx_di_gb28181 插件
+
+# ── SIP 传输层 ─────────────────────────────────────────────────────────────────
+[sip_config]
+host         = "0.0.0.0"    # 监听所有 IPv4 接口
+port         = 5060
+transport    = "udp"         # GB28181 标准使用 UDP
+user_agent   = "GB28181-Server/1.0"
+log_messages = true
+
+# ── GB28181 平台参数 ────────────────────────────────────────────────────────────
+[gb28181_server_config]
+platform_id            = "34020000002000000001"   # 20 位平台编号
+realm                  = "3402000000"              # 认证域
+heartbeat_timeout_secs = 120                       # 心跳超时（超时即标记设备离线）
+register_ttl           = 3600                      # 注册有效期
+enable_auth            = false                     # 是否开启摘要认证（生产建议 true）
+auth_password          = "12345678"                # 全局认证密码
+
+# ── 媒体层参数 ──────────────────────────────────────────────────────────────────
+[gb28181_server_config.media]
+local_ip       = "192.168.1.200"    # 媒体服务器 IP（接收 RTP 流）
+rtp_port_start = 10000              # RTP 端口池起始
+rtp_port_end   = 20000              # RTP 端口池结束

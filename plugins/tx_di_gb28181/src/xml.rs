@@ -88,7 +88,7 @@ pub fn build_catalog_response_xml(
         .iter()
         .map(|(ch_id, name)| {
             format!(
-                "  <Item>\r\n\
+                "<Item>\r\n\
                  <DeviceID>{ch_id}</DeviceID>\r\n\
                  <Name>{name}</Name>\r\n\
                  <Manufacturer>Simulator</Manufacturer>\r\n\

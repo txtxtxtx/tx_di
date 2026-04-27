@@ -1,0 +1,27 @@
+# GB28181 设备客户端配置
+# 使用 tx_di_gb28181_client 插件
+
+# ── SIP 传输层 ─────────────────────────────────────────────────────────────────
+[sip_config]
+host         = "0.0.0.0"
+port         = 5060
+transport    = "udp"
+user_agent   = "GB28181-Device/1.0"
+log_messages = true
+
+# ── GB28181 设备参数 ────────────────────────────────────────────────────────────
+[gb28181_device_config]
+device_id      = "34020000001320000001"   # 设备 ID（20 位）
+platform_ip    = "192.168.1.200"          # 上级平台 IP
+platform_port  = 5060                     # 上级平台 SIP 端口
+platform_id    = "34020000002000000001"   # 上级平台 ID
+realm          = "3402000000"             # 认证域
+username       = "34020000001320000001"   # 注册用户名（通常 = device_id）
+password       = "12345678"               # 注册密码
+local_ip       = "192.168.1.100"          # 本机 IP（SIP From/Contact）
+local_port     = 5060                     # 本机 SIP 端口
+heartbeat_secs = 60                       # 心跳间隔（秒）
+register_ttl   = 3600                     # 注册有效期
+rtp_port       = 10000                    # 推流 RTP 端口
+max_register_retries = 0                  # 0 = 无限重试
+retry_interval_secs  = 5                  # 重试初始间隔（指数退避至 300s）
