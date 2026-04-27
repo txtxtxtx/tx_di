@@ -21,6 +21,7 @@ pub struct Gb28181Manager {
     sn: AtomicU32,
 }
 
+#[allow(dead_code)]
 impl Gb28181Manager {
     pub fn new(config: Arc<Gb28181Config>) -> Self {
         Self {

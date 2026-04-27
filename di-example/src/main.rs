@@ -181,7 +181,6 @@ pub fn default_headers() -> HashMap<String, String> {
 // ─────────────────────────────────────────────────────────────────────────────
 // 5. main
 // ─────────────────────────────────────────────────────────────────────────────
-use tx_di_log;
 
 #[tokio::main]
 async fn main() {
@@ -255,7 +254,7 @@ async fn run() ->RIE<()> {
         info!("   从配置读取 port: {}", port);
     }
     
-    BuildContext::debug_registry();
+    let _ = BuildContext::debug_registry();
     Ok(())
 }
 

@@ -47,7 +47,7 @@ pub fn build_catalog_query_xml(platform_id: &str, sn: u32) -> String {
 }
 
 /// 构建设备信息查询 MESSAGE body
-pub fn build_device_info_query_xml(platform_id: &str, device_id: &str, sn: u32) -> String {
+pub fn build_device_info_query_xml(_platform_id: &str, device_id: &str, sn: u32) -> String {
     format!(
         "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
          <Query>\r\n\

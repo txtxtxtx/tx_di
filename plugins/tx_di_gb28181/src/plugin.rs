@@ -305,7 +305,7 @@ impl Gb28181ServerHandle {
             build_invite_sdp(rtp_recv_ip, rtp_recv_port, &ssrc, is_realtime);
 
         let platform_id = &self.inner.config.platform_id;
-        let sip_config = endpoint
+        let _sip_via = endpoint
             .get_via(None, None)
             .map_err(|e| anyhow::anyhow!("获取 Via 头失败: {}", e))?;
 

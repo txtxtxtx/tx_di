@@ -182,8 +182,6 @@ async fn run_register_heartbeat_loop(inner: Arc<DeviceInner>) {
     loop {
         match do_register(config).await {
             Ok(()) => {
-                retry_count = 0;
-                retry_interval = config.retry_interval_secs;
                 tokio::spawn(device_event::emit(DeviceEvent::Registered {
                     platform_uri: config.platform_uri(),
                 }));

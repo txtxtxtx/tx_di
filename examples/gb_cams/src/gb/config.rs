@@ -96,6 +96,7 @@ impl CompInit for Gb28181Config {
     }
 }
 
+#[allow(dead_code)]
 impl Gb28181Config {
     /// 构造上级平台 SIP URI，例如 `sip:34020000002000000001@192.168.1.200:5060`
     pub fn platform_uri(&self) -> String {
