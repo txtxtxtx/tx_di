@@ -1,6 +1,9 @@
 //! GB28181 XML 工具函数
 //!
-//! 构建和解析 MANSCDP XML 消息（不引入重型 XML 库，直接字符串操作）
+//! 构建和解析 MANSCDP XML 消息
+//!
+//! ## 性能优化
+//! 使用 `quick-xml` 流式解析器，避免重复字符串分配
 //!
 //! ## 支持的命令类型（GB28181-2022）
 //! - Keepalive       — 心跳
@@ -14,9 +17,12 @@
 //! - Broadcast       — 广播通知
 //! - ConfigDownload  — 配置下载
 
+use quick_xml::events::Event;
+use quick_xml::Reader;
+
 // ── 解析工具 ──────────────────────────────────────────────────────────────────
 
-/// 从 GB28181 XML 中提取指定字段值
+/// 从 GB28181 XML 中提取指定字段值（使用 quick-xml）
 ///
 /// # 示例
 /// ```
@@ -25,15 +31,32 @@
 /// assert_eq!(parse_xml_field(xml, "CmdType"), Some("Keepalive".to_string()));
 /// ```
 pub fn parse_xml_field(xml: &str, field: &str) -> Option<String> {
-    let open = format!("<{}>", field);
-    let close = format!("</{}>", field);
-    let start = xml.find(&open)? + open.len();
-    let end = xml.find(&close)?;
-    if start <= end {
-        Some(xml[start..end].trim().to_string())
-    } else {
-        None
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let field_bytes = field.as_bytes();
+    let mut buf = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) if e.name().as_ref() == field_bytes => {
+                // 找到目标标签，读取文本内容
+                match reader.read_event_into(&mut buf) {
+                    Ok(Event::Text(t)) => {
+                        return Some(t.unescape().ok()?.trim().to_string());
+                    }
+                    Ok(Event::Empty(e)) if e.name().as_ref() == field_bytes => {
+                        // 自闭合标签如 <Field/>
+                        return Some(String::new());
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::Eof) => break,
+            _ => {}
+        }
+        buf.clear();
     }
+    None
 }
 
 /// 从 XML 中解析 SN（消息序号）
@@ -76,54 +99,247 @@ pub fn build_catalog_query_xml(platform_id: &str, sn: u32) -> String {
     )
 }
 
-/// 解析目录响应中的通道列表
+/// 解析目录响应中的通道列表（使用 quick-xml 流式解析）
 ///
 /// 返回 `Vec<CatalogItem>`，包含通道完整信息
 pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
     let mut result = Vec::new();
-    let mut rest = xml;
-    while let Some(start) = rest.find("<Item>") {
-        let after = &rest[start + 6..];
-        if let Some(end) = after.find("</Item>") {
-            let item_xml = &after[..end];
-            let ch_id = parse_xml_field(item_xml, "DeviceID").unwrap_or_default();
-            if !ch_id.is_empty() {
-                result.push(CatalogItem {
-                    device_id: ch_id,
-                    name: parse_xml_field(item_xml, "Name").unwrap_or_default(),
-                    manufacturer: parse_xml_field(item_xml, "Manufacturer").unwrap_or_default(),
-                    model: parse_xml_field(item_xml, "Model").unwrap_or_default(),
-                    status: parse_xml_field(item_xml, "Status").unwrap_or_else(|| "Unknown".into()),
-                    address: parse_xml_field(item_xml, "Address").unwrap_or_default(),
-                    parent_id: parse_xml_field(item_xml, "ParentID").unwrap_or_default(),
-                    parental: parse_xml_field(item_xml, "Parental")
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(0),
-                    register_way: parse_xml_field(item_xml, "RegisterWay")
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(0),
-                    secrecy: parse_xml_field(item_xml, "Secrecy")
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(0),
-                    ip_address: parse_xml_field(item_xml, "IPAddress").unwrap_or_default(),
-                    port: parse_xml_field(item_xml, "Port")
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(0),
-                    longitude: parse_xml_field(item_xml, "Longitude")
-                        .and_then(|s| s.parse().ok()),
-                    latitude: parse_xml_field(item_xml, "Latitude")
-                        .and_then(|s| s.parse().ok()),
-                    block: parse_xml_field(item_xml, "Block").unwrap_or_default(),
-                    civil_code: parse_xml_field(item_xml, "CivilCode").unwrap_or_default(),
-                    channel_num: parse_xml_field(item_xml, "Num")
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(0),
-                });
+    let mut buf = Vec::new();
+    let mut in_item = false;
+
+    // 当前 Item 的字段
+    let mut cur_device_id = String::new();
+    let mut cur_name = String::new();
+    let mut cur_manufacturer = String::new();
+    let mut cur_model = String::new();
+    let mut cur_status = String::new();
+    let mut cur_address = String::new();
+    let mut cur_parent_id = String::new();
+    let mut cur_parental: u8 = 0;
+    let mut cur_register_way: u8 = 0;
+    let mut cur_secrecy: u8 = 0;
+    let mut cur_ip_address = String::new();
+    let mut cur_port: u16 = 0;
+    let mut cur_longitude: Option<f64> = None;
+    let mut cur_latitude: Option<f64> = None;
+    let mut cur_block = String::new();
+    let mut cur_civil_code = String::new();
+    let mut cur_channel_num: u32 = 0;
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                match e.name().as_ref() {
+                    b"Item" => {
+                        in_item = true;
+                        // 重置当前 Item 字段
+                        cur_device_id.clear();
+                        cur_name.clear();
+                        cur_manufacturer.clear();
+                        cur_model.clear();
+                        cur_status.clear();
+                        cur_address.clear();
+                        cur_parent_id.clear();
+                        cur_parental = 0;
+                        cur_register_way = 0;
+                        cur_secrecy = 0;
+                        cur_ip_address.clear();
+                        cur_port = 0;
+                        cur_longitude = None;
+                        cur_latitude = None;
+                        cur_block.clear();
+                        cur_civil_code.clear();
+                        cur_channel_num = 0;
+                    }
+                    b"DeviceID" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_device_id = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"Name" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_name = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"Manufacturer" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_manufacturer = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"Model" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_model = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"Status" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_status = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"Address" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_address = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"ParentID" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_parent_id = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"Parental" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_parental = s.trim().parse().unwrap_or(0);
+                                }
+                            }
+                        }
+                    }
+                    b"RegisterWay" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_register_way = s.trim().parse().unwrap_or(0);
+                                }
+                            }
+                        }
+                    }
+                    b"Secrecy" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_secrecy = s.trim().parse().unwrap_or(0);
+                                }
+                            }
+                        }
+                    }
+                    b"IPAddress" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_ip_address = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"Port" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_port = s.trim().parse().unwrap_or(0);
+                                }
+                            }
+                        }
+                    }
+                    b"Longitude" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_longitude = s.trim().parse().ok();
+                                }
+                            }
+                        }
+                    }
+                    b"Latitude" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_latitude = s.trim().parse().ok();
+                                }
+                            }
+                        }
+                    }
+                    b"Block" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_block = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"CivilCode" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_civil_code = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"Num" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_channel_num = s.trim().parse().unwrap_or(0);
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
             }
-            rest = &after[end + 7..];
-        } else {
-            break;
+            Ok(Event::End(e)) if e.name().as_ref() == b"Item" => {
+                if !cur_device_id.is_empty() {
+                    if cur_status.is_empty() {
+                        cur_status = "Unknown".to_string();
+                    }
+                    result.push(CatalogItem {
+                        device_id: std::mem::take(&mut cur_device_id),
+                        name: std::mem::take(&mut cur_name),
+                        manufacturer: std::mem::take(&mut cur_manufacturer),
+                        model: std::mem::take(&mut cur_model),
+                        status: std::mem::take(&mut cur_status),
+                        address: std::mem::take(&mut cur_address),
+                        parent_id: std::mem::take(&mut cur_parent_id),
+                        parental: cur_parental,
+                        register_way: cur_register_way,
+                        secrecy: cur_secrecy,
+                        ip_address: std::mem::take(&mut cur_ip_address),
+                        port: cur_port,
+                        longitude: cur_longitude,
+                        latitude: cur_latitude,
+                        block: std::mem::take(&mut cur_block),
+                        civil_code: std::mem::take(&mut cur_civil_code),
+                        channel_num: cur_channel_num,
+                    });
+                }
+                in_item = false;
+            }
+            Ok(Event::Eof) => break,
+            _ => {}
         }
+        buf.clear();
     }
     result
 }
@@ -274,41 +490,139 @@ pub struct AlarmStatus {
     pub storage_full: u8,
 }
 
-/// 解析设备状态响应
+/// 解析设备状态响应（使用 quick-xml）
 pub fn parse_device_status(xml: &str) -> DeviceStatus {
-    let mut s = DeviceStatus::default();
-    s.device_id = parse_xml_field(xml, "DeviceID").unwrap_or_default();
-    s.result = parse_xml_field(xml, "Result").unwrap_or_default();
-    s.on_line = parse_xml_field(xml, "Online").unwrap_or_default();
-    s.status = parse_xml_field(xml, "Status").unwrap_or_default();
-    s.encode = parse_xml_field(xml, "Encode").unwrap_or_default();
-    s.record = parse_xml_field(xml, "Record").unwrap_or_default();
-    s.device_time = parse_xml_field(xml, "DeviceTime").unwrap_or_default();
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut buf = Vec::new();
 
-    if xml.contains("<Alarmstatus>") {
-        let start = xml.find("<Alarmstatus>").unwrap() + 13;
-        let end = xml.find("</Alarmstatus>").unwrap_or(xml.len());
-        let alarm_xml = &xml[start..end];
-        s.alarmstatus = Some(AlarmStatus {
-            duress_alarm: parse_xml_field(alarm_xml, "DuressAlarm")
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(0),
-            enclosure_alarm: parse_xml_field(alarm_xml, "EnclosureAlarm")
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(0),
-            video_lost: parse_xml_field(alarm_xml, "VideoLost")
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(0),
-            video_motion: parse_xml_field(alarm_xml, "VideoMotion")
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(0),
-            storage_fault: parse_xml_field(alarm_xml, "StorageFault")
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(0),
-            storage_full: parse_xml_field(alarm_xml, "StorageFull")
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(0),
-        });
+    let mut s = DeviceStatus::default();
+    let mut in_alarmstatus = false;
+    let mut cur_duress_alarm: u8 = 0;
+    let mut cur_enclosure_alarm: u8 = 0;
+    let mut cur_video_lost: u8 = 0;
+    let mut cur_video_motion: u8 = 0;
+    let mut cur_storage_fault: u8 = 0;
+    let mut cur_storage_full: u8 = 0;
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                match e.name().as_ref() {
+                    b"DeviceID" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(txt) = t.unescape() {
+                                s.device_id = txt.trim().to_string();
+                            }
+                        }
+                    }
+                    b"Result" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(txt) = t.unescape() {
+                                s.result = txt.trim().to_string();
+                            }
+                        }
+                    }
+                    b"Online" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(txt) = t.unescape() {
+                                s.on_line = txt.trim().to_string();
+                            }
+                        }
+                    }
+                    b"Status" => {
+                        if !in_alarmstatus {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(txt) = t.unescape() {
+                                    s.status = txt.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"Encode" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(txt) = t.unescape() {
+                                s.encode = txt.trim().to_string();
+                            }
+                        }
+                    }
+                    b"Record" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(txt) = t.unescape() {
+                                s.record = txt.trim().to_string();
+                            }
+                        }
+                    }
+                    b"DeviceTime" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(txt) = t.unescape() {
+                                s.device_time = txt.trim().to_string();
+                            }
+                        }
+                    }
+                    b"Alarmstatus" => {
+                        in_alarmstatus = true;
+                    }
+                    b"DuressAlarm" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(txt) = t.unescape() {
+                                cur_duress_alarm = txt.trim().parse().unwrap_or(0);
+                            }
+                        }
+                    }
+                    b"EnclosureAlarm" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(txt) = t.unescape() {
+                                cur_enclosure_alarm = txt.trim().parse().unwrap_or(0);
+                            }
+                        }
+                    }
+                    b"VideoLost" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(txt) = t.unescape() {
+                                cur_video_lost = txt.trim().parse().unwrap_or(0);
+                            }
+                        }
+                    }
+                    b"VideoMotion" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(txt) = t.unescape() {
+                                cur_video_motion = txt.trim().parse().unwrap_or(0);
+                            }
+                        }
+                    }
+                    b"StorageFault" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(txt) = t.unescape() {
+                                cur_storage_fault = txt.trim().parse().unwrap_or(0);
+                            }
+                        }
+                    }
+                    b"StorageFull" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(txt) = t.unescape() {
+                                cur_storage_full = txt.trim().parse().unwrap_or(0);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::End(e)) if e.name().as_ref() == b"Alarmstatus" => {
+                s.alarmstatus = Some(AlarmStatus {
+                    duress_alarm: cur_duress_alarm,
+                    enclosure_alarm: cur_enclosure_alarm,
+                    video_lost: cur_video_lost,
+                    video_motion: cur_video_motion,
+                    storage_fault: cur_storage_fault,
+                    storage_full: cur_storage_full,
+                });
+                in_alarmstatus = false;
+            }
+            Ok(Event::Eof) => break,
+            _ => {}
+        }
+        buf.clear();
     }
     s
 }
@@ -529,35 +843,144 @@ pub struct RecordItem {
     pub file_size: Option<u64>,
 }
 
-/// 解析录像查询响应
+/// 解析录像查询响应（使用 quick-xml）
 pub fn parse_record_items(xml: &str) -> Vec<RecordItem> {
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
     let mut result = Vec::new();
-    let mut rest = xml;
-    while let Some(start) = rest.find("<Item>") {
-        let after = &rest[start + 6..];
-        if let Some(end) = after.find("</Item>") {
-            let item_xml = &after[..end];
-            let device_id = parse_xml_field(item_xml, "DeviceID").unwrap_or_default();
-            if !device_id.is_empty() {
-                result.push(RecordItem {
-                    device_id,
-                    name: parse_xml_field(item_xml, "Name").unwrap_or_default(),
-                    file_path: parse_xml_field(item_xml, "FilePath").unwrap_or_default(),
-                    address: parse_xml_field(item_xml, "Address").unwrap_or_default(),
-                    start_time: parse_xml_field(item_xml, "StartTime").unwrap_or_default(),
-                    end_time: parse_xml_field(item_xml, "EndTime").unwrap_or_default(),
-                    secrecy: parse_xml_field(item_xml, "Secrecy")
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(0),
-                    record_type: parse_xml_field(item_xml, "Type").unwrap_or_default(),
-                    file_size: parse_xml_field(item_xml, "FileSize")
-                        .and_then(|s| s.parse().ok()),
-                });
+    let mut buf = Vec::new();
+    let mut in_item = false;
+
+    let mut cur_device_id = String::new();
+    let mut cur_name = String::new();
+    let mut cur_file_path = String::new();
+    let mut cur_address = String::new();
+    let mut cur_start_time = String::new();
+    let mut cur_end_time = String::new();
+    let mut cur_secrecy: u8 = 0;
+    let mut cur_record_type = String::new();
+    let mut cur_file_size: Option<u64> = None;
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                match e.name().as_ref() {
+                    b"Item" => {
+                        in_item = true;
+                        cur_device_id.clear();
+                        cur_name.clear();
+                        cur_file_path.clear();
+                        cur_address.clear();
+                        cur_start_time.clear();
+                        cur_end_time.clear();
+                        cur_secrecy = 0;
+                        cur_record_type.clear();
+                        cur_file_size = None;
+                    }
+                    b"DeviceID" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_device_id = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"Name" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_name = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"FilePath" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_file_path = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"Address" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_address = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"StartTime" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_start_time = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"EndTime" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_end_time = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"Secrecy" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_secrecy = s.trim().parse().unwrap_or(0);
+                                }
+                            }
+                        }
+                    }
+                    b"Type" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_record_type = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"FileSize" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_file_size = s.trim().parse().ok();
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
             }
-            rest = &after[end + 7..];
-        } else {
-            break;
+            Ok(Event::End(e)) if e.name().as_ref() == b"Item" => {
+                if !cur_device_id.is_empty() {
+                    result.push(RecordItem {
+                        device_id: std::mem::take(&mut cur_device_id),
+                        name: std::mem::take(&mut cur_name),
+                        file_path: std::mem::take(&mut cur_file_path),
+                        address: std::mem::take(&mut cur_address),
+                        start_time: std::mem::take(&mut cur_start_time),
+                        end_time: std::mem::take(&mut cur_end_time),
+                        secrecy: cur_secrecy,
+                        record_type: std::mem::take(&mut cur_record_type),
+                        file_size: cur_file_size,
+                    });
+                }
+                in_item = false;
+            }
+            Ok(Event::Eof) => break,
+            _ => {}
         }
+        buf.clear();
     }
     result
 }
@@ -642,23 +1065,108 @@ pub struct AlarmInfo {
     pub latitude: Option<f64>,
 }
 
-/// 解析报警通知 XML
+/// 解析报警通知 XML（使用 quick-xml）
 pub fn parse_alarm_notify(xml: &str) -> Option<AlarmInfo> {
-    let device_id = parse_xml_field(xml, "DeviceID")?;
-    Some(AlarmInfo {
-        device_id,
-        start_alarm_time: parse_xml_field(xml, "StartAlarmTime").unwrap_or_default(),
-        end_alarm_time: parse_xml_field(xml, "EndAlarmTime").unwrap_or_default(),
-        alarm_priority: parse_xml_field(xml, "AlarmPriority")
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0),
-        alarm_method: parse_xml_field(xml, "AlarmMethod")
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0),
-        alarm_type: parse_xml_field(xml, "AlarmType").unwrap_or_default(),
-        alarm_description: parse_xml_field(xml, "AlarmDescription").unwrap_or_default(),
-        longitude: parse_xml_field(xml, "Longitude").and_then(|s| s.parse().ok()),
-        latitude: parse_xml_field(xml, "Latitude").and_then(|s| s.parse().ok()),
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut buf = Vec::new();
+
+    let mut device_id = None;
+    let mut start_alarm_time = String::new();
+    let mut end_alarm_time = String::new();
+    let mut alarm_priority: u8 = 0;
+    let mut alarm_method: u8 = 0;
+    let mut alarm_type = String::new();
+    let mut alarm_description = String::new();
+    let mut longitude: Option<f64> = None;
+    let mut latitude: Option<f64> = None;
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                match e.name().as_ref() {
+                    b"DeviceID" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                device_id = Some(s.trim().to_string());
+                            }
+                        }
+                    }
+                    b"StartAlarmTime" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                start_alarm_time = s.trim().to_string();
+                            }
+                        }
+                    }
+                    b"EndAlarmTime" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                end_alarm_time = s.trim().to_string();
+                            }
+                        }
+                    }
+                    b"AlarmPriority" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                alarm_priority = s.trim().parse().unwrap_or(0);
+                            }
+                        }
+                    }
+                    b"AlarmMethod" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                alarm_method = s.trim().parse().unwrap_or(0);
+                            }
+                        }
+                    }
+                    b"AlarmType" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                alarm_type = s.trim().to_string();
+                            }
+                        }
+                    }
+                    b"AlarmDescription" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                alarm_description = s.trim().to_string();
+                            }
+                        }
+                    }
+                    b"Longitude" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                longitude = s.trim().parse().ok();
+                            }
+                        }
+                    }
+                    b"Latitude" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                latitude = s.trim().parse().ok();
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::Eof) => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    device_id.map(|id| AlarmInfo {
+        device_id: id,
+        start_alarm_time,
+        end_alarm_time,
+        alarm_priority,
+        alarm_method,
+        alarm_type,
+        alarm_description,
+        longitude,
+        latitude,
     })
 }
 
@@ -771,23 +1279,59 @@ pub fn build_config_download_query_xml(device_id: &str, sn: u32, config_type: Co
     )
 }
 
-/// 解析设备配置响应
+/// 解析设备配置响应（使用 quick-xml）
 pub fn parse_config_download_response(xml: &str) -> Vec<ConfigItem> {
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
     let mut result = Vec::new();
-    let mut rest = xml;
-    while let Some(start) = rest.find("<Item>") {
-        let after = &rest[start + 6..];
-        if let Some(end) = after.find("</Item>") {
-            let item_xml = &after[..end];
-            let name = parse_xml_field(item_xml, "Name").unwrap_or_default();
-            let value = parse_xml_field(item_xml, "Value").unwrap_or_default();
-            if !name.is_empty() {
-                result.push(ConfigItem { name, value });
+    let mut buf = Vec::new();
+    let mut in_item = false;
+    let mut cur_name = String::new();
+    let mut cur_value = String::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                match e.name().as_ref() {
+                    b"Item" => {
+                        in_item = true;
+                        cur_name.clear();
+                        cur_value.clear();
+                    }
+                    b"Name" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_name = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"Value" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_value = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
             }
-            rest = &after[end + 7..];
-        } else {
-            break;
+            Ok(Event::End(e)) if e.name().as_ref() == b"Item" => {
+                if !cur_name.is_empty() {
+                    result.push(ConfigItem {
+                        name: std::mem::take(&mut cur_name),
+                        value: std::mem::take(&mut cur_value),
+                    });
+                }
+                in_item = false;
+            }
+            Ok(Event::Eof) => break,
+            _ => {}
         }
+        buf.clear();
     }
     result
 }
@@ -819,26 +1363,59 @@ pub fn build_preset_list_query_xml(device_id: &str, sn: u32) -> String {
     )
 }
 
-/// 解析预置位列表响应
+/// 解析预置位列表响应（使用 quick-xml）
 pub fn parse_preset_list(xml: &str) -> Vec<PresetInfo> {
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
     let mut result = Vec::new();
-    let mut rest = xml;
-    while let Some(start) = rest.find("<Item>") {
-        let after = &rest[start + 6..];
-        if let Some(end) = after.find("</Item>") {
-            let item_xml = &after[..end];
-            let preset_id = parse_xml_field(item_xml, "PresetID").unwrap_or_default();
-            let name = parse_xml_field(item_xml, "PresetName").unwrap_or_default();
-            if !preset_id.is_empty() {
-                result.push(PresetInfo {
-                    preset_id,
-                    name,
-                });
+    let mut buf = Vec::new();
+    let mut in_item = false;
+    let mut cur_preset_id = String::new();
+    let mut cur_name = String::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                match e.name().as_ref() {
+                    b"Item" => {
+                        in_item = true;
+                        cur_preset_id.clear();
+                        cur_name.clear();
+                    }
+                    b"PresetID" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_preset_id = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"PresetName" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_name = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
             }
-            rest = &after[end + 7..];
-        } else {
-            break;
+            Ok(Event::End(e)) if e.name().as_ref() == b"Item" => {
+                if !cur_preset_id.is_empty() {
+                    result.push(PresetInfo {
+                        preset_id: std::mem::take(&mut cur_preset_id),
+                        name: std::mem::take(&mut cur_name),
+                    });
+                }
+                in_item = false;
+            }
+            Ok(Event::Eof) => break,
+            _ => {}
         }
+        buf.clear();
     }
     result
 }
@@ -870,26 +1447,59 @@ pub fn build_cruise_list_query_xml(device_id: &str, sn: u32) -> String {
     )
 }
 
-/// 解析巡航轨迹列表响应
+/// 解析巡航轨迹列表响应（使用 quick-xml）
 pub fn parse_cruise_list(xml: &str) -> Vec<CruiseInfo> {
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
     let mut result = Vec::new();
-    let mut rest = xml;
-    while let Some(start) = rest.find("<Item>") {
-        let after = &rest[start + 6..];
-        if let Some(end) = after.find("</Item>") {
-            let item_xml = &after[..end];
-            let cruise_id = parse_xml_field(item_xml, "CruiseID").unwrap_or_default();
-            let name = parse_xml_field(item_xml, "CruiseName").unwrap_or_default();
-            if !cruise_id.is_empty() {
-                result.push(CruiseInfo {
-                    cruise_id,
-                    name,
-                });
+    let mut buf = Vec::new();
+    let mut in_item = false;
+    let mut cur_cruise_id = String::new();
+    let mut cur_name = String::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                match e.name().as_ref() {
+                    b"Item" => {
+                        in_item = true;
+                        cur_cruise_id.clear();
+                        cur_name.clear();
+                    }
+                    b"CruiseID" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_cruise_id = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"CruiseName" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_name = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
             }
-            rest = &after[end + 7..];
-        } else {
-            break;
+            Ok(Event::End(e)) if e.name().as_ref() == b"Item" => {
+                if !cur_cruise_id.is_empty() {
+                    result.push(CruiseInfo {
+                        cruise_id: std::mem::take(&mut cur_cruise_id),
+                        name: std::mem::take(&mut cur_name),
+                    });
+                }
+                in_item = false;
+            }
+            Ok(Event::Eof) => break,
+            _ => {}
         }
+        buf.clear();
     }
     result
 }
@@ -919,7 +1529,7 @@ pub struct GuardInfo {
     pub preset_index: u8,
 }
 
-/// 解析看守位信息响应 XML
+/// 解析看守位信息响应 XML（使用 quick-xml）
 ///
 /// GB28181-2022 A.2.4.11：看守位信息查询响应
 ///
@@ -930,16 +1540,46 @@ pub struct GuardInfo {
 /// - `Some(GuardInfo)`: 解析成功
 /// - `None`: 解析失败或 XML 中无有效数据
 pub fn parse_guard_info(xml: &str) -> Option<GuardInfo> {
-    let guard_id = parse_xml_field(xml, "GuardID")
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0);
-    let preset_index = parse_xml_field(xml, "PresetIndex")
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0);
-    Some(GuardInfo {
-        guard_id,
-        preset_index,
-    })
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut buf = Vec::new();
+
+    let mut guard_id: u8 = 0;
+    let mut preset_index: u8 = 0;
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                match e.name().as_ref() {
+                    b"GuardID" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                guard_id = s.trim().parse().unwrap_or(0);
+                            }
+                        }
+                    }
+                    b"PresetIndex" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                preset_index = s.trim().parse().unwrap_or(0);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::Eof) => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    // 只有当 guard_id > 0 时才返回
+    if guard_id > 0 {
+        Some(GuardInfo { guard_id, preset_index })
+    } else {
+        None
+    }
 }
 
 // ── 预置位/巡航控制 ────────────────────────────────────────────────────────────
@@ -1449,22 +2089,69 @@ pub struct StorageStatus {
     pub status: u8,
 }
 
-/// 解析存储卡状态查询响应
+/// 解析存储卡状态查询响应（使用 quick-xml）
 pub fn parse_storage_status(xml: &str) -> Option<StorageStatus> {
-    let device_id = parse_xml_field(xml, "DeviceID")?;
-    let total_space = parse_xml_field(xml, "TotalSpace")
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0);
-    let free_space = parse_xml_field(xml, "FreeSpace")
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0);
-    let status = parse_xml_field(xml, "Status")
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0);
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut buf = Vec::new();
 
-    Some(StorageStatus {
-        device_id,
-        storage_type: parse_xml_field(xml, "StorageType").unwrap_or_else(|| "SD".to_string()),
+    let mut device_id = None;
+    let mut total_space: u64 = 0;
+    let mut free_space: u64 = 0;
+    let mut status: u8 = 0;
+    let mut storage_type = "SD".to_string();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                match e.name().as_ref() {
+                    b"DeviceID" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                device_id = Some(s.trim().to_string());
+                            }
+                        }
+                    }
+                    b"TotalSpace" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                total_space = s.trim().parse().unwrap_or(0);
+                            }
+                        }
+                    }
+                    b"FreeSpace" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                free_space = s.trim().parse().unwrap_or(0);
+                            }
+                        }
+                    }
+                    b"Status" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                status = s.trim().parse().unwrap_or(0);
+                            }
+                        }
+                    }
+                    b"StorageType" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                storage_type = s.trim().to_string();
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::Eof) => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    device_id.map(|id| StorageStatus {
+        device_id: id,
+        storage_type,
         total_space,
         free_space,
         status,
@@ -1564,56 +2251,111 @@ pub fn build_cruise_track_query_xml(device_id: &str, sn: u32, cruise_id: &str) -
     )
 }
 
-/// 解析巡航轨迹查询响应
+/// 解析巡航轨迹查询响应（使用 quick-xml）
 pub fn parse_cruise_track(xml: &str) -> Vec<CruiseTrack> {
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
     let mut result = Vec::new();
-    let mut rest = xml;
+    let mut buf = Vec::new();
 
-    while let Some(start) = rest.find("<Item>") {
-        let after = &rest[start + 6..];
-        if let Some(end) = after.find("</Item>") {
-            let item_xml = &after[..end];
-            let cruise_id = parse_xml_field(item_xml, "CruiseID").unwrap_or_default();
-            let name = parse_xml_field(item_xml, "CruiseName").unwrap_or_default();
+    let mut in_item = false;
+    let mut in_point = false;
+    let mut cur_cruise_id = String::new();
+    let mut cur_name = String::new();
+    let mut cur_points: Vec<CruisePoint> = Vec::new();
+    let mut cur_preset_index: u8 = 0;
+    let mut cur_stay_time: u16 = 0;
+    let mut cur_speed: u8 = 0;
 
-            // 解析轨迹段
-            let mut points = Vec::new();
-            let mut point_rest = item_xml;
-            while let Some(ps) = point_rest.find("<Point>") {
-                let pa = &point_rest[ps + 7..];
-                if let Some(pe) = pa.find("</Point>") {
-                    let point_xml = &pa[..pe];
-                    let preset_index = parse_xml_field(point_xml, "PresetID")
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(0);
-                    let stay_time = parse_xml_field(point_xml, "StayTime")
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(0);
-                    let speed = parse_xml_field(point_xml, "Speed")
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(0);
-                    points.push(CruisePoint {
-                        preset_index,
-                        stay_time,
-                        speed,
-                    });
-                    point_rest = &pa[pe + 8..];
-                } else {
-                    break;
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                match e.name().as_ref() {
+                    b"Item" => {
+                        in_item = true;
+                        cur_cruise_id.clear();
+                        cur_name.clear();
+                        cur_points.clear();
+                    }
+                    b"CruiseID" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_cruise_id = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"CruiseName" => {
+                        if in_item {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_name = s.trim().to_string();
+                                }
+                            }
+                        }
+                    }
+                    b"Point" => {
+                        in_point = true;
+                        cur_preset_index = 0;
+                        cur_stay_time = 0;
+                        cur_speed = 0;
+                    }
+                    b"PresetID" => {
+                        if in_point {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_preset_index = s.trim().parse().unwrap_or(0);
+                                }
+                            }
+                        }
+                    }
+                    b"StayTime" => {
+                        if in_point {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_stay_time = s.trim().parse().unwrap_or(0);
+                                }
+                            }
+                        }
+                    }
+                    b"Speed" => {
+                        if in_point {
+                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                                if let Ok(s) = t.unescape() {
+                                    cur_speed = s.trim().parse().unwrap_or(0);
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
                 }
             }
-
-            if !cruise_id.is_empty() {
-                result.push(CruiseTrack {
-                    cruise_id,
-                    name,
-                    points,
-                });
+            Ok(Event::End(e)) => {
+                if e.name().as_ref() == b"Point" {
+                    if in_point {
+                        cur_points.push(CruisePoint {
+                            preset_index: cur_preset_index,
+                            stay_time: cur_stay_time,
+                            speed: cur_speed,
+                        });
+                    }
+                    in_point = false;
+                } else if e.name().as_ref() == b"Item" {
+                    if !cur_cruise_id.is_empty() {
+                        result.push(CruiseTrack {
+                            cruise_id: std::mem::take(&mut cur_cruise_id),
+                            name: std::mem::take(&mut cur_name),
+                            points: std::mem::take(&mut cur_points),
+                        });
+                    }
+                    in_item = false;
+                }
             }
-            rest = &after[end + 7..];
-        } else {
-            break;
+            Ok(Event::Eof) => break,
+            _ => {}
         }
+        buf.clear();
     }
     result
 }
@@ -1653,26 +2395,81 @@ pub fn build_ptz_precise_status_query_xml(device_id: &str, sn: u32) -> String {
     )
 }
 
-/// 解析 PTZ 精准状态响应
+/// 解析 PTZ 精准状态响应（使用 quick-xml）
 pub fn parse_ptz_precise_status(xml: &str) -> Option<PtzPreciseStatus> {
-    let device_id = parse_xml_field(xml, "DeviceID")?;
-    let pan_position = parse_xml_field(xml, "PanPosition")
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0);
-    let tilt_position = parse_xml_field(xml, "TiltPosition")
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0);
-    let zoom_position = parse_xml_field(xml, "ZoomPosition")
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0);
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut buf = Vec::new();
 
-    Some(PtzPreciseStatus {
-        device_id,
+    let mut device_id = None;
+    let mut pan_position: u16 = 0;
+    let mut tilt_position: u16 = 0;
+    let mut zoom_position: u16 = 0;
+    let mut focus_position: Option<u16> = None;
+    let mut iris_position: Option<u16> = None;
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                match e.name().as_ref() {
+                    b"DeviceID" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                device_id = Some(s.trim().to_string());
+                            }
+                        }
+                    }
+                    b"PanPosition" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                pan_position = s.trim().parse().unwrap_or(0);
+                            }
+                        }
+                    }
+                    b"TiltPosition" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                tilt_position = s.trim().parse().unwrap_or(0);
+                            }
+                        }
+                    }
+                    b"ZoomPosition" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                zoom_position = s.trim().parse().unwrap_or(0);
+                            }
+                        }
+                    }
+                    b"FocusPosition" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                focus_position = s.trim().parse().ok();
+                            }
+                        }
+                    }
+                    b"IrisPosition" => {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(s) = t.unescape() {
+                                iris_position = s.trim().parse().ok();
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::Eof) => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    device_id.map(|id| PtzPreciseStatus {
+        device_id: id,
         pan_position,
         tilt_position,
         zoom_position,
-        focus_position: parse_xml_field(xml, "FocusPosition").and_then(|s| s.parse().ok()),
-        iris_position: parse_xml_field(xml, "IrisPosition").and_then(|s| s.parse().ok()),
+        focus_position,
+        iris_position,
     })
 }
 
@@ -1848,7 +2645,7 @@ mod tests {
         };
         let cmd = rect.to_ptz_cmd();
         assert!(cmd.starts_with("8F005D"));
-        assert_eq!(cmd.len(), 26); // 8F 00 5D + 8字节坐标 + 1字节校验和
+        assert_eq!(cmd.len(), 24); // 8F 00 5D + 8字节坐标(16字符) + 1字节校验和(2字符)
     }
 
     #[test]
@@ -1875,8 +2672,8 @@ mod tests {
         };
         let cmd = param.to_ptz_cmd();
         assert!(cmd.starts_with("8F0091"));
-        // 8F 00 91 + 2*4(位置) + 2*2(聚焦/光圈) + 1(校验和) = 13字节
-        assert_eq!(cmd.len(), 26);
+        // 8F 00 91(6) + pan(4) + tilt(4) + zoom(4) + focus(4) + iris(4) + 校验和(2) = 28字符
+        assert_eq!(cmd.len(), 28);
     }
 
     #[test]
