@@ -42,7 +42,9 @@ pub fn parse_xml_field(xml: &str, field: &str) -> Option<String> {
                 // 找到目标标签，读取文本内容
                 match reader.read_event_into(&mut buf) {
                     Ok(Event::Text(t)) => {
-                        return Some(t.unescape().ok()?.trim().to_string());
+                        if let Ok(s) = t.xml_content() {
+                            return Some(s.trim().to_string());
+                        }
                     }
                     Ok(Event::Empty(e)) if e.name().as_ref() == field_bytes => {
                         // 自闭合标签如 <Field/>
@@ -156,7 +158,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                     b"DeviceID" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_device_id = s.trim().to_string();
                                 }
                             }
@@ -165,7 +167,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                     b"Name" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_name = s.trim().to_string();
                                 }
                             }
@@ -174,7 +176,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                     b"Manufacturer" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_manufacturer = s.trim().to_string();
                                 }
                             }
@@ -183,7 +185,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                     b"Model" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_model = s.trim().to_string();
                                 }
                             }
@@ -192,7 +194,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                     b"Status" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_status = s.trim().to_string();
                                 }
                             }
@@ -201,7 +203,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                     b"Address" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_address = s.trim().to_string();
                                 }
                             }
@@ -210,7 +212,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                     b"ParentID" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_parent_id = s.trim().to_string();
                                 }
                             }
@@ -219,7 +221,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                     b"Parental" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_parental = s.trim().parse().unwrap_or(0);
                                 }
                             }
@@ -228,7 +230,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                     b"RegisterWay" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_register_way = s.trim().parse().unwrap_or(0);
                                 }
                             }
@@ -237,7 +239,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                     b"Secrecy" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_secrecy = s.trim().parse().unwrap_or(0);
                                 }
                             }
@@ -246,7 +248,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                     b"IPAddress" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_ip_address = s.trim().to_string();
                                 }
                             }
@@ -255,7 +257,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                     b"Port" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_port = s.trim().parse().unwrap_or(0);
                                 }
                             }
@@ -264,7 +266,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                     b"Longitude" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_longitude = s.trim().parse().ok();
                                 }
                             }
@@ -273,7 +275,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                     b"Latitude" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_latitude = s.trim().parse().ok();
                                 }
                             }
@@ -282,7 +284,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                     b"Block" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_block = s.trim().to_string();
                                 }
                             }
@@ -291,7 +293,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                     b"CivilCode" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_civil_code = s.trim().to_string();
                                 }
                             }
@@ -300,7 +302,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                     b"Num" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_channel_num = s.trim().parse().unwrap_or(0);
                                 }
                             }
@@ -511,21 +513,21 @@ pub fn parse_device_status(xml: &str) -> DeviceStatus {
                 match e.name().as_ref() {
                     b"DeviceID" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.unescape() {
+                            if let Ok(txt) = t.xml_content() {
                                 s.device_id = txt.trim().to_string();
                             }
                         }
                     }
                     b"Result" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.unescape() {
+                            if let Ok(txt) = t.xml_content() {
                                 s.result = txt.trim().to_string();
                             }
                         }
                     }
                     b"Online" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.unescape() {
+                            if let Ok(txt) = t.xml_content() {
                                 s.on_line = txt.trim().to_string();
                             }
                         }
@@ -533,7 +535,7 @@ pub fn parse_device_status(xml: &str) -> DeviceStatus {
                     b"Status" => {
                         if !in_alarmstatus {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(txt) = t.unescape() {
+                                if let Ok(txt) = t.xml_content() {
                                     s.status = txt.trim().to_string();
                                 }
                             }
@@ -541,21 +543,21 @@ pub fn parse_device_status(xml: &str) -> DeviceStatus {
                     }
                     b"Encode" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.unescape() {
+                            if let Ok(txt) = t.xml_content() {
                                 s.encode = txt.trim().to_string();
                             }
                         }
                     }
                     b"Record" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.unescape() {
+                            if let Ok(txt) = t.xml_content() {
                                 s.record = txt.trim().to_string();
                             }
                         }
                     }
                     b"DeviceTime" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.unescape() {
+                            if let Ok(txt) = t.xml_content() {
                                 s.device_time = txt.trim().to_string();
                             }
                         }
@@ -565,42 +567,42 @@ pub fn parse_device_status(xml: &str) -> DeviceStatus {
                     }
                     b"DuressAlarm" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.unescape() {
+                            if let Ok(txt) = t.xml_content() {
                                 cur_duress_alarm = txt.trim().parse().unwrap_or(0);
                             }
                         }
                     }
                     b"EnclosureAlarm" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.unescape() {
+                            if let Ok(txt) = t.xml_content() {
                                 cur_enclosure_alarm = txt.trim().parse().unwrap_or(0);
                             }
                         }
                     }
                     b"VideoLost" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.unescape() {
+                            if let Ok(txt) = t.xml_content() {
                                 cur_video_lost = txt.trim().parse().unwrap_or(0);
                             }
                         }
                     }
                     b"VideoMotion" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.unescape() {
+                            if let Ok(txt) = t.xml_content() {
                                 cur_video_motion = txt.trim().parse().unwrap_or(0);
                             }
                         }
                     }
                     b"StorageFault" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.unescape() {
+                            if let Ok(txt) = t.xml_content() {
                                 cur_storage_fault = txt.trim().parse().unwrap_or(0);
                             }
                         }
                     }
                     b"StorageFull" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.unescape() {
+                            if let Ok(txt) = t.xml_content() {
                                 cur_storage_full = txt.trim().parse().unwrap_or(0);
                             }
                         }
@@ -880,7 +882,7 @@ pub fn parse_record_items(xml: &str) -> Vec<RecordItem> {
                     b"DeviceID" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_device_id = s.trim().to_string();
                                 }
                             }
@@ -889,7 +891,7 @@ pub fn parse_record_items(xml: &str) -> Vec<RecordItem> {
                     b"Name" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_name = s.trim().to_string();
                                 }
                             }
@@ -898,7 +900,7 @@ pub fn parse_record_items(xml: &str) -> Vec<RecordItem> {
                     b"FilePath" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_file_path = s.trim().to_string();
                                 }
                             }
@@ -907,7 +909,7 @@ pub fn parse_record_items(xml: &str) -> Vec<RecordItem> {
                     b"Address" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_address = s.trim().to_string();
                                 }
                             }
@@ -916,7 +918,7 @@ pub fn parse_record_items(xml: &str) -> Vec<RecordItem> {
                     b"StartTime" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_start_time = s.trim().to_string();
                                 }
                             }
@@ -925,7 +927,7 @@ pub fn parse_record_items(xml: &str) -> Vec<RecordItem> {
                     b"EndTime" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_end_time = s.trim().to_string();
                                 }
                             }
@@ -934,7 +936,7 @@ pub fn parse_record_items(xml: &str) -> Vec<RecordItem> {
                     b"Secrecy" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_secrecy = s.trim().parse().unwrap_or(0);
                                 }
                             }
@@ -943,7 +945,7 @@ pub fn parse_record_items(xml: &str) -> Vec<RecordItem> {
                     b"Type" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_record_type = s.trim().to_string();
                                 }
                             }
@@ -952,7 +954,7 @@ pub fn parse_record_items(xml: &str) -> Vec<RecordItem> {
                     b"FileSize" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_file_size = s.trim().parse().ok();
                                 }
                             }
@@ -1087,63 +1089,63 @@ pub fn parse_alarm_notify(xml: &str) -> Option<AlarmInfo> {
                 match e.name().as_ref() {
                     b"DeviceID" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 device_id = Some(s.trim().to_string());
                             }
                         }
                     }
                     b"StartAlarmTime" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 start_alarm_time = s.trim().to_string();
                             }
                         }
                     }
                     b"EndAlarmTime" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 end_alarm_time = s.trim().to_string();
                             }
                         }
                     }
                     b"AlarmPriority" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 alarm_priority = s.trim().parse().unwrap_or(0);
                             }
                         }
                     }
                     b"AlarmMethod" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 alarm_method = s.trim().parse().unwrap_or(0);
                             }
                         }
                     }
                     b"AlarmType" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 alarm_type = s.trim().to_string();
                             }
                         }
                     }
                     b"AlarmDescription" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 alarm_description = s.trim().to_string();
                             }
                         }
                     }
                     b"Longitude" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 longitude = s.trim().parse().ok();
                             }
                         }
                     }
                     b"Latitude" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 latitude = s.trim().parse().ok();
                             }
                         }
@@ -1301,7 +1303,7 @@ pub fn parse_config_download_response(xml: &str) -> Vec<ConfigItem> {
                     b"Name" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_name = s.trim().to_string();
                                 }
                             }
@@ -1310,7 +1312,7 @@ pub fn parse_config_download_response(xml: &str) -> Vec<ConfigItem> {
                     b"Value" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_value = s.trim().to_string();
                                 }
                             }
@@ -1385,7 +1387,7 @@ pub fn parse_preset_list(xml: &str) -> Vec<PresetInfo> {
                     b"PresetID" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_preset_id = s.trim().to_string();
                                 }
                             }
@@ -1394,7 +1396,7 @@ pub fn parse_preset_list(xml: &str) -> Vec<PresetInfo> {
                     b"PresetName" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_name = s.trim().to_string();
                                 }
                             }
@@ -1469,7 +1471,7 @@ pub fn parse_cruise_list(xml: &str) -> Vec<CruiseInfo> {
                     b"CruiseID" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_cruise_id = s.trim().to_string();
                                 }
                             }
@@ -1478,7 +1480,7 @@ pub fn parse_cruise_list(xml: &str) -> Vec<CruiseInfo> {
                     b"CruiseName" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_name = s.trim().to_string();
                                 }
                             }
@@ -1553,14 +1555,14 @@ pub fn parse_guard_info(xml: &str) -> Option<GuardInfo> {
                 match e.name().as_ref() {
                     b"GuardID" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 guard_id = s.trim().parse().unwrap_or(0);
                             }
                         }
                     }
                     b"PresetIndex" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 preset_index = s.trim().parse().unwrap_or(0);
                             }
                         }
@@ -2107,35 +2109,35 @@ pub fn parse_storage_status(xml: &str) -> Option<StorageStatus> {
                 match e.name().as_ref() {
                     b"DeviceID" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 device_id = Some(s.trim().to_string());
                             }
                         }
                     }
                     b"TotalSpace" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 total_space = s.trim().parse().unwrap_or(0);
                             }
                         }
                     }
                     b"FreeSpace" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 free_space = s.trim().parse().unwrap_or(0);
                             }
                         }
                     }
                     b"Status" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 status = s.trim().parse().unwrap_or(0);
                             }
                         }
                     }
                     b"StorageType" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 storage_type = s.trim().to_string();
                             }
                         }
@@ -2280,7 +2282,7 @@ pub fn parse_cruise_track(xml: &str) -> Vec<CruiseTrack> {
                     b"CruiseID" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_cruise_id = s.trim().to_string();
                                 }
                             }
@@ -2289,7 +2291,7 @@ pub fn parse_cruise_track(xml: &str) -> Vec<CruiseTrack> {
                     b"CruiseName" => {
                         if in_item {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_name = s.trim().to_string();
                                 }
                             }
@@ -2304,7 +2306,7 @@ pub fn parse_cruise_track(xml: &str) -> Vec<CruiseTrack> {
                     b"PresetID" => {
                         if in_point {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_preset_index = s.trim().parse().unwrap_or(0);
                                 }
                             }
@@ -2313,7 +2315,7 @@ pub fn parse_cruise_track(xml: &str) -> Vec<CruiseTrack> {
                     b"StayTime" => {
                         if in_point {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_stay_time = s.trim().parse().unwrap_or(0);
                                 }
                             }
@@ -2322,7 +2324,7 @@ pub fn parse_cruise_track(xml: &str) -> Vec<CruiseTrack> {
                     b"Speed" => {
                         if in_point {
                             if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.unescape() {
+                                if let Ok(s) = t.xml_content() {
                                     cur_speed = s.trim().parse().unwrap_or(0);
                                 }
                             }
@@ -2414,42 +2416,42 @@ pub fn parse_ptz_precise_status(xml: &str) -> Option<PtzPreciseStatus> {
                 match e.name().as_ref() {
                     b"DeviceID" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 device_id = Some(s.trim().to_string());
                             }
                         }
                     }
                     b"PanPosition" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 pan_position = s.trim().parse().unwrap_or(0);
                             }
                         }
                     }
                     b"TiltPosition" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 tilt_position = s.trim().parse().unwrap_or(0);
                             }
                         }
                     }
                     b"ZoomPosition" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 zoom_position = s.trim().parse().unwrap_or(0);
                             }
                         }
                     }
                     b"FocusPosition" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 focus_position = s.trim().parse().ok();
                             }
                         }
                     }
                     b"IrisPosition" => {
                         if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.unescape() {
+                            if let Ok(s) = t.xml_content() {
                                 iris_position = s.trim().parse().ok();
                             }
                         }
