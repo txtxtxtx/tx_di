@@ -131,22 +131,39 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
 /// 目录条目信息
 #[derive(Debug, Clone)]
 pub struct CatalogItem {
+    /// 设备ID（通道编号）
     pub device_id: String,
+    /// 设备名称
     pub name: String,
+    /// 制造商名称
     pub manufacturer: String,
+    /// 设备型号
     pub model: String,
+    /// 设备状态（ON/OFF/Unknown）
     pub status: String,
+    /// 设备地址信息
     pub address: String,
+    /// 父设备ID
     pub parent_id: String,
+    /// 是否有子设备（0=无，1=有）
     pub parental: u8,
+    /// 注册方式（1=符合标准，2=其他）
     pub register_way: u8,
+    /// 保密属性（0=非保密，1=保密）
     pub secrecy: u8,
+    /// IP地址
     pub ip_address: String,
+    /// 端口号
     pub port: u16,
+    /// 经度坐标（可选）
     pub longitude: Option<f64>,
+    /// 纬度坐标（可选）
     pub latitude: Option<f64>,
+    /// 区域标识
     pub block: String,
+    /// 行政区划代码
     pub civil_code: String,
+    /// 通道数量
     pub channel_num: u32,
 }
 
