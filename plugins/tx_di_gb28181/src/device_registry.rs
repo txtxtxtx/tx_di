@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tokio::time::{Duration, Instant};
 use tracing::{info, warn};
 
-/// 设备通道信息
+/// 设备通道信息（GB28181-2022 §8.1 目录结构）
 #[derive(Debug, Clone)]
 pub struct ChannelInfo {
     /// 通道 ID（20 位）
@@ -24,6 +24,24 @@ pub struct ChannelInfo {
     pub status: ChannelStatus,
     /// 地址描述
     pub address: String,
+    /// 父设备 ID
+    pub parent_id: String,
+    /// 是否父节点（1=父节点/设备，0=叶节点/通道）
+    pub parental: u8,
+    /// 注册方式（1=主动注册，2=被动注册）
+    pub register_way: u8,
+    /// 保密属性（0=不涉密）
+    pub secrecy: u8,
+    /// 设备 IP
+    pub ip_address: String,
+    /// 设备端口
+    pub port: u16,
+    /// 经度
+    pub longitude: Option<f64>,
+    /// 纬度
+    pub latitude: Option<f64>,
+    /// 行政区划代码
+    pub civil_code: String,
 }
 
 /// 通道在线状态
@@ -40,6 +58,14 @@ impl ChannelStatus {
             "ON" => ChannelStatus::On,
             "OFF" => ChannelStatus::Off,
             other => ChannelStatus::Unknown(other.to_string()),
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            ChannelStatus::On => "ON",
+            ChannelStatus::Off => "OFF",
+            ChannelStatus::Unknown(s) => s.as_str(),
         }
     }
 }
@@ -62,7 +88,7 @@ pub struct DeviceInfo {
     /// 注册有效期（秒）
     pub expires: u32,
 
-    /// 设备的 IP 地址
+    /// 设备的 IP 地址（来自 Via 头）
     pub remote_addr: String,
 
     /// 设备通道列表（目录查询后填充）
@@ -70,6 +96,15 @@ pub struct DeviceInfo {
 
     /// 是否在线（由心跳超时检测更新）
     pub online: bool,
+
+    /// 制造商（DeviceInfo 查询后填充）
+    pub manufacturer: String,
+
+    /// 型号（DeviceInfo 查询后填充）
+    pub model: String,
+
+    /// 固件版本
+    pub firmware: String,
 }
 
 impl DeviceInfo {
@@ -83,6 +118,9 @@ impl DeviceInfo {
             remote_addr,
             channels: Vec::new(),
             online: true,
+            manufacturer: String::new(),
+            model: String::new(),
+            firmware: String::new(),
         }
     }
 
@@ -154,6 +192,8 @@ impl DeviceRegistry {
     // ── 心跳 ─────────────────────────────────────────────────────────────────
 
     /// 刷新设备心跳时间戳（收到 MESSAGE Keepalive 时调用）
+    ///
+    /// 返回：(刷新成功, 之前是否离线)
     pub fn refresh_heartbeat(&self, device_id: &str) -> bool {
         if let Some(mut dev) = self.inner.get_mut(device_id) {
             dev.refresh_heartbeat();
@@ -202,7 +242,7 @@ impl DeviceRegistry {
         self.inner.contains_key(device_id)
     }
 
-    // ── 通道更新 ─────────────────────────────────────────────────────────────
+    // ── 更新 ─────────────────────────────────────────────────────────────────
 
     /// 更新设备通道列表（收到 Catalog 响应时调用）
     pub fn update_channels(&self, device_id: &str, channels: Vec<ChannelInfo>) {
@@ -213,6 +253,21 @@ impl DeviceRegistry {
                 "📂 更新设备通道列表"
             );
             dev.channels = channels;
+        }
+    }
+
+    /// 更新设备信息（收到 DeviceInfo 响应时调用）
+    pub fn update_device_info(
+        &self,
+        device_id: &str,
+        manufacturer: &str,
+        model: &str,
+        firmware: &str,
+    ) {
+        if let Some(mut dev) = self.inner.get_mut(device_id) {
+            dev.manufacturer = manufacturer.to_string();
+            dev.model = model.to_string();
+            dev.firmware = firmware.to_string();
         }
     }
 

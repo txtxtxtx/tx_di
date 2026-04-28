@@ -70,6 +70,9 @@ anyhow = "1.0"
 # 异步 trait
 async-trait = "0.1"
 
+# HTTP 客户端
+reqwest = { version = "0.12", features = ["json"] }
+
 # Web 框架
 axum = {version = "0.8", features = ["macros"]}
 tower = {version = "0.5", features = ["full"]}
