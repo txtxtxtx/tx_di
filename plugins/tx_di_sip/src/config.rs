@@ -3,21 +3,16 @@ use std::net::SocketAddr;
 use tx_di_core::{tx_comp, BuildContext, CompInit, RIE};
 
 /// SIP 传输协议类型
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq,Default)]
 #[serde(rename_all = "lowercase")]
 pub enum SipTransport {
     /// 仅启用 UDP（默认）
+    #[default]
     Udp,
     /// 仅启用 TCP
     Tcp,
     /// 同时启用 UDP 和 TCP
     Both,
-}
-
-impl Default for SipTransport {
-    fn default() -> Self {
-        SipTransport::Udp
-    }
 }
 
 /// SIP 服务器配置
@@ -77,7 +72,7 @@ pub struct SipConfig {
 
     /// User-Agent 字符串，出现在所有 SIP 请求/响应的 User-Agent 头中
     ///
-    /// 默认值：`"tx-di-sip/0.1.0"`
+    /// 默认值：`"tx-di-sip/1.0.0"`
     #[serde(default = "default_user_agent")]
     pub user_agent: String,
 
@@ -99,7 +94,7 @@ impl Default for SipConfig {
             port: default_port(),
             transport: SipTransport::default(),
             user_agent: default_user_agent(),
-            external_ip: None,
+            external_ip: Some(default_host()),
             log_messages: false,
         }
     }
@@ -156,5 +151,5 @@ pub(crate) fn default_port() -> u16 {
 }
 
 pub(crate) fn default_user_agent() -> String {
-    "tx-di-sip/0.1.0".to_string()
+    "tx-di-sip/1.0.0".to_string()
 }

@@ -3,7 +3,13 @@
 [web_config]
 host = "0.0.0.0"
 port = 8888
-enable_cors = true
+layers = [
+    #    [1,"auth"],           # 最内层，最靠近 Handler 请在业务模块实现并注册
+    [10,"api_log"],        # 请求日志，包含请求和返回信息的日志
+    #    [3,"trace"],          # 链路追踪，包含链路追踪信息的日志
+    [100,"compression"],    # 压缩
+    [10000,"cors"]   # 允许跨域,最外层,最先接收请求
+]
 
 [web_config.spa_apps]
 "/admin" = "examples/gb28181_admin/ui/dist"
