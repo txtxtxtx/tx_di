@@ -1,0 +1,35 @@
+# GB28181 管理后台配置
+
+[web_config]
+host = "0.0.0.0"
+port = 8888
+enable_cors = true
+
+[web_config.spa_apps]
+"/admin" = "examples/gb28181_admin/ui/dist"
+
+[gb28181_server_config]
+platform_id            = "34020000002000000001"
+realm                  = "3402000000"
+sip_ip                 = "127.0.0.1"
+heartbeat_timeout_secs = 120
+enable_auth            = false
+auth_password          = "12345678"
+
+[gb28181_server_config.media]
+local_ip       = "127.0.0.1"
+rtp_port_start = 30000
+rtp_port_end   = 40000
+
+[gb28181_server_config.zlm]
+base_url = "http://127.0.0.1:8080"
+secret   = "035c73f7-bb6b-4889-a715-d9eb2d1925cc"
+
+[sip_config]
+host  = "0.0.0.0"
+port  = 5060
+proto = "UDP"
+
+[log_config]
+level     = "debug"
+console_output = true
