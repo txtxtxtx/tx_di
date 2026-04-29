@@ -34,7 +34,7 @@ secret   = "035c73f7-bb6b-4889-a715-d9eb2d1925cc"
 [sip_config]
 host  = "0.0.0.0"
 port  = 5060
-proto = "UDP"
+transport = "both" #tcp udp both
 
 [log_config]
 level     = "debug"
