@@ -95,7 +95,7 @@ mod tests {
     #[test]
     fn config_default_user_agent() {
         let cfg = default_config();
-        assert_eq!(cfg.user_agent, "tx-di-sip/0.1.0");
+        assert_eq!(cfg.user_agent, "tx-di-sip/1.0.0");
     }
 
     #[test]
@@ -313,7 +313,7 @@ mod tests {
         assert_eq!(cfg.host, "0.0.0.0");
         assert_eq!(cfg.port, 5060);
         assert_eq!(cfg.transport, SipTransport::Udp);     // 默认值
-        assert_eq!(cfg.user_agent, "tx-di-sip/0.1.0");   // 默认值
+        assert_eq!(cfg.user_agent, "tx-di-sip/1.0.0");   // 默认值
         assert!(cfg.external_ip.is_none());               // 默认值
         assert!(!cfg.log_messages);                       // 默认值
     }

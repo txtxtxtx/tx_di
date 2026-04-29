@@ -3,7 +3,13 @@
 //! 提供类似 axum 路由表的消息处理机制：
 //! 用户可在应用启动前通过 [`SipRouter::add_handler`] 注册各种方法的处理函数，
 //! SIP 服务启动后会将收到的消息分发给对应的处理器。
+//!
+//! ## 性能优化
+//!
+//! - 查找使用 DashMap 索引：精确匹配 O(1)，无需每消息排序
+//! - 索引在注册时构建，运行时只读查询，完全无锁
 
+use dashmap::DashMap;
 use rsipstack::transaction::transaction::Transaction;
 use std::future::Future;
 use std::pin::Pin;
@@ -11,8 +17,6 @@ use std::sync::{Arc, LazyLock, RwLock};
 use tracing::{error, info};
 
 /// 异步 SIP 消息处理函数类型
-///
-/// 接收一个 `Transaction`，返回 `anyhow::Result<()>`。
 pub type SipHandlerFn = Arc<
     dyn Fn(Transaction) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send + 'static>>
         + Send
@@ -30,13 +34,24 @@ pub struct HandlerEntry {
     pub handler: SipHandlerFn,
 }
 
-/// 全局处理器注册表
+/// 全局处理器注册表（用于支持运行时遍历和移除）
 static HANDLER_REGISTRY: LazyLock<Arc<RwLock<Vec<HandlerEntry>>>> =
     LazyLock::new(|| Arc::new(RwLock::new(Vec::new())));
+
+/// 方法名 → HandlerEntry 索引（按 priority 升序排列）
+/// 查找复杂度 O(1)，每条消息分发时直接命中
+static HANDLER_INDEX: LazyLock<Arc<DashMap<String, Vec<HandlerEntry>>>> =
+    LazyLock::new(|| Arc::new(DashMap::new()));
 
 /// SIP 路由器
 ///
 /// 管理 SIP 消息处理器的注册与分发，设计上与 `WebPlugin::add_router` 对称。
+///
+/// # 性能特性
+///
+/// - 注册（`add_handler`）：O(1) 写入，同时更新注册表和索引
+/// - 查找（`dispatch`）：O(1) 精确匹配（DashMap），无锁并发读取
+/// - Fallback：O(n) 遍历 catch-all（仅在无精确匹配时触发）
 ///
 /// # 示例
 ///
@@ -97,55 +112,71 @@ impl SipRouter {
         Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
     {
         let method_str = method.into().map(|m| m.to_uppercase());
-        let handler_fn: SipHandlerFn =
-            Arc::new(move |tx| Box::pin(handler(tx)));
+        let handler_fn: SipHandlerFn = Arc::new(move |tx| Box::pin(handler(tx)));
+
+        let entry = HandlerEntry {
+            method: method_str.clone(),
+            priority,
+            handler: handler_fn.clone(),
+        };
+
+        // 1. 写入注册表
         let mut registry = HANDLER_REGISTRY.write().expect("handler registry write lock");
         registry.push(HandlerEntry {
             method: method_str.clone(),
             priority,
             handler: handler_fn,
         });
+        drop(registry); // 尽快释放写锁
+
+        // 2. 同步更新索引（按 priority 插入排序）
+        if let Some(ref method_name) = method_str {
+            let mut entries = HANDLER_INDEX
+                .entry(method_name.clone())
+                .or_insert_with(Vec::new);
+
+            // 二分查找插入位置，维持 priority 升序
+            let pos = entries
+                .binary_search_by_key(&priority, |e| e.priority)
+                .unwrap_or_else(|pos| pos);
+            entries.insert(pos, entry);
+        }
+
         info!(
             method = ?method_str,
             priority = priority,
-            "SIP 处理器已注册"
+            "SIP 处理器已注册（O(1) 索引）"
         );
     }
 
-    /// 分发消息：按优先级找到第一个匹配的处理器并调用
+    /// 分发消息：O(1) 查找匹配处理器并调用
     ///
     /// 查找策略：
-    /// 1. 优先按 `priority` 升序扫描
-    /// 2. 精确匹配方法名
-    /// 3. 若无精确匹配，使用 catch-all（`method == None`）
+    /// 1. DashMap 精确匹配（O(1)，无锁）→ 取最低 priority 条目
+    /// 2. 若无精确匹配，遍历注册表查找 catch-all（O(n)，持有读锁）
     pub(crate) async fn dispatch(tx: Transaction) {
         let method = tx.original.method.to_string().to_uppercase();
 
-        // 查找精确匹配 + catch-all
         let handler = {
+            // 路径 A：O(1) 精确查找（DashMap 并发读，无锁）
+            if let Some(entries) = HANDLER_INDEX.get(&method) {
+                if let Some(entry) = entries.first() {
+                    return Self::invoke_handler(entry.handler.clone(), tx).await;
+                }
+            }
+
+            // 路径 B：遍历 catch-all（O(n)，持有读锁）
+            // 仅当无精确匹配时触发，正常情况下极少见
             let registry = HANDLER_REGISTRY.read().expect("handler registry read lock");
-            // 先按 priority 排序，取第一个精确匹配
-            let mut entries: Vec<&HandlerEntry> = registry.iter().collect();
-            entries.sort_by_key(|e| e.priority);
-
-            let exact = entries
-                .iter()
-                .find(|e| e.method.as_deref() == Some(method.as_str()))
-                .map(|e| e.handler.clone());
-
-            let fallback = entries
+            registry
                 .iter()
                 .find(|e| e.method.is_none())
-                .map(|e| e.handler.clone());
-
-            exact.or(fallback)
+                .map(|e| e.handler.clone())
         };
 
         match handler {
             Some(h) => {
-                if let Err(e) = h(tx).await {
-                    error!(error = %e, "SIP 处理器执行出错");
-                }
+                Self::invoke_handler(h, tx).await;
             }
             None => {
                 // 没有注册任何处理器时自动回复 405
@@ -156,10 +187,19 @@ impl SipRouter {
         }
     }
 
+    /// 调用 handler 并统一处理错误日志
+    async fn invoke_handler(handler: SipHandlerFn, tx: Transaction) {
+        if let Err(e) = handler(tx).await {
+            error!(error = %e, "SIP 处理器执行出错");
+        }
+    }
+
     /// 清空所有已注册的处理器（主要用于测试）
     pub fn clear() {
         let mut registry = HANDLER_REGISTRY.write().expect("handler registry write lock");
         registry.clear();
+        // 清空 DashMap 索引
+        HANDLER_INDEX.clear();
         info!("已清空所有 SIP 处理器");
     }
 

@@ -2778,6 +2778,7 @@ name = "tx_di_sip"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "dashmap",
  "rsipstack",
  "serde",
  "tokio",

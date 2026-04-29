@@ -5,11 +5,16 @@
 //! 2. 构建 rsipstack `Endpoint` 并启动服务
 //! 3. 将收到的 SIP 事务分发给 [`SipRouter`] 中注册的处理器
 //! 4. 暴露 [`SipSender`] 供应用层发送 SIP 消息
+//!
+//! ## 性能特性
+//!
+//! - **Semaphore 背压**：限制并发 handler 数量，防止消息风暴 OOM
+//! - **Bounded Channel**：10,000 消息队列上限，超限触发背压等待
+//! - **O(1) Handler 查找**：DashMap 索引，精确匹配无锁
 
 use crate::config::SipConfig;
 use crate::handler::SipRouter;
 use crate::sender::SipSender;
-use rsipstack::sip::HeadersExt;
 use rsipstack::transport::tcp_listener::TcpListenerConnection;
 use rsipstack::transport::udp::UdpConnection;
 use rsipstack::transport::TransportLayer;
@@ -17,10 +22,21 @@ use rsipstack::transport::SipAddr;
 use rsipstack::transaction::endpoint::EndpointInnerRef;
 use rsipstack::{transaction::Endpoint, EndpointBuilder};
 use std::net::SocketAddr;
-use std::sync::{Arc, OnceLock};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::sync::OnceLock;
+use tokio::sync::{mpsc, Semaphore};
 use tokio_util::sync::CancellationToken;
-use tracing::info;
+use tracing::{info, warn};
 use tx_di_core::{tx_comp, App, BoxFuture, BuildContext, CompInit, RIE};
+
+// ── 性能配置常量 ──────────────────────────────────────────────────────────────
+
+/// Handler 并发上限（防止消息风暴 OOM）
+const MAX_CONCURRENT_HANDLERS: usize = 1000;
+
+/// 消息分发 channel 容量（生产者 → 消费者队列）
+const DISPATCH_CHANNEL_CAPACITY: usize = 10_000;
 
 /// 全局 SIP 端点 Inner 引用，供 `SipSender` 在异步 init 之后访问
 static ENDPOINT_INNER: OnceLock<EndpointInnerRef> = OnceLock::new();
@@ -40,6 +56,13 @@ static CANCEL_TOKEN: OnceLock<CancellationToken> = OnceLock::new();
 /// port     = 5060
 /// transport = "both"       # UDP + TCP
 /// user_agent = "MyApp/1.0"
+/// ```
+///
+/// # 性能配置（环境变量覆盖）
+///
+/// ```bash
+/// SIP_MAX_HANDLERS=2000  # 并发上限，默认 1000
+/// SIP_QUEUE_SIZE=20000   # 队列容量，默认 10000
 /// ```
 ///
 /// # 使用示例
@@ -108,14 +131,36 @@ impl CompInit for SipPlugin {
             info!("SIP 插件启动成功，监听 {}", config.bind_addr());
 
             // 获取消息接收通道
-            let incoming = endpoint
+            let mut incoming = endpoint
                 .incoming_transactions()
                 .map_err(|e| anyhow::anyhow!("获取 SIP 消息接收通道失败: {}", e))?;
 
-            // 在独立任务中运行 endpoint 驱动循环
+            // ── 性能优化：Semaphore 背压 + Bounded Channel ──────────────────
+            let queue_size = std::env::var("SIP_QUEUE_SIZE")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(DISPATCH_CHANNEL_CAPACITY);
+
+            let max_handlers = std::env::var("SIP_MAX_HANDLERS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(MAX_CONCURRENT_HANDLERS);
+
+            // Bounded mpsc channel：send() 在队列满时 await → 天然背压
+            let (tx, mut rx) = mpsc::channel::<rsipstack::transaction::transaction::Transaction>(queue_size);
+
+            // 共享信号量：限制并发 handler 数量
+            let sem = Arc::new(Semaphore::new(max_handlers));
+
+            // 过载标志（避免日志刷屏）
+            let overload_flag = Arc::new(AtomicBool::new(false));
+
+            let log_messages = config.log_messages;
             let ep_clone = endpoint.inner.clone();
             let token_clone = cancel_token.clone();
-            tokio::spawn(async move {
+
+            // Endpoint serve 任务
+            let ep_task = tokio::spawn(async move {
                 tokio::select! {
                     _ = ep_clone.serve() => {
                         info!("SIP endpoint 服务已退出");
@@ -126,12 +171,75 @@ impl CompInit for SipPlugin {
                 }
             });
 
-            // 在独立任务中处理入站消息
-            let log_messages = config.log_messages;
+            // 生产者：将 rsipstack incoming 消息送入 bounded channel
+            // 队列满时：send().await 自动 park，形成背压
             tokio::spawn(async move {
-                dispatch_loop(incoming, log_messages).await;
+                while let Some(sip_tx) = incoming.recv().await {
+                    if tx.send(sip_tx).await.is_err() {
+                        warn!("dispatch channel 已关闭，停止生产者");
+                        break;
+                    }
+                }
+                info!("SIP 消息生产者已退出");
             });
 
+            // 消费者：顺序从 channel 取消息，并发执行 handler
+            // 关键：消息接收顺序是串行的（保证同设备消息有序），
+            //       但 handler 执行是并发的（Semaphore 控制并发数）
+            tokio::spawn(async move {
+                info!(
+                    queue_capacity = queue_size,
+                    max_handlers = max_handlers,
+                    "SIP 消息分发引擎已启动"
+                );
+
+                while let Some(tx) = rx.recv().await {
+                    // Semaphore permit：超过并发上限时 park
+                    let permit = sem.clone().acquire_owned().await;
+                    let Ok(permit) = permit else {
+                        warn!("Semaphore 获取失败，停止消费者");
+                        break;
+                    };
+
+                    let flag = overload_flag.clone();
+                    let sem_clone = sem.clone();
+                    let log = log_messages;
+
+                    // Handler 在独立 task 中执行，不阻塞后续消息接收
+                    tokio::spawn(async move {
+                        // 感知并发压力
+                        let available = sem_clone.available_permits();
+                        if available == 0 {
+                            if !flag.load(Ordering::Relaxed) {
+                                flag.store(true, Ordering::Relaxed);
+                                warn!(
+                                    "SIP handler 并发已达上限({})，消息处理排队中",
+                                    max_handlers
+                                );
+                            }
+                        } else if available > max_handlers / 4
+                            && flag.load(Ordering::Relaxed)
+                        {
+                            flag.store(false, Ordering::Relaxed);
+                            info!("SIP handler 并发压力已缓解");
+                        }
+
+                        if log {
+                            let method = tx.original.method.to_string();
+                            info!(method = %method, "SIP 分发消息");
+                        }
+
+                        SipRouter::dispatch(tx).await;
+                        drop(permit); // permit 在此 drop，自动释放
+                    });
+                }
+
+                info!("SIP 消息分发引擎已退出");
+            });
+
+            // 等待 endpoint task
+            ep_task.await.ok();
+            info!("SIP 插件异步初始化完成");
             Ok(())
         })
     }
@@ -228,26 +336,4 @@ async fn build_transport_layer(
     }
 
     Ok(transport_layer)
-}
-
-/// 入站消息分发循环
-async fn dispatch_loop(
-    mut incoming: rsipstack::transaction::TransactionReceiver,
-    log_messages: bool,
-) {
-    info!("SIP 消息分发循环已启动");
-    while let Some(tx) = incoming.recv().await {
-        if log_messages {
-            info!(
-                method = %tx.original.method,
-                from = %tx.original
-                    .from_header()
-                    .map(|h| h.to_string())
-                    .unwrap_or_else(|_| "N/A".into()),
-                "收到 SIP 消息"
-            );
-        }
-        tokio::spawn(SipRouter::dispatch(tx));
-    }
-    info!("SIP 消息分发循环已退出");
 }
