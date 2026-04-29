@@ -67,10 +67,11 @@ impl SipSender {
         )
         .map_err(|e| anyhow::anyhow!("无效的注册服务器地址 '{}': {}", registrar, e))?;
 
+        // 认证信息
         let credential = Credential {
-            username: username.to_string(),
-            password: password.to_string(),
-            realm: None,
+            username: username.to_string(), // 用户名 一般是设备的国标id
+            password: password.to_string(), // 密码
+            realm: None, // Realm None，表示不指定特定的认证域,todo 可能需要设置服务端的域
         };
 
         let mut reg = Registration::new(self.endpoint.clone(), Some(credential));

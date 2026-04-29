@@ -159,15 +159,16 @@ impl SipRouter {
 
         let handler = {
             // 路径 A：O(1) 精确查找（DashMap 并发读，无锁）
-            if let Some(entries) = HANDLER_INDEX.get(&method) {
-                if let Some(entry) = entries.first() {
-                    return Self::invoke_handler(entry.handler.clone(), tx).await;
-                }
+            if let Some(entries) = HANDLER_INDEX.get(&method) && let Some(entry) = entries.first() {
+                return Self::invoke_handler(entry.handler.clone(), tx).await;
             }
 
             // 路径 B：遍历 catch-all（O(n)，持有读锁）
             // 仅当无精确匹配时触发，正常情况下极少见
-            let registry = HANDLER_REGISTRY.read().expect("handler registry read lock");
+            let registry = HANDLER_REGISTRY.read().unwrap_or_else(|e| {
+                error!(error = %e, "HANDLER_REGISTRY 读锁中毒，尝试恢复");
+                e.into_inner()
+            });
             registry
                 .iter()
                 .find(|e| e.method.is_none())
@@ -212,7 +213,7 @@ impl SipRouter {
     }
 }
 
-/// 默认处理器：对没有注册处理器的方法回复 405 Method Not Allowed
+/// 默认处理器：对没有注册处理器的方法回复 405 Method Not Allowed 方法不允许
 async fn default_handler(mut tx: Transaction) -> anyhow::Result<()> {
     use rsipstack::sip::StatusCode;
     info!(method = %tx.original.method, "收到未注册方法，回复 405");

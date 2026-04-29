@@ -27,7 +27,7 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 use tokio::sync::{mpsc, Semaphore};
 use tokio_util::sync::CancellationToken;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 use tx_di_core::{tx_comp, App, BoxFuture, BuildContext, CompInit, RIE};
 
 // ── 性能配置常量 ──────────────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ pub struct SipPlugin {
     /// SIP 配置（注入自 SipConfig）
     pub config: Arc<SipConfig>,
 
-    /// 端点（在 inner_init 时构建）
+    /// 端点（在 inner_init 时构建）,没有使用
     #[tx_cst(skip)]
     pub endpoint: Option<Endpoint>,
 }
@@ -146,7 +146,7 @@ impl CompInit for SipPlugin {
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(MAX_CONCURRENT_HANDLERS);
 
-            // Bounded mpsc channel：send() 在队列满时 await → 天然背压
+            // Bounded mpsc channel：send() 在队列满时 await → 天然背压 多生产者单消费者
             let (tx, mut rx) = mpsc::channel::<rsipstack::transaction::transaction::Transaction>(queue_size);
 
             // 共享信号量：限制并发 handler 数量
@@ -173,6 +173,7 @@ impl CompInit for SipPlugin {
 
             // 生产者：将 rsipstack incoming 消息送入 bounded channel
             // 队列满时：send().await 自动 park，形成背压
+            // 接收sip消息放入队列
             tokio::spawn(async move {
                 while let Some(sip_tx) = incoming.recv().await {
                     if tx.send(sip_tx).await.is_err() {
@@ -186,18 +187,18 @@ impl CompInit for SipPlugin {
             // 消费者：顺序从 channel 取消息，并发执行 handler
             // 关键：消息接收顺序是串行的（保证同设备消息有序），
             //       但 handler 执行是并发的（Semaphore 控制并发数）
+            // 使用handler 处理队列里面的sip消息
             tokio::spawn(async move {
                 info!(
                     queue_capacity = queue_size,
                     max_handlers = max_handlers,
                     "SIP 消息分发引擎已启动"
                 );
-
                 while let Some(tx) = rx.recv().await {
                     // Semaphore permit：超过并发上限时 park
                     let permit = sem.clone().acquire_owned().await;
                     let Ok(permit) = permit else {
-                        warn!("Semaphore 获取失败，停止消费者");
+                        error!("Semaphore 获取失败，停止消费者");
                         break;
                     };
 
@@ -230,7 +231,7 @@ impl CompInit for SipPlugin {
                         }
 
                         SipRouter::dispatch(tx).await;
-                        drop(permit); // permit 在此 drop，自动释放
+                        // drop(permit); // permit 在此 drop，自动释放
                     });
                 }
 
