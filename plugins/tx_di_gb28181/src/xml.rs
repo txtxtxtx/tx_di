@@ -5,7 +5,7 @@
 //! ## 性能优化
 //! 使用 `quick-xml` 流式解析器，避免重复字符串分配
 //!
-//! ## 支持的命令类型（GB28181-2022）
+//! ## 支持的命令类型（GB28181-2022） 2022 版本字符集换了 GB2312 -> GB18030
 //! - Keepalive       — 心跳
 //! - Catalog         — 目录查询/响应
 //! - DeviceInfo      — 设备信息查询/响应
@@ -17,8 +17,8 @@
 //! - Broadcast       — 广播通知
 //! - ConfigDownload  — 配置下载
 
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 
 // ── 解析工具 ──────────────────────────────────────────────────────────────────
 
@@ -73,7 +73,7 @@ pub fn parse_sn(xml: &str) -> u32 {
 /// 构建心跳 Keepalive XML（设备 → 平台）
 pub fn build_keepalive_xml(device_id: &str, sn: u32) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Notify>\r\n\
          <CmdType>Keepalive</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -90,7 +90,7 @@ pub fn build_keepalive_xml(device_id: &str, sn: u32) -> String {
 /// 构建目录查询 MESSAGE body（平台 → 设备）
 pub fn build_catalog_query_xml(platform_id: &str, sn: u32) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Query>\r\n\
          <CmdType>Catalog</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -112,22 +112,39 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
     let mut in_item = false;
 
     // 当前 Item 的字段
+    // 国标id
     let mut cur_device_id = String::new();
+    // 名称
     let mut cur_name = String::new();
+    // 生产厂商
     let mut cur_manufacturer = String::new();
+    // 型号
     let mut cur_model = String::new();
+    // 状态
     let mut cur_status = String::new();
+    // 地址
     let mut cur_address = String::new();
+    // 父级国标id
     let mut cur_parent_id = String::new();
+    // 父级级联
     let mut cur_parental: u8 = 0;
+    // 注册方式
     let mut cur_register_way: u8 = 0;
+    // 保密级别
     let mut cur_secrecy: u8 = 0;
+    // IP地址
     let mut cur_ip_address = String::new();
+    // 端口
     let mut cur_port: u16 = 0;
+    // 经度
     let mut cur_longitude: Option<f64> = None;
+    // 纬度
     let mut cur_latitude: Option<f64> = None;
+    // 警区
     let mut cur_block = String::new();
+    // 警区编号
     let mut cur_civil_code = String::new();
+    // 通道数
     let mut cur_channel_num: u32 = 0;
 
     loop {
@@ -156,156 +173,139 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                         cur_channel_num = 0;
                     }
                     b"DeviceID" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_device_id = s.trim().to_string();
-                                }
-                            }
+                        if in_item
+                            && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                            && let Ok(s) = t.xml_content()
+                        {
+                            cur_device_id = s.trim().to_string();
                         }
                     }
                     b"Name" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_name = s.trim().to_string();
-                                }
-                            }
+                        if in_item
+                            && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                            && let Ok(s) = t.xml_content()
+                        {
+                            cur_name = s.trim().to_string();
                         }
                     }
                     b"Manufacturer" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_manufacturer = s.trim().to_string();
-                                }
-                            }
+                        if in_item
+                            && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                            && let Ok(s) = t.xml_content()
+                        {
+                            cur_manufacturer = s.trim().to_string();
                         }
                     }
                     b"Model" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_model = s.trim().to_string();
-                                }
-                            }
+                        if in_item
+                            && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                            && let Ok(s) = t.xml_content()
+                        {
+                            cur_model = s.trim().to_string();
                         }
                     }
                     b"Status" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_status = s.trim().to_string();
-                                }
-                            }
+                        if in_item
+                            && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                            && let Ok(s) = t.xml_content()
+                        {
+                            cur_status = s.trim().to_string();
                         }
                     }
                     b"Address" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_address = s.trim().to_string();
-                                }
-                            }
+                        if in_item
+                            && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                            && let Ok(s) = t.xml_content()
+                        {
+                            cur_address = s.trim().to_string();
                         }
                     }
                     b"ParentID" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_parent_id = s.trim().to_string();
-                                }
-                            }
+                        if in_item
+                            && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                            && let Ok(s) = t.xml_content()
+                        {
+                            cur_parent_id = s.trim().to_string();
                         }
                     }
                     b"Parental" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_parental = s.trim().parse().unwrap_or(0);
-                                }
-                            }
+                        if in_item
+                            && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                            && let Ok(s) = t.xml_content()
+                        {
+                            cur_parental = s.trim().parse().unwrap_or(0);
                         }
                     }
                     b"RegisterWay" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_register_way = s.trim().parse().unwrap_or(0);
-                                }
-                            }
+                        if in_item
+                            && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                            && let Ok(s) = t.xml_content()
+                        {
+                            cur_register_way = s.trim().parse().unwrap_or(0);
                         }
                     }
                     b"Secrecy" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_secrecy = s.trim().parse().unwrap_or(0);
-                                }
-                            }
+                        if in_item
+                            && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                            && let Ok(s) = t.xml_content()
+                        {
+                            cur_secrecy = s.trim().parse().unwrap_or(0);
                         }
                     }
                     b"IPAddress" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_ip_address = s.trim().to_string();
-                                }
-                            }
+                        if in_item
+                            && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                            && let Ok(s) = t.xml_content()
+                        {
+                            cur_ip_address = s.trim().to_string();
                         }
                     }
                     b"Port" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_port = s.trim().parse().unwrap_or(0);
-                                }
-                            }
+                        if in_item
+                            && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                            && let Ok(s) = t.xml_content()
+                        {
+                            cur_port = s.trim().parse().unwrap_or(0);
                         }
                     }
                     b"Longitude" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_longitude = s.trim().parse().ok();
-                                }
-                            }
+                        if in_item
+                            && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                            && let Ok(s) = t.xml_content()
+                        {
+                            cur_longitude = s.trim().parse().ok();
                         }
                     }
                     b"Latitude" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_latitude = s.trim().parse().ok();
-                                }
-                            }
+                        if in_item
+                            && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                            && let Ok(s) = t.xml_content()
+                        {
+                            cur_latitude = s.trim().parse().ok();
                         }
                     }
                     b"Block" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_block = s.trim().to_string();
-                                }
-                            }
+                        if in_item
+                            && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                            && let Ok(s) = t.xml_content()
+                        {
+                            cur_block = s.trim().to_string();
                         }
                     }
                     b"CivilCode" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_civil_code = s.trim().to_string();
-                                }
-                            }
+                        if in_item
+                            && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                            && let Ok(s) = t.xml_content()
+                        {
+                            cur_civil_code = s.trim().to_string();
                         }
                     }
                     b"Num" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_channel_num = s.trim().parse().unwrap_or(0);
-                                }
-                            }
+                        if in_item
+                            && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                            && let Ok(s) = t.xml_content()
+                        {
+                            cur_channel_num = s.trim().parse().unwrap_or(0);
                         }
                     }
                     _ => {}
@@ -417,7 +417,7 @@ pub fn build_catalog_response_xml(
         .join("\r\n");
 
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Response>\r\n\
          <CmdType>Catalog</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -439,7 +439,7 @@ pub fn build_catalog_response_xml(
 /// 构建设备信息查询 MESSAGE body（平台 → 设备）
 pub fn build_device_info_query_xml(_platform_id: &str, device_id: &str, sn: u32) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Query>\r\n\
          <CmdType>DeviceInfo</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -457,7 +457,7 @@ pub fn build_device_info_query_xml(_platform_id: &str, device_id: &str, sn: u32)
 /// GB28181-2022 第 7 章：设备状态查询
 pub fn build_device_status_query_xml(device_id: &str, sn: u32) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Query>\r\n\
          <CmdType>DeviceStatus</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -484,11 +484,17 @@ pub struct DeviceStatus {
 /// 报警状态
 #[derive(Debug, Clone, Default)]
 pub struct AlarmStatus {
+    /// 胁迫报警
     pub duress_alarm: u8,
+    /// 遮挡报警
     pub enclosure_alarm: u8,
+    /// 视频丢失报警
     pub video_lost: u8,
+    /// 视频移动报警
     pub video_motion: u8,
+    /// 存储设备故障报警
     pub storage_fault: u8,
+    /// 存储设备满报警
     pub storage_full: u8,
 }
 
@@ -509,107 +515,105 @@ pub fn parse_device_status(xml: &str) -> DeviceStatus {
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => {
-                match e.name().as_ref() {
-                    b"DeviceID" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.xml_content() {
-                                s.device_id = txt.trim().to_string();
-                            }
+            Ok(Event::Start(e)) => match e.name().as_ref() {
+                b"DeviceID" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(txt) = t.xml_content() {
+                            s.device_id = txt.trim().to_string();
                         }
                     }
-                    b"Result" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.xml_content() {
-                                s.result = txt.trim().to_string();
-                            }
-                        }
-                    }
-                    b"Online" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.xml_content() {
-                                s.on_line = txt.trim().to_string();
-                            }
-                        }
-                    }
-                    b"Status" => {
-                        if !in_alarmstatus {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(txt) = t.xml_content() {
-                                    s.status = txt.trim().to_string();
-                                }
-                            }
-                        }
-                    }
-                    b"Encode" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.xml_content() {
-                                s.encode = txt.trim().to_string();
-                            }
-                        }
-                    }
-                    b"Record" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.xml_content() {
-                                s.record = txt.trim().to_string();
-                            }
-                        }
-                    }
-                    b"DeviceTime" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.xml_content() {
-                                s.device_time = txt.trim().to_string();
-                            }
-                        }
-                    }
-                    b"Alarmstatus" => {
-                        in_alarmstatus = true;
-                    }
-                    b"DuressAlarm" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.xml_content() {
-                                cur_duress_alarm = txt.trim().parse().unwrap_or(0);
-                            }
-                        }
-                    }
-                    b"EnclosureAlarm" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.xml_content() {
-                                cur_enclosure_alarm = txt.trim().parse().unwrap_or(0);
-                            }
-                        }
-                    }
-                    b"VideoLost" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.xml_content() {
-                                cur_video_lost = txt.trim().parse().unwrap_or(0);
-                            }
-                        }
-                    }
-                    b"VideoMotion" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.xml_content() {
-                                cur_video_motion = txt.trim().parse().unwrap_or(0);
-                            }
-                        }
-                    }
-                    b"StorageFault" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.xml_content() {
-                                cur_storage_fault = txt.trim().parse().unwrap_or(0);
-                            }
-                        }
-                    }
-                    b"StorageFull" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(txt) = t.xml_content() {
-                                cur_storage_full = txt.trim().parse().unwrap_or(0);
-                            }
-                        }
-                    }
-                    _ => {}
                 }
-            }
+                b"Result" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(txt) = t.xml_content() {
+                            s.result = txt.trim().to_string();
+                        }
+                    }
+                }
+                b"Online" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(txt) = t.xml_content() {
+                            s.on_line = txt.trim().to_string();
+                        }
+                    }
+                }
+                b"Status" => {
+                    if !in_alarmstatus {
+                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                            if let Ok(txt) = t.xml_content() {
+                                s.status = txt.trim().to_string();
+                            }
+                        }
+                    }
+                }
+                b"Encode" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(txt) = t.xml_content() {
+                            s.encode = txt.trim().to_string();
+                        }
+                    }
+                }
+                b"Record" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(txt) = t.xml_content() {
+                            s.record = txt.trim().to_string();
+                        }
+                    }
+                }
+                b"DeviceTime" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(txt) = t.xml_content() {
+                            s.device_time = txt.trim().to_string();
+                        }
+                    }
+                }
+                b"Alarmstatus" => {
+                    in_alarmstatus = true;
+                }
+                b"DuressAlarm" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(txt) = t.xml_content() {
+                            cur_duress_alarm = txt.trim().parse().unwrap_or(0);
+                        }
+                    }
+                }
+                b"EnclosureAlarm" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(txt) = t.xml_content() {
+                            cur_enclosure_alarm = txt.trim().parse().unwrap_or(0);
+                        }
+                    }
+                }
+                b"VideoLost" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(txt) = t.xml_content() {
+                            cur_video_lost = txt.trim().parse().unwrap_or(0);
+                        }
+                    }
+                }
+                b"VideoMotion" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(txt) = t.xml_content() {
+                            cur_video_motion = txt.trim().parse().unwrap_or(0);
+                        }
+                    }
+                }
+                b"StorageFault" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(txt) = t.xml_content() {
+                            cur_storage_fault = txt.trim().parse().unwrap_or(0);
+                        }
+                    }
+                }
+                b"StorageFull" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(txt) = t.xml_content() {
+                            cur_storage_full = txt.trim().parse().unwrap_or(0);
+                        }
+                    }
+                }
+                _ => {}
+            },
             Ok(Event::End(e)) if e.name().as_ref() == b"Alarmstatus" => {
                 s.alarmstatus = Some(AlarmStatus {
                     duress_alarm: cur_duress_alarm,
@@ -634,14 +638,18 @@ pub fn parse_device_status(xml: &str) -> DeviceStatus {
 /// PTZ 速度（0~255）
 #[derive(Debug, Clone, Copy)]
 pub struct PtzSpeed {
-    pub pan: u8,   // 水平速度
-    pub tilt: u8,  // 垂直速度
-    pub zoom: u8,  // 变倍速度
+    pub pan: u8,  // 水平速度
+    pub tilt: u8, // 垂直速度
+    pub zoom: u8, // 变倍速度
 }
 
 impl Default for PtzSpeed {
     fn default() -> Self {
-        Self { pan: 64, tilt: 64, zoom: 32 }
+        Self {
+            pan: 64,
+            tilt: 64,
+            zoom: 32,
+        }
     }
 }
 
@@ -708,17 +716,26 @@ pub fn encode_ptz_cmd(cmd: &PtzCommand) -> String {
         PtzCommand::IrisClose => (0x40, 0x00, 0x00, 0x08),
     };
 
-    let sum: u8 = (0xFFu16 + 0x01u16 + hh as u16 + 0x00u16 + v1 as u16 + v2 as u16 + v3 as u16) as u8;
-    format!("A50F01{:02X}00{:02X}{:02X}{:02X}{:02X}", hh, v1, v2, v3, sum)
+    let sum: u8 =
+        (0xFFu16 + 0x01u16 + hh as u16 + 0x00u16 + v1 as u16 + v2 as u16 + v3 as u16) as u8;
+    format!(
+        "A50F01{:02X}00{:02X}{:02X}{:02X}{:02X}",
+        hh, v1, v2, v3, sum
+    )
 }
 
 /// 构建 PTZ 控制 XML（平台 → 设备）
 ///
 /// GB28181-2022 §8.4：DeviceControl/PTZCmd
-pub fn build_ptz_control_xml(_device_id: &str, channel_id: &str, sn: u32, cmd: &PtzCommand) -> String {
+pub fn build_ptz_control_xml(
+    _device_id: &str,
+    channel_id: &str,
+    sn: u32,
+    cmd: &PtzCommand,
+) -> String {
     let ptz_cmd = encode_ptz_cmd(cmd);
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Control>\r\n\
          <CmdType>DeviceControl</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -735,7 +752,13 @@ pub fn build_ptz_control_xml(_device_id: &str, channel_id: &str, sn: u32, cmd: &
 ///
 /// 注意：此函数已被 `build_preset_set_xml` 和 `build_preset_goto_xml` 取代
 #[allow(dead_code)]
-pub fn build_preset_control_xml(_device_id: &str, channel_id: &str, sn: u32, preset_index: u8, set: bool) -> String {
+pub fn build_preset_control_xml(
+    _device_id: &str,
+    channel_id: &str,
+    sn: u32,
+    preset_index: u8,
+    set: bool,
+) -> String {
     // set=true 设置预置位，set=false 调用预置位
     let _cmd_type = if set { "SetPreset" } else { "GotoPreset" };
     let ptz_cmd = if set {
@@ -744,7 +767,7 @@ pub fn build_preset_control_xml(_device_id: &str, channel_id: &str, sn: u32, pre
         format!("8F0{:02X}0000000{:02X}", preset_index + 3, preset_index)
     };
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Control>\r\n\
          <CmdType>DeviceControl</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -758,10 +781,15 @@ pub fn build_preset_control_xml(_device_id: &str, channel_id: &str, sn: u32, pre
 }
 
 /// 构建设备控制（录像控制）XML
-pub fn build_record_control_xml(_device_id: &str, channel_id: &str, sn: u32, start: bool) -> String {
+pub fn build_record_control_xml(
+    _device_id: &str,
+    channel_id: &str,
+    sn: u32,
+    start: bool,
+) -> String {
     let record_cmd = if start { "Record" } else { "StopRecord" };
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Control>\r\n\
          <CmdType>DeviceControl</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -778,7 +806,7 @@ pub fn build_record_control_xml(_device_id: &str, channel_id: &str, sn: u32, sta
 pub fn build_guard_control_xml(_device_id: &str, channel_id: &str, sn: u32, guard: bool) -> String {
     let guard_cmd = if guard { "SetGuard" } else { "ResetGuard" };
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Control>\r\n\
          <CmdType>DeviceControl</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -810,7 +838,7 @@ pub fn build_record_info_query_xml(
     file_path: &str,
 ) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Query>\r\n\
          <CmdType>RecordInfo</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -865,104 +893,93 @@ pub fn parse_record_items(xml: &str) -> Vec<RecordItem> {
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => {
-                match e.name().as_ref() {
-                    b"Item" => {
-                        in_item = true;
-                        cur_device_id.clear();
-                        cur_name.clear();
-                        cur_file_path.clear();
-                        cur_address.clear();
-                        cur_start_time.clear();
-                        cur_end_time.clear();
-                        cur_secrecy = 0;
-                        cur_record_type.clear();
-                        cur_file_size = None;
-                    }
-                    b"DeviceID" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_device_id = s.trim().to_string();
-                                }
-                            }
-                        }
-                    }
-                    b"Name" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_name = s.trim().to_string();
-                                }
-                            }
-                        }
-                    }
-                    b"FilePath" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_file_path = s.trim().to_string();
-                                }
-                            }
-                        }
-                    }
-                    b"Address" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_address = s.trim().to_string();
-                                }
-                            }
-                        }
-                    }
-                    b"StartTime" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_start_time = s.trim().to_string();
-                                }
-                            }
-                        }
-                    }
-                    b"EndTime" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_end_time = s.trim().to_string();
-                                }
-                            }
-                        }
-                    }
-                    b"Secrecy" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_secrecy = s.trim().parse().unwrap_or(0);
-                                }
-                            }
-                        }
-                    }
-                    b"Type" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_record_type = s.trim().to_string();
-                                }
-                            }
-                        }
-                    }
-                    b"FileSize" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_file_size = s.trim().parse().ok();
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
+            Ok(Event::Start(e)) => match e.name().as_ref() {
+                b"Item" => {
+                    in_item = true;
+                    cur_device_id.clear();
+                    cur_name.clear();
+                    cur_file_path.clear();
+                    cur_address.clear();
+                    cur_start_time.clear();
+                    cur_end_time.clear();
+                    cur_secrecy = 0;
+                    cur_record_type.clear();
+                    cur_file_size = None;
                 }
-            }
+                b"DeviceID" => {
+                    if in_item
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_device_id = s.trim().to_string();
+                    }
+                }
+                b"Name" => {
+                    if in_item
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_name = s.trim().to_string();
+                    }
+                }
+                b"FilePath" => {
+                    if in_item
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_file_path = s.trim().to_string();
+                    }
+                }
+                b"Address" => {
+                    if in_item
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_address = s.trim().to_string();
+                    }
+                }
+                b"StartTime" => {
+                    if in_item
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_start_time = s.trim().to_string();
+                    }
+                }
+                b"EndTime" => {
+                    if in_item
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_end_time = s.trim().to_string();
+                    }
+                }
+                b"Secrecy" => {
+                    if in_item
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_secrecy = s.trim().parse().unwrap_or(0);
+                    }
+                }
+                b"Type" => {
+                    if in_item
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_record_type = s.trim().to_string();
+                    }
+                }
+                b"FileSize" => {
+                    if in_item
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_file_size = s.trim().parse().ok();
+                    }
+                }
+                _ => {}
+            },
             Ok(Event::End(e)) if e.name().as_ref() == b"Item" => {
                 if !cur_device_id.is_empty() {
                     result.push(RecordItem {
@@ -1032,7 +1049,7 @@ pub fn build_playback_control_xml(device_id: &str, sn: u32, ctrl: &PlaybackContr
     };
 
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Control>\r\n\
          <CmdType>MediaControl</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1085,74 +1102,72 @@ pub fn parse_alarm_notify(xml: &str) -> Option<AlarmInfo> {
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => {
-                match e.name().as_ref() {
-                    b"DeviceID" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                device_id = Some(s.trim().to_string());
-                            }
+            Ok(Event::Start(e)) => match e.name().as_ref() {
+                b"DeviceID" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            device_id = Some(s.trim().to_string());
                         }
                     }
-                    b"StartAlarmTime" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                start_alarm_time = s.trim().to_string();
-                            }
-                        }
-                    }
-                    b"EndAlarmTime" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                end_alarm_time = s.trim().to_string();
-                            }
-                        }
-                    }
-                    b"AlarmPriority" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                alarm_priority = s.trim().parse().unwrap_or(0);
-                            }
-                        }
-                    }
-                    b"AlarmMethod" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                alarm_method = s.trim().parse().unwrap_or(0);
-                            }
-                        }
-                    }
-                    b"AlarmType" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                alarm_type = s.trim().to_string();
-                            }
-                        }
-                    }
-                    b"AlarmDescription" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                alarm_description = s.trim().to_string();
-                            }
-                        }
-                    }
-                    b"Longitude" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                longitude = s.trim().parse().ok();
-                            }
-                        }
-                    }
-                    b"Latitude" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                latitude = s.trim().parse().ok();
-                            }
-                        }
-                    }
-                    _ => {}
                 }
-            }
+                b"StartAlarmTime" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            start_alarm_time = s.trim().to_string();
+                        }
+                    }
+                }
+                b"EndAlarmTime" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            end_alarm_time = s.trim().to_string();
+                        }
+                    }
+                }
+                b"AlarmPriority" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            alarm_priority = s.trim().parse().unwrap_or(0);
+                        }
+                    }
+                }
+                b"AlarmMethod" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            alarm_method = s.trim().parse().unwrap_or(0);
+                        }
+                    }
+                }
+                b"AlarmType" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            alarm_type = s.trim().to_string();
+                        }
+                    }
+                }
+                b"AlarmDescription" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            alarm_description = s.trim().to_string();
+                        }
+                    }
+                }
+                b"Longitude" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            longitude = s.trim().parse().ok();
+                        }
+                    }
+                }
+                b"Latitude" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            latitude = s.trim().parse().ok();
+                        }
+                    }
+                }
+                _ => {}
+            },
             Ok(Event::Eof) => break,
             _ => {}
         }
@@ -1175,7 +1190,7 @@ pub fn parse_alarm_notify(xml: &str) -> Option<AlarmInfo> {
 /// 构建报警确认响应 XML（平台 → 设备）
 pub fn build_alarm_ack_xml(device_id: &str, sn: u32) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Response>\r\n\
          <CmdType>Alarm</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1190,7 +1205,7 @@ pub fn build_alarm_ack_xml(device_id: &str, sn: u32) -> String {
 /// 构建报警订阅查询 XML（平台 → 设备，用于 SUBSCRIBE 消息体）
 pub fn build_alarm_subscribe_xml(device_id: &str, sn: u32, alarm_type: u8, expire: u32) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Query>\r\n\
          <CmdType>Alarm</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1219,7 +1234,7 @@ pub fn parse_media_status(xml: &str) -> Option<String> {
 #[allow(dead_code)]
 pub fn build_broadcast_xml(device_id: &str, sn: u32, source_id: &str) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Notify>\r\n\
          <CmdType>Broadcast</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1266,9 +1281,13 @@ pub struct ConfigItem {
 /// 构建设备配置查询 XML（平台 → 设备）
 ///
 /// GB28181-2022 A.2.4.7：ConfigDownload
-pub fn build_config_download_query_xml(device_id: &str, sn: u32, config_type: ConfigType) -> String {
+pub fn build_config_download_query_xml(
+    device_id: &str,
+    sn: u32,
+    config_type: ConfigType,
+) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Query>\r\n\
          <CmdType>ConfigDownload</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1293,34 +1312,30 @@ pub fn parse_config_download_response(xml: &str) -> Vec<ConfigItem> {
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => {
-                match e.name().as_ref() {
-                    b"Item" => {
-                        in_item = true;
-                        cur_name.clear();
-                        cur_value.clear();
-                    }
-                    b"Name" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_name = s.trim().to_string();
-                                }
-                            }
-                        }
-                    }
-                    b"Value" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_value = s.trim().to_string();
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
+            Ok(Event::Start(e)) => match e.name().as_ref() {
+                b"Item" => {
+                    in_item = true;
+                    cur_name.clear();
+                    cur_value.clear();
                 }
-            }
+                b"Name" => {
+                    if in_item
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_name = s.trim().to_string();
+                    }
+                }
+                b"Value" => {
+                    if in_item
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_value = s.trim().to_string();
+                    }
+                }
+                _ => {}
+            },
             Ok(Event::End(e)) if e.name().as_ref() == b"Item" => {
                 if !cur_name.is_empty() {
                     result.push(ConfigItem {
@@ -1354,7 +1369,7 @@ pub struct PresetInfo {
 /// GB28181-2022 A.2.4.8：PresetList
 pub fn build_preset_list_query_xml(device_id: &str, sn: u32) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Query>\r\n\
          <CmdType>PresetList</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1377,34 +1392,30 @@ pub fn parse_preset_list(xml: &str) -> Vec<PresetInfo> {
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => {
-                match e.name().as_ref() {
-                    b"Item" => {
-                        in_item = true;
-                        cur_preset_id.clear();
-                        cur_name.clear();
-                    }
-                    b"PresetID" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_preset_id = s.trim().to_string();
-                                }
-                            }
-                        }
-                    }
-                    b"PresetName" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_name = s.trim().to_string();
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
+            Ok(Event::Start(e)) => match e.name().as_ref() {
+                b"Item" => {
+                    in_item = true;
+                    cur_preset_id.clear();
+                    cur_name.clear();
                 }
-            }
+                b"PresetID" => {
+                    if in_item
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_preset_id = s.trim().to_string();
+                    }
+                }
+                b"PresetName" => {
+                    if in_item
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_name = s.trim().to_string();
+                    }
+                }
+                _ => {}
+            },
             Ok(Event::End(e)) if e.name().as_ref() == b"Item" => {
                 if !cur_preset_id.is_empty() {
                     result.push(PresetInfo {
@@ -1438,7 +1449,7 @@ pub struct CruiseInfo {
 /// GB28181-2022 A.2.4.11：CruiseList
 pub fn build_cruise_list_query_xml(device_id: &str, sn: u32) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Query>\r\n\
          <CmdType>CruiseList</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1461,34 +1472,30 @@ pub fn parse_cruise_list(xml: &str) -> Vec<CruiseInfo> {
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => {
-                match e.name().as_ref() {
-                    b"Item" => {
-                        in_item = true;
-                        cur_cruise_id.clear();
-                        cur_name.clear();
-                    }
-                    b"CruiseID" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_cruise_id = s.trim().to_string();
-                                }
-                            }
-                        }
-                    }
-                    b"CruiseName" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_name = s.trim().to_string();
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
+            Ok(Event::Start(e)) => match e.name().as_ref() {
+                b"Item" => {
+                    in_item = true;
+                    cur_cruise_id.clear();
+                    cur_name.clear();
                 }
-            }
+                b"CruiseID" => {
+                    if in_item
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_cruise_id = s.trim().to_string();
+                    }
+                }
+                b"CruiseName" => {
+                    if in_item
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_name = s.trim().to_string();
+                    }
+                }
+                _ => {}
+            },
             Ok(Event::End(e)) if e.name().as_ref() == b"Item" => {
                 if !cur_cruise_id.is_empty() {
                     result.push(CruiseInfo {
@@ -1513,7 +1520,7 @@ pub fn parse_cruise_list(xml: &str) -> Vec<CruiseInfo> {
 /// GB28181-2022 A.2.4.10（2022 新增）
 pub fn build_guard_info_query_xml(device_id: &str, sn: u32) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Query>\r\n\
          <CmdType>GuardInfo</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1551,25 +1558,23 @@ pub fn parse_guard_info(xml: &str) -> Option<GuardInfo> {
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => {
-                match e.name().as_ref() {
-                    b"GuardID" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                guard_id = s.trim().parse().unwrap_or(0);
-                            }
+            Ok(Event::Start(e)) => match e.name().as_ref() {
+                b"GuardID" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            guard_id = s.trim().parse().unwrap_or(0);
                         }
                     }
-                    b"PresetIndex" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                preset_index = s.trim().parse().unwrap_or(0);
-                            }
-                        }
-                    }
-                    _ => {}
                 }
-            }
+                b"PresetIndex" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            preset_index = s.trim().parse().unwrap_or(0);
+                        }
+                    }
+                }
+                _ => {}
+            },
             Ok(Event::Eof) => break,
             _ => {}
         }
@@ -1578,7 +1583,10 @@ pub fn parse_guard_info(xml: &str) -> Option<GuardInfo> {
 
     // 只有当 guard_id > 0 时才返回
     if guard_id > 0 {
-        Some(GuardInfo { guard_id, preset_index })
+        Some(GuardInfo {
+            guard_id,
+            preset_index,
+        })
     } else {
         None
     }
@@ -1592,7 +1600,7 @@ pub fn parse_guard_info(xml: &str) -> Option<GuardInfo> {
 pub fn build_preset_goto_xml(channel_id: &str, sn: u32, preset_index: u8) -> String {
     let ptz_cmd = format!("8F0{:02X}0000000{:02X}", preset_index + 3, preset_index);
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Control>\r\n\
          <CmdType>DeviceControl</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1611,7 +1619,7 @@ pub fn build_preset_goto_xml(channel_id: &str, sn: u32, preset_index: u8) -> Str
 pub fn build_preset_set_xml(channel_id: &str, sn: u32, preset_index: u8) -> String {
     let ptz_cmd = format!("8F0{:02X}0000000{:02X}", preset_index, preset_index);
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Control>\r\n\
          <CmdType>DeviceControl</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1631,7 +1639,7 @@ pub fn build_cruise_start_xml(channel_id: &str, sn: u32, cruise_no: u8) -> Strin
     // 巡航控制码：0x8F 0x09 00 cruise_no 00 preset 00 00 checksum
     let ptz_cmd = format!("8F09{:02X}000000{:02X}", cruise_no, cruise_no);
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Control>\r\n\
          <CmdType>DeviceControl</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1648,7 +1656,7 @@ pub fn build_cruise_start_xml(channel_id: &str, sn: u32, cruise_no: u8) -> Strin
 pub fn build_cruise_stop_xml(channel_id: &str, sn: u32, cruise_no: u8) -> String {
     let ptz_cmd = format!("8F0A{:02X}000000{:02X}", cruise_no, cruise_no);
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Control>\r\n\
          <CmdType>DeviceControl</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1677,7 +1685,7 @@ pub struct BroadcastSession {
 /// GB28181-2022 §9.12：平台向设备发起语音广播邀请
 pub fn build_broadcast_invite_xml(source_id: &str, target_id: &str, sn: u32) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Notify>\r\n\
          <CmdType>Broadcast</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1695,7 +1703,7 @@ pub fn build_broadcast_invite_xml(source_id: &str, target_id: &str, sn: u32) -> 
 /// GB28181-2022 §9.12：结束语音广播
 pub fn build_broadcast_cancel_xml(source_id: &str, target_id: &str, sn: u32) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Notify>\r\n\
          <CmdType>Broadcast</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1748,7 +1756,7 @@ pub fn build_time_sync_query_xml(_platform_id: &str, device_id: &str, sn: u32) -
     // TimeRequest 使用 ISO8601 格式的时间字符串
     let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Query>\r\n\
          <CmdType>DeviceStatus</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1767,7 +1775,7 @@ pub fn build_time_sync_query_xml(_platform_id: &str, device_id: &str, sn: u32) -
 pub fn build_time_sync_response_xml(device_id: &str, sn: u32) -> String {
     let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Response>\r\n\
          <CmdType>DeviceStatus</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1793,8 +1801,7 @@ pub fn parse_time_sync_response(xml: &str) -> Option<TimeSyncInfo> {
     // 解析设备时间，统一转换为 UTC
     let dev_time_utc = if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&device_time) {
         dt.with_timezone(&chrono::Utc)
-    } else if let Ok(ndt) =
-        chrono::NaiveDateTime::parse_from_str(&device_time, "%Y-%m-%dT%H:%M:%S")
+    } else if let Ok(ndt) = chrono::NaiveDateTime::parse_from_str(&device_time, "%Y-%m-%dT%H:%M:%S")
     {
         ndt.and_utc()
     } else {
@@ -1817,7 +1824,7 @@ pub fn parse_time_sync_response(xml: &str) -> Option<TimeSyncInfo> {
 /// 用于远程唤醒休眠状态的设备
 pub fn build_teleboot_xml(device_id: &str, sn: u32) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Control>\r\n\
          <CmdType>DeviceControl</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1837,7 +1844,7 @@ pub fn build_teleboot_xml(device_id: &str, sn: u32) -> String {
 /// 用于复位指定类型的报警状态
 pub fn build_alarm_reset_xml(device_id: &str, sn: u32, alarm_type: &str) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Control>\r\n\
          <CmdType>DeviceControl</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1858,7 +1865,7 @@ pub fn build_alarm_reset_xml(device_id: &str, sn: u32, alarm_type: &str) -> Stri
 /// 用于请求设备立即生成一个关键帧（I帧），改善视频质量
 pub fn build_make_video_record_xml(channel_id: &str, sn: u32) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Control>\r\n\
          <CmdType>DeviceControl</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1928,7 +1935,7 @@ impl ZoomRect {
 pub fn build_zoom_in_xml(channel_id: &str, sn: u32, rect: &ZoomRect) -> String {
     let ptz_cmd = rect.to_ptz_cmd();
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Control>\r\n\
          <CmdType>DeviceControl</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1948,7 +1955,7 @@ pub fn build_zoom_in_xml(channel_id: &str, sn: u32, rect: &ZoomRect) -> String {
 pub fn build_zoom_out_xml(channel_id: &str, sn: u32, rect: &ZoomRect) -> String {
     let ptz_cmd = rect.to_ptz_cmd();
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Control>\r\n\
          <CmdType>DeviceControl</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -1989,11 +1996,18 @@ impl PtzPreciseParam {
     /// - TT TT: 光圈位置（可选）
     /// - KK: 校验和
     pub fn to_ptz_cmd(&self) -> String {
-        let (pan_h, pan_l) = ((self.pan_position >> 8) as u8, (self.pan_position & 0xFF) as u8);
-        let (tilt_h, tilt_l) =
-            ((self.tilt_position >> 8) as u8, (self.tilt_position & 0xFF) as u8);
-        let (zoom_h, zoom_l) =
-            ((self.zoom_position >> 8) as u8, (self.zoom_position & 0xFF) as u8);
+        let (pan_h, pan_l) = (
+            (self.pan_position >> 8) as u8,
+            (self.pan_position & 0xFF) as u8,
+        );
+        let (tilt_h, tilt_l) = (
+            (self.tilt_position >> 8) as u8,
+            (self.tilt_position & 0xFF) as u8,
+        );
+        let (zoom_h, zoom_l) = (
+            (self.zoom_position >> 8) as u8,
+            (self.zoom_position & 0xFF) as u8,
+        );
 
         if let (Some(focus), Some(iris)) = (self.focus_position, self.iris_position) {
             let (focus_h, focus_l) = ((focus >> 8) as u8, (focus & 0xFF) as u8);
@@ -2042,7 +2056,7 @@ impl PtzPreciseParam {
 pub fn build_ptz_precise_xml(channel_id: &str, sn: u32, param: &PtzPreciseParam) -> String {
     let ptz_cmd = param.to_ptz_cmd();
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Control>\r\n\
          <CmdType>DeviceControl</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -2062,7 +2076,7 @@ pub fn build_ptz_precise_xml(channel_id: &str, sn: u32, param: &PtzPreciseParam)
 /// GB28181-2022 A.2.3.1.13：存储卡格式化
 pub fn build_storage_format_xml(device_id: &str, sn: u32, channel_id: &str) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Control>\r\n\
          <CmdType>DeviceControl</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -2105,46 +2119,44 @@ pub fn parse_storage_status(xml: &str) -> Option<StorageStatus> {
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => {
-                match e.name().as_ref() {
-                    b"DeviceID" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                device_id = Some(s.trim().to_string());
-                            }
+            Ok(Event::Start(e)) => match e.name().as_ref() {
+                b"DeviceID" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            device_id = Some(s.trim().to_string());
                         }
                     }
-                    b"TotalSpace" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                total_space = s.trim().parse().unwrap_or(0);
-                            }
-                        }
-                    }
-                    b"FreeSpace" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                free_space = s.trim().parse().unwrap_or(0);
-                            }
-                        }
-                    }
-                    b"Status" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                status = s.trim().parse().unwrap_or(0);
-                            }
-                        }
-                    }
-                    b"StorageType" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                storage_type = s.trim().to_string();
-                            }
-                        }
-                    }
-                    _ => {}
                 }
-            }
+                b"TotalSpace" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            total_space = s.trim().parse().unwrap_or(0);
+                        }
+                    }
+                }
+                b"FreeSpace" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            free_space = s.trim().parse().unwrap_or(0);
+                        }
+                    }
+                }
+                b"Status" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            status = s.trim().parse().unwrap_or(0);
+                        }
+                    }
+                }
+                b"StorageType" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            storage_type = s.trim().to_string();
+                        }
+                    }
+                }
+                _ => {}
+            },
             Ok(Event::Eof) => break,
             _ => {}
         }
@@ -2165,7 +2177,7 @@ pub fn parse_storage_status(xml: &str) -> Option<StorageStatus> {
 /// GB28181-2022 A.2.4.14：存储卡状态查询（2022 新增）
 pub fn build_storage_status_query_xml(device_id: &str, sn: u32, channel_id: &str) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Query>\r\n\
          <CmdType>StorageStatus</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -2198,7 +2210,7 @@ pub fn build_target_track_xml(channel_id: &str, sn: u32, mode: TargetTrackMode) 
         TargetTrackMode::Stop => "Stop",
     };
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Control>\r\n\
          <CmdType>DeviceControl</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -2240,7 +2252,7 @@ pub struct CruiseTrack {
 /// GB28181-2022 A.2.4.12：巡航轨迹查询（2022 新增）
 pub fn build_cruise_track_query_xml(device_id: &str, sn: u32, cruise_id: &str) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Query>\r\n\
          <CmdType>CruiseTrack</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -2271,68 +2283,61 @@ pub fn parse_cruise_track(xml: &str) -> Vec<CruiseTrack> {
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => {
-                match e.name().as_ref() {
-                    b"Item" => {
-                        in_item = true;
-                        cur_cruise_id.clear();
-                        cur_name.clear();
-                        cur_points.clear();
-                    }
-                    b"CruiseID" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_cruise_id = s.trim().to_string();
-                                }
-                            }
-                        }
-                    }
-                    b"CruiseName" => {
-                        if in_item {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_name = s.trim().to_string();
-                                }
-                            }
-                        }
-                    }
-                    b"Point" => {
-                        in_point = true;
-                        cur_preset_index = 0;
-                        cur_stay_time = 0;
-                        cur_speed = 0;
-                    }
-                    b"PresetID" => {
-                        if in_point {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_preset_index = s.trim().parse().unwrap_or(0);
-                                }
-                            }
-                        }
-                    }
-                    b"StayTime" => {
-                        if in_point {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_stay_time = s.trim().parse().unwrap_or(0);
-                                }
-                            }
-                        }
-                    }
-                    b"Speed" => {
-                        if in_point {
-                            if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                                if let Ok(s) = t.xml_content() {
-                                    cur_speed = s.trim().parse().unwrap_or(0);
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
+            Ok(Event::Start(e)) => match e.name().as_ref() {
+                b"Item" => {
+                    in_item = true;
+                    cur_cruise_id.clear();
+                    cur_name.clear();
+                    cur_points.clear();
                 }
-            }
+                b"CruiseID" => {
+                    if in_item
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_cruise_id = s.trim().to_string();
+                    }
+                }
+                b"CruiseName" => {
+                    if in_item
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_name = s.trim().to_string();
+                    }
+                }
+                b"Point" => {
+                    in_point = true;
+                    cur_preset_index = 0;
+                    cur_stay_time = 0;
+                    cur_speed = 0;
+                }
+                b"PresetID" => {
+                    if in_point
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_preset_index = s.trim().parse().unwrap_or(0);
+                    }
+                }
+                b"StayTime" => {
+                    if in_point
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_stay_time = s.trim().parse().unwrap_or(0);
+                    }
+                }
+                b"Speed" => {
+                    if in_point
+                        && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
+                        && let Ok(s) = t.xml_content()
+                    {
+                        cur_speed = s.trim().parse().unwrap_or(0);
+                    }
+                }
+                _ => {}
+            },
             Ok(Event::End(e)) => {
                 if e.name().as_ref() == b"Point" {
                     if in_point {
@@ -2386,7 +2391,7 @@ pub struct PtzPreciseStatus {
 /// GB28181-2022 A.2.4.13：PTZ 精准状态查询（2022 新增）
 pub fn build_ptz_precise_status_query_xml(device_id: &str, sn: u32) -> String {
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Query>\r\n\
          <CmdType>PTZPreciseStatus</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -2412,53 +2417,51 @@ pub fn parse_ptz_precise_status(xml: &str) -> Option<PtzPreciseStatus> {
 
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => {
-                match e.name().as_ref() {
-                    b"DeviceID" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                device_id = Some(s.trim().to_string());
-                            }
+            Ok(Event::Start(e)) => match e.name().as_ref() {
+                b"DeviceID" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            device_id = Some(s.trim().to_string());
                         }
                     }
-                    b"PanPosition" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                pan_position = s.trim().parse().unwrap_or(0);
-                            }
-                        }
-                    }
-                    b"TiltPosition" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                tilt_position = s.trim().parse().unwrap_or(0);
-                            }
-                        }
-                    }
-                    b"ZoomPosition" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                zoom_position = s.trim().parse().unwrap_or(0);
-                            }
-                        }
-                    }
-                    b"FocusPosition" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                focus_position = s.trim().parse().ok();
-                            }
-                        }
-                    }
-                    b"IrisPosition" => {
-                        if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
-                            if let Ok(s) = t.xml_content() {
-                                iris_position = s.trim().parse().ok();
-                            }
-                        }
-                    }
-                    _ => {}
                 }
-            }
+                b"PanPosition" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            pan_position = s.trim().parse().unwrap_or(0);
+                        }
+                    }
+                }
+                b"TiltPosition" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            tilt_position = s.trim().parse().unwrap_or(0);
+                        }
+                    }
+                }
+                b"ZoomPosition" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            zoom_position = s.trim().parse().unwrap_or(0);
+                        }
+                    }
+                }
+                b"FocusPosition" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            focus_position = s.trim().parse().ok();
+                        }
+                    }
+                }
+                b"IrisPosition" => {
+                    if let Ok(Event::Text(t)) = reader.read_event_into(&mut buf) {
+                        if let Ok(s) = t.xml_content() {
+                            iris_position = s.trim().parse().ok();
+                        }
+                    }
+                }
+                _ => {}
+            },
             Ok(Event::Eof) => break,
             _ => {}
         }
@@ -2491,7 +2494,12 @@ pub enum GuardMode {
 /// 构建看守位控制 XML（平台 → 设备）
 ///
 /// GB28181-2022 A.2.3.1.10：看守位控制
-pub fn build_guard_control_xml_v2(channel_id: &str, sn: u32, mode: GuardMode, preset_index: u8) -> String {
+pub fn build_guard_control_xml_v2(
+    channel_id: &str,
+    sn: u32,
+    mode: GuardMode,
+    preset_index: u8,
+) -> String {
     let guard_cmd = match mode {
         GuardMode::Set => "SetGuard",
         GuardMode::Call => "CallGuard",
@@ -2506,7 +2514,7 @@ pub fn build_guard_control_xml_v2(channel_id: &str, sn: u32, mode: GuardMode, pr
     };
 
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
          <Control>\r\n\
          <CmdType>DeviceControl</CmdType>\r\n\
          <SN>{sn}</SN>\r\n\
@@ -2530,7 +2538,10 @@ mod tests {
     #[test]
     fn test_parse_xml_field() {
         let xml = "<Notify><CmdType>Keepalive</CmdType><SN>42</SN></Notify>";
-        assert_eq!(parse_xml_field(xml, "CmdType"), Some("Keepalive".to_string()));
+        assert_eq!(
+            parse_xml_field(xml, "CmdType"),
+            Some("Keepalive".to_string())
+        );
         assert_eq!(parse_xml_field(xml, "SN"), Some("42".to_string()));
         assert_eq!(parse_xml_field(xml, "Missing"), None);
     }
@@ -2563,7 +2574,11 @@ mod tests {
 
     #[test]
     fn test_encode_ptz_right() {
-        let cmd = encode_ptz_cmd(&PtzCommand::Right(PtzSpeed { pan: 50, tilt: 0, zoom: 0 }));
+        let cmd = encode_ptz_cmd(&PtzCommand::Right(PtzSpeed {
+            pan: 50,
+            tilt: 0,
+            zoom: 0,
+        }));
         // HH = 0x01, v1=50, v2=0, v3=0
         assert!(cmd.contains("01"));
     }
