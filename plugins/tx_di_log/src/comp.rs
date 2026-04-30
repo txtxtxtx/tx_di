@@ -1,5 +1,4 @@
 use crate::LogConfig;
-use anyhow::{anyhow};
 use log::{error};
 use std::sync::{Arc, OnceLock};
 use std::{fs, panic};

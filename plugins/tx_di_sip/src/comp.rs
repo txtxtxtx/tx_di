@@ -197,7 +197,7 @@ impl CompInit for SipPlugin {
                 while let Some(tx) = rx.recv().await {
                     // Semaphore permit：超过并发上限时 park
                     let permit = sem.clone().acquire_owned().await;
-                    let Ok(permit) = permit else {
+                    let Ok(_permit) = permit else {
                         error!("Semaphore 获取失败，停止消费者");
                         break;
                     };
