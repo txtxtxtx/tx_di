@@ -104,6 +104,7 @@ impl NonceStore {
     }
 
     /// 验证 nonce（验证后不自动删除，允许重用）
+    #[allow(dead_code)]
     pub fn verify(&self, device_id: &str, nonce: &str) -> bool {
         let guard = self.inner.lock().unwrap();
         guard.get(device_id).map(|n| n == nonce).unwrap_or(false)
