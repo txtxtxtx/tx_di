@@ -89,7 +89,15 @@ async fn handle_invite(
     // 构造 SDP answer（设备告知平台从哪里推流）
     let local_ip = &config.local_ip;
     let rtp_port = config.rtp_port;
-    let sdp_answer = tx_di_gb28181::sdp::build_sdp_answer(local_ip, rtp_port, &ssrc);
+    // 根据 SDP offer 中的 s= 字段判断是实时还是回放
+    let is_realtime = !sdp_offer.contains("s=Playback");
+    let sdp_answer = tx_di_gb28181::sdp::build_sdp_answer(
+        local_ip,
+        rtp_port,
+        &ssrc,
+        &config.device_id,
+        is_realtime,
+    );
 
     // 创建 DialogLayer 和服务端对话
     let endpoint_inner = tx.endpoint_inner.clone();
@@ -196,6 +204,55 @@ async fn handle_message(
                 }
             });
         }
+        "DeviceStatus" => {
+            let sn = parse_sn(&body);
+            info!(sn = sn, "📊 收到设备状态查询");
+            tokio::spawn(device_event::emit(DeviceEvent::DeviceStatusQueried { sn }));
+
+            let cfg = config.clone();
+            tokio::spawn(async move {
+                if let Err(e) = send_device_status_response(&cfg, sn).await {
+                    warn!("发送设备状态响应失败: {}", e);
+                }
+            });
+        }
+        "RecordInfo" => {
+            let sn = parse_sn(&body);
+            info!(sn = sn, "📼 收到录像查询");
+            tokio::spawn(device_event::emit(DeviceEvent::RecordInfoQueried { sn }));
+
+            let cfg = config.clone();
+            tokio::spawn(async move {
+                if let Err(e) = send_record_info_response(&cfg, sn).await {
+                    warn!("发送录像信息响应失败: {}", e);
+                }
+            });
+        }
+        "ConfigDownload" => {
+            let sn = parse_sn(&body);
+            info!(sn = sn, "⚙️ 收到配置下载查询");
+            tokio::spawn(device_event::emit(DeviceEvent::ConfigDownloadQueried { sn }));
+
+            let cfg = config.clone();
+            let chs = channels.clone();
+            tokio::spawn(async move {
+                if let Err(e) = send_config_download_response(&cfg, &chs, sn).await {
+                    warn!("发送配置下载响应失败: {}", e);
+                }
+            });
+        }
+        "PresetQuery" => {
+            let sn = parse_sn(&body);
+            info!(sn = sn, "🎯 收到预置位查询");
+            tokio::spawn(device_event::emit(DeviceEvent::PresetQueryQueried { sn }));
+
+            let cfg = config.clone();
+            tokio::spawn(async move {
+                if let Err(e) = send_preset_query_response(&cfg, sn).await {
+                    warn!("发送预置位查询响应失败: {}", e);
+                }
+            });
+        }
         "Keepalive" => {
             // 平台有时会发心跳确认给设备，直接忽略
         }
@@ -245,6 +302,109 @@ async fn send_device_info_response(
          <Model>IPC-V1</Model>\r\n\
          <Firmware>1.0.0</Firmware>\r\n\
          </BasicParam>\r\n\
+         </Response>",
+        sn = sn,
+        device_id = config.device_id
+    );
+
+    send_manscdp_to_platform(config, &xml, sn).await
+}
+
+async fn send_device_status_response(
+    config: &Gb28181DeviceConfig,
+    sn: u32,
+) -> anyhow::Result<()> {
+    let xml = format!(
+        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+         <Response>\r\n\
+         <CmdType>DeviceStatus</CmdType>\r\n\
+         <SN>{sn}</SN>\r\n\
+         <DeviceID>{device_id}</DeviceID>\r\n\
+         <Result>OK</Result>\r\n\
+         <Online>ON</Online>\r\n\
+         <Status>OK</Status>\r\n\
+         <Encode>ON</Encode>\r\n\
+         <Record>OFF</Record>\r\n\
+         </Response>",
+        sn = sn,
+        device_id = config.device_id
+    );
+
+    send_manscdp_to_platform(config, &xml, sn).await
+}
+
+async fn send_record_info_response(
+    config: &Gb28181DeviceConfig,
+    sn: u32,
+) -> anyhow::Result<()> {
+    // 返回空录像列表（模拟器无实际录像）
+    let xml = format!(
+        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+         <Response>\r\n\
+         <CmdType>RecordInfo</CmdType>\r\n\
+         <SN>{sn}</SN>\r\n\
+         <DeviceID>{device_id}</DeviceID>\r\n\
+         <SumNum>0</SumNum>\r\n\
+         </Response>",
+        sn = sn,
+        device_id = config.device_id
+    );
+
+    send_manscdp_to_platform(config, &xml, sn).await
+}
+
+async fn send_config_download_response(
+    config: &Gb28181DeviceConfig,
+    _channels: &[ChannelConfig],
+    sn: u32,
+) -> anyhow::Result<()> {
+    let xml = format!(
+        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+         <Response>\r\n\
+         <CmdType>ConfigDownload</CmdType>\r\n\
+         <SN>{sn}</SN>\r\n\
+         <DeviceID>{device_id}</DeviceID>\r\n\
+         <Result>OK</Result>\r\n\
+         <BasicParam>\r\n\
+         <Name>Device-{device_id}</Name>\r\n\
+         <Manufacturer>Simulator</Manufacturer>\r\n\
+         <Model>IPC-V1</Model>\r\n\
+         <Firmware>1.0.0</Firmware>\r\n\
+         </BasicParam>\r\n\
+         </Response>",
+        sn = sn,
+        device_id = config.device_id
+    );
+
+    send_manscdp_to_platform(config, &xml, sn).await
+}
+
+async fn send_preset_query_response(
+    config: &Gb28181DeviceConfig,
+    sn: u32,
+) -> anyhow::Result<()> {
+    // 返回预置位列表（模拟器提供 3 个示例预置位）
+    let xml = format!(
+        "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
+         <Response>\r\n\
+         <CmdType>PresetQuery</CmdType>\r\n\
+         <SN>{sn}</SN>\r\n\
+         <DeviceID>{device_id}</DeviceID>\r\n\
+         <SumNum>3</SumNum>\r\n\
+         <PresetList>\r\n\
+         <Item>\r\n\
+         <PresetID>1</PresetID>\r\n\
+         <PresetName>Preset-1</PresetName>\r\n\
+         </Item>\r\n\
+         <Item>\r\n\
+         <PresetID>2</PresetID>\r\n\
+         <PresetName>Preset-2</PresetName>\r\n\
+         </Item>\r\n\
+         <Item>\r\n\
+         <PresetID>3</PresetID>\r\n\
+         <PresetName>Preset-3</PresetName>\r\n\
+         </Item>\r\n\
+         </PresetList>\r\n\
          </Response>",
         sn = sn,
         device_id = config.device_id

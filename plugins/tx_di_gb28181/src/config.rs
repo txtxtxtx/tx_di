@@ -1,5 +1,6 @@
 //! GB28181 服务端配置
 
+use crate::media::MediaBackendConfig;
 use crate::zlm::ZlmConfig;
 use serde::Deserialize;
 use tx_di_core::{tx_comp, BuildContext, CompInit, RIE};
@@ -34,10 +35,10 @@ fn default_media_ip() -> String {
     "0.0.0.0".to_string()
 }
 fn default_rtp_start() -> u16 {
-    10000
+    30000
 }
 fn default_rtp_end() -> u16 {
-    20000
+    30500
 }
 
 /// GB28181 上级平台服务端配置
@@ -95,9 +96,16 @@ pub struct Gb28181ServerConfig {
     #[serde(default)]
     pub media: MediaConfig,
 
-    /// ZLMediaServer 配置
+    /// ZLMediaServer 配置（兼容旧版，新版推荐使用 `media_backend`）
     #[serde(default)]
     pub zlm: ZlmConfig,
+
+    /// 统一流媒体后端配置（新版）
+    ///
+    /// 通过 `[gb28181_server_config.media_backend]` 配置，支持 ZLM、MediaMTX、Null。
+    /// 若同时配置了 `zlm` 和 `media_backend`，`media_backend` 优先生效。
+    #[serde(default)]
+    pub media_backend: MediaBackendConfig,
 }
 
 impl Default for Gb28181ServerConfig {
@@ -112,6 +120,7 @@ impl Default for Gb28181ServerConfig {
             auth_password: default_auth_password(),
             media: MediaConfig::default(),
             zlm: ZlmConfig::default(),
+            media_backend: MediaBackendConfig::default(),
         }
     }
 }

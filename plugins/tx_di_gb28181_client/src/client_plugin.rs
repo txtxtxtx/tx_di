@@ -178,38 +178,56 @@ async fn run_register_heartbeat_loop(inner: Arc<DeviceInner>) {
     let mut retry_count = 0u32;
     let mut retry_interval = config.retry_interval_secs;
 
-    // ── 阶段 1：注册（带重试） ─────────────────────────────────────────────
+    // ── 阶段 1：注册（带重试，支持 ctrl_c 退出） ───────────────────────────
     loop {
-        match do_register(config).await {
-            Ok(()) => {
-                tokio::spawn(device_event::emit(DeviceEvent::Registered {
-                    platform_uri: config.platform_uri(),
-                }));
-                break;
+        tokio::select! {
+            biased;
+            _ = tokio::signal::ctrl_c() => {
+                info!("收到退出信号，停止注册");
+                SipPlugin::shutdown();
+                return;
             }
-            Err(e) => {
-                retry_count += 1;
-                if max_retries > 0 && retry_count > max_retries {
-                    error!(
-                        error = %e,
-                        retries = retry_count,
-                        "注册失败次数超过上限，停止重试"
-                    );
-                    return;
+            result = do_register(config) => {
+                match result {
+                    Ok(()) => {
+                        tokio::spawn(device_event::emit(DeviceEvent::Registered {
+                            platform_uri: config.platform_uri(),
+                        }));
+                        break;
+                    }
+                    Err(e) => {
+                        retry_count += 1;
+                        if max_retries > 0 && retry_count > max_retries {
+                            error!(
+                                error = %e,
+                                retries = retry_count,
+                                "注册失败次数超过上限，停止重试"
+                            );
+                            return;
+                        }
+                        warn!(
+                            error = %e,
+                            retry_count = retry_count,
+                            retry_in_secs = retry_interval,
+                            "注册失败，将重试"
+                        );
+                        tokio::spawn(device_event::emit(DeviceEvent::RegisterFailed {
+                            reason: e.to_string(),
+                            retry_in_secs: retry_interval,
+                        }));
+                        // 等待重试间隔（也可被 ctrl_c 中断）
+                        tokio::select! {
+                            _ = tokio::signal::ctrl_c() => {
+                                info!("收到退出信号，停止注册重试");
+                                SipPlugin::shutdown();
+                                return;
+                            }
+                            _ = sleep(Duration::from_secs(retry_interval)) => {}
+                        }
+                        // 指数退避，最大 300 秒
+                        retry_interval = (retry_interval * 2).min(300);
+                    }
                 }
-                warn!(
-                    error = %e,
-                    retry_count = retry_count,
-                    retry_in_secs = retry_interval,
-                    "注册失败，将重试"
-                );
-                tokio::spawn(device_event::emit(DeviceEvent::RegisterFailed {
-                    reason: e.to_string(),
-                    retry_in_secs: retry_interval,
-                }));
-                sleep(Duration::from_secs(retry_interval)).await;
-                // 指数退避，最大 300 秒
-                retry_interval = (retry_interval * 2).min(300);
             }
         }
     }

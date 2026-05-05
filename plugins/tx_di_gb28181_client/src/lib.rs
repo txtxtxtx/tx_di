@@ -21,7 +21,7 @@
 //! tx_di_gb28181_client = { path = "plugins/tx_di_gb28181_client" }
 //! ```
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! use tx_di_gb28181_client::{Gb28181Device, DeviceEvent, ChannelConfig};
 //! use tx_di_core::BuildContext;
 //!

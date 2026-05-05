@@ -108,7 +108,8 @@ mod handlers;
 mod plugin;
 pub mod sdp;
 pub mod xml;
-pub mod zlm;
+pub mod media;
+mod zlm;
 
 pub use config::{Gb28181ServerConfig, MediaConfig};
 pub use device_registry::{ChannelInfo, ChannelStatus, DeviceInfo, DeviceRegistry};
@@ -123,4 +124,11 @@ pub use xml::{
     TargetTrackMode, parse_storage_status, parse_cruise_track, parse_ptz_precise_status,
     parse_guard_info, GuardInfo,
 };
-pub use zlm::{ZlmClient, ZlmConfig, PlayUrls};
+
+// media 统一接口再导出
+pub use media::{
+    MediaBackend, MediaBackendConfig, BackendType,
+    OpenRtpRequest, RtpServerHandle, PlayUrls,
+    MediaStreamInfo, StreamProxyHandle, TcpMode,
+    build_backend,
+};

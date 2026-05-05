@@ -5,7 +5,7 @@
 //! - 提供主动查询（目录、设备信息、设备状态、录像查询）
 //! - 提供主动点播（INVITE 实时/历史回放）
 //! - 提供 PTZ 云台控制、设备控制
-//! - 集成 ZLMediaServer HTTP API（通过 zlm.rs）
+//! - 通过统一 `MediaBackend` trait 接入流媒体服务（ZLM / MediaMTX / 自定义）
 //! - 提供事件订阅接口
 //! - 后台运行心跳超时检测
 
@@ -13,6 +13,7 @@ use crate::config::Gb28181ServerConfig;
 use crate::device_registry::{DeviceInfo, DeviceRegistry};
 use crate::event::{self, Gb28181Event};
 use crate::handlers::{register_server_handlers, NonceStore};
+use crate::media::{build_backend, MediaBackend, OpenRtpRequest, PlayUrls};
 use crate::sdp::{
     build_audio_invite_sdp, build_invite_sdp, build_snapshot_sdp,
     parse_audio_sdp, parse_snapshot_sdp, AudioCodec,
@@ -31,7 +32,6 @@ use crate::xml::{
     build_ptz_precise_status_query_xml, build_zoom_in_xml, build_zoom_out_xml, ConfigType,
     GuardMode, PtzPreciseParam, PlaybackControl, PtzCommand, ZoomRect,
 };
-use crate::zlm::{PlayUrls, ZlmClient};
 use rsipstack::dialog::dialog::DialogState;
 use rsipstack::dialog::dialog_layer::DialogLayer;
 use rsipstack::dialog::invitation::InviteOption;
@@ -80,8 +80,8 @@ pub(crate) struct Gb28181ServerInner {
     pub(crate) sessions: Mutex<HashMap<String, SessionInfo>>,
     /// 活跃语音广播会话表（device_id → BroadcastSessionInfo）
     pub(crate) broadcast_sessions: Mutex<HashMap<String, BroadcastSessionInfo>>,
-    /// ZLM HTTP API 客户端
-    pub(crate) zlm: ZlmClient,
+    /// 统一流媒体后端（ZLM / MediaMTX / Null）
+    pub(crate) media: Arc<dyn MediaBackend>,
 }
 
 /// GB28181 服务端插件
@@ -127,7 +127,9 @@ impl CompInit for Gb28181Server {
             // 创建全局注册表
             let registry = DeviceRegistry::new();
             let nonce_store = Arc::new(NonceStore::new());
-            let zlm = ZlmClient::new(config.zlm.clone());
+
+            // 构建流媒体后端（优先 media_backend，兼容旧版 zlm 配置）
+            let media_backend = build_backend(&config.media_backend);
 
             // 注册 SIP 消息处理器
             register_server_handlers(
@@ -140,7 +142,7 @@ impl CompInit for Gb28181Server {
                 platform_id = %config.platform_id,
                 heartbeat_timeout_secs = config.heartbeat_timeout_secs,
                 enable_auth = config.enable_auth,
-                zlm_url = %config.zlm.base_url,
+                media_backend = media_backend.backend_name(),
                 "✅ GB28181 服务端处理器注册完成"
             );
 
@@ -151,7 +153,7 @@ impl CompInit for Gb28181Server {
                 sn: AtomicU32::new(1),
                 sessions: Mutex::new(HashMap::new()),
                 broadcast_sessions: Mutex::new(HashMap::new()),
-                zlm,
+                media: media_backend,
             });
             let _ = INSTANCE.set(inner.clone());
 
@@ -539,10 +541,10 @@ impl Gb28181ServerHandle {
         };
 
         if let Some(sess) = session {
-            // 释放 ZLM RTP 端口
+            // 释放 RTP 端口
             let stream_id = sess.stream_id.clone();
-            if let Err(e) = self.inner.zlm.close_rtp_server(&stream_id).await {
-                warn!(call_id = %call_id, error = %e, "ZLM 关闭 RTP 端口失败（忽略）");
+            if let Err(e) = self.inner.media.close_rtp_server(&stream_id).await {
+                warn!(call_id = %call_id, error = %e, "关闭 RTP 端口失败（忽略）");
             }
 
             // 从会话表中移除
@@ -675,7 +677,7 @@ impl Gb28181ServerHandle {
                         "📸 抓拍会话结束"
                     );
                     // 释放 stream
-                    let _ = inner_clone.zlm.close_rtp_server(&stream_id).await;
+                    let _ = inner_clone.media.close_rtp_server(&stream_id).await;
                     break;
                 }
             }
@@ -838,9 +840,14 @@ impl Gb28181ServerHandle {
             self.inner.config.media.local_ip.clone()
         };
 
-        // 先通过 ZLM 申请视频 RTP 端口
+        // 申请视频 RTP 端口
         let stream_id = format!("talkback_{}_{}", channel_id, sn);
-        let video_port = self.inner.zlm.open_rtp_server(&stream_id, 0, 0).await?;
+        let handle = self
+            .inner
+            .media
+            .open_rtp_server(OpenRtpRequest::udp(&stream_id))
+            .await?;
+        let video_port = handle.port;
         let ssrc = format!("{:010}", sn);
 
         let sdp_offer = build_audio_invite_sdp(
@@ -941,7 +948,7 @@ impl Gb28181ServerHandle {
                     }
                     DialogState::Terminated(id, _) => {
                         info!(call_id = %call_id_clone, dialog_id = %id, "🎤 对讲会话结束");
-                        let _ = inner_clone.zlm.close_rtp_server(&stream_id).await;
+                        let _ = inner_clone.media.close_rtp_server(&stream_id).await;
                         inner_clone.sessions.lock().unwrap().remove(&call_id_clone);
                         tokio::spawn(event::emit(Gb28181Event::AudioTalkbackEnded {
                             device_id: device_id_owned.clone(),
@@ -1281,14 +1288,14 @@ impl Gb28181ServerHandle {
 
     // ── ZLM 流媒体 ───────────────────────────────────────────────────────────
 
-    /// 检查通道是否有活跃流（通过 ZLM API）
+    /// 检查通道是否有活跃流（通过流媒体后端 API）
     pub async fn is_streaming(&self, channel_id: &str) -> bool {
-        self.inner.zlm.is_stream_online("rtp", channel_id).await
+        self.inner.media.is_stream_online(channel_id).await
     }
 
     /// 获取通道的播放 URL
     pub fn get_play_urls(&self, channel_id: &str) -> PlayUrls {
-        self.inner.zlm.get_play_urls("rtp", channel_id)
+        self.inner.media.get_play_urls(channel_id)
     }
 
     // ── 内部工具 ─────────────────────────────────────────────────────────────
@@ -1320,17 +1327,23 @@ impl Gb28181ServerHandle {
             self.inner.config.media.local_ip.clone()
         };
 
-        // 通过 ZLM 开启 RTP 接收端口
+        // 开启 RTP 接收端口
         let stream_id = format!("{}_{}", channel_id, self.next_sn());
-        let rtp_port = self.inner.zlm.open_rtp_server(&stream_id, 0, 0).await
-            .map_err(|e| anyhow::anyhow!("ZLM 开启 RTP 端口失败: {}，请检查 ZLM 配置", e))?;
+        let rtp_handle = self
+            .inner
+            .media
+            .open_rtp_server(OpenRtpRequest::udp(&stream_id))
+            .await
+            .map_err(|e| anyhow::anyhow!("开启 RTP 端口失败: {}，请检查流媒体后端配置", e))?;
+        let rtp_port = rtp_handle.port;
 
         info!(
             device_id = %device_id,
             channel_id = %channel_id,
             stream_id = %stream_id,
             rtp_port = rtp_port,
-            "🎥 ZLM 分配 RTP 端口"
+            backend = self.inner.media.backend_name(),
+            "🎥 媒体后端分配 RTP 端口"
         );
 
         let ssrc = format!("{:010}", self.next_sn());
@@ -1400,14 +1413,14 @@ impl Gb28181ServerHandle {
             .insert(call_id.clone(), session);
 
         // 获取播放 URL
-        let play_urls = self.inner.zlm.get_play_urls("rtp", &stream_id);
+        let play_urls = self.inner.media.get_play_urls(&stream_id);
 
         // 在独立任务监听对话状态
         let call_id_clone = call_id.clone();
         let device_id_owned = device_id.to_string();
         let channel_id_owned = channel_id.to_string();
         let mut sessions = self.inner.sessions.lock().unwrap().clone();
-        let zlm = self.inner.zlm.clone();
+        let media = self.inner.media.clone();
         let rtp_port_clone = rtp_port;
         let ssrc_clone = ssrc.clone();
         let stream_id_clone = stream_id.clone();
@@ -1437,9 +1450,9 @@ impl Gb28181ServerHandle {
                             "📹 点播会话结束"
                         );
 
-                        // 释放 ZLM RTP 端口
-                        if let Err(e) = zlm.close_rtp_server(&stream_id_clone).await {
-                            warn!(call_id = %call_id_clone, error = %e, "ZLM 关闭 RTP 端口失败");
+                        // 释放 RTP 端口
+                        if let Err(e) = media.close_rtp_server(&stream_id_clone).await {
+                            warn!(call_id = %call_id_clone, error = %e, "关闭 RTP 端口失败");
                         }
 
                         // 从会话表移除

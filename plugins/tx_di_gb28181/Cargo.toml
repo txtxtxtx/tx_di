@@ -22,6 +22,7 @@ tracing.workspace = true
 dashmap.workspace = true
 chrono.workspace = true
 reqwest.workspace = true
+async-trait.workspace = true
 
 # XML 高效解析
 quick-xml = { version = "0.39", features = ["serialize"] }

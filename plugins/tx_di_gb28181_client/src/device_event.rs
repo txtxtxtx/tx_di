@@ -41,6 +41,18 @@ pub enum DeviceEvent {
 
     /// 收到设备信息查询
     DeviceInfoQueried { sn: u32 },
+
+    /// 收到设备状态查询
+    DeviceStatusQueried { sn: u32 },
+
+    /// 收到录像查询
+    RecordInfoQueried { sn: u32 },
+
+    /// 收到配置下载查询
+    ConfigDownloadQueried { sn: u32 },
+
+    /// 收到预置位查询
+    PresetQueryQueried { sn: u32 },
 }
 
 pub type DeviceEventHandler = Arc<

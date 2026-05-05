@@ -812,6 +812,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "gb28181_admin_cam"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "tokio",
+ "tracing",
+ "tx-di-core",
+ "tx_di_gb28181",
+ "tx_di_gb28181_client",
+ "tx_di_log",
+ "tx_di_sip",
+]
+
+[[package]]
 name = "gb_cams"
 version = "0.1.0"
 dependencies = [
@@ -2728,6 +2742,7 @@ name = "tx_di_gb28181"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "dashmap",
  "quick-xml",

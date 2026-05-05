@@ -19,8 +19,8 @@ platform_id            = "34020000002000000001"
 realm                  = "3402000000"
 sip_ip                 = "127.0.0.1"
 heartbeat_timeout_secs = 120
-enable_auth            = false
-auth_password          = "12345678"
+enable_auth            = true
+auth_password          = "tx123456"
 
 [gb28181_server_config.media]
 local_ip       = "127.0.0.1"
