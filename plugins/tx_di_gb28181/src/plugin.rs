@@ -38,10 +38,10 @@ use rsipstack::dialog::invitation::InviteOption;
 use rsipstack::sip as rsip;
 use rsipstack::transaction::key::{TransactionKey, TransactionRole};
 use rsipstack::transaction::transaction::Transaction;
-use std::collections::HashMap;
 use std::future::Future;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
+use dashmap::DashMap;
 use tokio::time::{interval, Duration};
 use tracing::{info, warn};
 use tx_di_core::{tx_comp, App, BoxFuture, BuildContext, CompInit, RIE};
@@ -77,9 +77,9 @@ pub(crate) struct Gb28181ServerInner {
     pub(crate) registry: DeviceRegistry,
     pub(crate) sn: AtomicU32,
     /// 活跃媒体会话表（call_id → SessionInfo）
-    pub(crate) sessions: Mutex<HashMap<String, SessionInfo>>,
+    pub(crate) sessions: DashMap<String, SessionInfo>,
     /// 活跃语音广播会话表（device_id → BroadcastSessionInfo）
-    pub(crate) broadcast_sessions: Mutex<HashMap<String, BroadcastSessionInfo>>,
+    pub(crate) broadcast_sessions: DashMap<String, BroadcastSessionInfo>,
     /// 统一流媒体后端（ZLM / MediaMTX / Null）
     pub(crate) media: Arc<dyn MediaBackend>,
 }
@@ -111,14 +111,14 @@ pub struct Gb28181Server {
 }
 
 impl CompInit for Gb28181Server {
-    fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
-        info!(
-            platform_id = %self.config.platform_id,
-            realm = %self.config.realm,
-            "GB28181 服务端插件初始化中..."
-        );
-        Ok(())
-    }
+    // fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
+    //     info!(
+    //         platform_id = %self.config.platform_id,
+    //         realm = %self.config.realm,
+    //         "GB28181 服务端插件初始化中..."
+    //     );
+    //     Ok(())
+    // }
 
     fn async_init(ctx: Arc<App>) -> BoxFuture<'static, RIE<()>> {
         Box::pin(async move {
@@ -151,8 +151,8 @@ impl CompInit for Gb28181Server {
                 config: config.clone(),
                 registry,
                 sn: AtomicU32::new(1),
-                sessions: Mutex::new(HashMap::new()),
-                broadcast_sessions: Mutex::new(HashMap::new()),
+                sessions: DashMap::new(),
+                broadcast_sessions: DashMap::new(),
                 media: media_backend,
             });
             let _ = INSTANCE.set(inner.clone());
@@ -169,7 +169,7 @@ impl CompInit for Gb28181Server {
 
     fn init_sort() -> i32 {
         // 在 SipPlugin（MAX-1）之后初始化
-        i32::MAX
+        10001
     }
 }
 
@@ -535,10 +535,7 @@ impl Gb28181ServerHandle {
     ///
     /// GB28181-2022 §9.1.4
     pub async fn hangup(&self, call_id: &str) -> anyhow::Result<()> {
-        let session = {
-            let guard = self.inner.sessions.lock().unwrap();
-            guard.get(call_id).cloned()
-        };
+        let session = self.inner.sessions.get(call_id).map(|r| r.value().clone());
 
         if let Some(sess) = session {
             // 释放 RTP 端口
@@ -548,7 +545,7 @@ impl Gb28181ServerHandle {
             }
 
             // 从会话表中移除
-            self.inner.sessions.lock().unwrap().remove(call_id);
+            self.inner.sessions.remove(call_id);
 
             info!(call_id = %call_id, "📴 主动挂断");
 
@@ -569,10 +566,8 @@ impl Gb28181ServerHandle {
     pub fn active_sessions(&self) -> Vec<SessionInfo> {
         self.inner
             .sessions
-            .lock()
-            .unwrap()
-            .values()
-            .cloned()
+            .iter()
+            .map(|r| r.value().clone())
             .collect()
     }
 
@@ -738,8 +733,6 @@ impl Gb28181ServerHandle {
         };
         self.inner
             .broadcast_sessions
-            .lock()
-            .unwrap()
             .insert(device_id.to_string(), session.clone());
 
         // 通过 MESSAGE 回复确认（含音频端口）
@@ -800,7 +793,7 @@ impl Gb28181ServerHandle {
         self.send_message_to_device(&dev.contact, &xml, sn).await?;
 
         // 清除广播会话
-        self.inner.broadcast_sessions.lock().unwrap().remove(device_id);
+        self.inner.broadcast_sessions.remove(device_id);
 
         info!(device_id = %device_id, "📢 结束语音广播");
 
@@ -921,8 +914,6 @@ impl Gb28181ServerHandle {
         };
         self.inner
             .sessions
-            .lock()
-            .unwrap()
             .insert(call_id.clone(), session);
 
         // 监听会话状态
@@ -949,7 +940,7 @@ impl Gb28181ServerHandle {
                     DialogState::Terminated(id, _) => {
                         info!(call_id = %call_id_clone, dialog_id = %id, "🎤 对讲会话结束");
                         let _ = inner_clone.media.close_rtp_server(&stream_id).await;
-                        inner_clone.sessions.lock().unwrap().remove(&call_id_clone);
+                        inner_clone.sessions.remove(&call_id_clone);
                         tokio::spawn(event::emit(Gb28181Event::AudioTalkbackEnded {
                             device_id: device_id_owned.clone(),
                             call_id: call_id_clone.clone(),
@@ -1408,8 +1399,6 @@ impl Gb28181ServerHandle {
         };
         self.inner
             .sessions
-            .lock()
-            .unwrap()
             .insert(call_id.clone(), session);
 
         // 获取播放 URL
@@ -1419,8 +1408,7 @@ impl Gb28181ServerHandle {
         let call_id_clone = call_id.clone();
         let device_id_owned = device_id.to_string();
         let channel_id_owned = channel_id.to_string();
-        let mut sessions = self.inner.sessions.lock().unwrap().clone();
-        let media = self.inner.media.clone();
+        let inner_clone = self.inner.clone();
         let rtp_port_clone = rtp_port;
         let ssrc_clone = ssrc.clone();
         let stream_id_clone = stream_id.clone();
@@ -1451,12 +1439,12 @@ impl Gb28181ServerHandle {
                         );
 
                         // 释放 RTP 端口
-                        if let Err(e) = media.close_rtp_server(&stream_id_clone).await {
+                        if let Err(e) = inner_clone.media.close_rtp_server(&stream_id_clone).await {
                             warn!(call_id = %call_id_clone, error = %e, "关闭 RTP 端口失败");
                         }
 
                         // 从会话表移除
-                        sessions.remove(&call_id_clone);
+                        inner_clone.sessions.remove(&call_id_clone);
 
                         tokio::spawn(event::emit(Gb28181Event::SessionEnded {
                             device_id: device_id_owned.clone(),
@@ -1498,14 +1486,14 @@ impl Gb28181ServerHandle {
 
         let from = rsip::typed::From {
             display_name: None,
-            uri: from_uri.into(),
+            uri: from_uri,
             params: vec![rsip::Param::Tag(rsip::uri::Tag::new(
                 rsipstack::transaction::make_tag(),
             ))],
         };
         let to = rsip::typed::To {
             display_name: None,
-            uri: req_uri.clone().into(),
+            uri: req_uri.clone(),
             params: vec![],
         };
 
@@ -1522,7 +1510,7 @@ impl Gb28181ServerHandle {
         request
             .headers
             .push(rsip::Header::ContentType("Application/MANSCDP+xml".into()));
-        request.body = body.as_bytes().to_vec().into();
+        request.body = body.as_bytes().to_vec();
 
         let key = TransactionKey::from_request(&request, TransactionRole::Client)
             .map_err(|e| anyhow::anyhow!("构造事务 key 失败: {}", e))?;
@@ -1550,7 +1538,7 @@ fn build_invite_sdp_with_time(
         .as_secs();
 
     // 将 ISO8601 时间转换为 NTP 时间戳（GB28181 要求）
-    // 简单处理：直接传递时间字符串
+    // 简单处理：直接传递时间字符串 todo 不支持ipv6
     format!(
         "v=0\r\n\
          o=- {session_id} {session_id} IN IP4 {local_ip}\r\n\
