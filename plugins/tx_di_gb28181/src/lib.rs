@@ -112,7 +112,8 @@ pub mod media;
 
 pub use config::{Gb28181ServerConfig, MediaConfig};
 pub use device_registry::{ChannelInfo, ChannelStatus, DeviceInfo, DeviceRegistry};
-pub use event::{Gb28181Event, Gb28181EventHandler};
+pub use event::{Gb28181Event, subscribe as subscribe_events};
+pub use handlers::Gb28181CmdType;
 pub use plugin::{Gb28181Server, Gb28181ServerHandle, SessionInfo};
 pub use sdp::{parse_sdp_ssrc, AudioCodec, AudioSessionInfo, SnapshotInfo};
 pub use xml::{
