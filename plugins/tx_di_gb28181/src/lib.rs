@@ -109,7 +109,6 @@ mod plugin;
 pub mod sdp;
 pub mod xml;
 pub mod media;
-mod zlm;
 
 pub use config::{Gb28181ServerConfig, MediaConfig};
 pub use device_registry::{ChannelInfo, ChannelStatus, DeviceInfo, DeviceRegistry};

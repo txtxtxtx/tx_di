@@ -386,21 +386,16 @@ pub trait MediaBackend: Send + Sync + 'static {
 // ── 配置 & 工厂 ─────────────────────────────────────────────────────────────
 
 /// 流媒体后端类型选择
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum BackendType {
     /// ZLMediaServer（默认）
+    #[default]
     Zlm,
     /// MediaMTX (rtsp-simple-server)
     MediaMtx,
     /// 空后端（测试/开发）
     Null,
-}
-
-impl Default for BackendType {
-    fn default() -> Self {
-        BackendType::Zlm
-    }
 }
 
 impl fmt::Display for BackendType {
