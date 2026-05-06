@@ -105,7 +105,7 @@ impl CompInit for SipConfig {
         Ok(())
     }
     fn init_sort() -> i32 {
-        i32::MAX - 2
+        10000
     }
 }
 

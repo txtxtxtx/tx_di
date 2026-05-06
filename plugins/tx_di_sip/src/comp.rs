@@ -246,7 +246,7 @@ impl CompInit for SipPlugin {
     }
 
     fn init_sort() -> i32 {
-        i32::MAX - 1
+        10000
     }
 }
 

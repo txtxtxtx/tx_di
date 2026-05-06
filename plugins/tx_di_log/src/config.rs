@@ -5,7 +5,7 @@ use std::{env, fmt};
 use time::format_description::well_known;
 use tracing_subscriber::fmt::format::Writer;
 use tracing_subscriber::fmt::time::{FormatTime, LocalTime, UtcTime};
-use tx_di_core::{tx_comp, CompInit};
+use tx_di_core::{CompInit, tx_comp};
 
 /// 日志配置结构体
 ///
@@ -18,7 +18,7 @@ use tx_di_core::{tx_comp, CompInit};
 /// level = "info"  # 可选值: "off", "error", "warn", "info", "debug", "trace"（不区分大小写）
 /// ```
 #[derive(Debug, Clone, Deserialize)]
-#[tx_comp(conf,init)]
+#[tx_comp(conf, init)]
 pub struct LogConfig {
     /// 全局日志级别过滤器
     ///
@@ -103,12 +103,13 @@ impl CompInit for LogConfig {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize,Default)]
 #[serde(rename_all = "lowercase")]
 pub enum TimeFormat {
     /// UTC 时间（协调世界时）
     Utc,
     /// 本地时间（系统时区）
+    #[default]
     Local,
 }
 
@@ -146,13 +147,6 @@ impl fmt::Display for TimeFormat {
     }
 }
 
-impl Default for TimeFormat {
-    fn default() -> Self {
-        TimeFormat::Utc
-    }
-}
-
-
 /// 提供默认的日志级别
 fn default_level() -> log::LevelFilter {
     log::LevelFilter::Info
@@ -166,11 +160,12 @@ fn default_format() -> String {
 /// 默认的日志目录
 fn default_dir() -> PathBuf {
     // 获取可执行文件所在目录
-    if let Ok(exe_path) = env::current_exe() {
-        if let Some(parent) = exe_path.parent() {
-            return parent.join("logs");
-        }
+    if let Ok(exe_path) = env::current_exe()
+        && let Some(parent) = exe_path.parent()
+    {
+        return parent.join("logs");
     }
+
     // 降级方案：使用当前工作目录
     PathBuf::from("./logs")
 }
