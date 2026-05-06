@@ -28,6 +28,128 @@ use dashmap::DashMap;
 use tracing::{debug, info, warn};
 use tx_di_sip::SipRouter;
 
+// ── GB28181 指令类型枚举 ─────────────────────────────────────────────────────
+
+/// GB28181 MESSAGE CmdType 枚举
+///
+/// 对应 GB28181-2022 标准中所有 MESSAGE 消息的 CmdType 字段值。
+/// 支持大小写不敏感解析（兼容不同厂商实现）。
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Gb28181CmdType {
+    /// 心跳保活
+    Keepalive,
+    /// 目录查询响应
+    Catalog,
+    /// 设备信息查询响应
+    DeviceInfo,
+    /// 设备状态查询响应
+    DeviceStatus,
+    /// 录像信息查询响应
+    RecordInfo,
+    /// 报警通知
+    Alarm,
+    /// 媒体流状态通知（设备推流结束等）
+    MediaStatus,
+    /// 移动设备位置上报
+    MobilePosition,
+    /// 设备配置下载响应
+    ConfigDownload,
+    /// 预置位查询响应
+    PresetList,
+    /// 巡航轨迹列表查询响应
+    CruiseList,
+    /// 巡航轨迹详情响应（GB28181-2022 新增）
+    CruiseTrack,
+    /// PTZ 精准状态响应（GB28181-2022 新增）
+    PtzPreciseStatus,
+    /// 看守位信息查询响应（GB28181-2022 新增）
+    GuardInfo,
+    /// 语音广播消息（Invite / TearDown）
+    Broadcast,
+}
+
+impl std::fmt::Display for Gb28181CmdType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Keepalive       => write!(f, "Keepalive"),
+            Self::Catalog         => write!(f, "Catalog"),
+            Self::DeviceInfo      => write!(f, "DeviceInfo"),
+            Self::DeviceStatus    => write!(f, "DeviceStatus"),
+            Self::RecordInfo      => write!(f, "RecordInfo"),
+            Self::Alarm           => write!(f, "Alarm"),
+            Self::MediaStatus     => write!(f, "MediaStatus"),
+            Self::MobilePosition  => write!(f, "MobilePosition"),
+            Self::ConfigDownload  => write!(f, "ConfigDownload"),
+            Self::PresetList      => write!(f, "PresetList"),
+            Self::CruiseList      => write!(f, "CruiseList"),
+            Self::CruiseTrack     => write!(f, "CruiseTrack"),
+            Self::PtzPreciseStatus => write!(f, "PtzPreciseStatus"),
+            Self::GuardInfo       => write!(f, "GuardInfo"),
+            Self::Broadcast       => write!(f, "Broadcast"),
+        }
+    }
+}
+
+impl std::str::FromStr for Gb28181CmdType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // 快速路径：精确匹配（绝大多数设备使用标准大小写）
+        let cmd = match s {
+            "Keepalive"        => return Ok(Self::Keepalive),
+            "Catalog"          => return Ok(Self::Catalog),
+            "DeviceInfo"       => return Ok(Self::DeviceInfo),
+            "DeviceStatus"     => return Ok(Self::DeviceStatus),
+            "RecordInfo"       => return Ok(Self::RecordInfo),
+            "Alarm"            => return Ok(Self::Alarm),
+            "MediaStatus"      => return Ok(Self::MediaStatus),
+            "MobilePosition"   => return Ok(Self::MobilePosition),
+            "ConfigDownload"   => return Ok(Self::ConfigDownload),
+            "PresetList"       => return Ok(Self::PresetList),
+            "CruiseList"       => return Ok(Self::CruiseList),
+            "CruiseTrack"      => return Ok(Self::CruiseTrack),
+            "PtzPreciseStatus" => return Ok(Self::PtzPreciseStatus),
+            "GuardInfo"        => return Ok(Self::GuardInfo),
+            "Broadcast"        => return Ok(Self::Broadcast),
+            _ => s,
+        };
+        // 大小写不敏感兜底（兼容部分厂商全小写/全大写实现）
+        let lower = cmd.to_ascii_lowercase();
+        match lower.as_str() {
+            "keepalive"        => Ok(Self::Keepalive),
+            "catalog"          => Ok(Self::Catalog),
+            "deviceinfo"       => Ok(Self::DeviceInfo),
+            "devicestatus"     => Ok(Self::DeviceStatus),
+            "recordinfo"       => Ok(Self::RecordInfo),
+            "alarm"            => Ok(Self::Alarm),
+            "mediastatus"      => Ok(Self::MediaStatus),
+            "mobileposition"   => Ok(Self::MobilePosition),
+            "configdownload"   => Ok(Self::ConfigDownload),
+            "presetlist"       => Ok(Self::PresetList),
+            "cruiselist"       => Ok(Self::CruiseList),
+            "cruisetrack"      => Ok(Self::CruiseTrack),
+            "ptzprecisestatus" => Ok(Self::PtzPreciseStatus),
+            "guardinfo"        => Ok(Self::GuardInfo),
+            "broadcast"        => Ok(Self::Broadcast),
+            _                  => Err(format!("未知的 GB28181 指令类型: {cmd}")),
+        }
+    }
+}
+
+/// 创建简单的 SIP 响应处理器（回复 200 OK）
+fn create_ok_handler(method_name: &'static str) -> impl Fn(Transaction) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + Send>> + Send + Sync + 'static {
+    move |mut tx| {
+        let method = method_name;
+        Box::pin(async move {
+            tx.reply(StatusCode::OK)
+                .await
+                .map_err(|e| anyhow::anyhow!("回复 {} 200 OK 失败: {}", method, e))?;
+            Ok(())
+        })
+    }
+}
+
 /// 向 SipRouter 注册所有 GB28181 服务端消息处理器
 pub fn register_server_handlers(
     registry: Arc<DeviceRegistry>,
@@ -56,28 +178,13 @@ pub fn register_server_handlers(
     });
 
     // NOTIFY — 报警订阅通知
-    SipRouter::add_handler(Some("NOTIFY"), 0, move |mut tx| async move {
-        tx.reply(StatusCode::OK)
-            .await
-            .map_err(|e| anyhow::anyhow!("回复 NOTIFY 200 OK 失败: {}", e))?;
-        Ok(())
-    });
+    SipRouter::add_handler(Some("NOTIFY"), 0, create_ok_handler("NOTIFY"));
 
     // SUBSCRIBE — 订阅请求（简单回 200 OK）
-    SipRouter::add_handler(Some("SUBSCRIBE"), 0, move |mut tx| async move {
-        tx.reply(StatusCode::OK)
-            .await
-            .map_err(|e| anyhow::anyhow!("回复 SUBSCRIBE 200 OK 失败: {}", e))?;
-        Ok(())
-    });
+    SipRouter::add_handler(Some("SUBSCRIBE"), 0, create_ok_handler("SUBSCRIBE"));
 
     // OPTIONS — 探活 / keep-alive
-    SipRouter::add_handler(Some("OPTIONS"), 0, |mut tx| async move {
-        tx.reply(StatusCode::OK)
-            .await
-            .map_err(|e| anyhow::anyhow!("回复 OPTIONS 200 OK 失败: {}", e))?;
-        Ok(())
-    });
+    SipRouter::add_handler(Some("OPTIONS"), 0, create_ok_handler("OPTIONS"));
 }
 
 // ── Nonce 存储（用于摘要认证）────────────────────────────────────────────────
@@ -274,6 +381,7 @@ fn md5_hex(hash: [u8; 16]) -> String {
 
 // ── REGISTER ─────────────────────────────────────────────────────────────────
 
+/// 处理 REGISTER 请求
 async fn handle_register(
     mut tx: Transaction,
     registry: Arc<DeviceRegistry>,
@@ -431,6 +539,7 @@ async fn handle_message(
     _config: Arc<Gb28181ServerConfig>,
 ) -> anyhow::Result<()> {
     // 先回 200 OK（GB28181 要求先确认再处理）
+    // create_ok_handler("MESSAGE")(tx).await?;
     tx.reply(StatusCode::OK)
         .await
         .map_err(|e| anyhow::anyhow!("回复 MESSAGE 200 OK 失败: {}", e))?;
@@ -453,35 +562,40 @@ async fn handle_message(
 
     let from_str = tx
         .original
-        .from_header()
+        .from_header() // 从 From 头中提取
         .map(|h| h.value().to_string())
         .unwrap_or_default();
     let device_id =
         extract_user_from_sip_uri(&from_str).unwrap_or_else(|| from_str.clone());
 
-    match cmd_type.as_str() {
-        "Keepalive" => handle_keepalive(&device_id, &body, &registry).await,
-        "Catalog" => handle_catalog_response(&device_id, &body, &registry).await,
-        "DeviceInfo" => handle_device_info(&device_id, &body).await,
-        "DeviceStatus" => handle_device_status(&device_id, &body).await,
-        "RecordInfo" => handle_record_info(&device_id, &body).await,
-        "Alarm" => handle_alarm(&device_id, &body).await,
-        "MediaStatus" => handle_media_status(&device_id, &body).await,
-        "MobilePosition" => handle_mobile_position(&device_id, &body).await,
-        "ConfigDownload" => handle_config_download(&device_id, &body).await,
-        "PresetList" => handle_preset_list(&device_id, &body).await,
-        "CruiseList" => handle_cruise_list(&device_id, &body).await,
-        "CruiseTrack" => handle_cruise_track_response(&device_id, &body).await,
-        "PtzPreciseStatus" => handle_ptz_precise_status_response(&device_id, &body).await,
-        "GuardInfo" => handle_guard_info(&device_id, &body).await,
-        "Broadcast" => handle_broadcast(&device_id, &body).await,
-        other => {
-            warn!(device_id = %device_id, cmd = %other, "未处理的 GB28181 指令");
-            Ok(())
+    let cmd: Gb28181CmdType = match cmd_type.parse() {
+        Ok(cmd) => cmd,
+        Err(_) => {
+            warn!(device_id = %device_id, cmd = %cmd_type, "未识别的 GB28181 指令类型");
+            return Ok(());
         }
+    };
+
+    match cmd {
+        Gb28181CmdType::Keepalive => handle_keepalive(&device_id, &body, &registry).await,
+        Gb28181CmdType::Catalog => handle_catalog_response(&device_id, &body, &registry).await,
+        Gb28181CmdType::DeviceInfo => handle_device_info(&device_id, &body).await,
+        Gb28181CmdType::DeviceStatus => handle_device_status(&device_id, &body).await,
+        Gb28181CmdType::RecordInfo => handle_record_info(&device_id, &body).await,
+        Gb28181CmdType::Alarm => handle_alarm(&device_id, &body).await,
+        Gb28181CmdType::MediaStatus => handle_media_status(&device_id, &body).await,
+        Gb28181CmdType::MobilePosition => handle_mobile_position(&device_id, &body).await,
+        Gb28181CmdType::ConfigDownload => handle_config_download(&device_id, &body).await,
+        Gb28181CmdType::PresetList => handle_preset_list(&device_id, &body).await,
+        Gb28181CmdType::CruiseList => handle_cruise_list(&device_id, &body).await,
+        Gb28181CmdType::CruiseTrack => handle_cruise_track_response(&device_id, &body).await,
+        Gb28181CmdType::PtzPreciseStatus => handle_ptz_precise_status_response(&device_id, &body).await,
+        Gb28181CmdType::GuardInfo => handle_guard_info(&device_id, &body).await,
+        Gb28181CmdType::Broadcast => handle_broadcast(&device_id, &body).await,
     }
 }
 
+/// Keepalive 心跳处理器
 async fn handle_keepalive(
     device_id: &str,
     body: &str,
@@ -495,6 +609,7 @@ async fn handle_keepalive(
     let was_refreshed = registry.refresh_heartbeat(device_id);
 
     if !was_refreshed {
+        // todo 可以重新注册，而不是忽略
         warn!(device_id = %device_id, "收到未注册设备的心跳（已忽略）");
         return Ok(());
     }
@@ -516,6 +631,7 @@ async fn handle_keepalive(
     Ok(())
 }
 
+/// 目录响应处理器
 async fn handle_catalog_response(
     device_id: &str,
     body: &str,
@@ -562,6 +678,7 @@ async fn handle_catalog_response(
     Ok(())
 }
 
+/// 设备信息处理器
 async fn handle_device_info(device_id: &str, body: &str) -> anyhow::Result<()> {
     let manufacturer = parse_xml_field(body, "Manufacturer").unwrap_or_default();
     let model = parse_xml_field(body, "Model").unwrap_or_default();
@@ -589,6 +706,7 @@ async fn handle_device_info(device_id: &str, body: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// 设备状态处理器
 async fn handle_device_status(device_id: &str, body: &str) -> anyhow::Result<()> {
     // 优先检查是否为校时响应（包含 TimeRequest 则为校时）
     if body.contains("<TimeRequest>") {
@@ -628,6 +746,7 @@ async fn handle_device_status(device_id: &str, body: &str) -> anyhow::Result<()>
     Ok(())
 }
 
+/// 录像文件列表处理器
 async fn handle_record_info(device_id: &str, body: &str) -> anyhow::Result<()> {
     let items = parse_record_items(body);
     let sum_num = parse_xml_field(body, "SumNum")
@@ -650,6 +769,7 @@ async fn handle_record_info(device_id: &str, body: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// 报警通知处理器
 async fn handle_alarm(device_id: &str, body: &str) -> anyhow::Result<()> {
     if let Some(alarm) = parse_alarm_notify(body) {
         info!(
@@ -673,6 +793,7 @@ async fn handle_alarm(device_id: &str, body: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// 媒体状态通知处理器
 async fn handle_media_status(device_id: &str, body: &str) -> anyhow::Result<()> {
     let notify_type = parse_media_status(body).unwrap_or_else(|| "121".to_string());
     info!(
@@ -689,6 +810,7 @@ async fn handle_media_status(device_id: &str, body: &str) -> anyhow::Result<()> 
     Ok(())
 }
 
+/// 移动位置通知处理器
 async fn handle_mobile_position(device_id: &str, body: &str) -> anyhow::Result<()> {
     let longitude = parse_xml_field(body, "Longitude")
         .and_then(|s| s.parse().ok())
@@ -705,6 +827,8 @@ async fn handle_mobile_position(device_id: &str, body: &str) -> anyhow::Result<(
         device_id = %device_id,
         lon = longitude,
         lat = latitude,
+        speed = speed,
+        direction = direction,
         "📍 收到移动位置通知"
     );
 
@@ -719,6 +843,7 @@ async fn handle_mobile_position(device_id: &str, body: &str) -> anyhow::Result<(
     Ok(())
 }
 
+/// 配置下载处理器
 async fn handle_config_download(device_id: &str, body: &str) -> anyhow::Result<()> {
     let config_type = parse_xml_field(body, "ConfigType").unwrap_or_default();
     let items = parse_config_download_response(body);
@@ -738,6 +863,7 @@ async fn handle_config_download(device_id: &str, body: &str) -> anyhow::Result<(
     Ok(())
 }
 
+/// 预置位列表处理器
 async fn handle_preset_list(device_id: &str, body: &str) -> anyhow::Result<()> {
     let channel_id = parse_xml_field(body, "DeviceID").unwrap_or_else(|| device_id.to_string());
     let presets = parse_preset_list(body);
@@ -757,6 +883,7 @@ async fn handle_preset_list(device_id: &str, body: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// 巡航轨迹列表处理器
 async fn handle_cruise_list(device_id: &str, body: &str) -> anyhow::Result<()> {
     let channel_id = parse_xml_field(body, "DeviceID").unwrap_or_else(|| device_id.to_string());
     let cruises = parse_cruise_list(body);
@@ -776,6 +903,7 @@ async fn handle_cruise_list(device_id: &str, body: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// 处理看守位信息
 async fn handle_guard_info(device_id: &str, body: &str) -> anyhow::Result<()> {
     let guard_info = match parse_guard_info(body) {
         Some(info) => info,
@@ -920,7 +1048,7 @@ pub fn extract_user_from_sip_uri(uri_str: &str) -> Option<String> {
         .unwrap_or(inner);
 
     // 取 @ 之前的 user 部分（去掉 ;tag=xxx 等参数）
-    let user_part = after_scheme.splitn(2, '@').next().unwrap_or(after_scheme);
+    let user_part = after_scheme.split('@').next().unwrap_or(after_scheme);
     // 去掉可能的参数
     let user = user_part.split(';').next().unwrap_or(user_part);
 
