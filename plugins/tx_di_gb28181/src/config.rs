@@ -1,7 +1,6 @@
 //! GB28181 服务端配置
 
 use crate::media::MediaBackendConfig;
-use crate::zlm::ZlmConfig;
 use serde::Deserialize;
 use tx_di_core::{tx_comp, BuildContext, CompInit, RIE};
 
@@ -57,9 +56,17 @@ fn default_rtp_end() -> u16 {
 /// rtp_port_start = 10000
 /// rtp_port_end   = 20000
 ///
-/// [gb28181_server_config.zlm]
+/// [gb28181_server_config.media_backend]
+/// backend_type = "zlm"
+/// [gb28181_server_config.media_backend.zlm]
 /// base_url = "http://127.0.0.1:8080"
-/// secret   = "035c73f7-bb6b-4889-a715-d9eb2d1925cc"
+/// secret = "aaa"
+/// timeout_secs = 10
+/// rtsp_port = 554
+/// rtsps_port = 0
+/// rtmp_port = 1935
+/// http_port = 8080
+/// https_port = 8081
 /// ```
 #[derive(Debug, Clone, Deserialize)]
 #[tx_comp(conf, init)]
@@ -95,11 +102,7 @@ pub struct Gb28181ServerConfig {
     /// 媒体层配置
     #[serde(default)]
     pub media: MediaConfig,
-
-    /// ZLMediaServer 配置（兼容旧版，新版推荐使用 `media_backend`）
-    #[serde(default)]
-    pub zlm: ZlmConfig,
-
+    
     /// 统一流媒体后端配置（新版）
     ///
     /// 通过 `[gb28181_server_config.media_backend]` 配置，支持 ZLM、MediaMTX、Null。
@@ -119,18 +122,14 @@ impl Default for Gb28181ServerConfig {
             enable_auth: false,
             auth_password: default_auth_password(),
             media: MediaConfig::default(),
-            zlm: ZlmConfig::default(),
             media_backend: MediaBackendConfig::default(),
         }
     }
 }
 
 impl CompInit for Gb28181ServerConfig {
-    fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
-        Ok(())
-    }
     fn init_sort() -> i32 {
-        i32::MAX - 3
+        10001
     }
 }
 
