@@ -22,8 +22,9 @@ use crate::xml::{
 };
 use rsipstack::sip::{Header, HeadersExt, StatusCode};
 use rsipstack::transaction::transaction::Transaction;
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::str::FromStr;
+use std::sync::Arc;
+use dashmap::DashMap;
 use tracing::{debug, info, warn};
 use tx_di_sip::SipRouter;
 
@@ -83,13 +84,13 @@ pub fn register_server_handlers(
 
 /// Nonce 存储：记录已发给每个设备的 nonce，防止重放攻击
 pub struct NonceStore {
-    inner: Mutex<HashMap<String, String>>,
+    inner: DashMap<String, String>,
 }
 
 impl NonceStore {
     pub fn new() -> Self {
         Self {
-            inner: Mutex::new(HashMap::new()),
+            inner: DashMap::new(),
         }
     }
 
@@ -97,8 +98,6 @@ impl NonceStore {
     pub fn issue(&self, device_id: &str) -> String {
         let nonce = generate_nonce();
         self.inner
-            .lock()
-            .unwrap()
             .insert(device_id.to_string(), nonce.clone());
         nonce
     }
@@ -106,13 +105,14 @@ impl NonceStore {
     /// 验证 nonce（验证后不自动删除，允许重用）
     #[allow(dead_code)]
     pub fn verify(&self, device_id: &str, nonce: &str) -> bool {
-        let guard = self.inner.lock().unwrap();
-        guard.get(device_id).map(|n| n == nonce).unwrap_or(false)
+        self.inner.get(device_id)
+            .map(|n| n.value() == nonce)
+            .unwrap_or(false)
     }
 
     /// 删除 nonce（认证成功后清除）
     pub fn remove(&self, device_id: &str) {
-        self.inner.lock().unwrap().remove(device_id);
+        self.inner.remove(device_id);
     }
 }
 
@@ -123,7 +123,7 @@ fn generate_nonce() -> String {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .subsec_nanos();
-    // 简单 nonce：时间戳 + 简单散列
+    // 简单 nonce：时间戳 + 简单散列 0x9e37_79b9 著名的 Golden Ratio constant（黄金比例常数）
     format!("{:08x}{:08x}", t, t.wrapping_mul(0x9e37_79b9))
 }
 
@@ -349,10 +349,8 @@ async fn handle_register(
                 // 有 Authorization → 验证
                 let nonce = nonce_store
                     .inner
-                    .lock()
-                    .unwrap()
                     .get(&device_id)
-                    .cloned()
+                    .map(|v| v.clone())
                     .unwrap_or_default();
 
                 // 提取 REGISTER 的 Request-URI（用于 MD5 计算）
@@ -539,7 +537,7 @@ async fn handle_catalog_response(
             name: item.name.clone(),
             manufacturer: item.manufacturer.clone(),
             model: item.model.clone(),
-            status: ChannelStatus::from_str(&item.status),
+            status: ChannelStatus::from_str(&item.status).unwrap(),
             address: item.address.clone(),
             parent_id: item.parent_id.clone(),
             ip_address: item.ip_address.clone(),
