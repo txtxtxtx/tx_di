@@ -5,6 +5,7 @@
 
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::time::{Duration, Instant};
 use tracing::{info, warn};
@@ -52,15 +53,22 @@ pub enum ChannelStatus {
     Unknown(String),
 }
 
-impl ChannelStatus {
-    pub fn from_str(s: &str) -> Self {
-        match s.to_uppercase().as_str() {
+impl FromStr for ChannelStatus {
+    /// 永远不会发生的错误
+    type Err = std::convert::Infallible;
+
+    /// 从字符串解析通道状态
+    /// 永远不会发生错误,可直接 unwrap
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_uppercase().as_str() {
             "ON" => ChannelStatus::On,
             "OFF" => ChannelStatus::Off,
             other => ChannelStatus::Unknown(other.to_string()),
-        }
+        })
     }
+}
 
+impl ChannelStatus {
     pub fn as_str(&self) -> &str {
         match self {
             ChannelStatus::On => "ON",
@@ -76,7 +84,14 @@ pub struct DeviceInfo {
     /// 设备 ID（20 位）
     pub device_id: String,
 
-    /// 设备的 SIP 联系地址（Contact URI）
+    /// 设备的 SIP 联系地址（Contact URI） 后续请求的直接目的地地址
+    /// - 指定后续通信的地址
+    /// - 实现 NAT（网络地址转换）穿透
+    /// - 支持移动性和分机
+    ///
+    /// case
+    /// - Contact: <sip:34020000001320000001@192.168.1.100:5060>
+    /// - Contact: <sip:34020000001320000001@192.168.1.100:5060>;expires=3600
     pub contact: String,
 
     /// 注册时间
@@ -181,11 +196,11 @@ impl DeviceRegistry {
 
     /// 设备下线（心跳超时）
     pub fn set_offline(&self, device_id: &str) {
-        if let Some(mut dev) = self.inner.get_mut(device_id) {
-            if dev.online {
-                warn!(device_id = %device_id, "⚠️ 设备心跳超时，标记离线");
-                dev.online = false;
-            }
+        if let Some(mut dev) = self.inner.get_mut(device_id)
+            && dev.online
+        {
+            warn!(device_id = %device_id, "⚠️ 设备心跳超时，标记离线");
+            dev.online = false;
         }
     }
 
