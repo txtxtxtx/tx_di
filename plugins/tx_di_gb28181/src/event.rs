@@ -1,12 +1,17 @@
 //! GB28181 事件总线
 //!
-//! 提供类型安全的事件订阅/发布机制，上层业务通过 `Gb28181Server::on_event()` 订阅。
+//! 基于 `tokio::sync::broadcast` 实现，支持多订阅者并发接收事件。
+//!
+//! - **回调订阅**：`Gb28181Server::on_event(|ev| async { ... })`（兼容旧 API）
+//! - **通道订阅**：`event::subscribe()` 返回 `broadcast::Receiver`，适用于需要精细控制消费节奏的场景
+//!
+//! 所有事件发布均为 O(1) 操作（无锁、无遍历），订阅者之间互不阻塞。
 
 use crate::device_registry::ChannelInfo;
 use crate::xml::{CruiseTrack, RecordItem};
 use std::future::Future;
-use std::pin::Pin;
-use std::sync::{Arc, LazyLock, RwLock};
+use std::sync::OnceLock;
+use tokio::sync::broadcast;
 
 /// GB28181 事件类型（GB28181-2022 完整版）
 #[derive(Debug, Clone)]
@@ -234,56 +239,84 @@ pub enum Gb28181Event {
     },
 }
 
-/// 异步事件处理函数类型
-pub type Gb28181EventHandler = Arc<
-    dyn Fn(Gb28181Event) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send + 'static>>
-        + Send
-        + Sync,
->;
+// ── broadcast 通道 ──────────────────────────────────────────────────────────
 
-/// 全局事件监听器列表
-static EVENT_LISTENERS: LazyLock<Arc<RwLock<Vec<Gb28181EventHandler>>>> =
-    LazyLock::new(|| Arc::new(RwLock::new(Vec::new())));
+/// 广播通道容量（超过此数量的未消费事件将触发 Lagged 通知）
+const EVENT_CHANNEL_CAPACITY: usize = 4096;
 
-/// 注册事件监听器
+/// 全局事件广播发送器（懒初始化，线程安全）
+static EVENT_TX: OnceLock<broadcast::Sender<Gb28181Event>> = OnceLock::new();
+
+/// 获取全局事件发送器（首次调用时初始化通道）
+fn event_sender() -> &'static broadcast::Sender<Gb28181Event> {
+    EVENT_TX.get_or_init(|| {
+        let (tx, _rx) = broadcast::channel(EVENT_CHANNEL_CAPACITY);
+        tx
+    })
+}
+
+/// 订阅事件，返回 `broadcast::Receiver`
+///
+/// 每次调用都会创建一个独立的订阅者，各订阅者之间互不影响。
+/// 推荐在 `build()` 之前调用，以确保不遗漏早期事件。
+///
+/// # 示例
+///
+/// ```rust,ignore
+/// let mut rx = event::subscribe();
+/// tokio::spawn(async move {
+///     loop {
+///         match rx.recv().await {
+///             Ok(ev) => { /* 处理事件 */ }
+///             Err(broadcast::error::RecvError::Lagged(n)) => {
+///                 tracing::warn!("落后 {n} 条事件");
+///             }
+///             Err(broadcast::error::RecvError::Closed) => break,
+///         }
+///     }
+/// });
+/// ```
+pub fn subscribe() -> broadcast::Receiver<Gb28181Event> {
+    event_sender().subscribe()
+}
+
+/// 注册事件监听器（回调方式，兼容旧 API）
+///
+/// 内部通过 `subscribe()` 获取 `Receiver`，在独立 tokio task 中驱动回调。
+/// 若需要更精细的控制（如 lagged 处理、背压策略），请直接使用 `subscribe()`。
 pub fn add_event_listener<F, Fut>(handler: F)
 where
     F: Fn(Gb28181Event) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
 {
-    let handler_fn: Gb28181EventHandler =
-        Arc::new(move |ev| Box::pin(handler(ev)));
-    EVENT_LISTENERS
-        .write()
-        .expect("event listener write lock")
-        .push(handler_fn);
+    let mut rx = subscribe();
+    tokio::spawn(async move {
+        loop {
+            match rx.recv().await {
+                Ok(event) => {
+                    if let Err(e) = handler(event).await {
+                        tracing::warn!(error = %e, "GB28181 事件处理器返回错误");
+                    }
+                }
+                Err(broadcast::error::RecvError::Lagged(n)) => {
+                    tracing::warn!(
+                        skipped = n,
+                        "GB28181 事件订阅者落后，跳过了 {n} 条事件"
+                    );
+                }
+                Err(broadcast::error::RecvError::Closed) => break,
+            }
+        }
+    });
 }
 
-/// 发布事件（广播给所有监听器）
+/// 发布事件（广播给所有订阅者）
 ///
-/// 在 `tokio::spawn` 内部调用，保证不阻塞 SIP 处理循环。
+/// O(1) 操作：仅一次内存拷贝 + 通知所有 Receiver。
+/// 无订阅者时静默忽略。
 pub async fn emit(event: Gb28181Event) {
-    let listeners = {
-        EVENT_LISTENERS
-            .read()
-            .expect("event listener read lock")
-            .clone()
-    };
-    for listener in listeners.iter() {
-        if let Err(e) = listener(event.clone()).await {
-            tracing::warn!(error = %e, "GB28181 事件处理器返回错误");
-        }
-    }
+    let _ = event_sender().send(event);
 }
 
 /// 巡航轨迹详情信息（与 xml::CruiseTrack 相同）
 pub type CruiseTrackInfo = CruiseTrack;
-
-/// 清空所有监听器（测试用）
-#[allow(dead_code)]
-pub fn clear_listeners() {
-    EVENT_LISTENERS
-        .write()
-        .expect("event listener write lock")
-        .clear();
-}
