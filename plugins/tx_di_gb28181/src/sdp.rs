@@ -8,7 +8,7 @@
 /// 判断 IP 字符串是 IPv6 还是 IPv4，返回 `("IP6", addr)` 或 `("IP4", addr)`
 ///
 /// IPv6 地址在 SDP `c=` / `o=` 字段中不需要方括号，直接裸写即可（RFC 4566 §5.7）。
-fn ip_net_type(ip: &str) -> (&'static str, &str) {
+pub(crate) fn ip_net_type(ip: &str) -> (&'static str, &str) {
     if ip.contains(':') {
         ("IP6", ip)
     } else {

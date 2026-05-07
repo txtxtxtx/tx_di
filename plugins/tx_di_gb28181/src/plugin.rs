@@ -588,7 +588,7 @@ impl Gb28181ServerHandle {
     pub async fn snapshot(&self, device_id: &str, channel_id: &str) -> anyhow::Result<String> {
         let dev = self.get_dev_or_err(device_id)?;
         let sn = self.inner.sn.fetch_add(1, Ordering::Relaxed);
-        let media_ip = if self.inner.config.media.local_ip == "0.0.0.0" {
+        let media_ip = if is_unspecified_ip(&self.inner.config.media.local_ip) {
             self.inner.config.sip_ip.clone()
         } else {
             self.inner.config.media.local_ip.clone()
@@ -737,7 +737,7 @@ impl Gb28181ServerHandle {
 
         // 通过 MESSAGE 回复确认（含音频端口）
         let sn = self.next_sn();
-        let media_ip = if self.inner.config.media.local_ip == "0.0.0.0" {
+        let media_ip = if is_unspecified_ip(&self.inner.config.media.local_ip) {
             self.inner.config.sip_ip.clone()
         } else {
             self.inner.config.media.local_ip.clone()
@@ -827,7 +827,7 @@ impl Gb28181ServerHandle {
     ) -> anyhow::Result<(String, String, u16)> {
         let dev = self.get_dev_or_err(device_id)?;
         let sn = self.inner.sn.fetch_add(1, Ordering::Relaxed);
-        let media_ip = if self.inner.config.media.local_ip == "0.0.0.0" {
+        let media_ip = if is_unspecified_ip(&self.inner.config.media.local_ip) {
             self.inner.config.sip_ip.clone()
         } else {
             self.inner.config.media.local_ip.clone()
@@ -1312,7 +1312,7 @@ impl Gb28181ServerHandle {
     ) -> anyhow::Result<(String, PlayUrls)> {
         let dev = self.get_dev_or_err(device_id)?;
 
-        let media_ip = if self.inner.config.media.local_ip == "0.0.0.0" {
+        let media_ip = if is_unspecified_ip(&self.inner.config.media.local_ip) {
             self.inner.config.sip_ip.clone()
         } else {
             self.inner.config.media.local_ip.clone()
@@ -1524,6 +1524,11 @@ impl Gb28181ServerHandle {
     }
 }
 
+/// 判断 IP 是否为"未指定"（any）地址，同时兼容 IPv4 `0.0.0.0` 和 IPv6 `::`
+fn is_unspecified_ip(ip: &str) -> bool {
+    ip == "0.0.0.0" || ip == "::" || ip == "::0" || ip == "[::]"
+}
+
 /// 构建历史回放 INVITE 的 SDP offer（带时间范围）
 fn build_invite_sdp_with_time(
     local_ip: &str,
@@ -1537,21 +1542,22 @@ fn build_invite_sdp_with_time(
         .unwrap_or_default()
         .as_secs();
 
-    // 将 ISO8601 时间转换为 NTP 时间戳（GB28181 要求）
-    // 简单处理：直接传递时间字符串 todo 不支持ipv6
+    let (addrtype, addr) = crate::sdp::ip_net_type(local_ip);
+
     format!(
         "v=0\r\n\
-         o=- {session_id} {session_id} IN IP4 {local_ip}\r\n\
+         o=- {session_id} {session_id} IN {addrtype} {addr}\r\n\
          s=Playback\r\n\
          u={start_time}:0\r\n\
-         c=IN IP4 {local_ip}\r\n\
+         c=IN {addrtype} {addr}\r\n\
          t=0 0\r\n\
          m=video {rtp_port} RTP/AVP 96\r\n\
          a=recvonly\r\n\
          a=rtpmap:96 PS/90000\r\n\
          y={ssrc}\r\n",
         session_id = session_id,
-        local_ip = local_ip,
+        addrtype = addrtype,
+        addr = addr,
         rtp_port = rtp_port,
         ssrc = ssrc,
         start_time = start_time,
