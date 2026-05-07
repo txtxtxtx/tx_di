@@ -21,6 +21,9 @@ use tx_di_axum::WebPlugin;
 use tx_di_core::BuildContext;
 use tracing::info;
 
+use tx_di_log;
+use tx_di_axum;
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config_path = "examples/gb_cams/config/gb_cams.toml";
@@ -48,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
 
     // 4. 启动 DI 框架（加载日志/配置/Web 服务等所有组件）
     let mut ctx = BuildContext::new(Some(config_path));
-    ctx.build().await?;
+    ctx.build_and_run().await?;
 
     info!("✅ GB28181 多设备模拟器启动完成");
     info!("📡 API: http://localhost:8889/api/gb_cams/");
