@@ -1,0 +1,44 @@
+# GB28181 多设备模拟器配置
+
+[log_config]
+level          = "info"
+prefix         = "gb_cams"
+dir            = "./logs"
+console_output = true
+time_format    = "local"
+
+# ── Web 管理界面 ──────────────────────────────────────────────────────────────
+[web_config]
+host = "0.0.0.0"
+port = 8889
+layers = [
+    [10, "api_log"],
+    [100, "compression"],
+    [10000, "cors"],
+]
+
+[web_config.spa_apps]
+"/cam" = "examples/gb_cams/ui/dist"
+
+# ── GB28181 模拟器配置 ────────────────────────────────────────────────────────
+[gb_cams_config]
+# 上级平台
+platform_id   = "34020000002000000001"
+platform_ip   = "127.0.0.1"
+platform_port = 5060
+realm         = "3402000000"
+password      = "12345678"
+
+# 设备基础参数
+heartbeat_secs = 60
+register_ttl   = 3600
+
+# SIP 端口分配：每个设备占用一个端口，从 base_port 开始递增
+sip_base_port = 6100
+
+# 媒体参数
+video_width   = 1280
+video_height  = 720
+video_fps     = 25
+# 背景图片路径（相对于项目根目录）
+background_image = "examples/gb_cams/public/qj.jpg"

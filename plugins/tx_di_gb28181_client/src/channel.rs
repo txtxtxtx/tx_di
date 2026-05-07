@@ -32,6 +32,6 @@ impl ChannelConfig {
     }
 }
 
-fn default_manufacturer() -> String { "Simulator".to_string() }
-fn default_model() -> String { "IPC-V1".to_string() }
+fn default_manufacturer() -> String { "tx".to_string() }
+fn default_model() -> String { "test_ipc".to_string() }
 fn default_status() -> String { "ON".to_string() }
