@@ -107,10 +107,10 @@ impl CompInit for SipPlugin {
         Ok(())
     }
 
-    fn async_init(ctx: Arc<App>) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(ctx: Arc<App>,token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
         Box::pin(async move {
             let config = ctx.inject::<SipConfig>();
-            let cancel_token = CancellationToken::new();
+            let cancel_token = token;
 
             // 存储取消令牌
             let _ = CANCEL_TOKEN.set(cancel_token.clone());
