@@ -112,7 +112,8 @@ pub struct GenerateReq {
     pub auto_register: bool,
 }
 fn default_channels() -> usize { 1 }
-fn default_prefix() -> String { "34020000001320".to_string() }
+/// 四川省,成都市,金牛区 nvr
+fn default_prefix() -> String { "51010600001180".to_string() }
 fn default_base_seq() -> u64 { 1 }
 
 /// POST /api/gb_cams/devices/generate — 批量随机生成

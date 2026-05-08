@@ -10,9 +10,11 @@
 
 use rand::Rng;
 
-/// 设备类型编码
-pub const DEVICE_TYPE_IPC: &str = "13";  // IPC 摄像机
-pub const DEVICE_TYPE_NVR: &str = "11";  // NVR 录像机
+/// 设备类型编码 131~199 表示类型为前端外围设备
+pub const DEVICE_TYPE_IPC: &str = "132";  // IPC 摄像机
+
+/// 111~130 表示类型为前端主设备
+pub const DEVICE_TYPE_NVR: &str = "118";  // NVR 录像机
 
 /// 生成设备 ID（20 位）
 ///
@@ -38,7 +40,11 @@ pub fn generate_channel_id(device_id: &str, ch_seq: u32) -> String {
     } else {
         device_id
     };
-    format!("{}{:02}", base, ch_seq)
+    let mut id = format!("{}{:02}", base, ch_seq);
+    // 替换 11-13位 为 132
+    id.replace_range(11..14, DEVICE_TYPE_IPC);
+    id
+
 }
 
 /// 随机设备前缀生成器

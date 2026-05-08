@@ -236,7 +236,7 @@ impl DeviceManager {
 // ── 单设备注册+心跳循环 ──────────────────────────────────────────────────────
 
 async fn run_device_loop(mgr: Arc<DeviceManager>, device_id: String, mut dev: VirtualDevice) {
-    let local_addr: SocketAddr = match format!("127.0.0.1:{}", dev.sip_port).parse() {
+    let local_addr: SocketAddr = match format!("0.0.0.0:{}", dev.sip_port).parse() {
         Ok(a) => a,
         Err(e) => {
             error!(device_id = %device_id, error = %e, "无效的本地地址");
