@@ -13,6 +13,7 @@ tracing.workspace = true
 #env_logger.workspace = true
 log.workspace = true
 tokio.workspace = true
+tokio-util.workspace = true
 serde = { version = "1.0.228", features = ["derive"] }
 
 [dev-dependencies]

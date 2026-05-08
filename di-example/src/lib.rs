@@ -9,18 +9,18 @@
 //! ## 依赖关系
 //!
 //! ```text
-//!  ┌──────────┐   ┌────────────┐
-//!  │  DbPool  │   │ AppConfig  │  ← #[tx_comp]（默认 Singleton）
-//!  └────┬─────┘   └─────┬──────┘
+//!  ┌──────────┐        ┌────────────┐
+//!  │  DbPool  │        │ AppConfig  │  ← #[tx_comp]（默认 Singleton）
+//!  └────┬─────┘        └─────┬──────┘
 //!       │                    │
 //!       ▼ Singleton          ▼ Singleton (自动)
 //!  ┌──────────────────┐  ┌──────────────────────┐
 //!  │    UserService   │  │    RequestLogger     │← #[tx_comp(scope = Prototype)]
 //!  │  db: Arc<DbPool> │  └──────────┬───────────┘
-//!  │  config: Arc<..> │              │ Prototype (自动)
-//!  └────────┬─────────┘              │
-//!           │ Singleton               │
-//!           └──────────┬──────────────┘
+//!  │  config: Arc<..> │             │ Prototype (自动)
+//!  └────────┬─────────┘             │
+//!           │ Singleton             │
+//!           └──────────┬────────────┘
 //!                      ▼
 //!              ┌──────────────┐
 //!              │  AppServer   │
@@ -36,7 +36,7 @@ use std::sync::{Arc, Mutex};
 use tx_di_core::{tx_comp, BoxFuture, BuildContext, CompInit, App, RIE};
 use log::{debug, info};
 use serde::Deserialize;
-use tracing::error;
+use tokio_util::sync::CancellationToken;
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. 无依赖的单例组件
 // ─────────────────────────────────────────────────────────────────────────────
@@ -160,7 +160,7 @@ impl CompInit for AppServer {
         debug!("AppServer::init");
         Ok(())
     }
-    fn async_init(ctx: Arc<App>) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(ctx: Arc<App>,_token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
         Box::pin(async move {
             debug!("AppServer::async_init, app.len={}", ctx.len());
             Ok(())
@@ -176,86 +176,6 @@ pub fn default_headers() -> HashMap<String, String> {
     m.insert("X-Powered-By".to_string(), "di-framework".to_string());
     m.insert("Content-Type".to_string(), "application/json".to_string());
     m
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 5. main
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[tokio::main]
-async fn main() {
-    run().await.map_err(|e| error!("{}", e)).expect("启动失败")
-}
-
-async fn run() ->RIE<()> {
-    
-    // env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
-    info!("🚀 tx_di 启动");
-
-    // 方式 1：自动扫描所有注册的组件（无需配置文件）
-    let mut ctx = BuildContext::new(Some("configs/test_log.toml"));
-    
-    // 方式 2：从配置文件加载指定组件（取消注释使用）
-    // let mut ctx = BuildContext::new(Some("../configs/di-config.toml"));
-    
-    ctx.build().expect("TODO: panic message");
-    info!("构建完成");
-    
-    // WebPlugin 已自动启动 web 服务器
-    // 可以通过 http://127.0.0.1:8080/health 访问健康检查端点
-    // ── 取出 AppServer ──────────────────────────────────────────────────
-    let server = ctx.take::<AppServer>()?;
-    info!("✅ AppServer 构建完成");
-    info!("   bind_addr  = {}", server.bind_addr);
-    info!("   headers    = {:?}", server.default_headers);
-
-    // ── 验证单例共享 ────────────────────────────────────────────────────
-    let greeting = server.user_svc.greet();
-    info!("   UserService.greet() = {}", greeting);
-
-    // server.user_svc.db 是 Arc<DbPool>，Arc derefs → 可以直接比较指针
-    let db_in_ctx = ctx.inject::<DbPool>();
-    let db_in_ctx_ptr = Arc::as_ptr(&db_in_ctx);
-    println!(
-        "   DbPool Arc 共享 = {}（{} vs {}）",
-        if Arc::as_ptr(&server.user_svc.db) == db_in_ctx_ptr {
-            "✅ 同实例"
-        } else {
-            "❌ 不同实例"
-        },
-        Arc::as_ptr(&server.user_svc.db) as usize,
-        db_in_ctx_ptr as usize
-    );
-
-    // ── 验证原型独立性 ─────────────────────────────────────────────────
-    println!("\n🔄 验证 Prototype 独立性：");
-    server.logger.log("第一条日志");
-    server.logger.log("第二条日志");
-
-    // 从 ctx 再次 inject Prototype 组件 → 构造新实例
-    let another_logger = ctx.inject::<RequestLogger>();
-    another_logger.log("另一个 logger 的第一条");
-    info!("   another_logger.count = {}（独立，从 0 开始）", another_logger.count());
-    info!("   server.logger.count = {}（独立）", server.logger.count());
-
-    // ── 验证 AppConfig ─────────────────────────────────────────────────
-    info!("\n⚙️  AppConfig（#[tx_cst] 自定义值）：");
-    let cfg_arc = ctx.inject::<AppConfig>();
-    info!("   app_name = {}", cfg_arc.app_name);
-    info!("   port     = {}", cfg_arc.port);
-    
-    // ── 验证全局配置对象 ───────────────────────────────────────────────
-    info!("\n📄 验证全局配置对象（AppAllConfig）：");
-    let global_config = ctx.inject::<tx_di_core::AppAllConfig>();
-    if let Some(app_name) = global_config.get::<String>("app_config.app_name") {
-        info!("   从配置读取 app_name: {}", app_name);
-    }
-    if let Some(port) = global_config.get::<u16>("app_config.port") {
-        info!("   从配置读取 port: {}", port);
-    }
-    
-    let _ = BuildContext::debug_registry();
-    Ok(())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
