@@ -16,6 +16,7 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
 pub struct BuildContext {
@@ -317,19 +318,21 @@ impl crate::BuildContext {
     ///
     /// 调用此方法后，self.store 会被替换为空的 DashMap，
     /// 此 BuildContext 实例不应再继续使用。
-    pub async fn build(&mut self) -> RIE<App>{
+    pub fn build(mut self) -> RIE<App>{
+        let shutdown_token = CancellationToken::new();
         // 使用 std::mem::replace 将 self.store 替换为空的 DashMap，取出原来的 store
         // 这样可以在不获取 self 所有权的情况下，将 store 移动出去
         let store = std::mem::replace(&mut self.store, DashMap::new());
         let metas: Vec<&ComponentMeta> = std::mem::replace(&mut self.metas, Vec::new());
         Ok(App{
             store,
-            metas
+            metas,
+            shutdown_token
         })
     }
     /// 构建 App 运行
-    pub async fn build_and_run(&mut self) -> RIE<()> {
-        let app = self.build().await?;
+    pub async fn build_and_run(self) -> RIE<()> {
+        let app = self.build()?;
         App::run(Arc::new(app)).await
     }
 }
@@ -343,7 +346,8 @@ impl Default for crate::BuildContext {
 /// 固定的组件上下文
 pub struct App {
     pub store: DashMap<TypeId, CompRef>,
-    pub metas: Vec<&'static ComponentMeta>
+    pub metas: Vec<&'static ComponentMeta>,
+    shutdown_token: CancellationToken,
 }
 
 impl App {
@@ -479,10 +483,42 @@ impl App {
         }
     }
 
-    /// 运行 App
-    pub async fn run(app: Arc<App>) -> RIE<()>{
+    /// 阻塞运行 App
+    async fn run(app: Arc<App>) -> RIE<()>{
         App::init(app.clone())?;
         App::async_init(app).await?;
         Ok(())
+    }
+
+    /// 通过 app 实例异步运行 App，并返回 Arc<App>
+    ///
+    /// 此方法会消耗 self，将初始化过程放到 tokio::spawn 中执行，避免阻塞当前线程。
+    /// 初始化完成后，返回 Arc<App> 供后续使用。
+    ///
+    /// # 注意
+    /// - 初始化在后台异步执行，调用方需要确保在使用 App 之前初始化已完成
+    /// - 如果需要等待初始化完成，请使用 `ins_run_blocking()` 或手动等待返回的 future
+    pub fn ins_run(self) -> RIE<Arc<App>> {
+        // 创建 Arc<App> 用于初始化
+        let app = Arc::new(App {
+            store: self.store,
+            metas: self.metas,
+            shutdown_token: self.shutdown_token,
+        });
+
+        let app_clone = app.clone();
+
+        // 在后台 spawn 初始化任务
+        tokio::spawn(async move {
+            if let Err(e) = App::run(app_clone).await {
+                tracing::error!("[di] App 初始化失败: {:?}", e);
+            }
+        });
+
+        Ok(app)
+    }
+
+    pub async fn waiting_exit(){
+
     }
 }
