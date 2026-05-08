@@ -1,0 +1,20 @@
+{
+  "name": "gb-cams-admin",
+  "version": "1.0.0",
+  "description": "GB28181 多设备模拟器管理界面",
+  "scripts": {
+    "dev": "vite --port 5174",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "pinia": "^2.1.7",
+    "vue": "^3.4.27",
+    "vue-router": "^4.3.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "vite": "^5.2.11"
+  }
+}
