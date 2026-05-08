@@ -11,6 +11,7 @@ members = [
     "plugins/tx_di_can",
     "examples/gb_cams",
     "examples/gb28181_admin",
+    "common/tx_gb28181",
 ]
 resolver = "3"
 [workspace.package]
@@ -27,6 +28,7 @@ repository = "https://gitee.com/tian_xiong/tx_di"
 [workspace.dependencies]
 tx-di-core = { path = "tx-di-core" }
 tx_di_log = { path = "plugins/tx_di_log"}
+tx_gb28181 = { path = "common/tx_gb28181" }
 # linkme 用于跨 crate 在链接期收集静态数组切片
 # 基于 ELF/Mach-O/PE 的自定义 link section，完全零运行时开销
 linkme = "0.3"
@@ -82,3 +84,4 @@ tower = {version = "0.5", features = ["full"]}
 hyper = {version =  "1.9.0",features = ["full"]}
 tower-http = {version = "0.6", features = ["full"]}
 http = { version = "1.4.0"}
+encoding_rs = "0.8"

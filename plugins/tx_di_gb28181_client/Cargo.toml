@@ -12,6 +12,7 @@ description = "GB28181 device client plugin for tx-di framework (register, keepa
 tx-di-core.workspace = true
 tx_di_sip       = { path = "../tx_di_sip" }
 tx_di_gb28181   = { path = "../tx_di_gb28181" }
+tx_gb28181      = { path = "../../common/tx_gb28181" }
 
 rsipstack.workspace = true
 tokio.workspace = true

@@ -1,0 +1,17 @@
+[package]
+name = "tx_gb28181"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+description = "GB28181-2022 common types, XML builders/parsers and SDP utilities"
+
+[dependencies]
+# XML 高效解析
+quick-xml = { version = "0.39", features = ["serialize"] }
+# 时间（用于 build_time_sync_query_xml 等函数）
+chrono.workspace = true
+tx-di-core.workspace = true
+encoding_rs.workspace = true

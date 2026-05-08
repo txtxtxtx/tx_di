@@ -2843,7 +2843,6 @@ dependencies = [
  "async-trait",
  "chrono",
  "dashmap",
- "quick-xml",
  "reqwest",
  "rsipstack",
  "serde",
@@ -2853,6 +2852,7 @@ dependencies = [
  "tracing",
  "tx-di-core",
  "tx_di_sip",
+ "tx_gb28181",
 ]
 
 [[package]]
@@ -2870,6 +2870,7 @@ dependencies = [
  "tx-di-core",
  "tx_di_gb28181",
  "tx_di_sip",
+ "tx_gb28181",
 ]
 
 [[package]]
@@ -2898,6 +2899,16 @@ dependencies = [
  "tokio-util",
  "toml 1.1.2+spec-1.1.0",
  "tracing",
+ "tx-di-core",
+]
+
+[[package]]
+name = "tx_gb28181"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "encoding_rs",
+ "quick-xml",
  "tx-di-core",
 ]
 

@@ -11,6 +11,7 @@ description = "GB28181 server plugin for tx-di framework (SIP registration cente
 [dependencies]
 tx-di-core.workspace = true
 tx_di_sip       = { path = "../tx_di_sip" }
+tx_gb28181      = { path = "../../common/tx_gb28181" }
 
 rsipstack.workspace = true
 tokio.workspace = true
@@ -24,5 +25,5 @@ chrono.workspace = true
 reqwest.workspace = true
 async-trait.workspace = true
 
-# XML 高效解析
-quick-xml = { version = "0.39", features = ["serialize"] }
+# XML 高效解析（tx_gb28181 内部使用，此处为传递依赖不再需要，但保留兼容性）
+#quick-xml = { version = "0.39", features = ["serialize"] }
