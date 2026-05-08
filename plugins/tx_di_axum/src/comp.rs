@@ -6,6 +6,7 @@ use axum::{routing::get, Router};
 use std::sync::{Arc, LazyLock, RwLock};
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::TcpListener as TokioTcpListener;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 use tx_di_core::{tx_comp, ApiR, App, BoxFuture, BuildContext, CompInit, FormattedDateTime, RIE};
 use crate::layers::{add_static_path_prefix, freeze_static_path_prefixes, LAYER_REGISTRY};
@@ -37,7 +38,7 @@ impl CompInit for WebPlugin {
         self.router = WebPlugin::merge_routers();
         Ok(())
     }
-    fn async_init(ctx: Arc<App>) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(ctx: Arc<App>,token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
         let config = ctx.inject::<WebConfig>();
         let web = ctx.inject::<WebPlugin>();
         let app_status = AppStatus { app: ctx.clone() };
@@ -66,7 +67,7 @@ impl CompInit for WebPlugin {
         // 添加中间件
         router = WebPlugin::layer_with_router(router);
         Box::pin(async move {
-            start_server(config, router).await?;
+            start_server(config, router,token).await?;
             Ok(())
         })
     }
@@ -270,7 +271,7 @@ async fn hello_di(web_config: DiComp<WebConfig>) -> R<String> {
 /// # Errors
 ///
 /// 如果服务器绑定失败或运行出错，将返回错误
-async fn start_server(config: Arc<WebConfig>, router: Router) -> RIE<()> {
+async fn start_server(config: Arc<WebConfig>, router: Router,token: CancellationToken) -> RIE<()> {
     let addr = config.socket_addr()?;
 
     info!("CORS 启用状态: {}", config.enable_cors);
@@ -279,6 +280,9 @@ async fn start_server(config: Arc<WebConfig>, router: Router) -> RIE<()> {
     info!("Web 服务器正在监听: {}", addr);
     let listener = create_tcp_listener(addr)?;
     axum::serve(listener, router)
+        .with_graceful_shutdown(async move {
+            token.cancelled().await;
+        })
         .await
         .map_err(|e| anyhow::anyhow!("Web 服务器运行失败: {}", e))?;
 
