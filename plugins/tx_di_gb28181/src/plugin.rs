@@ -16,7 +16,7 @@ use crate::handlers::{register_server_handlers, NonceStore};
 use crate::media::{build_backend, MediaBackend, OpenRtpRequest, PlayUrls};
 use crate::sdp::{
     build_audio_invite_sdp, build_invite_sdp, build_snapshot_sdp,
-    parse_audio_sdp, parse_snapshot_sdp, AudioCodec,
+    parse_audio_sdp, parse_snapshot_sdp, AudioCodec, SessionType,
 };
 use crate::xml::{
     build_alarm_reset_xml, build_alarm_subscribe_xml, build_broadcast_cancel_xml,
@@ -45,7 +45,7 @@ use dashmap::DashMap;
 use tokio::time::{interval, Duration};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
-use tx_di_core::{tx_comp, App, BoxFuture, BuildContext, CompInit, RIE};
+use tx_di_core::{tx_comp, App, BoxFuture, CompInit, RIE};
 use tx_di_sip::SipPlugin;
 
 /// 全局服务实例
@@ -722,7 +722,7 @@ impl Gb28181ServerHandle {
             device_id: device_id.to_string(),
             source_id: self.inner.config.platform_id.clone(),
             audio_port,
-            codec: AudioCodec::Pcmu,
+            codec: AudioCodec::PCMU,
         };
         self.inner
             .broadcast_sessions
@@ -808,7 +808,7 @@ impl Gb28181ServerHandle {
     /// - `device_id`：设备 ID
     /// - `channel_id`：通道 ID
     /// - `audio_port`：平台发送音频的 RTP 端口
-    /// - `codec`：音频编码（默认 Pcmu）
+    /// - `codec`：音频编码（默认 PCMU）
     ///
     /// # 返回
     /// `(call_id, device_ip, device_audio_port)`
@@ -817,6 +817,7 @@ impl Gb28181ServerHandle {
         device_id: &str,
         channel_id: &str,
         audio_port: u16,
+        codec: Option<AudioCodec>,
     ) -> anyhow::Result<(String, String, u16)> {
         let dev = self.get_dev_or_err(device_id)?;
         let sn = self.inner.sn.fetch_add(1, Ordering::Relaxed);
@@ -840,7 +841,7 @@ impl Gb28181ServerHandle {
             &media_ip,
             video_port,
             audio_port,
-            AudioCodec::Pcmu,
+            codec.unwrap_or(AudioCodec::PCMU),
             &ssrc,
         );
 
@@ -1332,9 +1333,25 @@ impl Gb28181ServerHandle {
 
         let ssrc = format!("{:010}", self.next_sn());
         let sdp_offer = if is_realtime {
-            build_invite_sdp(&media_ip, rtp_port, &ssrc, true)
+            build_invite_sdp(&media_ip, rtp_port, &ssrc, SessionType::Play, None, None)
+                .unwrap_or_default()
         } else {
-            build_invite_sdp_with_time(&media_ip, rtp_port, &ssrc, &start_time.unwrap_or_default(), &end_time.unwrap_or_default())
+            // ISO8601 字符串 → Unix 时间戳（秒），用于 SDP t= 字段
+            let parse_ts = |s: &str| -> u64 {
+                chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
+                    .or_else(|_| chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%SZ"))
+                    .map(|dt| dt.and_utc().timestamp() as u64)
+                    .unwrap_or(0)
+            };
+            let t_start = parse_ts(start_time.as_deref().unwrap_or_default());
+            let t_end   = parse_ts(end_time.as_deref().unwrap_or_default());
+            build_invite_sdp(
+                &media_ip, rtp_port, &ssrc,
+                SessionType::Playback,
+                Some((t_start, t_end)),
+                None,
+            )
+            .unwrap_or_default()
         };
 
         let platform_id = &self.inner.config.platform_id;
@@ -1520,39 +1537,4 @@ impl Gb28181ServerHandle {
 /// 判断 IP 是否为"未指定"（any）地址，同时兼容 IPv4 `0.0.0.0` 和 IPv6 `::`
 fn is_unspecified_ip(ip: &str) -> bool {
     ip == "0.0.0.0" || ip == "::" || ip == "::0" || ip == "[::]"
-}
-
-/// 构建历史回放 INVITE 的 SDP offer（带时间范围）
-fn build_invite_sdp_with_time(
-    local_ip: &str,
-    rtp_port: u16,
-    ssrc: &str,
-    start_time: &str,
-    _end_time: &str,
-) -> String {
-    let session_id = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-
-    let (addrtype, addr) = crate::sdp::ip_net_type(local_ip);
-
-    format!(
-        "v=0\r\n\
-         o=- {session_id} {session_id} IN {addrtype} {addr}\r\n\
-         s=Playback\r\n\
-         u={start_time}:0\r\n\
-         c=IN {addrtype} {addr}\r\n\
-         t=0 0\r\n\
-         m=video {rtp_port} RTP/AVP 96\r\n\
-         a=recvonly\r\n\
-         a=rtpmap:96 PS/90000\r\n\
-         y={ssrc}\r\n",
-        session_id = session_id,
-        addrtype = addrtype,
-        addr = addr,
-        rtp_port = rtp_port,
-        ssrc = ssrc,
-        start_time = start_time,
-    )
 }
