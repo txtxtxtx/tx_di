@@ -1,6 +1,7 @@
 use std::any::{Any, TypeId};
 use std::pin::Pin;
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 use crate::{App, BuildContext, Scope};
 use crate::di::common::RIE;
 
@@ -113,7 +114,7 @@ pub trait CompInit :Any + Sized + Send + Sync + 'static{
 
     /// 异步初始化方法
     #[allow(unused_variables)]
-    fn async_init(ctx: Arc<App>) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(ctx: Arc<App>,token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
         Box::pin(async {
             Ok(())
         })

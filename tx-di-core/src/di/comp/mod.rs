@@ -8,6 +8,13 @@ use crate::di::common::RIE;
 use std::collections::{BinaryHeap, HashMap};
 use std::cmp::Reverse;
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
+
+
+// 类型别名：简化复杂函数指针类型的定义
+type FactoryFn = fn(&mut BuildContext) -> Box<dyn Any + Send + Sync>;
+type InitFn = fn(Arc<App>) -> RIE<()>;
+type AsyncInitFn = fn(Arc<App>, CancellationToken) -> BoxFuture<'static, RIE<()>>;
 
 #[linkme::distributed_slice]
 pub static COMPONENT_REGISTRY: [ComponentMeta] = [..];
@@ -51,11 +58,11 @@ pub struct ComponentMeta {
     ///
     /// 该字段为可选，主要用于调试和开发阶段的组件信息查看。
     /// 在正式运行时，组件构建通过 `ComponentDescriptor::build` 方法完成。
-    pub factory_fn: Option<fn(&mut BuildContext) -> Box<dyn Any + Send + Sync>>,
+    pub factory_fn: Option<FactoryFn>,
 
     pub init_sort_fn: fn() -> i32,
-    pub init_fn: Option<fn(Arc<App>) -> RIE<()>>,
-    pub async_init_fn: Option<fn(Arc<App>)-> BoxFuture<'static, RIE<()>>>,
+    pub init_fn: Option<InitFn>,
+    pub async_init_fn: Option<AsyncInitFn>,
 }
 
 /// 对组件元数据进行拓扑排序，确定组件的构建顺序。 `Kahn算法`

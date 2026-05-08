@@ -1,28 +1,31 @@
-
-
-
 // ─────────────────────────────────────────────────────────────────────────────
 // 4. BuildContext
 // ─────────────────────────────────────────────────────────────────────────────
 
-pub mod scopes;
-pub mod comp;
 pub mod common;
+pub mod comp;
+pub mod scopes;
 
 use crate::di::comp::config::AppAllConfig;
-use crate::{topo_sort, CompRef, ComponentDescriptor, ComponentMeta, Scope, COMPONENT_REGISTRY, IE, RIE};
+use crate::{
+    COMPONENT_REGISTRY, CompRef, ComponentDescriptor, ComponentMeta, IE, RIE, Scope, topo_sort,
+};
 use dashmap::DashMap;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::signal;
+use tokio::sync::RwLock;
+use tokio::task::JoinHandle;
+use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
-use tracing::debug;
+use tracing::{debug, info};
 
 pub struct BuildContext {
     /// TypeId → CompRef（使用 DashMap 支持并发访问）
     store: DashMap<TypeId, CompRef>,
-    metas: Vec<&'static ComponentMeta>
+    metas: Vec<&'static ComponentMeta>,
 }
 
 impl crate::BuildContext {
@@ -38,19 +41,20 @@ impl crate::BuildContext {
     pub fn new<P: Into<PathBuf>>(config_path: Option<P>) -> Self {
         let mut ctx = Self {
             store: DashMap::new(),
-            metas: vec![]
+            metas: vec![],
         };
         // 加载配置文件并放入全局上下文
         let app_configs = AppAllConfig::new(config_path);
-        ctx.store.insert(TypeId::of::<AppAllConfig>(), CompRef::Cached(Arc::new(app_configs)));
+        ctx.store.insert(
+            TypeId::of::<AppAllConfig>(),
+            CompRef::Cached(Arc::new(app_configs)),
+        );
 
         // 自动扫描并注册所有组件（通过拓扑排序）
         ctx.auto_register_all();
 
         ctx
     }
-
-
 
     /// 自动注册所有通过 #[tx_comp] 标记的组件
     fn auto_register_all(&mut self) {
@@ -189,8 +193,6 @@ impl crate::BuildContext {
         })
     }
 
-
-
     /// 注入单例：factory 只调用一次，之后返回缓存的 Arc。
     fn inject_singleton<T: Any + Send + Sync + 'static>(&self, tid: TypeId) -> Arc<T> {
         self.store
@@ -256,9 +258,7 @@ impl crate::BuildContext {
                 Arc::try_unwrap(arc_t)
                     .map_err(|_| IE::Other(format!("取出组件失败,无法获取所有权:{name}")))
             }
-            _ => {
-                Err(IE::Other(format!("取出组件失败,该组件不是单例:{name}")))
-            }
+            _ => Err(IE::Other(format!("取出组件失败,该组件不是单例:{name}"))),
         }
     }
 
@@ -274,25 +274,33 @@ impl crate::BuildContext {
     }
 
     /// 打印所有已注册的组件（调试用）
-    pub fn debug_registry() ->RIE<()> {
+    pub fn debug_registry() -> RIE<()> {
         let metas: Vec<&ComponentMeta> = COMPONENT_REGISTRY.iter().collect();
-        let id_to_idx: HashMap<TypeId, (usize,&str)> = metas
+        let id_to_idx: HashMap<TypeId, (usize, &str)> = metas
             .iter()
             .enumerate()
-            .map(|(i, m)| ((m.type_id)(), (i,m.name)))
+            .map(|(i, m)| ((m.type_id)(), (i, m.name)))
             .collect();
         let ans = topo_sort(&metas);
 
         debug!("组件注册表：");
         debug!("{:20} scope      deps", "name");
         for meta in ans.iter() {
-            let meta = metas[id_to_idx.get(meta).ok_or_else(||IE::Other("组件注册表错误".to_string()))?.0];
-            let dep_names: Vec<&str> = meta.deps.iter().map(|dep_fn| {
-                COMPONENT_REGISTRY.iter()
-                    .find(|m| (m.type_id)() == dep_fn())
-                    .map(|m| m.name)
-                    .unwrap_or("unknown")
-            }).collect();
+            let meta = metas[id_to_idx
+                .get(meta)
+                .ok_or_else(|| IE::Other("组件注册表错误".to_string()))?
+                .0];
+            let dep_names: Vec<&str> = meta
+                .deps
+                .iter()
+                .map(|dep_fn| {
+                    COMPONENT_REGISTRY
+                        .iter()
+                        .find(|m| (m.type_id)() == dep_fn())
+                        .map(|m| m.name)
+                        .unwrap_or("unknown")
+                })
+                .collect();
             debug!(
                 "{:20} {:?}  [{}]",
                 meta.name,
@@ -318,22 +326,24 @@ impl crate::BuildContext {
     ///
     /// 调用此方法后，self.store 会被替换为空的 DashMap，
     /// 此 BuildContext 实例不应再继续使用。
-    pub fn build(mut self) -> RIE<App>{
+    pub fn build(mut self) -> RIE<App> {
         let shutdown_token = CancellationToken::new();
         // 使用 std::mem::replace 将 self.store 替换为空的 DashMap，取出原来的 store
         // 这样可以在不获取 self 所有权的情况下，将 store 移动出去
         let store = std::mem::replace(&mut self.store, DashMap::new());
         let metas: Vec<&ComponentMeta> = std::mem::replace(&mut self.metas, Vec::new());
-        Ok(App{
+        Ok(App {
             store,
             metas,
-            shutdown_token
+            shutdown_token,
+            task_handle: RwLock::new(None),
         })
     }
     /// 构建 App 运行
     pub async fn build_and_run(self) -> RIE<()> {
         let app = self.build()?;
-        App::run(Arc::new(app)).await
+        let arc_app = Arc::new(app);
+        App::run(arc_app.clone(), arc_app.shutdown_token.clone()).await
     }
 }
 
@@ -348,6 +358,7 @@ pub struct App {
     pub store: DashMap<TypeId, CompRef>,
     pub metas: Vec<&'static ComponentMeta>,
     shutdown_token: CancellationToken,
+    task_handle: RwLock<Option<JoinHandle<()>>>,
 }
 
 impl App {
@@ -379,7 +390,7 @@ impl App {
                 )
             })
     }
-    
+
     /// 尝试获取单例组件，失败时返回 None
     ///
     /// 该方法用于安全地获取已缓存的单例组件，不会 panic。
@@ -394,7 +405,9 @@ impl App {
     ///
     /// - 只能获取 Singleton 类型的组件，Prototype 组件始终返回 None
     /// - 不进行类型检查的 panic，失败时静默返回 None
-    pub fn try_inject<T: Any + Send + Sync + 'static + ComponentDescriptor>(&self) -> Option<Arc<T>> {
+    pub fn try_inject<T: Any + Send + Sync + 'static + ComponentDescriptor>(
+        &self,
+    ) -> Option<Arc<T>> {
         let tid = TypeId::of::<T>();
         self.store
             .get(&tid)
@@ -402,9 +415,7 @@ impl App {
                 // 单例：克隆 Arc 引用
                 CompRef::Cached(any_arc) => Some(any_arc.clone()),
                 // 原型组件：App 阶段不支持动态创建，返回 None
-                CompRef::Factory(_) => {
-                    None
-                }
+                CompRef::Factory(_) => None,
             })
             .flatten()
             .and_then(|any_arc| {
@@ -425,7 +436,7 @@ impl App {
         self.store.is_empty()
     }
 
-    fn init(app: Arc<App>) ->RIE<()> {
+    fn init(app: Arc<App>) -> RIE<()> {
         let mut metas: Vec<&ComponentMeta> = COMPONENT_REGISTRY
             .iter()
             .filter(|m| m.async_init_fn.is_some())
@@ -442,7 +453,7 @@ impl App {
         Ok(())
     }
 
-    async fn async_init(app: Arc<App>) -> RIE<()> {
+    async fn async_init(app: Arc<App>, token: CancellationToken) -> RIE<()> {
         let mut metas: Vec<&ComponentMeta> = COMPONENT_REGISTRY
             .iter()
             .filter(|m| m.async_init_fn.is_some())
@@ -453,7 +464,10 @@ impl App {
         // 收集所有异步初始化任务并并行执行
         let futures: Vec<_> = metas
             .iter()
-            .filter_map(|meta| meta.async_init_fn.map(|init_fn| init_fn(app.clone())))
+            .filter_map(|meta| {
+                meta.async_init_fn
+                    .map(|init_fn| init_fn(app.clone(), token.clone()))
+            })
             .collect();
 
         if futures.is_empty() {
@@ -470,7 +484,7 @@ impl App {
         let mut errors = Vec::new();
         for handle in handles {
             match handle.await {
-                Ok(Ok(_)) => {},
+                Ok(Ok(_)) => {}
                 Ok(Err(e)) => errors.push(e),
                 Err(e) => errors.push(IE::Other(format!("Task panicked: {}", e))),
             }
@@ -484,9 +498,9 @@ impl App {
     }
 
     /// 阻塞运行 App
-    async fn run(app: Arc<App>) -> RIE<()>{
+    async fn run(app: Arc<App>, token: CancellationToken) -> RIE<()> {
         App::init(app.clone())?;
-        App::async_init(app).await?;
+        App::async_init(app, token).await?;
         Ok(())
     }
 
@@ -498,27 +512,79 @@ impl App {
     /// # 注意
     /// - 初始化在后台异步执行，调用方需要确保在使用 App 之前初始化已完成
     /// - 如果需要等待初始化完成，请使用 `ins_run_blocking()` 或手动等待返回的 future
-    pub fn ins_run(self) -> RIE<Arc<App>> {
+    pub async fn ins_run(self) -> RIE<Arc<App>> {
         // 创建 Arc<App> 用于初始化
         let app = Arc::new(App {
             store: self.store,
             metas: self.metas,
             shutdown_token: self.shutdown_token,
+            task_handle: self.task_handle,
         });
 
         let app_clone = app.clone();
 
         // 在后台 spawn 初始化任务
-        tokio::spawn(async move {
-            if let Err(e) = App::run(app_clone).await {
+        let app_handler = tokio::spawn(async move {
+            if let Err(e) = App::run(app_clone.clone(), app_clone.shutdown_token.clone()).await {
                 tracing::error!("[di] App 初始化失败: {:?}", e);
             }
         });
 
+        {
+            // 直接 await 获取写锁并设置句柄（现在是 async 方法，可以直接 await）
+            let mut guard = app.task_handle.write().await;
+            *guard = Some(app_handler);
+        }
+
         Ok(app)
     }
 
-    pub async fn waiting_exit(){
+    pub async fn waiting_exit(&self) {
+        // 等待 Ctrl+C 信号
+        App::wait_for_exit_signal().await;
+        // 统计退出耗时
+        let start = Instant::now();
+        info!("正在等待退出...");
+        self.shutdown_token.cancel();
+        // 等待后台任务真正结束 ➜ 依赖 task_handle
+        if let Some(handle) = self.task_handle.write().await.take() {
+            match tokio::time::timeout(std::time::Duration::from_secs(5), handle).await {
+                Ok(Ok(())) => {
+                    info!("后台任务已正常关闭");
+                }
+                Ok(Err(e)) => {
+                    tracing::error!("后台任务退出时发生错误: {:?}", e);
+                }
+                Err(_) => {
+                    tracing::warn!("后台任务关闭超时（5秒），强制退出");
+                }
+            }
+        } else {
+            tracing::warn!("未找到后台任务句柄");
+        }
+        info!("app 已安全退出，耗时: {:?} ", start.elapsed());
+        // 确保日志被 flush 到输出
+        // 短暂休眠以确保日志被 flush
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
 
+    /// 跨平台等待退出信号：Linux/macOS 等 Ctrl+C 和 SIGTERM，Windows 只等 Ctrl+C
+    async fn wait_for_exit_signal() {
+        #[cfg(unix)]
+        {
+            let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate())
+                .expect("无法注册 SIGTERM 处理器");
+            let mut sighup = signal::unix::signal(signal::unix::SignalKind::hangup())
+                .expect("无法注册 SIGHUP 处理器");
+            tokio::select! {
+                _ = signal::ctrl_c() => {},
+                _ = sigterm.recv() => {},
+                _ = sighup.recv() => {},
+            }
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = signal::ctrl_c().await;
+        }
     }
 }
