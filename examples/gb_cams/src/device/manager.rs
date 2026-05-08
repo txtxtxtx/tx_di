@@ -450,13 +450,17 @@ async fn handle_invite(mgr: Arc<DeviceManager>, device_id: String, tx: Transacti
 
     info!(device_id = %device_id, call_id = %call_id, "📹 收到点播 INVITE");
 
-    let is_realtime = !sdp_offer.contains("s=Playback");
-    let session_type = if is_realtime {
-        tx_di_gb28181::sdp::SessionType::Play
-    } else {
+    // 根据 SDP offer 中的 s= 字段判断会话类型
+    let session_type = if sdp_offer.contains("s=Download") {
+        tx_di_gb28181::sdp::SessionType::Download
+    } else if sdp_offer.contains("s=Playback") {
         tx_di_gb28181::sdp::SessionType::Playback
+    } else {
+        tx_di_gb28181::sdp::SessionType::Play
     };
-    // 设备端模拟器：回放时使用 offer 中的 t= 字段（解析失败时 fallback 到 0..0）
+    let is_realtime = matches!(session_type, tx_di_gb28181::sdp::SessionType::Play);
+
+    // 回放或下载时：从 offer 的 t= 字段解析时间范围（解析失败 fallback 到 None）
     let time_range = if !is_realtime {
         let extract_t = |sdp: &str| -> Option<(u64, u64)> {
             for line in sdp.lines() {
@@ -464,7 +468,9 @@ async fn handle_invite(mgr: Arc<DeviceManager>, device_id: String, tx: Transacti
                     let mut parts = rest.split_whitespace();
                     let start: u64 = parts.next()?.parse().ok()?;
                     let end: u64 = parts.next()?.parse().ok()?;
-                    if start > 0 { return Some((start, end)); }
+                    if start > 0 {
+                        return Some((start, end));
+                    }
                 }
             }
             None
@@ -473,6 +479,7 @@ async fn handle_invite(mgr: Arc<DeviceManager>, device_id: String, tx: Transacti
     } else {
         None
     };
+
     let sdp_answer = tx_di_gb28181::sdp::build_sdp_answer(
         "127.0.0.1", 0, &ssrc, &device_id, session_type, time_range, None,
     )

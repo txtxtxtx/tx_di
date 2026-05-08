@@ -90,14 +90,17 @@ async fn handle_invite(
     // 构造 SDP answer（设备告知平台从哪里推流）
     let local_ip = &config.local_ip;
     let rtp_port = config.rtp_port;
-    // 根据 SDP offer 中的 s= 字段判断是实时还是回放
-    let is_realtime = !sdp_offer.contains("s=Playback");
-    let session_type = if is_realtime {
-        tx_di_gb28181::sdp::SessionType::Play
-    } else {
+    // 根据 SDP offer 中的 s= 字段判断会话类型
+    let session_type = if sdp_offer.contains("s=Download") {
+        tx_di_gb28181::sdp::SessionType::Download
+    } else if sdp_offer.contains("s=Playback") {
         tx_di_gb28181::sdp::SessionType::Playback
+    } else {
+        tx_di_gb28181::sdp::SessionType::Play
     };
-    // 回放时从 offer 的 t= 行解析时间范围
+    let is_realtime = matches!(session_type, tx_di_gb28181::sdp::SessionType::Play);
+
+    // 回放或下载时：从 offer 的 t= 字段解析时间范围
     let time_range = if !is_realtime {
         let mut result = None;
         for line in sdp_offer.lines() {
@@ -105,7 +108,10 @@ async fn handle_invite(
                 let mut parts = rest.split_whitespace();
                 if let (Some(s), Some(e)) = (parts.next(), parts.next()) {
                     if let (Ok(start), Ok(end)) = (s.parse::<u64>(), e.parse::<u64>()) {
-                        if start > 0 { result = Some((start, end)); break; }
+                        if start > 0 {
+                            result = Some((start, end));
+                            break;
+                        }
                     }
                 }
             }
