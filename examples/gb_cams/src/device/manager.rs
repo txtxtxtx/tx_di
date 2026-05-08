@@ -451,9 +451,32 @@ async fn handle_invite(mgr: Arc<DeviceManager>, device_id: String, tx: Transacti
     info!(device_id = %device_id, call_id = %call_id, "📹 收到点播 INVITE");
 
     let is_realtime = !sdp_offer.contains("s=Playback");
+    let session_type = if is_realtime {
+        tx_di_gb28181::sdp::SessionType::Play
+    } else {
+        tx_di_gb28181::sdp::SessionType::Playback
+    };
+    // 设备端模拟器：回放时使用 offer 中的 t= 字段（解析失败时 fallback 到 0..0）
+    let time_range = if !is_realtime {
+        let extract_t = |sdp: &str| -> Option<(u64, u64)> {
+            for line in sdp.lines() {
+                if let Some(rest) = line.strip_prefix("t=") {
+                    let mut parts = rest.split_whitespace();
+                    let start: u64 = parts.next()?.parse().ok()?;
+                    let end: u64 = parts.next()?.parse().ok()?;
+                    if start > 0 { return Some((start, end)); }
+                }
+            }
+            None
+        };
+        extract_t(&sdp_offer)
+    } else {
+        None
+    };
     let sdp_answer = tx_di_gb28181::sdp::build_sdp_answer(
-        "127.0.0.1", 0, &ssrc, &device_id, is_realtime,
-    );
+        "127.0.0.1", 0, &ssrc, &device_id, session_type, time_range, None,
+    )
+    .unwrap_or_default();
 
     let endpoint_inner = tx.endpoint_inner.clone();
     let dialog_layer = Arc::new(DialogLayer::new(endpoint_inner));

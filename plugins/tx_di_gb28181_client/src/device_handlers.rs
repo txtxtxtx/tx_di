@@ -67,7 +67,8 @@ async fn handle_invite(
 
     // 解析推流目标地址（平台要接收 RTP 的地址）
     let (rtp_target_ip, rtp_target_port) =
-        tx_di_gb28181::sdp::parse_sdp_destination(&sdp_offer);
+        tx_di_gb28181::sdp::parse_sdp_destination(&sdp_offer, &tx_di_gb28181::sdp::GBMedia::Video)
+            .unwrap_or_else(|_| ("0.0.0.0".to_string(), 0));
     let ssrc = tx_di_gb28181::sdp::parse_sdp_ssrc(&sdp_offer)
         .unwrap_or_else(|| "0000000001".to_string());
 
@@ -91,13 +92,38 @@ async fn handle_invite(
     let rtp_port = config.rtp_port;
     // 根据 SDP offer 中的 s= 字段判断是实时还是回放
     let is_realtime = !sdp_offer.contains("s=Playback");
+    let session_type = if is_realtime {
+        tx_di_gb28181::sdp::SessionType::Play
+    } else {
+        tx_di_gb28181::sdp::SessionType::Playback
+    };
+    // 回放时从 offer 的 t= 行解析时间范围
+    let time_range = if !is_realtime {
+        let mut result = None;
+        for line in sdp_offer.lines() {
+            if let Some(rest) = line.strip_prefix("t=") {
+                let mut parts = rest.split_whitespace();
+                if let (Some(s), Some(e)) = (parts.next(), parts.next()) {
+                    if let (Ok(start), Ok(end)) = (s.parse::<u64>(), e.parse::<u64>()) {
+                        if start > 0 { result = Some((start, end)); break; }
+                    }
+                }
+            }
+        }
+        result
+    } else {
+        None
+    };
     let sdp_answer = tx_di_gb28181::sdp::build_sdp_answer(
         local_ip,
         rtp_port,
         &ssrc,
         &config.device_id,
-        is_realtime,
-    );
+        session_type,
+        time_range,
+        None,
+    )
+    .unwrap_or_default();
 
     // 创建 DialogLayer 和服务端对话
     let endpoint_inner = tx.endpoint_inner.clone();
