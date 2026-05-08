@@ -43,6 +43,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, OnceLock};
 use dashmap::DashMap;
 use tokio::time::{interval, Duration};
+use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 use tx_di_core::{tx_comp, App, BoxFuture, BuildContext, CompInit, RIE};
 use tx_di_sip::SipPlugin;
@@ -111,16 +112,8 @@ pub struct Gb28181Server {
 }
 
 impl CompInit for Gb28181Server {
-    // fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
-    //     info!(
-    //         platform_id = %self.config.platform_id,
-    //         realm = %self.config.realm,
-    //         "GB28181 服务端插件初始化中..."
-    //     );
-    //     Ok(())
-    // }
-
-    fn async_init(ctx: Arc<App>) -> BoxFuture<'static, RIE<()>> {
+    
+    fn async_init(ctx: Arc<App>,_token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
         Box::pin(async move {
             let config = ctx.inject::<Gb28181ServerConfig>();
 

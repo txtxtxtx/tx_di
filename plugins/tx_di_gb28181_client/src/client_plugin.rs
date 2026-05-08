@@ -20,6 +20,7 @@ use std::future::Future;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, OnceLock};
 use tokio::time::{interval, sleep, Duration};
+use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 use tx_di_core::{tx_comp, App, BoxFuture, BuildContext, CompInit, RIE};
 use tx_di_sip::SipPlugin;
@@ -132,7 +133,7 @@ impl CompInit for Gb28181Device {
         Ok(())
     }
 
-    fn async_init(ctx: Arc<App>) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(ctx: Arc<App>,_token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
         Box::pin(async move {
             let config = ctx.inject::<Gb28181DeviceConfig>();
 

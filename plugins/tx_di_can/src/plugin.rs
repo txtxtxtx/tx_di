@@ -11,6 +11,7 @@ use crate::uds::UdsClient;
 use anyhow::Result;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
+use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 use tx_di_core::{tx_comp, App, BoxFuture, BuildContext, CompInit, RIE};
 
@@ -284,7 +285,7 @@ impl CompInit for CanPlugin {
     }
 
     /// 异步初始化：启动帧接收循环
-    fn async_init(_ctx: Arc<App>) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(_ctx: Arc<App>,_token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
         Box::pin(async move {
             if let Some(inner_ref) = INSTANCE.get() {
                 Arc::new(inner_ref.clone()).start_rx_loop().await;
