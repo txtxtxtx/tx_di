@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const http = axios.create({
-  baseURL: '/api/gb_cams',
+  baseURL: '/api/gb28181',
   timeout: 15000,
 })
 

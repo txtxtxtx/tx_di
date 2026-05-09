@@ -358,8 +358,8 @@ impl Default for crate::BuildContext {
 pub struct App {
     pub store: DashMap<TypeId, CompRef>,
     pub metas: Vec<&'static ComponentMeta>,
-    shutdown_token: CancellationToken,
-    task_handle: RwLock<Option<JoinHandle<()>>>,
+    pub shutdown_token: CancellationToken,
+    pub task_handle: RwLock<Option<JoinHandle<()>>>,
 }
 
 impl App {

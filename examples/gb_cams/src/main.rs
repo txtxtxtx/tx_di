@@ -28,30 +28,20 @@ use tx_di_axum;
 async fn main() -> anyhow::Result<()> {
     let config_path = "examples/gb_cams/config/gb_cams.toml";
 
-    // 1. 预读取配置文件，初始化全局设备管理器
-    // （WebPlugin::add_router 必须在 ctx.build() 之前调用）
-    let toml_content = std::fs::read_to_string(config_path)
-        .map_err(|e| anyhow::anyhow!("读取配置文件失败: {}", e))?;
-    let full_config: toml::Value = toml::from_str(&toml_content)
-        .map_err(|e| anyhow::anyhow!("解析配置文件失败: {}", e))?;
-
-    // 提取 [gb_cams_config] 段
-    let gb_cfg: GbCamsConfig = full_config
-        .get("gb_cams_config")
-        .and_then(|v| v.clone().try_into().ok())
-        .unwrap_or_default();
-
-    info!("📂 配置加载完成: platform={}, base_port={}", gb_cfg.platform_uri(), gb_cfg.sip_base_port);
-
-    // 2. 初始化全局设备管理器（单例，所有 API handler 可访问）
-    DeviceManager::init(std::sync::Arc::new(gb_cfg));
-
-    // 3. 注册 REST API 路由（必须在 build 前）
+    // 注册 REST API 路由（必须在 build 前）
     WebPlugin::add_router(api::router());
 
-    // 4. 启动 DI 框架（加载日志/配置/Web 服务等所有组件）
     let mut ctx = BuildContext::new(Some(config_path));
-    ctx.build_and_run().await?;
+    let cam_config = ctx.inject::<GbCamsConfig>();
+
+
+    // 启动 DI 框架（加载日志/配置/Web 服务等所有组件）
+    let app = ctx.build()?;
+    // 初始化全局设备管理器（单例，所有 API handler 可访问）
+    DeviceManager::init(cam_config,app.shutdown_token.clone());
+
+    let app = app.ins_run()
+        .await?;
 
     info!("✅ GB28181 多设备模拟器启动完成");
     info!("📡 API: http://localhost:8889/api/gb_cams/");
@@ -64,10 +54,6 @@ async fn main() -> anyhow::Result<()> {
     info!("   3. 查看统计: GET /api/gb_cams/stats");
     info!("");
 
-    // 5. 等待 Ctrl+C
-    tokio::signal::ctrl_c().await?;
-    info!("正在关闭...");
-    DeviceManager::instance().stop_all();
-
+    app.waiting_exit().await;
     Ok(())
 }

@@ -39,7 +39,7 @@ export const useDeviceStore = defineStore('devices', () => {
   }
 
   function connectSSE() {
-    const source = new EventSource('/api/gb_cams/events')
+    const source = new EventSource('/api/gb28181/events')
     source.onmessage = (e) => {
       try {
         const ev = JSON.parse(e.data)

@@ -58,7 +58,7 @@ pub struct DeviceManager {
 
 impl DeviceManager {
     /// 初始化全局单例（需在 ctx.build() 之前调用）
-    pub fn init(config: Arc<GbCamsConfig>) {
+    pub fn init(config: Arc<GbCamsConfig>, token: CancellationToken) {
         let (event_tx, _) = tokio::sync::broadcast::channel(1024);
         let next_port = config.sip_base_port;
         let mgr = Arc::new(Self {
@@ -66,7 +66,7 @@ impl DeviceManager {
             config,
             next_port: AtomicU32::new(next_port as u32),
             event_tx,
-            cancel: CancellationToken::new(),
+            cancel: token,
             running: AtomicBool::new(false),
         });
         let _ = INSTANCE.set(mgr);
@@ -381,7 +381,7 @@ async fn do_register(
         .map_err(|e| anyhow::anyhow!("无效的平台 URI: {}", e))?;
 
     let mut reg = Registration::new(endpoint.clone(), Some(credential));
-    let resp = reg.register(server_uri, None).await
+    let resp = reg.register(server_uri, Some(config.register_ttl)).await
         .map_err(|e| anyhow::anyhow!("REGISTER 失败: {}", e))?;
 
     if resp.status_code == StatusCode::OK {

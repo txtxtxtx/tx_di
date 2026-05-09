@@ -23,11 +23,11 @@ layers = [
 # ── GB28181 模拟器配置 ────────────────────────────────────────────────────────
 [gb_cams_config]
 # 上级平台
-platform_id   = "34020000002000000001"
-platform_ip   = "127.0.0.1"
-platform_port = 5060
-realm         = "3402000000"
-password      = "12345678"
+platform_id   = "41010500002000000001"
+platform_ip   = "192.168.0.66"
+platform_port = 8116
+realm         = "4101050000"
+password      = "123456"
 
 # 设备基础参数
 heartbeat_secs = 60
