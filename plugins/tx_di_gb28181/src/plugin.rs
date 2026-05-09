@@ -12,26 +12,27 @@
 use crate::config::Gb28181ServerConfig;
 use crate::device_registry::{DeviceInfo, DeviceRegistry};
 use crate::event::{self, Gb28181Event};
-use crate::handlers::{register_server_handlers, NonceStore};
-use crate::media::{build_backend, MediaBackend, OpenRtpRequest, PlayUrls};
+use crate::handlers::{NonceStore, register_server_handlers};
+use crate::media::{MediaBackend, OpenRtpRequest, PlayUrls, build_backend};
 use crate::sdp::{
-    build_audio_invite_sdp, build_invite_sdp, build_snapshot_sdp,
-    parse_audio_sdp, parse_snapshot_sdp, AudioCodec, SessionType,
+    AudioCodec, SessionType, build_audio_invite_sdp, build_invite_sdp, build_snapshot_sdp,
+    parse_audio_sdp, parse_snapshot_sdp,
 };
 use crate::xml::{
+    ConfigType, GuardMode, PlaybackControl, PtzCommand, PtzPreciseParam, ZoomRect,
     build_alarm_reset_xml, build_alarm_subscribe_xml, build_broadcast_cancel_xml,
     build_broadcast_invite_xml, build_catalog_query_xml, build_config_download_query_xml,
     build_cruise_list_query_xml, build_cruise_start_xml, build_cruise_stop_xml,
-    build_device_info_query_xml, build_device_status_query_xml, build_guard_control_xml,
-    build_guard_control_xml_v2, build_guard_info_query_xml, build_make_video_record_xml,
-    build_playback_control_xml, build_preset_goto_xml, build_preset_list_query_xml,
-    build_preset_set_xml, build_ptz_control_xml, build_ptz_precise_xml, build_record_control_xml,
+    build_cruise_track_query_xml, build_device_info_query_xml, build_device_status_query_xml,
+    build_guard_control_xml, build_guard_control_xml_v2, build_guard_info_query_xml,
+    build_make_video_record_xml, build_playback_control_xml, build_preset_goto_xml,
+    build_preset_list_query_xml, build_preset_set_xml, build_ptz_control_xml,
+    build_ptz_precise_status_query_xml, build_ptz_precise_xml, build_record_control_xml,
     build_record_info_query_xml, build_storage_format_xml, build_storage_status_query_xml,
     build_target_track_xml, build_teleboot_xml, build_time_sync_query_xml,
-    build_time_sync_response_xml, build_cruise_track_query_xml,
-    build_ptz_precise_status_query_xml, build_zoom_in_xml, build_zoom_out_xml, ConfigType,
-    GuardMode, PtzPreciseParam, PlaybackControl, PtzCommand, ZoomRect,
+    build_time_sync_response_xml, build_zoom_in_xml, build_zoom_out_xml,
 };
+use dashmap::DashMap;
 use rsipstack::dialog::dialog::DialogState;
 use rsipstack::dialog::dialog_layer::DialogLayer;
 use rsipstack::dialog::invitation::InviteOption;
@@ -41,11 +42,10 @@ use rsipstack::transaction::transaction::Transaction;
 use std::future::Future;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, OnceLock};
-use dashmap::DashMap;
-use tokio::time::{interval, Duration};
+use tokio::time::{Duration, interval};
 use tokio_util::sync::CancellationToken;
-use tracing::{info, warn};
-use tx_di_core::{tx_comp, App, BoxFuture, CompInit, RIE};
+use tracing::{error, info, warn};
+use tx_di_core::{App, BoxFuture, CompInit, RIE, tx_comp, IE};
 use tx_di_sip::SipPlugin;
 
 /// 全局服务实例
@@ -112,8 +112,7 @@ pub struct Gb28181Server {
 }
 
 impl CompInit for Gb28181Server {
-    
-    fn async_init(ctx: Arc<App>,_token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(ctx: Arc<App>, _token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
         Box::pin(async move {
             let config = ctx.inject::<Gb28181ServerConfig>();
 
@@ -125,11 +124,7 @@ impl CompInit for Gb28181Server {
             let media_backend = build_backend(&config.media_backend);
 
             // 注册 SIP 消息处理器
-            register_server_handlers(
-                Arc::new(registry.clone()),
-                config.clone(),
-                nonce_store,
-            );
+            register_server_handlers(Arc::new(registry.clone()), config.clone(), nonce_store);
 
             info!(
                 platform_id = %config.platform_id,
@@ -153,9 +148,10 @@ impl CompInit for Gb28181Server {
             // 启动心跳超时检测后台任务
             let timeout_secs = config.heartbeat_timeout_secs;
             tokio::spawn(async move {
-                heartbeat_watchdog(inner, timeout_secs).await;
+                if let Err(e) = heartbeat_watchdog(inner, timeout_secs).await{
+                    error!("心跳检测任务出错：{}", e);
+                }
             });
-
             Ok(())
         })
     }
@@ -192,21 +188,33 @@ impl Gb28181Server {
 
 // ── 心跳超时检测后台任务 ──────────────────────────────────────────────────────
 
-async fn heartbeat_watchdog(inner: Arc<Gb28181ServerInner>, timeout_secs: u64) {
+async fn heartbeat_watchdog(inner: Arc<Gb28181ServerInner>, timeout_secs: u64) ->RIE<()> {
     // 每 30 秒检查一次
     let check_interval = Duration::from_secs(timeout_secs.min(30));
     let mut ticker = interval(check_interval);
     ticker.tick().await; // 跳过立即触发的第一次
-
+    
+    // 获取 SIP 插件的取消令牌
+    let cancel_token = SipPlugin::cancel_token()
+        .ok_or_else(|| IE::Other("SIP 插件未初始化，无法获取取消令牌".to_string()))?;
+    
     loop {
-        ticker.tick().await;
-        let timeout_devices = inner.registry.check_timeouts(timeout_secs);
-        for device_id in timeout_devices {
-            warn!(device_id = %device_id, "⚠️ 设备心跳超时，标记离线");
-            inner.registry.set_offline(&device_id);
-            tokio::spawn(event::emit(Gb28181Event::DeviceOffline {
-                device_id: device_id.clone(),
-            }));
+        tokio::select! {
+            biased;
+            _ = cancel_token.cancelled() => {
+                info!("GB28181 心跳检测收到停止信号");
+                return Ok(());
+            }
+            _ = ticker.tick() => {
+                let timeout_devices = inner.registry.check_timeouts(timeout_secs);
+                for device_id in timeout_devices {
+                    warn!(device_id = %device_id, "⚠️ 设备心跳超时，标记离线");
+                    inner.registry.set_offline(&device_id);
+                    tokio::spawn(event::emit(Gb28181Event::DeviceOffline {
+                        device_id: device_id.clone(),
+                    }));
+                }
+            },
         }
     }
 }
@@ -269,11 +277,7 @@ impl Gb28181ServerHandle {
     pub async fn query_device_info(&self, device_id: &str) -> anyhow::Result<()> {
         let dev = self.get_dev_or_err(device_id)?;
         let sn = self.next_sn();
-        let xml = build_device_info_query_xml(
-            &self.inner.config.platform_id,
-            device_id,
-            sn,
-        );
+        let xml = build_device_info_query_xml(&self.inner.config.platform_id, device_id, sn);
         self.send_message_to_device(&dev.contact, &xml, sn).await?;
         info!(device_id = %device_id, "ℹ️ 发送设备信息查询");
         Ok(())
@@ -698,11 +702,7 @@ impl Gb28181ServerHandle {
     pub async fn broadcast_invite(&self, device_id: &str) -> anyhow::Result<()> {
         let dev = self.get_dev_or_err(device_id)?;
         let sn = self.next_sn();
-        let xml = build_broadcast_invite_xml(
-            &self.inner.config.platform_id,
-            device_id,
-            sn,
-        );
+        let xml = build_broadcast_invite_xml(&self.inner.config.platform_id, device_id, sn);
         self.send_message_to_device(&dev.contact, &xml, sn).await?;
         info!(device_id = %device_id, sn = sn, "📢 发起语音广播邀请");
         Ok(())
@@ -712,11 +712,7 @@ impl Gb28181ServerHandle {
     ///
     /// 当收到 `BroadcastInviteReceived` 事件后，平台可调用此方法确认接收。
     /// 需要传入音频端口，设备会将音频推送到此端口。
-    pub async fn broadcast_accept(
-        &self,
-        device_id: &str,
-        audio_port: u16,
-    ) -> anyhow::Result<()> {
+    pub async fn broadcast_accept(&self, device_id: &str, audio_port: u16) -> anyhow::Result<()> {
         // 记录广播会话
         let session = BroadcastSessionInfo {
             device_id: device_id.to_string(),
@@ -753,12 +749,8 @@ impl Gb28181ServerHandle {
             audio_port = audio_port,
             media_ip = media_ip
         );
-        self.send_message_to_device(
-            &self.get_dev_or_err(device_id)?.contact,
-            &ack_xml,
-            sn,
-        )
-        .await?;
+        self.send_message_to_device(&self.get_dev_or_err(device_id)?.contact, &ack_xml, sn)
+            .await?;
 
         info!(
             device_id = %device_id,
@@ -778,11 +770,7 @@ impl Gb28181ServerHandle {
     pub async fn broadcast_stop(&self, device_id: &str) -> anyhow::Result<()> {
         let dev = self.get_dev_or_err(device_id)?;
         let sn = self.next_sn();
-        let xml = build_broadcast_cancel_xml(
-            &self.inner.config.platform_id,
-            device_id,
-            sn,
-        );
+        let xml = build_broadcast_cancel_xml(&self.inner.config.platform_id, device_id, sn);
         self.send_message_to_device(&dev.contact, &xml, sn).await?;
 
         // 清除广播会话
@@ -906,9 +894,7 @@ impl Gb28181ServerHandle {
             stream_id: stream_id.clone(),
             is_realtime: true,
         };
-        self.inner
-            .sessions
-            .insert(call_id.clone(), session);
+        self.inner.sessions.insert(call_id.clone(), session);
 
         // 监听会话状态
         let inner_clone = self.inner.clone();
@@ -1123,11 +1109,7 @@ impl Gb28181ServerHandle {
     /// 存储卡格式化
     ///
     /// GB28181-2022 A.2.3.1.13：存储卡格式化
-    pub async fn storage_format(
-        &self,
-        device_id: &str,
-        channel_id: &str,
-    ) -> anyhow::Result<()> {
+    pub async fn storage_format(&self, device_id: &str, channel_id: &str) -> anyhow::Result<()> {
         let dev = self.get_dev_or_err(device_id)?;
         let sn = self.next_sn();
         let xml = build_storage_format_xml(device_id, sn, channel_id);
@@ -1147,9 +1129,14 @@ impl Gb28181ServerHandle {
     ) -> anyhow::Result<()> {
         let dev = self.get_dev_or_err(device_id)?;
         let sn = self.next_sn();
-        let xml = build_target_track_xml(channel_id, sn,
-            if start { crate::xml::TargetTrackMode::Start }
-            else { crate::xml::TargetTrackMode::Stop }
+        let xml = build_target_track_xml(
+            channel_id,
+            sn,
+            if start {
+                crate::xml::TargetTrackMode::Start
+            } else {
+                crate::xml::TargetTrackMode::Stop
+            },
         );
         self.send_message_to_device(&dev.contact, &xml, sn).await?;
         info!(device_id = %device_id, channel_id = %channel_id, start = start, "🎯 目标跟踪控制");
@@ -1344,9 +1331,11 @@ impl Gb28181ServerHandle {
                     .unwrap_or(0)
             };
             let t_start = parse_ts(start_time.as_deref().unwrap_or_default());
-            let t_end   = parse_ts(end_time.as_deref().unwrap_or_default());
+            let t_end = parse_ts(end_time.as_deref().unwrap_or_default());
             build_invite_sdp(
-                &media_ip, rtp_port, &ssrc,
+                &media_ip,
+                rtp_port,
+                &ssrc,
                 SessionType::Playback,
                 Some((t_start, t_end)),
                 None,
@@ -1407,9 +1396,7 @@ impl Gb28181ServerHandle {
             stream_id: stream_id.clone(),
             is_realtime,
         };
-        self.inner
-            .sessions
-            .insert(call_id.clone(), session);
+        self.inner.sessions.insert(call_id.clone(), session);
 
         // 获取播放 URL
         let play_urls = self.inner.media.get_play_urls(&stream_id);
