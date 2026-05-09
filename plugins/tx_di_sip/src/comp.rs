@@ -28,7 +28,7 @@ use std::sync::OnceLock;
 use tokio::sync::{mpsc, Semaphore};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
-use tx_di_core::{tx_comp, App, BoxFuture, BuildContext, CompInit, RIE};
+use tx_di_core::{tx_comp, App, BoxFuture, BuildContext, CompInit, InnerContext, RIE};
 
 // ── 性能配置常量 ──────────────────────────────────────────────────────────────
 
@@ -97,7 +97,7 @@ pub struct SipPlugin {
 }
 
 impl CompInit for SipPlugin {
-    fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
+    fn inner_init(&mut self, _: &InnerContext ) -> RIE<()> {
         info!(
             host = %self.config.host,
             port = self.config.port,

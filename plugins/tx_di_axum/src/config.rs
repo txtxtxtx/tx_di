@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use serde::Deserialize;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use tx_di_core::{tx_comp, BuildContext, CompInit, RIE};
+use tx_di_core::{tx_comp, BuildContext, CompInit, InnerContext, RIE};
 use crate::layers::{add_layer_by_name};
 
 
@@ -96,7 +96,7 @@ impl Default for WebConfig {
 }
 
 impl CompInit for WebConfig {
-    fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
+    fn inner_init(&mut self, _: &InnerContext) -> RIE<()> {
         // 设置超时时间
         crate::layers::set_timeout_secs(self.timeout_secs);
         // 注册配置的中间件

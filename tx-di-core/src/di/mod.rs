@@ -23,6 +23,8 @@ use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
 
+/// 构建上下文,本质上就是一个map
+pub type InnerContext = DashMap<TypeId, CompRef>;
 /// 构建上下文
 pub struct BuildContext {
     /// TypeId → CompRef（使用 DashMap 支持并发访问）
@@ -74,7 +76,7 @@ impl crate::BuildContext {
     }
 
     // ── 注册 ─────────────────────────────────────────────────────────────────
-    
+
     /// 注册已擦除类型的工厂函数（用于从 COMPONENT_REGISTRY 批量注册）。
     ///
     /// `factory` 的签名统一为 `fn(&DashMap<TypeId, CompRef>) -> Box<dyn Any>`。
@@ -85,7 +87,7 @@ impl crate::BuildContext {
         type_id: TypeId,
         scope: Scope,
         factory: StoreFactoryFn,
-    ) 
+    )
     {
         match scope {
             Scope::Singleton => {
@@ -119,7 +121,7 @@ impl crate::BuildContext {
         let tid = TypeId::of::<T>();
         inject_from_store(&self.store, tid)
     }
-    
+
     // ── 调试辅助 ────────────────────────────────────────────────────────────
 
     #[inline]
@@ -428,7 +430,7 @@ impl App {
 }
 
 /// 从 store 中注入组件的通用辅助函数
-fn inject_from_store<T: Any + Send + Sync + 'static>(
+pub fn inject_from_store<T: Any + Send + Sync + 'static>(
     store: &DashMap<TypeId, CompRef>,
     tid: TypeId,
 ) -> Arc<T> {

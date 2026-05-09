@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use std::net::SocketAddr;
-use tx_di_core::{tx_comp, BuildContext, CompInit, RIE};
+use tx_di_core::{tx_comp, BuildContext, CompInit, InnerContext, RIE};
 
 /// SIP 传输协议类型
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq,Default)]
@@ -101,9 +101,6 @@ impl Default for SipConfig {
 }
 
 impl CompInit for SipConfig {
-    fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
-        Ok(())
-    }
     fn init_sort() -> i32 {
         10000
     }

@@ -87,9 +87,6 @@ impl Gb28181DeviceConfig {
 }
 
 impl CompInit for Gb28181DeviceConfig {
-    fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
-        Ok(())
-    }
     fn init_sort() -> i32 {
         i32::MAX - 3
     }

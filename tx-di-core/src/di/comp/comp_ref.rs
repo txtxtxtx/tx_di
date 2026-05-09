@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use dashmap::DashMap;
 use tokio_util::sync::CancellationToken;
-use crate::{App, BuildContext, Scope};
+use crate::{App, BuildContext, InnerContext, Scope};
 use crate::di::common::RIE;
 
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -156,7 +156,7 @@ pub trait CompInit :Any + Sized + Send + Sync + 'static{
     ///
     /// 在主键完成构建后、注入全局上下文之前执行
     #[allow(unused_variables)]
-    fn inner_init(&mut self, ctx: &mut BuildContext) -> RIE<()>{
+    fn inner_init(&mut self, ctx: &InnerContext) -> RIE<()>{
         Ok(())
     }
     /// 同步初始化方法

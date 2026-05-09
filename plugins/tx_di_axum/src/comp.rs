@@ -8,7 +8,7 @@ use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::TcpListener as TokioTcpListener;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
-use tx_di_core::{tx_comp, ApiR, App, BoxFuture, BuildContext, CompInit, FormattedDateTime, RIE};
+use tx_di_core::{tx_comp, ApiR, App, BoxFuture, BuildContext, CompInit, FormattedDateTime, InnerContext, RIE};
 use crate::layers::{add_static_path_prefix, freeze_static_path_prefixes, LAYER_REGISTRY};
 
 /// 全局路由器注册表
@@ -33,7 +33,7 @@ pub struct WebPlugin {
 }
 
 impl CompInit for WebPlugin {
-    fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
+    fn inner_init(&mut self, _: &InnerContext) -> RIE<()> {
         info!("Web 服务器插件初始化中...");
         self.router = WebPlugin::merge_routers();
         Ok(())

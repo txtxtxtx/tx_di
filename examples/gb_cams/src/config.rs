@@ -1,7 +1,7 @@
 //! GB_CAMS 全局配置
 
 use serde::Deserialize;
-use tx_di_core::{tx_comp, BuildContext, CompInit, RIE};
+use tx_di_core::{tx_comp, BuildContext, CompInit, InnerContext, RIE};
 
 /// GB28181 多设备模拟器全局配置
 ///
@@ -83,7 +83,7 @@ impl GbCamsConfig {
 }
 
 impl CompInit for GbCamsConfig {
-    fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
+    fn inner_init(&mut self, _ctx: &InnerContext) -> RIE<()> {
         Ok(())
     }
     fn init_sort() -> i32 {

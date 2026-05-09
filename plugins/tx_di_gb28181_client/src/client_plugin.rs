@@ -22,7 +22,7 @@ use std::sync::{Arc, OnceLock};
 use tokio::time::{interval, sleep, Duration};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
-use tx_di_core::{tx_comp, App, BoxFuture, BuildContext, CompInit, RIE};
+use tx_di_core::{tx_comp, App, BoxFuture, BuildContext, CompInit, InnerContext, RIE};
 use tx_di_sip::SipPlugin;
 
 /// 全局设备实例
@@ -124,7 +124,7 @@ impl Gb28181Device {
 }
 
 impl CompInit for Gb28181Device {
-    fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
+    fn inner_init(&mut self, _: &InnerContext) -> RIE<()> {
         info!(
             device_id = %self.config.device_id,
             platform_ip = %self.config.platform_ip,

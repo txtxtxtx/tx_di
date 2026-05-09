@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
-use tx_di_core::{tx_comp, App, BoxFuture, BuildContext, CompInit, RIE};
+use tx_di_core::{tx_comp, App, BoxFuture, BuildContext, CompInit, InnerContext, RIE};
 
 /// 默认配置文件路径（可通过 #[tx_cst(my_custom_path())] 覆盖）
 fn default_can_config_path() -> String {
@@ -268,7 +268,7 @@ impl CanPlugin {
 
 impl CompInit for CanPlugin {
     /// 同步初始化：加载配置，建立全局实例
-    fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
+    fn inner_init(&mut self, _: &InnerContext) -> RIE<()> {
         let config = CanConfig::load_from_toml(&self.config_path)
             .map_err(|e| {
                 tx_di_core::IE::from(anyhow::anyhow!(
