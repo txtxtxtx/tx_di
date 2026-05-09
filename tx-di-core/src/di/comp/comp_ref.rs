@@ -1,6 +1,7 @@
 use std::any::{Any, TypeId};
 use std::pin::Pin;
 use std::sync::Arc;
+use dashmap::DashMap;
 use tokio_util::sync::CancellationToken;
 use crate::{App, BuildContext, Scope};
 use crate::di::common::RIE;
@@ -11,12 +12,18 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 /// - `Factory(Arc<dyn Fn>)` → 存工厂闭包，prototype 每次注入时调用
 /// - `Cached(Arc<dyn Any>)` → 已实例化的单例（擦除类型）
 ///
+/// # Factory 闭包签名
+///
+/// 闭包接收 `&DashMap<TypeId, CompRef>`（即 store 的引用），从中解析依赖并构建新实例。
+/// 这样 `BuildContext` 和 `App` 都能调用工厂闭包，因为两者都持有 `DashMap<TypeId, CompRef>`。
+///
 /// # 线程安全性
 ///
 /// `Factory` 中的闭包必须实现 `Send + Sync`，以确保 `CompRef` 可以安全地
 /// 在多线程环境中使用（存储在 DashMap 中）。
+#[derive(Clone)]
 pub enum CompRef {
-    Factory(Arc<dyn Fn(&mut BuildContext) -> Arc<dyn Any + Send + Sync> + Send + Sync>),
+    Factory(Arc<dyn Fn(&DashMap<TypeId, CompRef>) -> Arc<dyn Any + Send + Sync> + Send + Sync>),
     Cached(Arc<dyn Any + Send + Sync>),
 }
 
@@ -76,7 +83,53 @@ pub trait ComponentDescriptor: CompInit {
     ///
     /// 该方法仅在组件首次被需要时调用（对于 Singleton），或者每次注入时调用（对于 Prototype）。
     /// 不应该手动调用此方法，应该通过 `BuildContext::inject::<T>()` 来获取组件实例。
-    fn build(ctx: &mut BuildContext) -> Self;
+    // fn build(ctx: &mut BuildContext) -> Self;
+
+    /// 从 store（DashMap）构建组件实例。
+    ///
+    /// 与 [`build`](ComponentDescriptor::build) 类似，但不依赖 `BuildContext`，
+    /// 而是从 `DashMap<TypeId, CompRef>` 中解析依赖。
+    ///
+    /// 用于 Prototype 组件在 App 阶段注入时调用（此时 `BuildContext` 已不存在）。
+    /// 注意：此方法不调用 `inner_init`，因为 Prototype 注入时跳过初始化。
+    fn build(
+        store: &DashMap<TypeId, CompRef>,
+    ) -> Self;
+}
+
+/// 从 store 中注入依赖（类型安全版本）。
+///
+/// 供宏生成的 `build_from_store` 方法调用：
+/// ```ignore
+/// fn build_from_store(store: &DashMap<TypeId, CompRef>) -> Self {
+///     Self {
+///         db: tx_di_core::inject_from_store::<DbPool>(store),
+///     }
+/// }
+/// ```
+pub fn inject_from_store<T: Any + Send + Sync + 'static>(
+    store: &DashMap<TypeId, CompRef>,
+) -> Arc<T> {
+    let tid = TypeId::of::<T>();
+    store
+        .get(&tid)
+        .map(|entry| match &*entry {
+            CompRef::Cached(any_arc) => any_arc.clone(),
+            CompRef::Factory(f) => f(store),
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "[di] inject_from_store::<{}> 未找到，请确认该组件已注册",
+                std::any::type_name::<T>()
+            )
+        })
+        .downcast::<T>()
+        .unwrap_or_else(|_| {
+            panic!(
+                "[di] inject_from_store downcast 失败: {}",
+                std::any::type_name::<T>()
+            )
+        })
 }
 
 /// 组件初始化 trait，用于在依赖注入完成后执行自定义初始化逻辑。

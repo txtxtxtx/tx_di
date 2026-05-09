@@ -1,9 +1,10 @@
 use std::any::TypeId;
 use std::fs;
 use std::path::{Path, PathBuf};
+use dashmap::DashMap;
 use serde::de::DeserializeOwned;
 use toml::Value::Table;
-use crate::{BuildContext, CompInit, ComponentDescriptor, Scope};
+use crate::{BuildContext, CompInit, ComponentDescriptor, CompRef, Scope};
 
 /// 全局配置文件
 pub struct AppAllConfig{
@@ -86,8 +87,9 @@ impl CompInit for AppAllConfig {}
 impl ComponentDescriptor for AppAllConfig {
     const DEP_IDS: &'static [fn() -> TypeId] = &[];
     const SCOPE: Scope = Scope::Singleton;
-
-    fn build(_ctx: &mut BuildContext) -> Self {
-        panic!("AppAllConfig should not be built via ComponentDescriptor::build. It is manually created in BuildContext::new().")
+    fn build(
+        _store: &DashMap<TypeId, CompRef>,
+    ) -> Self {
+        panic!("AppAllConfig should not be built via build_from_store. It is manually created in BuildContext::new().")
     }
 }

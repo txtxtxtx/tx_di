@@ -6,6 +6,7 @@ pub mod common;
 pub mod comp;
 pub mod scopes;
 
+use crate::di::comp::StoreFactoryFn;
 use crate::di::comp::config::AppAllConfig;
 use crate::{
     COMPONENT_REGISTRY, CompRef, ComponentDescriptor, ComponentMeta, IE, RIE, Scope, topo_sort,
@@ -73,54 +74,31 @@ impl crate::BuildContext {
     }
 
     // ── 注册 ─────────────────────────────────────────────────────────────────
-
-    /// 注册组件的工厂函数。
-    ///
-    /// `factory` 返回 `Box<T>`：
-    /// - Singleton：立即调用，存入 `Box<Arc<T>>`
-    /// - Prototype：用 Arc<dyn Fn> 包装，闭包每次调用时构造新实例
-    pub fn register_factory<T: Any + Send + Sync + 'static>(
-        &mut self,
-        scope: Scope,
-        factory: fn(&mut crate::BuildContext) -> Box<T>,
-    ) {
-        match scope {
-            Scope::Singleton => {
-                // 单例：立即调用 factory，构造 Arc<T> 后缓存
-                let instance: Arc<T> = Arc::new(*factory(self));
-                self.store
-                    .insert(TypeId::of::<T>(), CompRef::Cached(instance));
-            }
-            Scope::Prototype => {
-                // 原型：存闭包，每次调用时构造新实例
-                let factory_fn = factory;
-                let closure = move |ctx: &mut crate::BuildContext| -> Arc<dyn Any + Send + Sync> {
-                    let boxed: Box<T> = (factory_fn)(ctx);
-                    Arc::new(*boxed) as Arc<dyn Any + Send + Sync>
-                };
-                self.store
-                    .insert(TypeId::of::<T>(), CompRef::Factory(Arc::new(closure)));
-            }
-        }
-    }
-
+    
     /// 注册已擦除类型的工厂函数（用于从 COMPONENT_REGISTRY 批量注册）。
+    ///
+    /// `factory` 的签名统一为 `fn(&DashMap<TypeId, CompRef>) -> Box<dyn Any>`。
+    /// - Singleton：立即调用并缓存为 `CompRef::Cached`
+    /// - Prototype：存为 `CompRef::Factory` 闭包，每次注入时调用
     pub fn register_factory_boxed(
         &mut self,
         type_id: TypeId,
         scope: Scope,
-        factory: fn(&mut crate::BuildContext) -> Box<dyn Any + Send + Sync>,
-    ) {
+        factory: StoreFactoryFn,
+    ) 
+    {
         match scope {
             Scope::Singleton => {
-                let instance: Box<dyn Any + Send + Sync> = factory(self);
+                // 单例：立即调用 factory 传入 store 引用，构造 Arc 后缓存
+                let instance: Box<dyn Any + Send + Sync> = factory(&self.store);
                 let arc: Arc<dyn Any + Send + Sync> = Arc::from(instance);
                 self.store.insert(type_id, CompRef::Cached(arc));
             }
             Scope::Prototype => {
-                let factory_fn = factory;
-                let closure = move |ctx: &mut crate::BuildContext| -> Arc<dyn Any + Send + Sync> {
-                    let boxed: Box<dyn Any + Send + Sync> = (factory_fn)(ctx);
+                // 原型：存闭包，每次注入时从 store 解析依赖并构造新实例
+                // 包装为闭包类型：Fn(&DashMap<TypeId, CompRef>) -> Arc<dyn Any>
+                let closure = move |store: &DashMap<TypeId, CompRef>| -> Arc<dyn Any + Send + Sync> {
+                    let boxed = factory(store);
                     Arc::from(boxed)
                 };
                 self.store
@@ -131,138 +109,17 @@ impl crate::BuildContext {
 
     // ── 统一注入入口 ─────────────────────────────────────────────────────────
 
-    /// 统一注入入口。根据被注入组件 T 的 scope 自动选择：
+    /// 统一注入入口
+    ///
+    /// - Singleton：返回缓存的 `Arc<T>`
+    /// - Prototype：调用工厂闭包，每次构造新实例
     ///
     /// 注意：scope 来自被注入者（T 自己的 SCOPE），而非调用者的 scope。
-    pub fn inject<T: Any + Send + Sync + 'static + ComponentDescriptor>(&mut self) -> Arc<T> {
+    pub fn inject<T: Any + Send + Sync + 'static + ComponentDescriptor>(&self) -> Arc<T> {
         let tid = TypeId::of::<T>();
-        // 直接用编译期常量，避免在构建过程中动态查询 registry
-        let scope = <T as ComponentDescriptor>::SCOPE;
-
-        match scope {
-            Scope::Singleton => self.inject_singleton::<T>(tid),
-            Scope::Prototype => self.inject_prototype::<T>(tid),
-        }
+        inject_from_store(&self.store, tid)
     }
-
-    /// 获取单例组件的不可变引用版本。
-    ///
-    /// 此方法不需要 `&mut self`，但只能用于 Singleton 作用域的组件。
-    /// 如果尝试获取 Prototype 组件，将会 panic。
-    ///
-    /// # Panics
-    ///
-    /// - 如果组件是 Prototype 作用域
-    /// - 如果组件未注册
-    /// - 如果类型转换失败
-    pub fn get<T: ComponentDescriptor>(&self) -> Arc<T> {
-        let tid = TypeId::of::<T>();
-        let scope = <T as ComponentDescriptor>::SCOPE;
-
-        match scope {
-            Scope::Singleton => self.inject_singleton::<T>(tid),
-            Scope::Prototype => {
-                panic!(
-                    "[di] get::<{}> 不能用于 Prototype 组件，请使用 inject() 方法",
-                    std::any::type_name::<T>()
-                )
-            }
-        }
-    }
-
-    /// 通过 `Arc<BuildContext>` 获取已缓存的单例组件（无需 `ComponentDescriptor` 约束）。
-    ///
-    /// 适用于 axum handler 等场景：持有 `Arc<BuildContext>` 时只能拿 `&self`，
-    /// 而 `inject` 需要 `&mut self`。此方法绕过该限制，直接从 store 读取已缓存的 Arc。
-    ///
-    /// # Panics
-    ///
-    /// - 组件未注册或未缓存（Prototype 组件无法通过此方法获取）
-    /// - downcast 失败
-    pub fn get_singleton<T: Any + Send + Sync + 'static>(&self) -> Arc<T> {
-        self.inject_singleton::<T>(TypeId::of::<T>())
-    }
-
-    /// 尝试获取已缓存的单例组件，未找到时返回 `None`（不 panic）。
-    ///
-    /// 适合在 axum handler 等不能 panic 的场景中使用。
-    pub fn try_get_singleton<T: Any + Send + Sync + 'static>(&self) -> Option<Arc<T>> {
-        let tid = TypeId::of::<T>();
-        self.store.get(&tid).and_then(|entry| match &*entry {
-            CompRef::Cached(any_arc) => any_arc.clone().downcast::<T>().ok(),
-            CompRef::Factory(_) => None,
-        })
-    }
-
-    /// 注入单例：factory 只调用一次，之后返回缓存的 Arc。
-    fn inject_singleton<T: Any + Send + Sync + 'static>(&self, tid: TypeId) -> Arc<T> {
-        self.store
-            .get(&tid)
-            .map(|entry| match &*entry {
-                CompRef::Cached(any_arc) => any_arc.clone(),
-                CompRef::Factory(_) => {
-                    panic!(
-                        "[di] inject_singleton::<{}> 错误：组件注册为 Prototype",
-                        std::any::type_name::<T>()
-                    )
-                }
-            })
-            .unwrap_or_else(|| {
-                panic!(
-                    "[di] inject::<{}> 未找到，请确认该组件已注册（使用 #[tx_comp] 注解）",
-                    std::any::type_name::<T>()
-                )
-            })
-            .downcast::<T>()
-            .unwrap_or_else(|_| {
-                panic!(
-                    "[di] inject singleton downcast 失败：{}",
-                    std::any::type_name::<T>()
-                )
-            })
-    }
-
-    /// 注入原型：factory 每次都调用，构造新实例。
-    fn inject_prototype<T: Any + Send + Sync + 'static>(&mut self, tid: TypeId) -> Arc<T> {
-        // 1. 先把 factory_arc 从 Ref 中提取出来
-        let factory_arc = self
-            .store
-            .get(&tid)
-            .map(|entry| match &*entry {
-                CompRef::Factory(f) => Some(f.clone()),
-                _ => None,
-            })
-            .flatten()
-            .unwrap_or_else(|| panic!("[di] inject::<{}> 未找到", std::any::type_name::<T>()));
-        // 此时 Ref 已经 dropped，self 不再被不可变借用
-
-        // 3. 现在可以安全调用 factory_arc(self)
-        factory_arc(self)
-            .downcast::<T>()
-            .unwrap_or_else(|_| panic!("[di] downcast 失败：{}", std::any::type_name::<T>()))
-    }
-
-    /// 从上下文中取出并移除单例（所有权）。
-    pub fn take<T: Any + Send + Sync + 'static>(&mut self) -> RIE<T> {
-        let name = std::any::type_name::<T>();
-        let entry = self
-            .store
-            .remove(&TypeId::of::<T>())
-            .ok_or_else(|| IE::Other(format!("取出组件失败,未找到该组件:{name}")))?
-            .1;
-
-        match entry {
-            CompRef::Cached(any_arc) => {
-                let arc_t: Arc<T> = any_arc.downcast::<T>().unwrap_or_else(|_| {
-                    panic!("[di] take downcast 失败：{}", std::any::type_name::<T>())
-                });
-                Arc::try_unwrap(arc_t)
-                    .map_err(|_| IE::Other(format!("取出组件失败,无法获取所有权:{name}")))
-            }
-            _ => Err(IE::Other(format!("取出组件失败,该组件不是单例:{name}"))),
-        }
-    }
-
+    
     // ── 调试辅助 ────────────────────────────────────────────────────────────
 
     #[inline]
@@ -332,7 +189,7 @@ impl crate::BuildContext {
         // 使用 std::mem::replace 将 self.store 替换为空的 DashMap，取出原来的 store
         // 这样可以在不获取 self 所有权的情况下，将 store 移动出去
         let store = std::mem::replace(&mut self.store, DashMap::new());
-        let metas: Vec<&ComponentMeta> = std::mem::replace(&mut self.metas, Vec::new());
+        let metas: Vec<&ComponentMeta> = std::mem::take(&mut self.metas);
         Ok(App {
             store,
             metas,
@@ -363,49 +220,19 @@ pub struct App {
 }
 
 impl App {
-    /// 获取单例,原型再固定期就不能直接获取了
+    /// 获取组件实例（Singleton 返回缓存，Prototype 每次创建新实例）
+    ///
+    /// 对于 Singleton：返回缓存的 Arc 引用
+    /// 对于 Prototype：调用工厂闭包，每次从 store 解析依赖并创建新实例
     pub fn inject<T: Any + Send + Sync + 'static + ComponentDescriptor>(&self) -> Arc<T> {
         let tid = TypeId::of::<T>();
-        self.store
-            .get(&tid)
-            .map(|entry| match &*entry {
-                CompRef::Cached(any_arc) => any_arc.clone(),
-                CompRef::Factory(_) => {
-                    panic!(
-                        "[di] inject_singleton::<{}> 错误：组件注册为 Prototype",
-                        std::any::type_name::<T>()
-                    )
-                }
-            })
-            .unwrap_or_else(|| {
-                panic!(
-                    "[di] inject::<{}> 未找到，请确认该组件已注册（使用 #[tx_comp] 注解）",
-                    std::any::type_name::<T>()
-                )
-            })
-            .downcast::<T>()
-            .unwrap_or_else(|_| {
-                panic!(
-                    "[di] inject singleton downcast 失败：{}",
-                    std::any::type_name::<T>()
-                )
-            })
+        inject_from_store(&self.store, tid)
     }
 
-    /// 尝试获取单例组件，失败时返回 None
+    /// 尝试获取组件，失败时返回 None（不 panic）。
     ///
-    /// 该方法用于安全地获取已缓存的单例组件，不会 panic。
-    /// 适用于运行时可能不存在某些组件的场景。
-    ///
-    /// # 返回值
-    ///
-    /// - `Some(Arc<T>)`: 组件存在且类型匹配
-    /// - `None`: 组件未注册、是 Prototype 类型、或类型转换失败
-    ///
-    /// # 注意
-    ///
-    /// - 只能获取 Singleton 类型的组件，Prototype 组件始终返回 None
-    /// - 不进行类型检查的 panic，失败时静默返回 None
+    /// - Singleton：克隆 Arc 引用
+    /// - Prototype：调用工厂闭包创建新实例
     pub fn try_inject<T: Any + Send + Sync + 'static + ComponentDescriptor>(
         &self,
     ) -> Option<Arc<T>> {
@@ -413,16 +240,10 @@ impl App {
         self.store
             .get(&tid)
             .map(|entry| match &*entry {
-                // 单例：克隆 Arc 引用
-                CompRef::Cached(any_arc) => Some(any_arc.clone()),
-                // 原型组件：App 阶段不支持动态创建，返回 None
-                CompRef::Factory(_) => None,
+                CompRef::Cached(any_arc) => any_arc.clone(),
+                CompRef::Factory(f) => f(&self.store),
             })
-            .flatten()
-            .and_then(|any_arc| {
-                // 尝试向下转型为目标类型，失败则返回 None
-                any_arc.downcast::<T>().ok()
-            })
+            .and_then(|any_arc| any_arc.downcast::<T>().ok())
     }
 
     /// 获取组件的总数
@@ -583,9 +404,51 @@ impl App {
                 _ = sighup.recv() => {},
             }
         }
-        #[cfg(not(unix))]
+        #[cfg(windows)]
+        {
+            use tokio::signal::windows;
+
+            let ctrl_c = signal::ctrl_c();
+            let mut ctrl_break = windows::ctrl_break().expect("无法注册 Ctrl+Break 处理器");
+            let mut ctrl_close = windows::ctrl_close().expect("无法注册 Ctrl+Close 处理器");
+            let mut ctrl_shutdown = windows::ctrl_shutdown().expect("无法注册 Ctrl+Shutdown 处理器");
+
+            tokio::select! {
+                _ = ctrl_c => {},
+                _ = ctrl_break.recv() => {},
+                _ = ctrl_close.recv() => {},
+                _ = ctrl_shutdown.recv() => {},
+            }
+        }
+        #[cfg(all(not(unix), not(windows)))]
         {
             let _ = signal::ctrl_c().await;
         }
     }
+}
+
+/// 从 store 中注入组件的通用辅助函数
+fn inject_from_store<T: Any + Send + Sync + 'static>(
+    store: &DashMap<TypeId, CompRef>,
+    tid: TypeId,
+) -> Arc<T> {
+    store
+        .get(&tid)
+        .map(|entry| match &*entry {
+            CompRef::Cached(any_arc) => any_arc.clone(),
+            CompRef::Factory(f) => f(store),
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "[di] inject::<{}> 未找到，请确认该组件已注册（使用 #[tx_comp] 注解）",
+                std::any::type_name::<T>()
+            )
+        })
+        .downcast::<T>()
+        .unwrap_or_else(|_| {
+            panic!(
+                "[di] inject downcast 失败：{}",
+                std::any::type_name::<T>()
+            )
+        })
 }
