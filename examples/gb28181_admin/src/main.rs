@@ -33,16 +33,14 @@ async fn main() -> anyhow::Result<()> {
     WebPlugin::add_router(api::router());
 
     // 3. 启动 DI 框架（加载配置 → 初始化所有组件）
-    let mut ctx = BuildContext::new(Some("examples/gb28181_admin/config/config.toml"));
-    ctx.build_and_run().await?;
-
+    let app = BuildContext::new(Some("examples/gb28181_admin/config/config.toml"))
+        .build()?
+        .ins_run()
+        .await?;
     info!("✅ GB28181 管理后台启动完成");
     info!("📡 API:      http://localhost:8080/api/gb28181/");
     info!("🖥️  前端:     http://localhost:8080/admin/");
 
-    // 4. 等待 Ctrl+C
-    tokio::signal::ctrl_c().await?;
-    info!("正在关闭...");
-
+    app.waiting_exit().await;
     Ok(())
 }
