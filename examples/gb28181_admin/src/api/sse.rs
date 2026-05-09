@@ -9,7 +9,7 @@ use std::sync::LazyLock;
 use tokio::sync::broadcast;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt as _;
-use tx_di_gb28181::Gb28181Event;
+use tx_gb28181::Gb28181Event;
 
 /// 全局广播通道（容量 256 条消息）
 static TX: LazyLock<broadcast::Sender<String>> = LazyLock::new(|| {
