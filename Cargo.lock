@@ -2758,7 +2758,7 @@ dependencies = [
 
 [[package]]
 name = "tx-di-core"
-version = "0.1.7"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2772,12 +2772,23 @@ dependencies = [
  "toml 1.1.2+spec-1.1.0",
  "tracing",
  "tracing-subscriber",
- "tx-di-macros",
+ "tx-di-macros 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "tx-di-macros"
 version = "0.2.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "tx-di-macros"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7589f131ab9aa8420fb6f91466a21af1d44c3f9e96310a5058a7dfe78f249267"
 dependencies = [
  "proc-macro2",
  "quote",
