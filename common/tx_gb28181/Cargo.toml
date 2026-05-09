@@ -15,3 +15,9 @@ quick-xml = { version = "0.39", features = ["serialize"] }
 chrono.workspace = true
 tx-di-core.workspace = true
 encoding_rs.workspace = true
+# 异步运行时（用于事件广播 tokio::sync::broadcast）
+tokio.workspace = true
+# 错误处理（用于事件监听回调 Future 输出类型）
+anyhow.workspace = true
+# 日志（用于事件广播中的 tracing::warn!）
+tracing.workspace = true
