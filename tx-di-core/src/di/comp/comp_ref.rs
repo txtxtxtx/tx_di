@@ -8,6 +8,13 @@ use crate::di::common::RIE;
 
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
+/// 工厂函数类型别名
+///
+/// 用于从组件存储中创建组件实例的工厂闭包类型。
+/// 接收 DashMap 引用作为参数，返回类型擦除的 Arc 指针。
+type FactoryFn = dyn Fn(&DashMap<TypeId, CompRef>) -> Arc<dyn Any + Send + Sync> + Send + Sync;
+
+
 /// 存储单元：
 /// - `Factory(Arc<dyn Fn>)` → 存工厂闭包，prototype 每次注入时调用
 /// - `Cached(Arc<dyn Any>)` → 已实例化的单例（擦除类型）
@@ -23,7 +30,7 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 /// 在多线程环境中使用（存储在 DashMap 中）。
 #[derive(Clone)]
 pub enum CompRef {
-    Factory(Arc<dyn Fn(&DashMap<TypeId, CompRef>) -> Arc<dyn Any + Send + Sync> + Send + Sync>),
+    Factory(Arc<FactoryFn>),
     Cached(Arc<dyn Any + Send + Sync>),
 }
 
