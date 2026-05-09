@@ -1,9 +1,10 @@
 pub mod comp_ref;
 pub mod config;
 
+use dashmap::DashMap;
 use std::any::{Any, TypeId};
 use tracing::debug;
-use crate::{App, BoxFuture, BuildContext, Scope};
+use crate::{App, BoxFuture, CompRef, Scope};
 use crate::di::common::RIE;
 use std::collections::{BinaryHeap, HashMap};
 use std::cmp::Reverse;
@@ -12,7 +13,7 @@ use tokio_util::sync::CancellationToken;
 
 
 // 类型别名：简化复杂函数指针类型的定义
-type FactoryFn = fn(&mut BuildContext) -> Box<dyn Any + Send + Sync>;
+pub type StoreFactoryFn = fn(&DashMap<TypeId, CompRef>) -> Box<dyn Any + Send + Sync>;
 type InitFn = fn(Arc<App>) -> RIE<()>;
 type AsyncInitFn = fn(Arc<App>, CancellationToken) -> BoxFuture<'static, RIE<()>>;
 
@@ -30,7 +31,7 @@ pub static COMPONENT_REGISTRY: [ComponentMeta] = [..];
 /// - `deps`: 组件的依赖列表，每个元素是返回依赖类型 `TypeId` 的函数指针
 /// - `name`: 组件的类型名称字符串，用于调试和错误提示
 /// - `scope`: 组件的作用域（Singleton 或 Prototype），决定实例的生命周期
-/// - `factory_fn`: 可选的工厂函数，仅用于调试诊断，运行时不使用
+/// - `factory_fn`: 工厂函数，接收 `&DashMap<TypeId, CompRef>`，用于构建组件实例
 pub struct ComponentMeta {
     /// 返回组件类型 `TypeId` 的函数指针。
     ///
@@ -54,11 +55,12 @@ pub struct ComponentMeta {
     /// - `Scope::Prototype`: 原型模式，每次注入都创建新实例
     pub scope: Scope,
 
-    /// 原始工厂函数，仅用于 `debug_registry` 诊断；运行时不使用。
+    /// 工厂函数：接收 `&DashMap<TypeId, CompRef>`，返回 `Box<dyn Any>`。
     ///
-    /// 该字段为可选，主要用于调试和开发阶段的组件信息查看。
-    /// 在正式运行时，组件构建通过 `ComponentDescriptor::build` 方法完成。
-    pub factory_fn: Option<FactoryFn>,
+    /// 统一签名供 Singleton 和 Prototype 使用：
+    /// - `auto_register_all` 阶段：Singleton 立即调用并缓存，Prototype 存为闭包
+    /// - App 阶段：Prototype 调用闭包每次创建新实例
+    pub factory_fn: Option<StoreFactoryFn>,
 
     pub init_sort_fn: fn() -> i32,
     pub init_fn: Option<InitFn>,
