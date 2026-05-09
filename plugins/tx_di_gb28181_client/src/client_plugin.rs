@@ -133,7 +133,7 @@ impl CompInit for Gb28181Device {
         Ok(())
     }
 
-    fn async_init(ctx: Arc<App>,_token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(ctx: Arc<App>,token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
         Box::pin(async move {
             let config = ctx.inject::<Gb28181DeviceConfig>();
 
@@ -155,10 +155,15 @@ impl CompInit for Gb28181Device {
                 platform = %config.platform_uri(),
                 "✅ GB28181 设备端处理器注册完成，开始自动注册..."
             );
-
+            let token_clone = token.clone();
             // 启动注册 + 心跳后台任务
             tokio::spawn(async move {
-                run_register_heartbeat_loop(inner).await;
+                tokio::select! {
+                    _ = run_register_heartbeat_loop(inner) => {},
+                    _ = token_clone.cancelled() => {
+                        info!("GB28181 客户端收到停止信号");
+                    }
+                }
             });
 
             Ok(())
@@ -178,7 +183,7 @@ async fn run_register_heartbeat_loop(inner: Arc<DeviceInner>) {
     let max_retries = config.max_register_retries;
     let mut retry_count = 0u32;
     let mut retry_interval = config.retry_interval_secs;
-
+    let cancel_token = SipPlugin::cancel_token();
     // ── 阶段 1：注册（带重试，支持 ctrl_c 退出） ───────────────────────────
     loop {
         tokio::select! {
@@ -186,6 +191,17 @@ async fn run_register_heartbeat_loop(inner: Arc<DeviceInner>) {
             _ = tokio::signal::ctrl_c() => {
                 info!("收到退出信号，停止注册");
                 SipPlugin::shutdown();
+                return;
+            }
+            _ = async {
+                if let Some(ref token) = cancel_token {
+                    token.cancelled().await;
+                } else {
+                    // 如果没有 cancel token，就永远等待
+                    tokio::time::sleep(std::time::Duration::from_secs(u64::MAX)).await;
+                }
+            } => {
+                info!("收到取消信号，停止注册");
                 return;
             }
             result = do_register(config) => {
@@ -218,12 +234,16 @@ async fn run_register_heartbeat_loop(inner: Arc<DeviceInner>) {
                         }));
                         // 等待重试间隔（也可被 ctrl_c 中断）
                         tokio::select! {
-                            _ = tokio::signal::ctrl_c() => {
-                                info!("收到退出信号，停止注册重试");
-                                SipPlugin::shutdown();
-                                return;
-                            }
-                            _ = sleep(Duration::from_secs(retry_interval)) => {}
+                            _ = async {
+                                if let Some(ref token) = cancel_token {
+                                    tokio::select! {
+                                        _ = sleep(Duration::from_secs(retry_interval)) => {},
+                                        _ = token.cancelled() => {},
+                                    }
+                                } else {
+                                    sleep(Duration::from_secs(retry_interval)).await;
+                                }
+                            } => {}
                         }
                         // 指数退避，最大 300 秒
                         retry_interval = (retry_interval * 2).min(300);
@@ -252,6 +272,22 @@ async fn run_register_heartbeat_loop(inner: Arc<DeviceInner>) {
         tokio::select! {
             _ = tokio::signal::ctrl_c() => {
                 info!("收到退出信号，准备注销...");
+                if let Err(e) = do_unregister(&inner.config).await {
+                    warn!("注销失败: {}", e);
+                } else {
+                    tokio::spawn(device_event::emit(DeviceEvent::Unregistered));
+                }
+                SipPlugin::shutdown();
+                break;
+            }
+            _ = async {
+                if let Some(ref token) = cancel_token {
+                    token.cancelled().await;
+                } else {
+                    tokio::time::sleep(std::time::Duration::from_secs(u64::MAX)).await;
+                }
+            } => {
+                info!("收到取消信号，准备注销...");
                 if let Err(e) = do_unregister(&inner.config).await {
                     warn!("注销失败: {}", e);
                 } else {

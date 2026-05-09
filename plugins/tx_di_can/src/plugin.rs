@@ -285,10 +285,21 @@ impl CompInit for CanPlugin {
     }
 
     /// 异步初始化：启动帧接收循环
-    fn async_init(_ctx: Arc<App>,_token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(_ctx: Arc<App>, token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
         Box::pin(async move {
             if let Some(inner_ref) = INSTANCE.get() {
-                Arc::new(inner_ref.clone()).start_rx_loop().await;
+                let inner = Arc::new(inner_ref.clone());
+                let running = inner.running.clone();
+                
+                // 监听取消信号，停止接收循环
+                let cancel_task = tokio::spawn(async move {
+                    token.cancelled().await;
+                    running.store(false, Ordering::SeqCst);
+                    info!("[can] 收到停止信号，关闭 CAN 接收循环");
+                });
+                
+                inner.start_rx_loop().await;
+                cancel_task.abort(); // 清理取消任务
             }
             Ok(())
         })
