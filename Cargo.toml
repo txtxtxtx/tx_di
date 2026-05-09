@@ -1,17 +1,33 @@
 [workspace]
 members = [
+    # 核心
     "tx-di-core",
+    # 宏
     "tx-di-macros",
+    # 示例/测试
     "di-example",
+    # 插件
+    # web
     "plugins/tx_di_axum",
+    # sip
     "plugins/tx_di_sip",
+    # 日志
     "plugins/tx_di_log",
+    # gb28181
     "plugins/tx_di_gb28181",
+    # gb28181_client
     "plugins/tx_di_gb28181_client",
+    # can todo 暂时未审查代码，ai生成
     "plugins/tx_di_can",
+    # app
+    # 国标设备模拟
     "examples/gb_cams",
+    # 国标服务
     "examples/gb28181_admin",
+    # 国标公共模块
     "common/tx_gb28181",
+    # 数据库orm
+    "plugins/tx_di_toasty",
 ]
 resolver = "3"
 [workspace.package]

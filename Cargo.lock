@@ -2903,6 +2903,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "tx_di_toasty"
+version = "0.1.0"
+
+[[package]]
 name = "tx_gb28181"
 version = "0.1.0"
 dependencies = [
