@@ -1,0 +1,32 @@
+[log_config]
+level = "debug"             # 日志级别
+prefix = "di-axum"          # 日志前缀
+dir = "./logs"              # 日志目录
+console_output = true       # 控制台输出日志
+time_format = "local"       # local / utc
+[app_config]
+app_name = "zdy_name"
+
+[web_config]
+port = 8089
+host = "192.168.0.140"
+enable_cors = true
+timeout_secs = 6            # 请求超时时间
+layers = [
+    #    [1,"auth"],           # todo 没有实现 最内层，最靠近 Handler 请在业务模块实现并注册
+    [10,"api_log"],        # 请求日志，包含请求和返回信息的日志
+    #    [3,"trace"],          # 链路追踪，包含链路追踪信息的日志
+    [100,"compression"],    # 压缩
+    [10000,"cors"]   # 允许跨域,最外层,最先接收请求
+]
+
+[sip_config]
+host = "::"
+port = 5069
+transport = "both"
+user_agent = "tx-di-sip/0.1.0"
+log_messages = false
+
+[database]
+host = "localhost"
+port = 5432

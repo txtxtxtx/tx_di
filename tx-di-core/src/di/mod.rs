@@ -22,6 +22,7 @@ use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
 
+/// 构建上下文
 pub struct BuildContext {
     /// TypeId → CompRef（使用 DashMap 支持并发访问）
     store: DashMap<TypeId, CompRef>,
