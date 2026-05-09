@@ -160,7 +160,7 @@ impl CompInit for SipPlugin {
             let token_clone = cancel_token.clone();
 
             // Endpoint serve 任务
-            let ep_task = tokio::spawn(async move {
+            let _ = tokio::spawn(async move {
                 tokio::select! {
                     _ = ep_clone.serve() => {
                         info!("SIP endpoint 服务已退出");
@@ -234,10 +234,9 @@ impl CompInit for SipPlugin {
                         // drop(permit); // permit 在此 drop，自动释放
                     });
                 }
-
                 info!("SIP 消息分发引擎已退出");
             });
-            
+
             info!("SIP 插件异步初始化完成");
             Ok(())
         })
