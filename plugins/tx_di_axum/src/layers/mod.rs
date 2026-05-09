@@ -20,7 +20,7 @@ use axum::Router;
 use axum::routing::Route;
 use tower::Layer;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer};
-use tracing::{debug, error, info, Level};
+use tracing::{debug, error, Level};
 
 pub mod api_log;
 

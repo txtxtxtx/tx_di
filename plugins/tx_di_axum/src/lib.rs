@@ -8,6 +8,7 @@ mod layers;
 pub use config::*;
 pub use comp::*;
 pub use r::R;
+pub use layers::{add_arc_layer, add_layer};
 #[cfg(test)]
 mod tests {
     use tx_di_core::{BuildContext};
@@ -17,15 +18,16 @@ mod tests {
 
     #[tokio::test]
     async fn it_works() {
-        // tx_di_log::LogConfig::init_sort();
         // D:\proj\tx_di\configs\di-config.toml
         // C:\a_me\proj\rust\tx_di\configs\di-config.toml
-        let ctx = BuildContext::new(Some(r"C:\a_me\proj\rust\tx_di\configs\di-config.toml"));
-        let app = ctx.build().expect("TODO: panic message");
-        let app = app.ins_run().await.expect("TODO: panic message");
+        let ctx = BuildContext::new(Some(r"D:\proj\tx_di\configs\di-config.toml"));
+        // 运行 app
+        let app = ctx.build()
+            .unwrap()
+            .ins_run()
+            .await.unwrap();
+        // 等待退出
         app.waiting_exit().await;
-        // BuildContext::debug_registry().expect("TODO: panic message");
-        // ctx.build_and_run().await.expect("TODO: panic message");
     }
     
 }
