@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use dashmap::DashMap;
 use tokio_util::sync::CancellationToken;
-use crate::{App, BuildContext, InnerContext, Scope};
+use crate::{App, InnerContext, Scope};
 use crate::di::common::RIE;
 
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;

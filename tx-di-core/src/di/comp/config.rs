@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use dashmap::DashMap;
 use serde::de::DeserializeOwned;
 use toml::Value::Table;
-use crate::{BuildContext, CompInit, ComponentDescriptor, CompRef, Scope};
+use crate::{CompInit, ComponentDescriptor, CompRef, Scope};
 
 /// 全局配置文件
 pub struct AppAllConfig{
