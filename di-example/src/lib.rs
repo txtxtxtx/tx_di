@@ -33,7 +33,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use tx_di_core::{tx_comp, BoxFuture, BuildContext, CompInit, App, RIE};
+use tx_di_core::{tx_comp, BoxFuture, BuildContext, CompInit, App, RIE, InnerContext};
 use log::{debug, info};
 use serde::Deserialize;
 use tokio_util::sync::CancellationToken;
@@ -152,7 +152,7 @@ pub struct AppServer {
 }
 
 impl CompInit for AppServer {
-    fn inner_init(&mut self, _ctx: &mut BuildContext) -> RIE<()> {
+    fn inner_init(&mut self, _ctx: &InnerContext) -> RIE<()> {
         info!("AppServer::inner_init");
         Ok(())
     }
