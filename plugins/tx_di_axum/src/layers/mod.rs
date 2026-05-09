@@ -181,8 +181,8 @@ where
 pub fn add_arc_layer(middleware: Arc<dyn DynMiddleware>, sort: i32)
 {
     if let Ok(mut layers) = LAYER_REGISTRY.write() {
-        layers.push((sort, middleware));
-        debug!("中间件层已注册到全局注册表: sort={}", sort);
+        layers.push((sort, middleware.clone()));
+        debug!("axum 中间件已注册到全局注册表: sort={},name={}", sort, middleware.name());
     } else {
         error!("无法获取中间件注册表的写锁");
     }
