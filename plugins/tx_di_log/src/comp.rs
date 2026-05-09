@@ -2,14 +2,13 @@ use crate::LogConfig;
 use log::{error};
 use std::sync::{Arc, OnceLock};
 use std::{fs, panic};
-use std::any::TypeId;
 use tracing::info;
 use tracing_appender::non_blocking::NonBlocking;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, EnvFilter};
-use tx_di_core::{tx_comp, CompInit, CompRef, DashMap, InnerContext, RIE};
+use tx_di_core::{tx_comp, CompInit, DashMap, InnerContext, RIE};
 
 // 全局变量存储 日志 guard
 static LOG_GUARD: OnceLock<tracing_appender::non_blocking::WorkerGuard> = OnceLock::new();

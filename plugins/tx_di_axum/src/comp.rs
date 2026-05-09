@@ -8,7 +8,7 @@ use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::TcpListener as TokioTcpListener;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
-use tx_di_core::{tx_comp, ApiR, App, BoxFuture, BuildContext, CompInit, FormattedDateTime, InnerContext, RIE};
+use tx_di_core::{tx_comp, ApiR, App, BoxFuture, CompInit, FormattedDateTime, InnerContext, RIE};
 use crate::layers::{add_static_path_prefix, freeze_static_path_prefixes, LAYER_REGISTRY};
 
 /// 全局路由器注册表

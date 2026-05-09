@@ -2,7 +2,7 @@
 
 use crate::media::MediaBackendConfig;
 use serde::Deserialize;
-use tx_di_core::{tx_comp, BuildContext, CompInit, RIE};
+use tx_di_core::{tx_comp, CompInit};
 
 /// 媒体层配置（RTP/RTSP 推流参数）
 #[derive(Debug, Clone, Deserialize)]

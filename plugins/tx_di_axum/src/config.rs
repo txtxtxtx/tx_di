@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use serde::Deserialize;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use tx_di_core::{tx_comp, BuildContext, CompInit, InnerContext, RIE};
+use tx_di_core::{tx_comp, CompInit, InnerContext, RIE};
 use crate::layers::{add_layer_by_name};
 
 

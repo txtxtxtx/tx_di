@@ -28,7 +28,7 @@ use std::sync::OnceLock;
 use tokio::sync::{mpsc, Semaphore};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
-use tx_di_core::{tx_comp, App, BoxFuture, BuildContext, CompInit, InnerContext, RIE};
+use tx_di_core::{tx_comp, App, BoxFuture, CompInit, InnerContext, RIE};
 
 // ── 性能配置常量 ──────────────────────────────────────────────────────────────
 
