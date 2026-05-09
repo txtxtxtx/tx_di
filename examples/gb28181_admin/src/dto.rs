@@ -4,7 +4,8 @@
 //! 这里创建镜像 DTO 供 JSON 序列化。
 
 use serde::Serialize;
-use tx_di_gb28181::{DeviceInfo, ChannelInfo, SessionInfo, ChannelStatus};
+use tx_gb28181::{DeviceInfo, ChannelInfo, ChannelStatus};
+use tx_di_gb28181::SessionInfo;
 
 /// 统计概要
 #[derive(Serialize)]

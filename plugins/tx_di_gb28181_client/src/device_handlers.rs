@@ -9,9 +9,11 @@ use rsipstack::dialog::dialog::DialogState;
 use rsipstack::dialog::dialog_layer::DialogLayer;
 use rsipstack::sip::{Header, HeadersExt, StatusCode};
 use rsipstack::transaction::transaction::Transaction;
+use std::str::FromStr;
 use std::sync::Arc;
 use tracing::{info, warn};
 use tx_di_sip::SipRouter;
+use tx_gb28181::Gb28181CmdType;
 use tx_di_gb28181::xml::{parse_sn, parse_xml_field};
 
 /// 注册设备端所有 SIP 消息处理器
@@ -204,13 +206,22 @@ async fn handle_message(
         return Ok(());
     }
 
-    let cmd_type: String = match parse_xml_field(&body, "CmdType") {
+    let cmd_type_str = match parse_xml_field(&body, "CmdType") {
         Some(c) => c,
         None => return Ok(()),
     };
 
-    match cmd_type.as_str() {
-        "Catalog" => {
+    // 使用公共模块的类型安全枚举进行分发（支持大小写不敏感匹配）
+    let cmd: Gb28181CmdType = match Gb28181CmdType::from_str(&cmd_type_str) {
+        Ok(cmd) => cmd,
+        Err(e) => {
+            warn!(cmd = %cmd_type_str, err = %e, "未识别的 GB28181 指令类型");
+            return Ok(());
+        }
+    };
+
+    match cmd {
+        Gb28181CmdType::Catalog => {
             let sn = parse_sn(&body);
             info!(sn = sn, "📂 收到目录查询，准备响应");
             tokio::spawn(device_event::emit(DeviceEvent::CatalogQueried { sn }));
@@ -224,7 +235,7 @@ async fn handle_message(
                 }
             });
         }
-        "DeviceInfo" => {
+        Gb28181CmdType::DeviceInfo => {
             let sn = parse_sn(&body);
             info!(sn = sn, "ℹ️ 收到设备信息查询");
             tokio::spawn(device_event::emit(DeviceEvent::DeviceInfoQueried { sn }));
@@ -236,7 +247,7 @@ async fn handle_message(
                 }
             });
         }
-        "DeviceStatus" => {
+        Gb28181CmdType::DeviceStatus => {
             let sn = parse_sn(&body);
             info!(sn = sn, "📊 收到设备状态查询");
             tokio::spawn(device_event::emit(DeviceEvent::DeviceStatusQueried { sn }));
@@ -248,7 +259,7 @@ async fn handle_message(
                 }
             });
         }
-        "RecordInfo" => {
+        Gb28181CmdType::RecordInfo => {
             let sn = parse_sn(&body);
             info!(sn = sn, "📼 收到录像查询");
             tokio::spawn(device_event::emit(DeviceEvent::RecordInfoQueried { sn }));
@@ -260,7 +271,7 @@ async fn handle_message(
                 }
             });
         }
-        "ConfigDownload" => {
+        Gb28181CmdType::ConfigDownload => {
             let sn = parse_sn(&body);
             info!(sn = sn, "⚙️ 收到配置下载查询");
             tokio::spawn(device_event::emit(DeviceEvent::ConfigDownloadQueried { sn }));
@@ -273,7 +284,7 @@ async fn handle_message(
                 }
             });
         }
-        "PresetQuery" => {
+        Gb28181CmdType::PresetList => {
             let sn = parse_sn(&body);
             info!(sn = sn, "🎯 收到预置位查询");
             tokio::spawn(device_event::emit(DeviceEvent::PresetQueryQueried { sn }));
@@ -285,7 +296,7 @@ async fn handle_message(
                 }
             });
         }
-        "Keepalive" => {
+        Gb28181CmdType::Keepalive => {
             // 平台有时会发心跳确认给设备，直接忽略
         }
         other => {
