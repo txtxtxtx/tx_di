@@ -97,7 +97,7 @@ pub fn freeze_static_path_prefixes() {
         let frozen = prefixes.clone();
         // 尝试设置，如果已经设置过则忽略
         let _ = STATIC_PATH_PREFIXES.set(frozen);
-        info!("静态文件路径前缀列表已冻结，共 {} 个前缀", 
+        debug!("静态文件路径前缀列表已冻结，共 {} 个前缀",
               STATIC_PATH_PREFIXES.get().map(|v| v.len()).unwrap_or(0));
     }
 }
@@ -159,6 +159,8 @@ pub static LAYER_REGISTRY: LazyLock<Arc<RwLock<Vec<SortLayer>>>> =
     LazyLock::new(|| Arc::new(RwLock::new(Vec::new())));
 
 /// 添加中间件到全局中间件
+///
+/// layer 实现请参照 [ApiLogLayer](crate::layers::api_log::ApiLogLayer)
 #[allow(unused)]
 pub fn add_layer<M>(middleware: M, sort: i32)
 where
@@ -166,13 +168,16 @@ where
 {
     if let Ok(mut layers) = LAYER_REGISTRY.write() {
         let middleware = Arc::new(middleware);
-        layers.push((sort, middleware));
-        debug!("中间件层已注册到全局注册表: sort={}", sort);
+        layers.push((sort, middleware.clone()));
+        debug!("axum 中间件已注册到全局注册表: sort={},name={}", sort, middleware.name());
     } else {
         error!("无法获取中间件注册表的写锁");
     }
 }
 
+/// 添加 Arc<dyn DynMiddleware> 到全局中间件,可添加自定义中间件
+///
+/// layer 实现请参照 [ApiLogLayer](crate::layers::api_log::ApiLogLayer)
 pub fn add_arc_layer(middleware: Arc<dyn DynMiddleware>, sort: i32)
 {
     if let Ok(mut layers) = LAYER_REGISTRY.write() {
@@ -182,13 +187,15 @@ pub fn add_arc_layer(middleware: Arc<dyn DynMiddleware>, sort: i32)
         error!("无法获取中间件注册表的写锁");
     }
 }
+
+/// 通过名称添加中间件
 pub fn add_layer_by_name(name: impl Into<String>, sort: i32){
     if let Some(middleware) = get_layer_by_name(name) {
         add_arc_layer(middleware, sort);
     }
 }
 /// 通过名称获取中间件
-pub fn get_layer_by_name(name: impl Into<String>) -> Option<Arc<dyn DynMiddleware>> {
+fn get_layer_by_name(name: impl Into<String>) -> Option<Arc<dyn DynMiddleware>> {
     let name = name.into();
     match name.as_str() {
         "api_log" => {
