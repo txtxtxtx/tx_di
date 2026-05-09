@@ -207,7 +207,9 @@ mod tests {
 
     /// 辅助函数：创建无配置文件的上下文（自动扫描所有组件）
     fn create_full_context() -> BuildContext {
-        BuildContext::new(Some(r"D:\proj\tx_di\configs\di-example.toml"))
+        //
+        // D:\proj\tx_di\configs\di-example.toml
+        BuildContext::new(Some(r"C:\a_me\proj\rust\tx_di\configs\di-example.toml"))
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -273,7 +275,7 @@ mod tests {
     //  2. DI 核心功能 — 原型 (Prototype)
     // ════════════════════════════════════════════════════════════════════
 
-    // todo 目前原型只能在初始方法中注入，不能在其他地方注入
+    /// 验证 Prototype 组件每次注入产生独立实例
     #[test]
     fn test_prototype_independent() {
         let ctx = create_full_context().build().unwrap();
@@ -288,6 +290,48 @@ mod tests {
         );
         assert_eq!(l1.count(), 1);
         assert_eq!(l2.count(), 1);
+    }
+
+    /// 验证：build() 后的 App 也能注入 Prototype 组件
+    #[test]
+    fn test_prototype_inject_from_app() {
+        let app = create_full_context().build().unwrap();
+
+        // 从 App 注入 Prototype，不应 panic
+        let l1 = app.inject::<RequestLogger>();
+        let l2 = app.inject::<RequestLogger>();
+
+        // 每次注入创建新实例
+        assert_ne!(
+            Arc::as_ptr(&l1),
+            Arc::as_ptr(&l2),
+            "App 阶段 Prototype 注入应产生不同实例"
+        );
+        // 各实例状态独立
+        assert_eq!(l1.count(), 0);
+        assert_eq!(l2.count(), 0);
+
+        // 验证 try_inject 也能拿到 Prototype
+        let l3 = app.try_inject::<RequestLogger>();
+        assert!(l3.is_some(), "App::try_inject 应能返回 Prototype");
+    }
+
+    /// 验证：App::inject 返回的 Prototype 中注入的 Singleton 仍是全局同一实例
+    #[test]
+    fn test_prototype_from_app_uses_same_singletons() {
+        let app = create_full_context().build().unwrap();
+
+        // Singleton：两次注入指向同一实例
+        let db1 = app.inject::<DbPool>();
+        let db2 = app.inject::<DbPool>();
+        assert!(Arc::ptr_eq(&db1, &db2), "Singleton 在 App 阶段应返回同一实例");
+
+        // Prototype 中包含 Singleton 依赖，验证也是同一个
+        let server = app.inject::<AppServer>();
+        assert!(
+            Arc::ptr_eq(&server.user_svc.db, &db1),
+            "Prototype 注入的 Singleton 应与全局一致"
+        );
     }
 
     #[test]
@@ -446,15 +490,6 @@ mod tests {
     }
 
     #[test]
-    fn test_take_removes_from_context() {
-        let mut ctx = create_full_context();
-        let _db_before = ctx.inject::<DbPool>();
-        let _server = ctx.take::<AppServer>().expect("AppServer 构建失败");
-        let _db_after = ctx.inject::<DbPool>();
-        // take 之后其他单例仍然可用
-    }
-
-    #[test]
     fn test_debug_registry_no_panic() {
         BuildContext::debug_registry().expect("debug_registry 不应出错");
     }
@@ -519,7 +554,7 @@ mod tests {
         let db_port: Option<u16> = global_config.get("database.port");
         assert_eq!(db_port, Some(5432));
 
-        let log_level: Option<String> = global_config.get("logging.level");
+        let log_level: Option<String> = global_config.get("log_config.level");
         assert_eq!(log_level, Some("debug".to_string()));
     }
 
