@@ -237,9 +237,7 @@ impl CompInit for SipPlugin {
 
                 info!("SIP 消息分发引擎已退出");
             });
-
-            // 等待 endpoint task
-            ep_task.await.ok();
+            
             info!("SIP 插件异步初始化完成");
             Ok(())
         })
