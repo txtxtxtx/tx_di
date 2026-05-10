@@ -2,6 +2,7 @@
 
 use crate::media::MediaBackendConfig;
 use serde::Deserialize;
+use std::collections::HashMap;
 use tx_di_core::{tx_comp, CompInit};
 
 /// 媒体层配置（RTP/RTSP 推流参数）
@@ -99,9 +100,23 @@ pub struct Gb28181ServerConfig {
     #[serde(default = "default_auth_password")]
     pub auth_password: String,
 
+    /// 按设备 ID 配置独立密码（优先级高于 auth_password）
+    ///
+    /// ```toml
+    /// [gb28181_server_config.device_passwords]
+    /// "34020000001320000001" = "device1_pass"
+    /// "34020000001320000002" = "device2_pass"
+    /// ```
+    #[serde(default)]
+    pub device_passwords: HashMap<String, String>,
+
     /// 媒体层配置
     #[serde(default)]
     pub media: MediaConfig,
+
+    /// 级联配置（上下级平台互联）
+    #[serde(default)]
+    pub cascade: CascadeConfig,
     
     /// 统一流媒体后端配置（新版）
     ///
@@ -121,8 +136,10 @@ impl Default for Gb28181ServerConfig {
             register_ttl: default_register_ttl(),
             enable_auth: false,
             auth_password: default_auth_password(),
+            device_passwords: HashMap::new(),
             media: MediaConfig::default(),
             media_backend: MediaBackendConfig::default(),
+            cascade: CascadeConfig::default(),
         }
     }
 }
@@ -150,4 +167,46 @@ fn default_register_ttl() -> u32 {
 }
 fn default_auth_password() -> String {
     "12345678".to_string()
+}
+
+/// 级联配置（上下级平台互联）
+///
+/// ```toml
+/// [gb28181_server_config.cascade]
+/// enable_upper = true
+/// enable_lower = false
+/// # upper_platform_sip = "sip:192.168.1.1:5060"
+/// # upper_platform_id = "34020000002000000001"
+/// # upper_auth_password = "12345678"
+/// ```
+#[derive(Debug, Clone, Deserialize,Default)]
+pub struct CascadeConfig {
+    /// 本平台是否同时作为上级（接收下级设备/平台注册）
+    #[serde(default="enable_upper")]
+    pub enable_upper: bool,
+
+    /// 本平台是否同时作为下级（向上级平台注册）
+    #[serde(default)]
+    pub enable_lower: bool,
+
+    /// 上级平台 SIP 地址（enable_lower=true 时必填）
+    pub upper_platform_sip: Option<String>,
+
+    /// 上级平台 ID
+    pub upper_platform_id: Option<String>,
+
+    /// 向上级注册的密码
+    pub upper_auth_password: Option<String>,
+}
+fn enable_upper() -> bool {
+    true
+}
+impl Gb28181ServerConfig {
+    /// 获取设备认证密码（优先查 device_passwords，fallback 到全局 auth_password）
+    pub fn get_password(&self, device_id: &str) -> &str {
+        self.device_passwords
+            .get(device_id)
+            .map(|s| s.as_str())
+            .unwrap_or(&self.auth_password)
+    }
 }
