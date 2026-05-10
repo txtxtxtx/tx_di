@@ -156,7 +156,7 @@ impl CompInit for AppServer {
         info!("AppServer::inner_init");
         Ok(())
     }
-    fn init(_ctx: Arc<App>) -> RIE<()> {
+    fn init(_ctx: Arc<App>,_token: CancellationToken) -> RIE<()> {
         debug!("AppServer::init");
         Ok(())
     }
