@@ -158,7 +158,7 @@ pub fn inject_from_store<T: Any + Send + Sync + 'static>(
 ///
 /// 通过实现 `init_sort()` 方法可以控制组件的初始化顺序，
 /// 返回值越小越先初始化。默认值为 10000。
-pub trait CompInit :Any + Sized + Send + Sync + 'static{
+pub trait CompInit :Any + Send + Sync + 'static{
     /// 组件内部初始化方法
     ///
     /// 在主键完成构建后、注入全局上下文之前执行
