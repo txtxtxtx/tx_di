@@ -23,3 +23,4 @@ pub use cmd_type::Gb28181CmdType;
 pub use device::{ChannelInfo, ChannelStatus, DeviceInfo};
 pub use event::{Gb28181Event, add_event_listener, emit, subscribe};
 pub use sip::extract_user_from_sip_uri;
+pub use xml::AlarmType;
