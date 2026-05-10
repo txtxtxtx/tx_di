@@ -25,19 +25,19 @@ tokio-stream.workspace = true
 futures-core.workspace = true
 
 # 随机数
-rand = "0.8"
+rand.workspace = true
 
 # 并发
-dashmap = "6"
+dashmap.workspace = true
 
 # 图片处理
-image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+image = {workspace = true, features = ["jpeg", "png"] }
 
 # 时间
 chrono.workspace = true
 
 # 字节处理
-bytes = "1"
+bytes.workspace = true
 
 # 配置文件解析
 toml.workspace = true
