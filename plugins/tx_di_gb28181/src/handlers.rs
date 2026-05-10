@@ -12,6 +12,7 @@
 //! ```
 
 use crate::config::Gb28181ServerConfig;
+use crate::crypto::{generate_nonce, verify_digest_auth};
 use crate::device_registry::{ChannelInfo, ChannelStatus, DeviceInfo, DeviceRegistry};
 use crate::event::{emit, Gb28181Event};
 use crate::xml::{
@@ -46,9 +47,9 @@ fn create_ok_handler(method_name: &'static str) -> impl Fn(Transaction) -> std::
 
 /// 向 SipRouter 注册所有 GB28181 服务端消息处理器
 pub fn register_server_handlers(
-    registry: Arc<DeviceRegistry>,
+    registry: DeviceRegistry,
     config: Arc<Gb28181ServerConfig>,
-    nonce_store: Arc<NonceStore>,
+    nonce_store: NonceStore,
 ) {
     let reg_register = registry.clone();
     let cfg_register = config.clone();
@@ -82,20 +83,22 @@ pub fn register_server_handlers(
 }
 
 // ── Nonce 存储（用于摘要认证）────────────────────────────────────────────────
+// Nonce 生成和摘要验证函数已提取到 crate::crypto 模块
 
 /// Nonce 存储：记录已发给每个设备的 nonce，防止重放攻击
+#[derive(Clone)]
 pub struct NonceStore {
-    inner: DashMap<String, String>,
+    inner: Arc<DashMap<String, String>>,
 }
 
 impl NonceStore {
     pub fn new() -> Self {
         Self {
-            inner: DashMap::new(),
+            inner: Arc::new(DashMap::new()) ,
         }
     }
 
-    /// 生成并存储 nonce
+    /// 生成并存储 nonce（使用加密安全随机数）
     pub fn issue(&self, device_id: &str) -> String {
         let nonce = generate_nonce();
         self.inner
@@ -117,170 +120,14 @@ impl NonceStore {
     }
 }
 
-/// 生成随机 nonce（16字节十六进制）
-fn generate_nonce() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let t = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .subsec_nanos();
-    // 简单 nonce：时间戳 + 简单散列 0x9e37_79b9 著名的 Golden Ratio constant（黄金比例常数）
-    format!("{:08x}{:08x}", t, t.wrapping_mul(0x9e37_79b9))
-}
-
-/// 验证 SIP 摘要认证
-///
-/// 按 RFC 2617 / GB28181 规范验证 Authorization 头
-fn verify_digest_auth(
-    auth_header: &str,
-    method: &str,
-    uri: &str,
-    expected_password: &str,
-    realm: &str,
-    nonce: &str,
-) -> bool {
-    // 从 Authorization 头提取各字段
-    let get_field = |name: &str| -> Option<String> {
-        let prefix = format!("{}=\"", name);
-        let start = auth_header.find(&prefix)? + prefix.len();
-        let end = auth_header[start..].find('"')?;
-        Some(auth_header[start..start + end].to_string())
-    };
-
-    let auth_response = match get_field("response") {
-        Some(r) => r,
-        None => return false,
-    };
-    let auth_nonce = get_field("nonce").unwrap_or_default();
-    let auth_realm = get_field("realm").unwrap_or_default();
-    let auth_username = get_field("username").unwrap_or_default();
-
-    // 验证 realm 匹配
-    if auth_realm != realm {
-        debug!("realm 不匹配: expected={}, got={}", realm, auth_realm);
-        return false;
-    }
-
-    // 验证 nonce 匹配
-    if auth_nonce != nonce {
-        debug!("nonce 不匹配: expected={}, got={}", nonce, auth_nonce);
-        return false;
-    }
-
-    // 计算期望的 response = MD5(MD5(A1):nonce:MD5(A2))
-    // A1 = username:realm:password （使用传入的 realm 而非 Authorization 中的）
-    let a1 = format!("{}:{}:{}", auth_username, realm, expected_password);
-    // A2 = method:uri （使用传入的 uri）
-    let a2 = format!("{}:{}", method, uri);
-    let ha1 = md5_hex(md5_digest(a1.as_bytes()));
-    let ha2 = md5_hex(md5_digest(a2.as_bytes()));
-    let expected = md5_hex(md5_digest(format!("{}:{}:{}", ha1, nonce, ha2).as_bytes()));
-
-    if auth_response == expected {
-        true
-    } else {
-        debug!(
-            "摘要验证失败: username={}, realm={}, uri={}",
-            auth_username, realm, uri
-        );
-        false
-    }
-}
-
-/// 简单的 MD5 实现（GB28181 只使用 MD5，无需引入额外依赖）
-fn md5_digest(data: &[u8]) -> [u8; 16] {
-    // RFC 1321 MD5 实现
-    let mut state = [0x67452301u32, 0xefcdab89, 0x98badcfe, 0x10325476];
-
-    // 填充
-    let orig_len_bits = (data.len() as u64) * 8;
-    let mut msg = data.to_vec();
-    msg.push(0x80);
-    while msg.len() % 64 != 56 {
-        msg.push(0);
-    }
-    msg.extend_from_slice(&orig_len_bits.to_le_bytes());
-
-    // K 表
-    const K: [u32; 64] = [
-        0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee,
-        0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
-        0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be,
-        0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
-        0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa,
-        0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
-        0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed,
-        0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
-        0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c,
-        0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
-        0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05,
-        0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
-        0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039,
-        0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
-        0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1,
-        0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
-    ];
-    const S: [u32; 64] = [
-        7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
-        5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20,
-        4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
-        6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
-    ];
-
-    for chunk in msg.chunks(64) {
-        let mut w = [0u32; 16];
-        for (i, b) in chunk.chunks(4).enumerate() {
-            w[i] = u32::from_le_bytes([b[0], b[1], b[2], b[3]]);
-        }
-        let (mut a, mut b, mut c, mut d) = (state[0], state[1], state[2], state[3]);
-        for i in 0..64usize {
-            let (f, g): (u32, usize) = if i < 16 {
-                ((b & c) | (!b & d), i)
-            } else if i < 32 {
-                ((d & b) | (!d & c), (5 * i + 1) % 16)
-            } else if i < 48 {
-                (b ^ c ^ d, (3 * i + 5) % 16)
-            } else {
-                (c ^ (b | !d), (7 * i) % 16)
-            };
-            let temp = d;
-            d = c;
-            c = b;
-            b = b.wrapping_add(
-                a.wrapping_add(f)
-                    .wrapping_add(K[i])
-                    .wrapping_add(w[g])
-                    .rotate_left(S[i]),
-            );
-            a = temp;
-        }
-        state[0] = state[0].wrapping_add(a);
-        state[1] = state[1].wrapping_add(b);
-        state[2] = state[2].wrapping_add(c);
-        state[3] = state[3].wrapping_add(d);
-    }
-
-    let mut result = [0u8; 16];
-    for (i, &s) in state.iter().enumerate() {
-        let b = s.to_le_bytes();
-        result[i * 4..i * 4 + 4].copy_from_slice(&b);
-    }
-    result
-}
-
-/// 将 MD5 结果转换为十六进制字符串
-fn md5_hex(hash: [u8; 16]) -> String {
-    hash.iter().map(|b| format!("{:02x}", b)).collect()
-}
-
 // ── REGISTER ─────────────────────────────────────────────────────────────────
 
 /// 处理 REGISTER 请求
 async fn handle_register(
     mut tx: Transaction,
-    registry: Arc<DeviceRegistry>,
+    registry: DeviceRegistry,
     config: Arc<Gb28181ServerConfig>,
-    nonce_store: Arc<NonceStore>,
+    nonce_store: NonceStore,
 ) -> anyhow::Result<()> {
     // 解析 From 头中的 device_id
     let from_str = tx
@@ -365,7 +212,7 @@ async fn handle_register(
                     &auth,
                     "REGISTER",
                     &req_uri,
-                    &config.auth_password,
+                    config.get_password(&device_id),
                     &config.realm,
                     &nonce,
                 );
@@ -429,7 +276,7 @@ async fn handle_register(
 
 async fn handle_message(
     mut tx: Transaction,
-    registry: Arc<DeviceRegistry>,
+    registry: DeviceRegistry,
     _config: Arc<Gb28181ServerConfig>,
 ) -> anyhow::Result<()> {
     // 先回 200 OK（GB28181 要求先确认再处理）
@@ -497,7 +344,7 @@ async fn handle_message(
 async fn handle_keepalive(
     device_id: &str,
     body: &str,
-    registry: &Arc<DeviceRegistry>,
+    registry: &DeviceRegistry,
 ) -> anyhow::Result<()> {
     let status = parse_xml_field(body, "Status").unwrap_or_else(|| "OK".to_string());
     let was_offline = registry
@@ -533,7 +380,7 @@ async fn handle_keepalive(
 async fn handle_catalog_response(
     device_id: &str,
     body: &str,
-    registry: &Arc<DeviceRegistry>,
+    registry: &DeviceRegistry,
 ) -> anyhow::Result<()> {
     let items = parse_catalog_items(body);
     let channel_count = items.len();
