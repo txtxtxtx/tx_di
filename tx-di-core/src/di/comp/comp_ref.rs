@@ -168,7 +168,7 @@ pub trait CompInit :Any + Sized + Send + Sync + 'static{
     }
     /// 同步初始化方法
     #[allow(unused_variables)]
-    fn init(ctx: Arc<App>) ->RIE<()> {
+    fn init(ctx: Arc<App>, token: CancellationToken) ->RIE<()> {
         Ok(())
     }
 

@@ -106,15 +106,17 @@ impl CompInit for SipPlugin {
         );
         Ok(())
     }
-
+    fn init(_ctx: Arc<App>, token: CancellationToken) -> RIE<()> {
+        // 存储取消令牌,确保在异步任务中可以使用
+        let _ = CANCEL_TOKEN.set(token);
+        Ok(())
+    }
+    
     fn async_init(ctx: Arc<App>,token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
         Box::pin(async move {
             let config = ctx.inject::<SipConfig>();
             let cancel_token = token;
-
-            // 存储取消令牌
-            let _ = CANCEL_TOKEN.set(cancel_token.clone());
-
+            
             // 构建传输层
             let transport_layer = build_transport_layer(&config, cancel_token.clone()).await?;
 

@@ -271,7 +271,7 @@ impl App {
         for meta in metas {
             if let Some(init_fn) = meta.init_fn {
                 // 直接调函数指针，传入 &mut self（DashMap 的 owner）
-                init_fn(app.clone())?;
+                init_fn(app.clone(), app.shutdown_token.clone())?;
             }
         }
         Ok(())
