@@ -2514,18 +2514,239 @@ pub fn build_guard_control_xml_v2(
     };
 
     format!(
-        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
-         <Control>\r\n\
-         <CmdType>DeviceControl</CmdType>\r\n\
-         <SN>{sn}</SN>\r\n\
-         <DeviceID>{channel_id}</DeviceID>\r\n\
-         <GuardCmd>{guard_cmd}</GuardCmd>\r\n\
-         <PTZCmd>{ptz_cmd}</PTZCmd>\r\n\
-         </Control>",
+"<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
+<Control>\r\n\
+<CmdType>DeviceControl</CmdType>\r\n\
+<SN>{sn}</SN>\r\n\
+<DeviceID>{channel_id}</DeviceID>\r\n\
+<GuardCmd>{guard_cmd}</GuardCmd>\r\n\
+<PTZCmd>{ptz_cmd}</PTZCmd>\r\n\
+</Control>",
         sn = sn,
         channel_id = channel_id,
         guard_cmd = guard_cmd,
         ptz_cmd = ptz_cmd
+    )
+}
+
+// ── 报警类型枚举 ─────────────────────────────────────────────────────────────
+
+/// GB28181 报警类型枚举（GB28181-2022 §10.2.4.3）
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AlarmType {
+    /// 1 - 紧急报警
+    Emergency,
+    /// 2 - 消防报警
+    Fire,
+    /// 3 - 非法入侵/布防区入侵
+    Forced,
+    /// 4 - 设备故障
+    Equipment,
+    /// 5 - 设备罩被打开
+    EquipmentOpen,
+    /// 6 - 周界入侵
+    Pfa,
+    /// 7 - 车辆检测
+    Vehicle,
+    /// 8 - 跨越围栏
+    Pfd,
+    /// 9 - 场景变更
+    Scene,
+    /// a - 移动侦测
+    Vmd,
+    /// b - 智能行为分析
+    Smart,
+    /// 其他自定义类型
+    Custom(String),
+}
+
+impl AlarmType {
+    /// 从 GB28181 AlarmType 字符串解析
+    pub fn from_gb28181(s: &str) -> Self {
+        match s.trim() {
+            "1" => Self::Emergency,
+            "2" => Self::Fire,
+            "3" => Self::Forced,
+            "4" => Self::Equipment,
+            "5" => Self::EquipmentOpen,
+            "6" => Self::Pfa,
+            "7" => Self::Vehicle,
+            "8" => Self::Pfd,
+            "9" => Self::Scene,
+            "a" | "A" => Self::Vmd,
+            "b" | "B" => Self::Smart,
+            other => Self::Custom(other.to_string()),
+        }
+    }
+
+    /// 转换为 GB28181 标准编号字符串
+    pub fn to_gb28181(&self) -> String {
+        match self {
+            Self::Emergency => "1".to_string(),
+            Self::Fire => "2".to_string(),
+            Self::Forced => "3".to_string(),
+            Self::Equipment => "4".to_string(),
+            Self::EquipmentOpen => "5".to_string(),
+            Self::Pfa => "6".to_string(),
+            Self::Vehicle => "7".to_string(),
+            Self::Pfd => "8".to_string(),
+            Self::Scene => "9".to_string(),
+            Self::Vmd => "a".to_string(),
+            Self::Smart => "b".to_string(),
+            Self::Custom(s) => s.clone(),
+        }
+    }
+
+    /// 获取报警类型中文描述
+    pub fn description(&self) -> &str {
+        match self {
+            Self::Emergency => "紧急报警",
+            Self::Fire => "消防报警",
+            Self::Forced => "非法入侵",
+            Self::Equipment => "设备故障",
+            Self::EquipmentOpen => "设备罩被打开",
+            Self::Pfa => "周界入侵",
+            Self::Vehicle => "车辆检测",
+            Self::Pfd => "跨越围栏",
+            Self::Scene => "场景变更",
+            Self::Vmd => "移动侦测",
+            Self::Smart => "智能行为分析",
+            Self::Custom(_) => "自定义报警",
+        }
+    }
+}
+
+impl std::fmt::Display for AlarmType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
+// ── 移动位置查询 ─────────────────────────────────────────────────────────────
+
+/// 构建移动位置查询 MESSAGE body（平台 → 设备）
+///
+/// GB28181-2022 A.2.4.5：平台主动查询设备位置
+/// `interval` 为 `None` 时表示仅查一次，`Some(secs)` 时表示设备按间隔持续上报
+pub fn build_mobile_position_query_xml(
+    device_id: &str,
+    sn: u32,
+    interval: Option<u32>,
+) -> String {
+    let interval_str = interval
+        .map(|i| format!("\r\n<Interval>{}</Interval>", i))
+        .unwrap_or_default();
+    format!(
+"<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
+<Query>\r\n\
+<CmdType>MobilePosition</CmdType>\r\n\
+<SN>{sn}</SN>\r\n\
+<DeviceID>{device_id}</DeviceID>\r\n\
+{interval}</Query>",
+        sn = sn,
+        device_id = device_id,
+        interval = interval_str,
+    )
+}
+
+/// 构建取消移动位置订阅 XML（平台 → 设备）
+///
+/// interval=0 表示取消订阅
+pub fn build_mobile_position_unsubscribe_xml(device_id: &str, sn: u32) -> String {
+    build_mobile_position_query_xml(device_id, sn, Some(0))
+}
+
+// ── PTZ 锁定/解锁 ───────────────────────────────────────────────────────────
+
+/// PTZ 云台锁定（A.2.3.1.12）
+///
+/// 锁定后其他平台无法控制该设备的云台
+pub fn build_ptz_lock_xml(channel_id: &str, sn: u32) -> String {
+    format!(
+"<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
+<Control>\r\n\
+<CmdType>DeviceControl</CmdType>\r\n\
+<SN>{sn}</SN>\r\n\
+<DeviceID>{channel_id}</DeviceID>\r\n\
+<PTZ>\r\n\
+<lock>1</lock>\r\n\
+</PTZ>\r\n\
+</Control>",
+        sn = sn,
+        channel_id = channel_id,
+    )
+}
+
+/// PTZ 云台解锁（A.2.3.1.12）
+pub fn build_ptz_unlock_xml(channel_id: &str, sn: u32) -> String {
+    format!(
+"<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
+<Control>\r\n\
+<CmdType>DeviceControl</CmdType>\r\n\
+<SN>{sn}</SN>\r\n\
+<DeviceID>{channel_id}</DeviceID>\r\n\
+<PTZ>\r\n\
+<lock>0</lock>\r\n\
+</PTZ>\r\n\
+</Control>",
+        sn = sn,
+        channel_id = channel_id,
+    )
+}
+
+// ── DeviceControl 手动抓拍 ───────────────────────────────────────────────────
+
+/// DeviceControl 手动抓拍（非 INVITE 模式，A.2.3.1.4）
+///
+/// 通过 RecordCmd 控制设备抓拍，设备收到后主动推送图片
+pub fn build_snapshot_control_xml(channel_id: &str, sn: u32) -> String {
+    format!(
+"<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
+<Control>\r\n\
+<CmdType>DeviceControl</CmdType>\r\n\
+<SN>{sn}</SN>\r\n\
+<DeviceID>{channel_id}</DeviceID>\r\n\
+<RecordCmd>SHOOT</RecordCmd>\r\n\
+</Control>",
+        sn = sn,
+        channel_id = channel_id,
+    )
+}
+
+// ── 配置推送 ─────────────────────────────────────────────────────────────────
+
+/// 推送配置参数到设备（A.2.3.2）
+///
+/// `device_id`: 设备 ID
+/// `sn`: 消息序号
+/// `config_type`: 配置类型
+/// `params`: (name, value) 参数对列表
+pub fn build_config_push_xml(
+    device_id: &str,
+    sn: u32,
+    config_type: ConfigType,
+    params: &[(String, String)],
+) -> String {
+    let params_xml: String = params
+        .iter()
+        .map(|(name, value)| format!("    <{}>{}</{}>", name, value, name))
+        .collect::<Vec<_>>()
+        .join("\r\n");
+    let config_type_str = config_type.as_str();
+    format!(
+"<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
+<Control>\r\n\
+<CmdType>ConfigDownload</CmdType>\r\n\
+<SN>{sn}</SN>\r\n\
+<DeviceID>{device_id}</DeviceID>\r\n\
+<ConfigType>{config_type_str}</ConfigType>\r\n\
+<ConfigParam>\r\n\
+{params}\r\n\
+</ConfigParam>\r\n\
+</Control>",
+        sn = sn,
+        device_id = device_id,
+        params = params_xml,
     )
 }
 
