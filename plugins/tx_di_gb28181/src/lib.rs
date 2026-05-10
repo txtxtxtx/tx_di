@@ -102,6 +102,7 @@
 //! ```
 
 mod config;
+pub mod crypto;
 mod device_registry;
 mod event;
 mod handlers;
@@ -110,7 +111,7 @@ pub mod sdp;
 pub mod xml;
 pub mod media;
 
-pub use config::{Gb28181ServerConfig, MediaConfig};
+pub use config::{Gb28181ServerConfig, MediaConfig, CascadeConfig};
 pub use device_registry::{ChannelInfo, ChannelStatus, DeviceInfo, DeviceRegistry};
 pub use event::{Gb28181Event, subscribe as subscribe_events};
 pub use handlers::Gb28181CmdType;
@@ -118,11 +119,14 @@ pub use plugin::{Gb28181Server, Gb28181ServerHandle, SessionInfo};
 pub use sdp::{parse_sdp_ssrc, AudioCodec, AudioSessionInfo, SnapshotInfo};
 pub use xml::{
     build_catalog_query_xml, build_device_info_query_xml, build_keepalive_xml,
+    build_mobile_position_query_xml, build_mobile_position_unsubscribe_xml,
+    build_ptz_lock_xml, build_ptz_unlock_xml, build_snapshot_control_xml,
+    build_config_push_xml,
     parse_xml_field, PtzCommand, PtzSpeed, PlaybackControl, TimeSyncInfo, ConfigType,
     ConfigItem, PresetInfo, CruiseInfo, CruiseTrack, CruisePoint,
     PtzPreciseParam, ZoomRect, GuardMode, StorageStatus, PtzPreciseStatus,
     TargetTrackMode, parse_storage_status, parse_cruise_track, parse_ptz_precise_status,
-    parse_guard_info, GuardInfo,
+    parse_guard_info, GuardInfo, AlarmType,
 };
 
 // media 统一接口再导出
