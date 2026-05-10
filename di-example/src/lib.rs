@@ -160,7 +160,7 @@ impl CompInit for AppServer {
         debug!("AppServer::init");
         Ok(())
     }
-    fn async_init(ctx: Arc<App>,_token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(ctx: Arc<App>,_token: CancellationToken) -> BoxFuture {
         Box::pin(async move {
             debug!("AppServer::async_init, app.len={}", ctx.len());
             Ok(())

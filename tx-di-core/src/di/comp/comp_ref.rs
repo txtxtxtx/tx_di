@@ -6,7 +6,7 @@ use tokio_util::sync::CancellationToken;
 use crate::{App, InnerContext, Scope};
 use crate::di::common::RIE;
 
-pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+pub type BoxFuture = Pin<Box<dyn Future<Output = RIE<()>> + Send>>;
 
 /// 工厂函数类型别名
 ///
@@ -174,7 +174,7 @@ pub trait CompInit :Any + Send + Sync + 'static{
 
     /// 异步初始化方法
     #[allow(unused_variables)]
-    fn async_init(ctx: Arc<App>,token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(ctx: Arc<App>,token: CancellationToken) -> BoxFuture {
         Box::pin(async {
             Ok(())
         })

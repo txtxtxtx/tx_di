@@ -121,7 +121,7 @@ pub struct Gb28181Server {
 }
 
 impl CompInit for Gb28181Server {
-    fn async_init(ctx: Arc<App>, _token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(ctx: Arc<App>, _token: CancellationToken) -> BoxFuture {
         Box::pin(async move {
             let gb28181_server = ctx.inject::<Gb28181Server>();
 

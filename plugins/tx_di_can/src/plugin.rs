@@ -285,7 +285,7 @@ impl CompInit for CanPlugin {
     }
 
     /// 异步初始化：启动帧接收循环
-    fn async_init(_ctx: Arc<App>, token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(_ctx: Arc<App>, token: CancellationToken) -> BoxFuture {
         Box::pin(async move {
             if let Some(inner_ref) = INSTANCE.get() {
                 let inner = Arc::new(inner_ref.clone());

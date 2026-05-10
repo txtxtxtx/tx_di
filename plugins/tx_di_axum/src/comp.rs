@@ -38,7 +38,7 @@ impl CompInit for WebPlugin {
         self.router = WebPlugin::merge_routers();
         Ok(())
     }
-    fn async_init(ctx: Arc<App>,token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(ctx: Arc<App>,token: CancellationToken) -> BoxFuture {
         let config = ctx.inject::<WebConfig>();
         let web = ctx.inject::<WebPlugin>();
         let app_status = AppStatus { app: ctx.clone() };

@@ -253,7 +253,7 @@ impl CompInit for AppServer {
         Ok(())
     }
 
-    fn async_init(ctx: Arc<App>) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(ctx: Arc<App>) -> BoxFuture {
         let addr = ctx.inject::<AppServer>().bind_addr.clone();
         Box::pin(async move {
             println!("异步初始化，bind_addr: {}", addr);

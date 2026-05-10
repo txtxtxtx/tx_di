@@ -112,7 +112,7 @@ impl CompInit for SipPlugin {
         Ok(())
     }
     
-    fn async_init(ctx: Arc<App>,token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(ctx: Arc<App>,token: CancellationToken) -> BoxFuture {
         Box::pin(async move {
             let config = ctx.inject::<SipConfig>();
             let cancel_token = token;

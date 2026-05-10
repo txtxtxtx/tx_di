@@ -133,7 +133,7 @@ impl CompInit for Gb28181Device {
         Ok(())
     }
 
-    fn async_init(ctx: Arc<App>,token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
+    fn async_init(ctx: Arc<App>,token: CancellationToken) -> BoxFuture {
         Box::pin(async move {
             let config = ctx.inject::<Gb28181DeviceConfig>();
 

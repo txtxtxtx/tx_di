@@ -15,7 +15,7 @@ use tokio_util::sync::CancellationToken;
 // 类型别名：简化复杂函数指针类型的定义
 pub type StoreFactoryFn = fn(&DashMap<TypeId, CompRef>) -> Box<dyn Any + Send + Sync>;
 type InitFn = fn(Arc<App>,CancellationToken) -> RIE<()>;
-type AsyncInitFn = fn(Arc<App>, CancellationToken) -> BoxFuture<'static, RIE<()>>;
+type AsyncInitFn = fn(Arc<App>, CancellationToken) -> BoxFuture;
 
 #[linkme::distributed_slice]
 pub static COMPONENT_REGISTRY: [ComponentMeta] = [..];
