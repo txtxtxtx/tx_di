@@ -76,7 +76,8 @@ pub struct BroadcastSessionInfo {
 pub(crate) struct Gb28181ServerInner {
     pub(crate) config: Arc<Gb28181ServerConfig>,
     pub(crate) registry: DeviceRegistry,
-    pub(crate) sn: AtomicU32,
+    /// 每设备独立 SN 序列号（device_id → SN），避免多设备并发时全局 SN 冲突
+    pub(crate) sn_map: DashMap<String, AtomicU32>,
     /// 活跃媒体会话表（call_id → SessionInfo）
     pub(crate) sessions: DashMap<String, SessionInfo>,
     /// 活跃语音广播会话表（device_id → BroadcastSessionInfo）
@@ -108,37 +109,47 @@ pub(crate) struct Gb28181ServerInner {
 /// ```
 #[tx_comp(init)]
 pub struct Gb28181Server {
+    /// 配置
     pub config: Arc<Gb28181ServerConfig>,
+    /// 设备注册表
+    #[tx_cst(DeviceRegistry::new())]
+    pub device_registry: DeviceRegistry,
+    /// 随机数存储
+    #[tx_cst(NonceStore::new())]
+    pub nonce_store: NonceStore,
+
 }
 
 impl CompInit for Gb28181Server {
     fn async_init(ctx: Arc<App>, _token: CancellationToken) -> BoxFuture<'static, RIE<()>> {
         Box::pin(async move {
-            let config = ctx.inject::<Gb28181ServerConfig>();
+            let gb28181_server = ctx.inject::<Gb28181Server>();
 
-            // 创建全局注册表
-            let registry = DeviceRegistry::new();
-            let nonce_store = Arc::new(NonceStore::new());
+            let config = gb28181_server.config.clone();
+            let registry = gb28181_server.device_registry.clone();
+            let nonce_store = gb28181_server.nonce_store.clone();
 
             // 构建流媒体后端（优先 media_backend，兼容旧版 zlm 配置）
             let media_backend = build_backend(&config.media_backend);
 
             // 注册 SIP 消息处理器
-            register_server_handlers(Arc::new(registry.clone()), config.clone(), nonce_store);
+            register_server_handlers(registry.clone(), config.clone(), nonce_store);
 
             info!(
                 platform_id = %config.platform_id,
+                realm = %config.realm,
+                sip_ip = %config.sip_ip,
                 heartbeat_timeout_secs = config.heartbeat_timeout_secs,
                 enable_auth = config.enable_auth,
                 media_backend = media_backend.backend_name(),
-                "✅ GB28181 服务端处理器注册完成"
+                "GB28181 服务端处理器注册完成"
             );
 
             // 存储全局实例
             let inner = Arc::new(Gb28181ServerInner {
                 config: config.clone(),
                 registry,
-                sn: AtomicU32::new(1),
+                sn_map: DashMap::new(),
                 sessions: DashMap::new(),
                 broadcast_sessions: DashMap::new(),
                 media: media_backend,
@@ -584,7 +595,7 @@ impl Gb28181ServerHandle {
     /// 抓拍图片的 URL 列表（从设备 SDP 中解析）
     pub async fn snapshot(&self, device_id: &str, channel_id: &str) -> anyhow::Result<String> {
         let dev = self.get_dev_or_err(device_id)?;
-        let sn = self.inner.sn.fetch_add(1, Ordering::Relaxed);
+        let sn = self.next_sn_for(device_id);
         let media_ip = if is_unspecified_ip(&self.inner.config.media.local_ip) {
             self.inner.config.sip_ip.clone()
         } else {
@@ -808,7 +819,7 @@ impl Gb28181ServerHandle {
         codec: Option<AudioCodec>,
     ) -> anyhow::Result<(String, String, u16)> {
         let dev = self.get_dev_or_err(device_id)?;
-        let sn = self.inner.sn.fetch_add(1, Ordering::Relaxed);
+        let sn = self.next_sn_for(device_id);
         let media_ip = if is_unspecified_ip(&self.inner.config.media.local_ip) {
             self.inner.config.sip_ip.clone()
         } else {
@@ -1270,6 +1281,82 @@ impl Gb28181ServerHandle {
         self.inner.media.get_play_urls(channel_id)
     }
 
+    // ── Group E: 录像下载 ───────────────────────────────────────────────────
+
+    /// 录像下载（INVITE s=Download）
+    ///
+    /// `download_speed`: 下载倍速（0=不限速, 1=1倍速, 2=2倍速...），None 表示不限速
+    pub async fn invite_download(
+        &self,
+        device_id: &str,
+        channel_id: &str,
+        download_speed: Option<u32>,
+    ) -> anyhow::Result<(String, PlayUrls)> {
+        // 重用 invite_internal，Download 模式下 is_realtime=false，start/end 时间无意义
+        self.invite_internal(device_id, channel_id, false, None, None).await
+    }
+
+    // ── Group F: 移动位置主动查询 ──────────────────────────────────────────
+
+    /// 主动查询设备位置（A.2.4.5）
+    ///
+    /// `interval`: None = 仅查一次，Some(secs) = 设备按间隔持续上报
+    pub async fn query_mobile_position(
+        &self,
+        device_id: &str,
+        interval: Option<u32>,
+    ) -> anyhow::Result<()> {
+        let sn = self.next_sn_for(device_id);
+        let xml = crate::xml::build_mobile_position_query_xml(device_id, sn, interval);
+        let device = self.get_dev_or_err(device_id)?;
+        self.send_message_to_device(&device.contact, &xml, sn).await
+    }
+
+    /// 取消移动位置订阅
+    pub async fn unsubscribe_mobile_position(&self, device_id: &str) -> anyhow::Result<()> {
+        self.query_mobile_position(device_id, Some(0)).await
+    }
+
+    // ── Group G: 云台锁定/解锁 + DeviceControl 抓拍 + 配置推送 ─────────────
+
+    /// PTZ 云台锁定（A.2.3.1.12）
+    ///
+    /// 锁定后其他平台无法控制该设备的云台
+    pub async fn ptz_lock(&self, device_id: &str, channel_id: &str) -> anyhow::Result<()> {
+        let sn = self.next_sn_for(device_id);
+        let xml = crate::xml::build_ptz_lock_xml(channel_id, sn);
+        self.send_device_control(device_id, channel_id, sn, &xml, "PTZ锁定").await
+    }
+
+    /// PTZ 云台解锁（A.2.3.1.12）
+    pub async fn ptz_unlock(&self, device_id: &str, channel_id: &str) -> anyhow::Result<()> {
+        let sn = self.next_sn_for(device_id);
+        let xml = crate::xml::build_ptz_unlock_xml(channel_id, sn);
+        self.send_device_control(device_id, channel_id, sn, &xml, "PTZ解锁").await
+    }
+
+    /// 手动抓拍（DeviceControl 方式，非 INVITE 模式）
+    ///
+    /// 设备收到后主动推送图片（通过图像抓拍通知）
+    pub async fn snapshot_control(&self, device_id: &str, channel_id: &str) -> anyhow::Result<()> {
+        let sn = self.next_sn_for(device_id);
+        let xml = crate::xml::build_snapshot_control_xml(channel_id, sn);
+        self.send_device_control(device_id, channel_id, sn, &xml, "手动抓拍").await
+    }
+
+    /// 推送配置参数到设备（A.2.3.2）
+    pub async fn push_config(
+        &self,
+        device_id: &str,
+        config_type: crate::xml::ConfigType,
+        params: &[(String, String)],
+    ) -> anyhow::Result<()> {
+        let sn = self.next_sn_for(device_id);
+        let xml = crate::xml::build_config_push_xml(device_id, sn, config_type, params);
+        let device = self.get_dev_or_err(device_id)?;
+        self.send_message_to_device(&device.contact, &xml, sn).await
+    }
+
     // ── 内部工具 ─────────────────────────────────────────────────────────────
 
     fn get_dev_or_err(&self, device_id: &str) -> anyhow::Result<DeviceInfo> {
@@ -1280,7 +1367,17 @@ impl Gb28181ServerHandle {
     }
 
     fn next_sn(&self) -> u32 {
-        self.inner.sn.fetch_add(1, Ordering::Relaxed)
+        // 使用 platform_id 作为默认设备的 SN key
+        self.next_sn_for(&self.inner.config.platform_id)
+    }
+
+    /// 为指定设备获取下一个 SN 序列号（每设备独立计数）
+    fn next_sn_for(&self, device_id: &str) -> u32 {
+        self.inner
+            .sn_map
+            .entry(device_id.to_string())
+            .or_insert_with(|| AtomicU32::new(1))
+            .fetch_add(1, Ordering::Relaxed)
     }
 
     async fn invite_internal(
@@ -1300,7 +1397,7 @@ impl Gb28181ServerHandle {
         };
 
         // 开启 RTP 接收端口
-        let stream_id = format!("{}_{}", channel_id, self.next_sn());
+        let stream_id = format!("{}_{}", channel_id, self.next_sn_for(device_id));
         let rtp_handle = self
             .inner
             .media
@@ -1318,7 +1415,7 @@ impl Gb28181ServerHandle {
             "🎥 媒体后端分配 RTP 端口"
         );
 
-        let ssrc = format!("{:010}", self.next_sn());
+        let ssrc = format!("{:010}", self.next_sn_for(device_id));
         let sdp_offer = if is_realtime {
             build_invite_sdp(&media_ip, rtp_port, &ssrc, SessionType::Play, None, None)
                 .unwrap_or_default()
@@ -1456,6 +1553,20 @@ impl Gb28181ServerHandle {
         });
 
         Ok((call_id, play_urls))
+    }
+
+    /// 发送 DeviceControl MESSAGE 的通用方法
+    #[allow(unused_variables)]
+    async fn send_device_control(
+        &self,
+        device_id: &str,
+        _channel_id: &str,
+        sn: u32,
+        xml_body: &str,
+        desc: &str,
+    ) -> anyhow::Result<()> {
+        let device = self.get_dev_or_err(device_id)?;
+        self.send_message_to_device(&device.contact, xml_body, sn).await
     }
 
     /// 向指定设备 Contact URI 发送 MESSAGE

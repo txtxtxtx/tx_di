@@ -24,6 +24,7 @@ dashmap.workspace = true
 chrono.workspace = true
 reqwest.workspace = true
 async-trait.workspace = true
+rand.workspace = true
 
 # XML 高效解析（tx_gb28181 内部使用，此处为传递依赖不再需要，但保留兼容性）
 #quick-xml = { version = "0.39", features = ["serialize"] }
