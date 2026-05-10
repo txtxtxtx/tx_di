@@ -243,6 +243,53 @@ pub enum Gb28181Event {
         device_id: String,
         call_id: String,
     },
+
+    // ── 设备控制结果 ─────────────────────────────────────────────────────────
+
+    /// 录像控制结果通知
+    RecordControlResult {
+        device_id: String,
+        channel_id: String,
+        result: String,
+    },
+
+    /// 主动查询的移动位置响应
+    MobilePositionQueryResult {
+        device_id: String,
+        longitude: f64,
+        latitude: f64,
+        speed: Option<f64>,
+        direction: Option<f64>,
+        timestamp: String,
+    },
+
+    /// 配置推送结果
+    ConfigPushResult {
+        device_id: String,
+        config_type: String,
+        result: String,
+    },
+
+    /// PTZ 云台锁定/解锁结果
+    PtLockResult {
+        device_id: String,
+        channel_id: String,
+        locked: bool,
+        result: String,
+    },
+
+    // ── 级联管理 ─────────────────────────────────────────────────────────────
+
+    /// 上级平台注册到本平台
+    UpperPlatformRegistered {
+        platform_id: String,
+        contact: String,
+    },
+
+    /// 上级平台注销
+    UpperPlatformUnregistered {
+        platform_id: String,
+    },
 }
 
 // ── broadcast 通道 ──────────────────────────────────────────────────────────
