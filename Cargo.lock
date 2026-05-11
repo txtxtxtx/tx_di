@@ -856,9 +856,9 @@ dependencies = [
  "tracing",
  "tx-di-core",
  "tx_di_axum",
- "tx_di_gb28181",
  "tx_di_log",
  "tx_di_sip",
+ "tx_gb28181",
 ]
 
 [[package]]

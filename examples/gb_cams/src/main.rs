@@ -28,10 +28,9 @@ use tx_di_axum;
 async fn main() -> anyhow::Result<()> {
     let config_path = "examples/gb_cams/config/gb_cams.toml";
 
-    // 注册 REST API 路由（必须在 build 前）
     WebPlugin::add_router(api::router());
 
-    let mut ctx = BuildContext::new(Some(config_path));
+    let ctx = BuildContext::new(Some(config_path));
     let cam_config = ctx.inject::<GbCamsConfig>();
 
 
@@ -42,17 +41,6 @@ async fn main() -> anyhow::Result<()> {
 
     let app = app.ins_run()
         .await?;
-
-    info!("✅ GB28181 多设备模拟器启动完成");
-    info!("📡 API: http://localhost:8889/api/gb_cams/");
-    info!("🖥️  管理界面: http://localhost:8889/cam/");
-    info!("");
-    info!("📌 快速开始:");
-    info!("   1. 批量生成设备: POST /api/gb_cams/devices/generate");
-    info!("      body: {{\"count\": 10, \"channels_per_device\": 4, \"auto_register\": true}}");
-    info!("   2. 查看设备列表: GET /api/gb_cams/devices");
-    info!("   3. 查看统计: GET /api/gb_cams/stats");
-    info!("");
 
     app.waiting_exit().await;
     Ok(())

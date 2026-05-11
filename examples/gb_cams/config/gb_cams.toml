@@ -1,7 +1,7 @@
 # GB28181 多设备模拟器配置
 
 [log_config]
-level          = "info"
+level          = "debug"
 prefix         = "gb_cams"
 dir            = "./logs"
 console_output = true
@@ -11,12 +11,12 @@ time_format    = "local"
 [web_config]
 host = "0.0.0.0"
 port = 8889
+
 layers = [
     [10, "api_log"],
     [100, "compression"],
     [10000, "cors"],
 ]
-
 [web_config.spa_apps]
 "/cam" = "examples/gb_cams/ui/dist"
 

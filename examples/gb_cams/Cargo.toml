@@ -12,8 +12,7 @@ tx-di-core    = { path = "../../tx-di-core" }
 tx_di_sip     = { path = "../../plugins/tx_di_sip" }
 tx_di_axum    = { path = "../../plugins/tx_di_axum" }
 tx_di_log     = { path = "../../plugins/tx_di_log" }
-tx_di_gb28181 = { path = "../../plugins/tx_di_gb28181" }
-
+tx_gb28181 = { path = "../../common/tx_gb28181" }
 rsipstack.workspace = true
 tokio.workspace     = true
 anyhow.workspace    = true
