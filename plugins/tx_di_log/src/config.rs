@@ -2,10 +2,11 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{env, fmt};
-use time::format_description::well_known;
+use time::format_description;
+use time::format_description::{OwnedFormatItem};
 use tracing_subscriber::fmt::format::Writer;
 use tracing_subscriber::fmt::time::{FormatTime, LocalTime, UtcTime};
-use tx_di_core::{CompInit, tx_comp};
+use tx_di_core::{CompInit, tx_comp, RIE};
 
 /// 日志配置结构体
 ///
@@ -80,8 +81,13 @@ pub struct LogConfig {
     /// 该字段在 TOML 配置文件中对应 `log_config.time_format`。
     #[serde(default)]
     pub time_format: TimeFormat,
+    #[serde(default = "time_format_str")]
+    pub time_format_str: String,
 }
 
+fn time_format_str() -> String {
+    "[year][month padding:zero][day padding:zero] [hour]:[minute]:[second].[subsecond digits:3]".to_string()
+}
 impl Default for LogConfig {
     fn default() -> Self {
         Self {
@@ -93,6 +99,7 @@ impl Default for LogConfig {
             console_output: false,
             prefix: default_prefix(),
             time_format: TimeFormat::default(),
+            time_format_str: time_format_str(),
         }
     }
 }
@@ -116,16 +123,18 @@ pub enum TimeFormat {
 /// 定时器包装器，统一 UTC 和本地时间
 #[derive(Debug, Clone)]
 pub enum TimerWrapper {
-    Utc(UtcTime<well_known::Rfc3339>),
-    Local(LocalTime<well_known::Rfc3339>),
+    Utc(UtcTime<OwnedFormatItem>),
+    Local(LocalTime<OwnedFormatItem>),
 }
 
 impl TimeFormat {
     /// 将 TimeFormat 转换为对应的计时器实例
-    pub fn to_timer(&self) -> TimerWrapper {
+    pub fn to_timer(&self, format: &str) -> RIE<TimerWrapper> {
+        let format = format_description::parse_owned::<2>(format)
+            .map_err(|e| anyhow::anyhow!(e))?;
         match self {
-            TimeFormat::Utc => TimerWrapper::Utc(UtcTime::rfc_3339()),
-            TimeFormat::Local => TimerWrapper::Local(LocalTime::rfc_3339()),
+            TimeFormat::Utc => Ok(TimerWrapper::Utc(UtcTime::new(format))),
+            TimeFormat::Local => Ok(TimerWrapper::Local(LocalTime::new(format))),
         }
     }
 }

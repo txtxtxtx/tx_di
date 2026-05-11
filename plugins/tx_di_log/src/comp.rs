@@ -62,7 +62,7 @@ impl CompInit for LogPlugins{
             return Ok(());
         }
 
-        let timer = self.config.time_format.to_timer();
+        let timer = self.config.time_format.to_timer(&self.config.time_format_str)?;
         let file_layer = fmt::layer()
             .with_writer( non_blocking_appender)
             .with_ansi(false)
