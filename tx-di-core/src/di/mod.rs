@@ -386,7 +386,7 @@ impl App {
         } else {
             tracing::warn!("未找到后台任务句柄");
         }
-        info!("app 已安全退出，耗时: {:?} ", start.elapsed());
+        info!("app 已退出，耗时: {:?} ", start.elapsed());
         // 确保日志被 flush 到输出
         // 短暂休眠以确保日志被 flush
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;

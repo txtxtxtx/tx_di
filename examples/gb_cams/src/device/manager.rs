@@ -20,6 +20,7 @@ use rsipstack::EndpointBuilder;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, OnceLock};
+use tokio::sync::RwLock;
 use tokio::time::{interval, Duration};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
@@ -54,6 +55,8 @@ pub struct DeviceManager {
     cancel: CancellationToken,
     /// 是否已启动
     running: AtomicBool,
+    /// 设备任务句柄列表（用于优雅退出）
+    device_tasks: RwLock<Vec<tokio::task::JoinHandle<()>>>,
 }
 
 impl DeviceManager {
@@ -68,6 +71,7 @@ impl DeviceManager {
             event_tx,
             cancel: token,
             running: AtomicBool::new(false),
+            device_tasks: RwLock::new(vec![]),
         });
         let _ = INSTANCE.set(mgr);
     }
@@ -170,29 +174,33 @@ impl DeviceManager {
 
     /// 启动所有设备的注册 + 心跳循环
     pub fn start_all(&self) {
-        if self.running.swap(true, Ordering::Relaxed) {
-            // 已在运行，仅注册新增设备
-            info!("设备管理器已在运行，跳过重复启动");
-            return;
-        }
-
-        let mgr = INSTANCE.get().unwrap().clone();
+        // if self.running.swap(true, Ordering::Relaxed) {
+        //     // 已在运行，仅注册新增设备
+        //     info!("设备管理器已在运行，跳过重复启动");
+        //     return;
+        // }
         tokio::spawn(async move {
+            let mgr = INSTANCE.get().unwrap().clone();
+            let mut tasks = mgr.device_tasks.write().await;
             for entry in mgr.devices.iter() {
+                if entry.value().running {
+                    continue;
+                }
                 let device_id = entry.key().clone();
                 let dev = entry.value().clone();
                 let mgr_clone = mgr.clone();
 
-                tokio::spawn(async move {
+                let handler = tokio::spawn(async move {
                     run_device_loop(mgr_clone, device_id, dev).await;
                 });
+                tasks.push(handler)
             }
+        });
 
-            info!(
-                count = mgr.devices.len(),
+        info!(
+                count = self.devices.len(),
                 "🚀 所有设备已启动注册+心跳循环"
             );
-        });
     }
 
     /// 注销设备
@@ -285,7 +293,10 @@ async fn run_device_loop(mgr: Arc<DeviceManager>, device_id: String, mut dev: Vi
             _ = cancel_token.cancelled() => {}
         }
     });
-
+    mgr.devices.entry(device_id.clone())
+        .and_modify(|entry| {
+            entry.running = true;
+        });
     // ── 注册 ──────────────────────────────────────────────────────────────
     set_device_status(&mgr, &device_id, DeviceStatus::Registering, None);
 
@@ -318,13 +329,10 @@ async fn run_device_loop(mgr: Arc<DeviceManager>, device_id: String, mut dev: Vi
 
     let device_id_clone = device_id.clone();
 
-    loop {
-        tokio::select! {
+    tokio::select! {
             _ = mgr.cancel.cancelled() => {
                 info!(device_id = %device_id_clone, "收到停止信号");
-                break;
             }
-
             _ = heartbeat_ticker.tick() => {
                 if let Err(e) = send_keepalive(&endpoint_inner, &mgr.config, &dev).await {
                     warn!(device_id = %device_id_clone, error = %e, "心跳失败");
@@ -338,14 +346,12 @@ async fn run_device_loop(mgr: Arc<DeviceManager>, device_id: String, mut dev: Vi
                     mgr.emit(DeviceEvent::Keepalive { device_id: device_id_clone.clone() });
                 }
             }
-
             _ = refresh_ticker.tick() => {
                 info!(device_id = %device_id_clone, "🔄 刷新注册");
                 if let Err(e) = do_register(&endpoint_inner, &mgr.config, &dev).await {
                     error!(device_id = %device_id_clone, error = %e, "刷新注册失败");
                 }
             }
-
             Some(tx) = incoming.recv() => {
                 let did = device_id_clone.clone();
                 let ep = endpoint_inner.clone();
@@ -357,9 +363,12 @@ async fn run_device_loop(mgr: Arc<DeviceManager>, device_id: String, mut dev: Vi
                 });
             }
         }
-    }
 
     let _ = mgr.unregister_device(&dev).await;
+    mgr.devices.entry(device_id.clone())
+        .and_modify(|entry| {
+            entry.running = false;
+        });
     mgr.emit(DeviceEvent::Unregistered { device_id: device_id_clone.clone() });
     info!(device_id = %device_id_clone, "设备已注销");
 }
@@ -403,7 +412,7 @@ async fn send_keepalive(
         .unwrap_or_default()
         .as_secs() as u32;
 
-    let xml = tx_di_gb28181::xml::build_keepalive_xml(&dev.device_id, sn);
+    let xml = tx_gb28181::xml::build_keepalive_xml(&dev.device_id, sn);
     send_manscdp(endpoint, config, dev, &xml, sn).await
 }
 
@@ -445,20 +454,20 @@ async fn handle_invite(mgr: Arc<DeviceManager>, device_id: String, tx: Transacti
         .unwrap_or_else(|_| "N/A".into());
 
     let sdp_offer = std::str::from_utf8(&tx.original.body).unwrap_or("").to_string();
-    let ssrc = tx_di_gb28181::sdp::parse_sdp_ssrc(&sdp_offer)
+    let ssrc = tx_gb28181::sdp::parse_sdp_ssrc(&sdp_offer)
         .unwrap_or_else(|| "0000000001".to_string());
 
     info!(device_id = %device_id, call_id = %call_id, "📹 收到点播 INVITE");
 
     // 根据 SDP offer 中的 s= 字段判断会话类型
     let session_type = if sdp_offer.contains("s=Download") {
-        tx_di_gb28181::sdp::SessionType::Download
+        tx_gb28181::sdp::SessionType::Download
     } else if sdp_offer.contains("s=Playback") {
-        tx_di_gb28181::sdp::SessionType::Playback
+        tx_gb28181::sdp::SessionType::Playback
     } else {
-        tx_di_gb28181::sdp::SessionType::Play
+        tx_gb28181::sdp::SessionType::Play
     };
-    let is_realtime = matches!(session_type, tx_di_gb28181::sdp::SessionType::Play);
+    let is_realtime = matches!(session_type, tx_gb28181::sdp::SessionType::Play);
 
     // 回放或下载时：从 offer 的 t= 字段解析时间范围（解析失败 fallback 到 None）
     let time_range = if !is_realtime {
@@ -480,7 +489,7 @@ async fn handle_invite(mgr: Arc<DeviceManager>, device_id: String, tx: Transacti
         None
     };
 
-    let sdp_answer = tx_di_gb28181::sdp::build_sdp_answer(
+    let sdp_answer = tx_gb28181::sdp::build_sdp_answer(
         "127.0.0.1", 0, &ssrc, &device_id, session_type, time_range, None,
     )
     .unwrap_or_default();
@@ -538,10 +547,10 @@ async fn handle_message(
     let _ = tx.reply(StatusCode::OK).await;
     if body.is_empty() { return; }
 
-    let cmd_type = match tx_di_gb28181::xml::parse_xml_field(&body, "CmdType") {
+    let cmd_type = match tx_gb28181::xml::parse_xml_field(&body, "CmdType") {
         Some(c) => c, None => return,
     };
-    let sn = tx_di_gb28181::xml::parse_sn(&body);
+    let sn = tx_gb28181::xml::parse_sn(&body);
 
     match cmd_type.as_str() {
         "Catalog" => {
@@ -554,7 +563,7 @@ async fn handle_message(
             tokio::spawn(async move {
                 let ch_pairs: Vec<(String, String)> = dev_c.channels.iter()
                     .map(|c| (c.channel_id.clone(), c.name.clone())).collect();
-                let xml = tx_di_gb28181::xml::build_catalog_response_xml(&did, sn, &ch_pairs);
+                let xml = tx_gb28181::xml::build_catalog_response_xml(&did, sn, &ch_pairs);
                 let _ = send_manscdp(&ep, &cfg, &dev_c, &xml, sn).await;
             });
         }

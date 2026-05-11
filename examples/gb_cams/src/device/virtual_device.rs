@@ -1,5 +1,6 @@
 //! 虚拟设备 & 通道数据结构
 
+use std::sync::atomic::AtomicBool;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
@@ -55,7 +56,7 @@ impl std::fmt::Display for DeviceStatus {
 }
 
 /// 虚拟设备实例
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug,Clone, Serialize, Deserialize)]
 pub struct VirtualDevice {
     /// 设备 ID（20 位）
     pub device_id: String,
@@ -84,6 +85,8 @@ pub struct VirtualDevice {
 
     /// 心跳计数
     pub keepalive_count: u64,
+
+    pub running: bool,
 }
 
 impl VirtualDevice {
@@ -99,6 +102,7 @@ impl VirtualDevice {
             error: None,
             last_keepalive: None,
             keepalive_count: 0,
+            running: false,
         }
     }
 
