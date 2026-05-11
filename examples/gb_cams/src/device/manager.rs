@@ -5,7 +5,7 @@
 //! - SIP 注册/注销/心跳
 //! - SIP 消息处理（INVITE/MESSAGE/OPTIONS）
 
-use super::virtual_device::{ChannelStatus, DeviceStatus, VirtualChannel, VirtualDevice};
+use super::virtual_device::{ DeviceStatus, VirtualChannel, VirtualDevice};
 use crate::config::GbCamsConfig;
 use dashmap::DashMap;
 use rsipstack::dialog::authenticate::Credential;
@@ -24,6 +24,7 @@ use tokio::sync::RwLock;
 use tokio::time::{interval, Duration};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
+use tx_gb28181::ChannelStatus;
 
 /// 设备事件（供 API 层 SSE 推送）
 #[derive(Debug, Clone, serde::Serialize)]
@@ -114,7 +115,7 @@ impl DeviceManager {
             .map(|(id, name)| VirtualChannel {
                 channel_id: id,
                 name,
-                status: ChannelStatus::Online,
+                status: ChannelStatus::On,
             })
             .collect();
 

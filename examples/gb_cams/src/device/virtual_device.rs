@@ -1,24 +1,8 @@
 //! 虚拟设备 & 通道数据结构
 
-use std::sync::atomic::AtomicBool;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
-
-/// 通道状态
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ChannelStatus {
-    Online,
-    Offline,
-}
-
-impl std::fmt::Display for ChannelStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ChannelStatus::Online => write!(f, "ON"),
-            ChannelStatus::Offline => write!(f, "OFF"),
-        }
-    }
-}
+use tx_gb28181::ChannelStatus;
 
 /// 虚拟通道
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -21,3 +21,4 @@ tokio.workspace = true
 anyhow.workspace = true
 # 日志（用于事件广播中的 tracing::warn!）
 tracing.workspace = true
+serde = { version = "1.0.228", features = ["derive"] }

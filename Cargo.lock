@@ -2874,6 +2874,7 @@ dependencies = [
  "chrono",
  "encoding_rs",
  "quick-xml",
+ "serde",
  "tokio",
  "tracing",
  "tx-di-core",

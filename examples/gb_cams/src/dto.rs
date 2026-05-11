@@ -53,7 +53,7 @@ impl From<&VirtualChannel> for ChannelDto {
         Self {
             channel_id: ch.channel_id.clone(),
             name: ch.name.clone(),
-            status: ch.status.to_string(),
+            status: ch.status.as_str().to_string(),
         }
     }
 }

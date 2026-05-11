@@ -1,4 +1,4 @@
-//! GB28181 设备与通道数据类型
+//! GB28181 设备与通道数据类型 todo 统一设备和通道数据结构，提供兼容2016的数据结构以及转换方法
 //!
 //! 定义 GB28181-2022 标准中的核心域模型：
 //! - [`ChannelInfo`]：设备/通道信息（目录结构 §8.1）
@@ -11,15 +11,28 @@
 use chrono::{DateTime, Utc};
 use std::str::FromStr;
 use tokio::time::{Duration, Instant};
+use serde::{Deserialize, Deserializer, Serialize};
 
 /// 通道在线状态
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq,Serialize)]
+#[serde(rename_all = "UPPERCASE")]
+#[serde(untagged)]
 pub enum ChannelStatus {
     On,
     Off,
     Unknown(String),
 }
-
+impl<'de> Deserialize<'de> for ChannelStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        // 使用 FromStr 实现，支持大小写不敏感
+        s.parse::<ChannelStatus>()
+            .map_err(serde::de::Error::custom)
+    }
+}
 impl FromStr for ChannelStatus {
     /// 永远不会发生的错误
     type Err = std::convert::Infallible;
