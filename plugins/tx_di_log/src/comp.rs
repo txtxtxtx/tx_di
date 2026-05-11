@@ -71,7 +71,7 @@ impl CompInit for LogPlugins{
             .with_level(true)
             .with_file( true)
             .with_line_number( true)
-            .with_target( true)
+            .with_target( false)
             .with_timer(timer.clone())
             .compact();
 
@@ -81,7 +81,7 @@ impl CompInit for LogPlugins{
             .with_ansi(true) // 控制台启用颜色
             .with_timer(timer)
             .with_level(true)
-            .with_target(true) // 显示模块路径
+            .with_target(false) // 显示模块路径
             .with_file(true) // 显示文件名
             .with_line_number(true) // 显示行号
             .compact(); // pretty json compact
