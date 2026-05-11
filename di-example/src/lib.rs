@@ -207,9 +207,9 @@ mod tests {
 
     /// 辅助函数：创建无配置文件的上下文（自动扫描所有组件）
     fn create_full_context() -> BuildContext {
-        //
+        // C:\a_me\proj\rust\tx_di\configs\di-example.toml
         // D:\proj\tx_di\configs\di-example.toml
-        BuildContext::new(Some(r"C:\a_me\proj\rust\tx_di\configs\di-example.toml"))
+        BuildContext::new(Some(r"D:\proj\tx_di\configs\di-example.toml"))
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -220,6 +220,7 @@ mod tests {
     #[test]
     fn test_singleton_shared() ->RIE<()> {
         let  app = create_full_context().build()?;
+        // debug!("AppServer::init");
         // 获取单例
         let server = app.inject::<AppServer>();
         // 获取可能不存在的单例
@@ -336,7 +337,7 @@ mod tests {
 
     #[test]
     fn test_prototype_each_inject_creates_new_instance() {
-        let mut ctx = create_full_context();
+        let ctx = create_full_context();
         let loggers: Vec<_> = (0..5).map(|_| ctx.inject::<RequestLogger>()).collect();
         for i in 0..loggers.len() {
             for j in (i + 1)..loggers.len() {
@@ -353,7 +354,7 @@ mod tests {
 
     #[test]
     fn test_prototype_with_custom_values() {
-        let mut ctx = create_full_context();
+        let ctx = create_full_context();
         let logger = ctx.inject::<RequestLogger>();
         assert_eq!(logger.prefix, "[REQUEST]");
         assert_eq!(logger.count(), 0);
@@ -361,7 +362,7 @@ mod tests {
 
     #[test]
     fn test_prototype_state_isolation() {
-        let mut ctx = create_full_context();
+        let ctx = create_full_context();
         let mut loggers = vec![];
         for i in 0..3 {
             let logger = ctx.inject::<RequestLogger>();
@@ -560,7 +561,7 @@ mod tests {
 
     #[test]
     fn test_missing_config_uses_defaults() {
-        let mut ctx = BuildContext::new(Some("nonexistent/config.toml"));
+        let ctx = BuildContext::new(Some("nonexistent/config.toml"));
         let config = ctx.inject::<AppConfig>();
         assert_eq!(config.app_name, "tx-di-example");
         assert_eq!(config.port, 8080);
