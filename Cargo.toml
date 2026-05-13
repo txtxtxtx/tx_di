@@ -104,3 +104,5 @@ http = { version = "1.4.0"}
 encoding_rs = "0.8"
 
 image = {version = "0.25.9", default-features = false}
+
+deku = {version = "0.20"}
