@@ -19,7 +19,7 @@
 
 use quick_xml::Reader;
 use quick_xml::events::Event;
-
+use crate::ChannelStatus;
 // ── 解析工具 ──────────────────────────────────────────────────────────────────
 
 /// 从 GB28181 XML 中提取指定字段值（使用 quick-xml）
@@ -326,6 +326,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                         parent_id: std::mem::take(&mut cur_parent_id),
                         parental: cur_parental,
                         register_way: cur_register_way,
+                        security_level_code: None,
                         secrecy: cur_secrecy,
                         ip_address: std::mem::take(&mut cur_ip_address),
                         port: cur_port,
@@ -334,6 +335,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                         block: std::mem::take(&mut cur_block),
                         civil_code: std::mem::take(&mut cur_civil_code),
                         channel_num: cur_channel_num,
+                        password: None,
                     });
                 }
                 in_item = false;
@@ -349,7 +351,8 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
 /// 目录条目信息
 #[derive(Debug, Clone)]
 pub struct CatalogItem {
-    /// 设备ID（通道编号）
+    /// - 行政区划分时可为 2、4、6、8位
+    /// - 其他情况为20位
     pub device_id: String,
     /// 设备名称
     pub name: String,
@@ -357,30 +360,43 @@ pub struct CatalogItem {
     pub manufacturer: String,
     /// 设备型号
     pub model: String,
-    /// 设备状态（ON/OFF/Unknown）
-    pub status: String,
+    /// 行政区划代码 可选 2，4，6，8位
+    pub civil_code: String,
+    /// 警区
+    pub block: Option<String>,
     /// 设备地址信息
     pub address: String,
-    /// 父设备ID
-    pub parent_id: String,
     /// 是否有子设备（0=无，1=有）
     pub parental: u8,
-    /// 注册方式（1=符合标准，2=其他）
+    /// 父节点ID，可多值 / 分割
+    pub parent_id: String,
+    /// 注册方式（1=标准，2=基于口令的双向认证注册模式，3=基于数字证书的双向认证模式（高安全级别），4=基于数字证书的单向认证模式（高安全级别））
+    ///
+    /// 默认 1
     pub register_way: u8,
+    /// 摄像机安全能力等级代码
+    /// - A-GB 35114 前端设备安全能力A级
+    /// - B-GB 35114 前端设备安全能力B级
+    /// - C-GB 35114 前端设备安全能力C级
+    pub security_level_code: Option<String>,
     /// 保密属性（0=非保密，1=保密）
+    ///
+    /// 默认 0
     pub secrecy: u8,
-    /// IP地址
-    pub ip_address: String,
-    /// 端口号
-    pub port: u16,
-    /// 经度坐标（可选）
+    /// 设备/系统 ipv4/ipv6 地址
+    pub ip_address: Option<String>,
+    /// 设备/系统 端口
+    pub port: Option<u16>,
+    /// 设备口令
+    pub password: Option<String>,
+    /// 设备状态（ON/OFF/Unknown）
+    pub status: ChannelStatus,
+    /// 经度坐标，一二类监控点位必选
     pub longitude: Option<f64>,
-    /// 纬度坐标（可选）
+    /// 纬度坐标，一二类监控点位必选
     pub latitude: Option<f64>,
-    /// 区域标识
-    pub block: String,
-    /// 行政区划代码
-    pub civil_code: String,
+    pub
+
     /// 通道数量
     pub channel_num: u32,
 }
@@ -2783,7 +2799,7 @@ mod tests {
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].device_id, "ch01");
         assert_eq!(items[0].manufacturer, "Hikvision");
-        assert_eq!(items[1].status, "OFF");
+        assert_eq!(items[1].status.as_str(), "OFF");
     }
 
     #[test]

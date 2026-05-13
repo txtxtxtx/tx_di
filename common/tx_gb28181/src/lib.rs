@@ -17,6 +17,7 @@ pub mod sdp;
 pub mod sip;
 pub mod xml;
 mod ps;
+mod enums;
 // ── 便捷再导出 ──────────────────────────────────────────────────────────────
 
 pub use cmd_type::Gb28181CmdType;
