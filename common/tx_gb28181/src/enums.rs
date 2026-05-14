@@ -269,7 +269,7 @@ pub enum PTZType {
     MultiObjectSplit = 7,
 }
 
-/// 摄像机光电成像类型。1-可见光成像；2-热成像；3-雷达成像；4-X光成像；5-深度光场成像；9-其他。可多值，用英文半角“/”分割。当为摄像机时可选
+/// 摄像机光电成像类型。1-可见光成像；2-热成像；3-雷达成像；4-X光成像；5-深度光场成像；9-其他。可多值，用英文半角"/"分割。当为摄像机时可选
 #[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum PhotoelectricImagingType {
@@ -301,6 +301,7 @@ impl TryFrom<u8> for PhotoelectricImagingType {
     }
 }
 
+/// 摄像机光电成像类型。1-可见光成像；2-热成像；3-雷达成像；4-X光成像；5-深度光场成像；9-其他。可多值，用英文半角"/"分割。当为摄像机时可选
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct PhotoelectricImagingTypes(pub Vec<PhotoelectricImagingType>);
@@ -358,23 +359,23 @@ pub enum SupplyLightType {
     #[default]
     NoneLight = 1,
     /// 红外补光
-    InfraredLight = 2,
+    Infrared = 2,
     /// 白光补光
-    WhiteLight = 3,
+    White = 3,
     /// 激光补光
-    LaserLight = 4,
+    Laser = 4,
     /// 其他补光
-    OtherLight = 9,
+    Other = 9,
 }
 impl TryFrom<u8> for SupplyLightType {
     type Error = &'static str;
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             1 => Ok(SupplyLightType::NoneLight),
-            2 => Ok(SupplyLightType::InfraredLight),
-            3 => Ok(SupplyLightType::WhiteLight),
-            4 => Ok(SupplyLightType::LaserLight),
-            9 => Ok(SupplyLightType::OtherLight),
+            2 => Ok(SupplyLightType::Infrared),
+            3 => Ok(SupplyLightType::White),
+            4 => Ok(SupplyLightType::Laser),
+            9 => Ok(SupplyLightType::Other),
             _ => Err("Invalid SupplyLightType"),
         }
     }
@@ -418,7 +419,7 @@ impl TryFrom<u8> for DirectionType {
     }
 }
 
-///  摄像机支持的分辨率，可多值，用英文半角“/”。分辨率取值应符合附录 G 中 SDP f 字段规定。当为摄像机时可选。
+///  摄像机支持的分辨率，可多值，用英文半角"/"。分辨率取值应符合附录 G 中 SDP f 字段规定。当为摄像机时可选。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Resolution(String);
@@ -427,7 +428,7 @@ pub struct Resolution(String);
 #[repr(u8)]
 pub enum SVCSpaceSupportMode {
     /// 不支持
-    NotSupport = 0,
+    UnSupport = 0,
     /// 1 级增强（1 个增强层）
     Level1Support = 1,
     /// 2 级增强（2 个增强层）
@@ -439,7 +440,7 @@ impl TryFrom<u8> for SVCSpaceSupportMode {
     type Error = &'static str;
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(SVCSpaceSupportMode::NotSupport),
+            0 => Ok(SVCSpaceSupportMode::UnSupport),
             1 => Ok(SVCSpaceSupportMode::Level1Support),
             2 => Ok(SVCSpaceSupportMode::Level2Support),
             3 => Ok(SVCSpaceSupportMode::Level3Support),
@@ -448,27 +449,375 @@ impl TryFrom<u8> for SVCSpaceSupportMode {
     }
 }
 
+/// 时域编码能力，取值 0-不支持；1-1 级增强（1 个增强层）；2-2 级增强（2 个增强层）；3-3 级增强（3 个增强层）（可选）
+#[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
+pub enum SVCTimeSupportMode {
+    /// 不支持
+    NotSupport = 0,
+    /// 1 级增强（1 个增强层）
+    Level1Support = 1,
+    /// 2 级增强（2 个增强层）
+    Level2Support = 2,
+    /// 3 级增强（3 个增强层）
+    Level3Support = 3,
+}
+impl TryFrom<u8> for SVCTimeSupportMode {
+    type Error = &'static str;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(SVCTimeSupportMode::NotSupport),
+            1 => Ok(SVCTimeSupportMode::Level1Support),
+            2 => Ok(SVCTimeSupportMode::Level2Support),
+            3 => Ok(SVCTimeSupportMode::Level3Support),
+            _ => Err("Invalid SVCTimeSupportMode"),
+        }
+    }
+}
+
+/// SVC-SI 能力，取值 0-不支持；1-支持（可选）
+#[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
+pub enum SVCSSIMode {
+    /// 不支持
+    NotSupport = 0,
+    /// 支持
+    Support = 1,
+}
+impl TryFrom<u8> for SVCSSIMode {
+    type Error = &'static str;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(SVCSSIMode::NotSupport),
+            1 => Ok(SVCSSIMode::Support),
+            _ => Err("Invalid SVCSSIMode"),
+        }
+    }
+}
+
+/// 移动采集设备类型
+#[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
+pub enum MobileDeviceType {
+    MobileRobot = 1,
+    BodyCamera = 2,
+    SingleSoldier = 3,
+    VehicleVideo = 4,
+    Drone = 5,
+    Other = 9,
+}
+
+/// 监控点位类型
+#[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
+pub enum PointType {
+    Class1 = 1,
+    Class2 = 2,
+    Class3 = 3,
+    Other = 9,
+}
+
+// ---------------------------------------------------------------------------
+// 光电成像类型（单值枚举）
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
+pub enum PhotoelectricImagingTypeValue {
+    Visible = 1,
+    Thermal = 2,
+    Radar = 3,
+    XRay = 4,
+    DepthLightField = 5,
+    Other = 9,
+}
+
+// ---------------------------------------------------------------------------
+// 卡口功能类型（单值枚举，注意序列化为两位数字符串）
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum FunctionTypeValue {
+    Face = 1,
+    Person = 2,
+    Vehicle = 3,
+    NonMotorVehicle = 4,
+    Object = 5,
+    Other = 99,
+}
+impl Serialize for FunctionTypeValue {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let s = format!("{:02}", self.clone() as u8);
+        serializer.serialize_str(&s)
+    }
+}
+
+impl<'de> Deserialize<'de> for FunctionTypeValue {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        let num: u8 = s.parse().map_err(serde::de::Error::custom)?;
+        match num {
+            1 => Ok(FunctionTypeValue::Face),
+            2 => Ok(FunctionTypeValue::Person),
+            3 => Ok(FunctionTypeValue::Vehicle),
+            4 => Ok(FunctionTypeValue::NonMotorVehicle),
+            5 => Ok(FunctionTypeValue::Object),
+            99 => Ok(FunctionTypeValue::Other),
+            _ => Err(serde::de::Error::custom(format!("invalid FunctionTypeValue: {}", num))),
+        }
+    }
+}
+
+/// 卡口功能类型列表（如 "01/03/99"）
+#[derive(Debug, Clone, PartialEq)]
+pub struct FunctionTypes(pub Vec<FunctionTypeValue>);
+
+impl Serialize for FunctionTypes {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let s = self.0.iter()
+            .map(|v| format!("{:02}", v.clone() as u8))
+            .collect::<Vec<_>>()
+            .join("/");
+        serializer.serialize_str(&s)
+    }
+}
+
+impl<'de> Deserialize<'de> for FunctionTypes {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        let parts = s.split('/');
+        let mut values = Vec::new();
+        for part in parts {
+            let num: u8 = part.parse().map_err(serde::de::Error::custom)?;
+            let value = match num {
+                1 => FunctionTypeValue::Face,
+                2 => FunctionTypeValue::Person,
+                3 => FunctionTypeValue::Vehicle,
+                4 => FunctionTypeValue::NonMotorVehicle,
+                5 => FunctionTypeValue::Object,
+                99 => FunctionTypeValue::Other,
+                _ => return Err(serde::de::Error::custom(format!("invalid FunctionTypeValue: {}", num))),
+            };
+            values.push(value);
+        }
+        Ok(FunctionTypes(values))
+    }
+}
+
+/// 码流编号列表（如 "0/1/2"）
+#[derive(Debug, Clone, PartialEq)]
+pub struct StreamNumberList(pub Vec<u8>);
+
+impl Serialize for StreamNumberList {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let s = self.0.iter()
+            .map(|v| v.to_string())
+            .collect::<Vec<_>>()
+            .join("/");
+        serializer.serialize_str(&s)
+    }
+}
+
+impl<'de> Deserialize<'de> for StreamNumberList {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        let parts = s.split('/');
+        let values = parts.map(|p| p.parse::<u8>().map_err(serde::de::Error::custom))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(StreamNumberList(values))
+    }
+}
+/// 下载倍速列表（如 "1/2/4"）
+#[derive(Debug, Clone, PartialEq)]
+pub struct DownloadSpeed(pub Vec<u8>);
+
+impl Serialize for DownloadSpeed {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let s = self.0.iter()
+            .map(|v| v.to_string())
+            .collect::<Vec<_>>()
+            .join("/");
+        serializer.serialize_str(&s)
+    }
+}
+
+impl<'de> Deserialize<'de> for DownloadSpeed {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        let parts = s.split('/');
+        let values = parts.map(|p| p.parse::<u8>().map_err(serde::de::Error::custom))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(DownloadSpeed(values))
+    }
+}
+
+/// SSVC 比例（如 "4:3"）
+#[derive(Debug, Clone, PartialEq)]
+pub struct Ratio {
+    pub numerator: u32,
+    pub denominator: u32,
+}
+
+impl fmt::Display for Ratio {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.numerator, self.denominator)
+    }
+}
+
+impl FromStr for Ratio {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<&str> = s.split(':').collect();
+        if parts.len() != 2 {
+            return Err("invalid ratio format".to_string());
+        }
+        let numerator = parts[0].parse().map_err(|_| "invalid numerator".to_string())?;
+        let denominator = parts[1].parse().map_err(|_| "invalid denominator".to_string())?;
+        Ok(Ratio { numerator, denominator })
+    }
+}
+
+/// SSVC 比例列表（如 "4:3/2:1/4:1"）
+#[derive(Debug, Clone, PartialEq)]
+pub struct SSVCRatioSupportList(pub Vec<Ratio>);
+
+impl Serialize for SSVCRatioSupportList {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let s = self.0.iter()
+            .map(|r| r.to_string())
+            .collect::<Vec<_>>()
+            .join("/");
+        serializer.serialize_str(&s)
+    }
+}
+
+impl<'de> Deserialize<'de> for SSVCRatioSupportList {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        let parts = s.split('/');
+        let ratios = parts.map(|p| p.parse::<Ratio>().map_err(serde::de::Error::custom))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(SSVCRatioSupportList(ratios))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 简单 newtype 包装（用于语义化字符串）
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EncodeType(pub String);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct IndustrialClassification(pub String);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GrassrootsCode(pub String);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MAC(pub String); // 格式 "XX-XX-XX-XX-XX-XX"
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ManagementUnit(pub String);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ContactInfo(pub String);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PointCommonName(pub String);
+
+// 安装时间使用字符串（ISO8601），也可替换为 chrono::NaiveDateTime
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InstallTime(pub String);
+
+/// 目录项中摄像机的详细参数配置（GB/T 28181-2022 附录 A.2.1.9）
+///
+/// Info 结构体（对应 <Info> 元素）
+/// 对应于 Catalog `<Item>` 中的 `<Info>` 子元素，包含摄像机的结构类型、
+/// 光电成像、补光、方位、分辨率、码流、SVC 编码能力等扩展信息。
+/// 所有字段均为可选，仅在摄像机节点中存在。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Info {
-    /// 摄像机结构类型，标识摄像机类型：1-球机；2-半球；3-固定枪机；4-遥控枪机；5-遥控半球；6-多目设备的全景/拼接通道；7-多目设备的分割通道。当为摄像机时可选。
+    #[serde(rename = "PTZType")]
     pub ptz_type: Option<PTZType>,
-    /// 摄像机光电成像类型。1-可见光成像；2-热成像；3-雷达成像；4-X光成像；5-深度光场成像；9-其他。可多值，用英文半角“/”分割。当为摄像机时可选
+
+    #[serde(rename = "PhotoelectricImagingType")]
     pub photoelectric_imaging_type: Option<PhotoelectricImagingTypes>,
-    /// 摄像机采集部位类型。应符合附录 O 中的规定。当为摄像机时可选。 todo 查看附录 O
-    pub capture_position_type: Option<RoomType>,
-    /// 摄像机补光属性。1-无补光；2-红外补光；3-白光补光；4-激光补光；9-其他。当为摄像机时可选，缺省为1。
+
+    #[serde(rename = "CapturePositionType")]
+    pub capture_position_type: Option<CapturePositionType>,
+
+    #[serde(rename = "RoomType")]
+    pub room_type: Option<RoomType>,
+
+    #[serde(rename = "SupplyLightType")]
     pub supply_light_type: Option<SupplyLightType>,
-    /// 摄像机监视方位(光轴方向)属性。1-东(西向东)、2-西(东向西)、3-南(北向南)、4-北(南向北)、5-东南(西北到东南)、6-东北(西南到东北)、7-西南(东北到西南)、8-西北(东南到西北)。当为摄像机时且为固定摄像机或设置看守位摄像机时可选。
+
+    #[serde(rename = "DirectionType")]
     pub direction_type: Option<DirectionType>,
-    /// 摄像机支持的分辨率，可多值，用英文半角“/”。分辨率取值应符合附录 G 中 SDP f 字段规定。当为摄像机时可选。
+
+    #[serde(rename = "Resolution")]
     pub resolution: Option<Resolution>,
-    /// 摄像机支持的码流编号列表，用于实时点播时指定码流编号（可选），多个取值间用英文半角“/”分割。如“0/1/2”，表示支持主码流，子码流 1，子码流 2，以此类推。
-    pub stream_number_list: Option<String>,
-    /// 下载倍速(可选),可多值,用英文半角“/”分割,如设备支持1,2,4倍速下载则应写为“1/2/4”
-    pub download_speed: Option<String>,
-    /// 空域编码能力，取值 0-不支持；1-1 级增强（1 个增强层）；2-2 级增强（2 个增强层）；3-3 级增强（3 个增强层）（可选）
+
+    #[serde(rename = "StreamNumberList")]
+    pub stream_number_list: Option<StreamNumberList>,
+
+    #[serde(rename = "DownloadSpeed")]
+    pub download_speed: Option<DownloadSpeed>,
+
+    #[serde(rename = "SVCSpaceSupportMode")]
     pub svc_space_support_mode: Option<SVCSpaceSupportMode>,
-    /// todo 还有2个minerU图片没填写
-    pub temp: Option<String>,
+
+    #[serde(rename = "SVCTimeSupportMode")]
+    pub svc_time_support_mode: Option<SVCTimeSupportMode>,
+
+    #[serde(rename = "SSVCRatioSupportList")]
+    pub ssvc_ratio_support_list: Option<SSVCRatioSupportList>,
+
+    #[serde(rename = "MobileDeviceType")]
+    pub mobile_device_type: Option<MobileDeviceType>,
+
+    #[serde(rename = "HorizontalFieldAngle")]
+    pub horizontal_field_angle: Option<f64>,
+
+    #[serde(rename = "VerticalFieldAngle")]
+    pub vertical_field_angle: Option<f64>,
+
+    #[serde(rename = "MaxViewDistance")]
+    pub max_view_distance: Option<f64>,
+
+    #[serde(rename = "GrassrootsCode")]
+    pub grassroots_code: GrassrootsCode,
+
+    #[serde(rename = "PointType")]
+    pub point_type: Option<PointType>,
+
+    #[serde(rename = "PointCommonName")]
+    pub point_common_name: Option<PointCommonName>,
+
+    #[serde(rename = "MAC")]
+    pub mac: Option<MAC>,
+
+    #[serde(rename = "FunctionType")]
+    pub function_type: Option<FunctionTypes>,
+
+    #[serde(rename = "EncodeType")]
+    pub encode_type: Option<EncodeType>,
+
+    #[serde(rename = "InstallTime")]
+    pub install_time: Option<InstallTime>,
+
+    #[serde(rename = "ManagementUnit")]
+    pub management_unit: Option<ManagementUnit>,
+
+    #[serde(rename = "ContactInfo")]
+    pub contact_info: Option<ContactInfo>,
+
+    #[serde(rename = "RecordSaveDays")]
+    pub record_save_days: Option<i32>,
+
+    #[serde(rename = "IndustrialClassification")]
+    pub industrial_classification: Option<IndustrialClassification>,
 }
 
 /// 目录项类型
@@ -524,7 +873,9 @@ pub struct ItemType {
 }
 
 /// 文件目录类型
-pub enum ItemFileType {}
+pub struct ItemFileType {
+
+}
 /// PTZ精确控制类型
 pub enum PTZPreciseType {}
 /// OSD 配置类型
