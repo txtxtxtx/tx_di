@@ -1133,37 +1133,617 @@ pub struct ItemType {
     pub info: Option<Info>,
 }
 
-/// 文件目录类型
+/// 文件目录项类型（GB/T 28181-2022 附录 A.2.1.10 完整定义）
+///
+/// 对应文件目录检索应答中的 `<itemFileType>` 元素，描述单个录像文件的信息。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ItemFileType {
+    /// 目标设备编码（必选）
+    #[serde(rename = "DeviceID")]
+    pub device_id: DeviceIDType,
 
+    /// 目标设备名称（必选）
+    #[serde(rename = "Name")]
+    pub name: String,
+
+    /// 文件路径名（可选）
+    #[serde(rename = "FilePath")]
+    pub file_path: Option<String>,
+
+    /// 录像地址（可选）
+    #[serde(rename = "Address")]
+    pub address: Option<String>,
+
+    /// 录像开始时间（可选），ISO 8601 格式
+    #[serde(rename = "StartTime")]
+    pub start_time: Option<String>,
+
+    /// 录像结束时间（可选），ISO 8601 格式
+    #[serde(rename = "EndTime")]
+    pub end_time: Option<String>,
+
+    /// 保密属性（必选），缺省为 0：0-不涉密，1-涉密
+    #[serde(rename = "Secrecy")]
+    pub secrecy: u8,
+
+    /// 录像产生类型（可选）：time / alarm / manual (手动)
+    #[serde(rename = "Type")]
+    pub record_type: Option<String>,
+
+    /// 录像触发者 ID（可选）
+    #[serde(rename = "RecorderID")]
+    pub recorder_id: Option<String>,
+
+    /// 录像文件大小，单位：Byte（可选）
+    #[serde(rename = "FileSize")]
+    pub file_size: Option<String>,
+
+    /// 存储录像文件的设备/系统编码（模糊查询时必选）
+    #[serde(rename = "RecordLocation")]
+    pub record_location: Option<DeviceIDType>,
+
+    /// 码流类型（可选）：0-主码流；1-子码流1；2-子码流2；以此类推
+    #[serde(rename = "StreamNumber")]
+    pub stream_number: Option<i32>,
 }
-/// PTZ精确控制类型
-pub enum PTZPreciseType {}
-/// OSD 配置类型
-pub enum OSDCfgType {}
-/// 视频参数属性类型
-pub enum VideoParamAttributeCfgType {}
-/// 移动设备位置类型
-pub enum ItemMobilePositionType {}
-/// 录像计划配置类型
-pub enum VideoRecordPlanCfgType {}
-/// 报警录像配置类型
-pub enum VideoAlarmRecordCfgType {}
-/// 视频画面遮挡配置类型
-pub enum PictureMaskCfgType {}
-/// 报警上报开关配置类型
-pub enum AlarmReportCfgType {}
-/// 基本参数配置类型
-pub enum BasicParamCfgType {}
-pub enum VideoParamOptCfgType {}
-/// SVAC 编码配置类型
-pub enum SVACEncodeCfgType {}
-/// SVAC 解码配置类型
-pub enum SVACDecodeCfgType {}
-/// 画面翻转配置类型
-pub enum FrameMirrorCfgType {}
-/// 图像抓拍配置类型
-pub enum SnapShotCfgType {}
+
+/// PTZ 精准控制类型（GB/T 28181-2022 附录 A.2.1.11）
+///
+/// 对应 `<PTZPreciseCtrlType>` 元素，用于设定云台水平角度、垂直角度和变焦倍数。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PTZPreciseCtrlType {
+    /// 设定云台水平角度（可选），0~360.00 度。
+    /// 0 度：绝对 0 度以球机水平光耦为基准，相对 0 度位置以实际设置为准。
+    /// 方向：球机竖立安装，从上向下看，顺时针方向增大，逆时针方向减小。
+    #[serde(rename = "Pan")]
+    pub pan: Option<f64>,
+
+    /// 设定云台垂直角度（可选），一般取值 -30.00~90.00 度。
+    /// 0 度：球机竖立安装时，镜头水平位置为 0 度。
+    /// 方向：镜头向上转，度数变小；向下转，度数变大。
+    #[serde(rename = "Tilt")]
+    pub tilt: Option<f64>,
+
+    /// 设定变焦倍数（可选），取值一般大于 1.00。
+    /// 若参数在光学变焦最大值内则动作至对应光学变焦倍数，
+    /// 超出光学变焦最大值时启动相应数字变焦。
+    #[serde(rename = "Zoom")]
+    pub zoom: Option<f64>,
+}
+
+/// OSD 配置类型（GB/T 28181-2022 附录 A.2.1.12）
+///
+/// 对应 `<OSDCfgType>` 元素，用于配置前端设备的 OSD 显示参数。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OSDCfgType {
+    /// 配置窗口长度像素值（必选）
+    #[serde(rename = "Length")]
+    pub length: i32,
+
+    /// 配置窗口宽度像素值（必选）
+    #[serde(rename = "Width")]
+    pub width: i32,
+
+    /// 时间 X 像素坐标（必选），以播放窗口左上角像素为原点，水平向右为正
+    #[serde(rename = "TimeX")]
+    pub time_x: i32,
+
+    /// 时间 Y 像素坐标（必选），以播放窗口左上角像素为原点，竖直向下为正
+    #[serde(rename = "TimeY")]
+    pub time_y: i32,
+
+    /// 显示时间开关（可选），0-关闭；1-打开（默认值 1）
+    #[serde(rename = "TimeEnable")]
+    pub time_enable: Option<i32>,
+
+    /// 时间显示类型（可选）：0-YYYY-MM-DD HH:MM:SS；1-YYYY年MM月DD日HH:MM:SS
+    #[serde(rename = "TimeType")]
+    pub time_type: Option<i32>,
+
+    /// 显示文字开关（可选），0-关闭；1-打开（默认值 1）
+    #[serde(rename = "TextEnable")]
+    pub text_enable: Option<i32>,
+
+    /// 显示文字行数总数（必选）
+    #[serde(rename = "SumNum")]
+    pub sum_num: i32,
+
+    /// 显示文字列表（可选），最多 8 行
+    #[serde(rename = "Item")]
+    pub items: Option<Vec<OSDItem>>,
+}
+
+/// OSD 文字项
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OSDItem {
+    /// 文字内容（必选），长度取值范围 0～32
+    #[serde(rename = "Text")]
+    pub text: String,
+
+    /// 文字 X 坐标（必选）
+    #[serde(rename = "X")]
+    pub x: i32,
+
+    /// 文字 Y 坐标（必选）
+    #[serde(rename = "Y")]
+    pub y: i32,
+}
+
+/// 视频参数属性配置类型
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct VideoParamAttributeCfgType {
+    #[serde(rename = "Item", default)]
+    pub items: Vec<VideoParamItem>,
+
+    #[serde(rename = "Num")]
+    pub num: Option<i32>,
+}
+
+/// 视频参数项
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct VideoParamItem {
+    /// 视频流编号(必选)，0-主码流；1-子码流1；2-子码流2，以此类推
+    #[serde(rename = "StreamNumber")]
+    pub stream_number: i32,
+
+    /// 视频编码格式(必选)
+    #[serde(rename = "VideoFormat")]
+    pub video_format: String,
+
+    /// 分辨率(必选)
+    #[serde(rename = "Resolution")]
+    pub resolution: String,
+
+    /// 帧率(必选)
+    #[serde(rename = "FrameRate")]
+    pub frame_rate: String,
+
+    /// 码率类型(必选)
+    #[serde(rename = "BitRateType")]
+    pub bit_rate_type: String,
+
+    /// 视频码率(固定码率时必选)
+    #[serde(rename = "VideoBitRate")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub video_bit_rate: Option<String>,
+}
+// --------------------------------------------------------------------------
+/// 移动设备位置类型（GB/T 28181-2022 附录 A.2.1.14）
+///
+/// 对应 `<itemMobilePositionType>` 元素，描述移动采集设备的位置信息。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ItemMobilePositionType {
+    /// 目标设备编码（必选）
+    #[serde(rename = "DeviceID")]
+    pub device_id: DeviceIDType,
+
+    /// 位置采集时间（必选）
+    #[serde(rename = "CaptureTime")]
+    pub capture_time: String,
+
+    /// 经度（必选），WGS-84 坐标系
+    #[serde(rename = "Longitude")]
+    pub longitude: f64,
+
+    /// 纬度（必选），WGS-84 坐标系
+    #[serde(rename = "Latitude")]
+    pub latitude: f64,
+
+    /// 速度（可选），单位：km/h
+    #[serde(rename = "Speed")]
+    pub speed: Option<f64>,
+
+    /// 方向夹角（可选），取值为当前摄像头方向与正北方的顺时针夹角，取值范围 0~360，单位：度
+    #[serde(rename = "Direction")]
+    pub direction: Option<f64>,
+
+    /// 海拔高度（可选），单位：米
+    #[serde(rename = "Altitude")]
+    pub altitude: Option<f64>,
+
+    /// 地面高度（可选），单位：米
+    #[serde(rename = "Height")]
+    pub height: Option<f64>,
+}
+
+/// 录像计划配置类型（GB/T 28181-2022 附录 A.2.1.15）
+///
+/// 对应 `<videoRecordPlanCfgType>` 元素，用于配置设备的录像计划。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct VideoRecordPlanCfgType {
+    /// 是否启用时间计划录像配置（必选）：0-否，1-是
+    #[serde(rename = "RecordEnable")]
+    pub record_enable: u8,
+
+    /// 每周录像计划总天数（必选）
+    #[serde(rename = "RecordScheduleSumNum")]
+    pub record_schedule_sum_num: i32,
+
+    /// 一周7天的录像计划（可选），每天最大支持8个时间段配置
+    #[serde(rename = "RecordSchedule", default)]
+    pub record_schedule: Vec<DayRecordSchedule>,
+
+    /// 码流类型（必选）：0-主码流，1-子码流1，2-子码流2，以此类推
+    #[serde(rename = "StreamNumber")]
+    pub stream_number: u8,
+}
+
+/// 每天的录像计划
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DayRecordSchedule {
+    /// 周几（必选），取值 1~7，表示周一到周日
+    #[serde(rename = "WeekDayNum")]
+    pub week_day_num: u8,
+
+    /// 每天录像计划时间段总数（必选）
+    #[serde(rename = "TimeSegmentSumNum")]
+    pub time_segment_sum_num: i32,
+
+    /// 时间段列表（必选），每天支持最多8个时间段
+    #[serde(rename = "TimeSegment", default)]
+    pub time_segments: Vec<TimeSegment>,
+}
+
+/// 录像时间段
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TimeSegment {
+    /// 开始时间：时（必选），取值 0~23
+    #[serde(rename = "StartHour")]
+    pub start_hour: u8,
+
+    /// 开始时间：分（必选），取值 0~59
+    #[serde(rename = "StartMin")]
+    pub start_min: u8,
+
+    /// 开始时间：秒（必选），取值 0~59
+    #[serde(rename = "StartSec")]
+    pub start_sec: u8,
+
+    /// 结束时间：时（必选），取值 0~23
+    #[serde(rename = "StopHour")]
+    pub stop_hour: u8,
+
+    /// 结束时间：分（必选），取值 0~59
+    #[serde(rename = "StopMin")]
+    pub stop_min: u8,
+
+    /// 结束时间：秒（必选），取值 0~59
+    #[serde(rename = "StopSec")]
+    pub stop_sec: u8,
+}
+
+/// 报警录像配置类型（GB/T 28181-2022 附录 A.2.1.16）
+///
+/// 对应 `<videoAlarmRecordCfgType>` 元素，用于配置报警触发时的录像行为。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct VideoAlarmRecordCfgType {
+    /// 是否启用报警录像配置（必选）：0-否，1-是
+    #[serde(rename = "RecordEnable")]
+    pub record_enable: u8,
+
+    /// 录像延时时间（可选），报警时间点后的时间，单位：秒
+    #[serde(rename = "RecordTime")]
+    pub record_time: Option<i32>,
+
+    /// 预录时间（可选），报警时间点前的时间，单位：秒
+    #[serde(rename = "PreRecordTime")]
+    pub pre_record_time: Option<i32>,
+
+    /// 码流编号（必选）：0-主码流，1-子码流1，2-子码流2，以此类推
+    #[serde(rename = "StreamNumber")]
+    pub stream_number: u8,
+}
+
+/// 视频画面遮挡配置类型（GB/T 28181-2022 附录 A.2.1.17）
+///
+/// 对应 `<pictureMaskCfgType>` 元素，用于配置视频画面遮挡区域。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PictureMaskCfgType {
+    /// 画面遮挡开关（必选）：0-关闭，1-打开
+    #[serde(rename = "On")]
+    pub on: u8,
+
+    /// 区域总数（必选）
+    #[serde(rename = "SumNum")]
+    pub sum_num: i32,
+
+    /// 区域列表（可选），最多4个区域
+    #[serde(rename = "RegionList")]
+    pub region_list: Option<MaskRegionList>,
+}
+
+/// 遮挡区域列表
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MaskRegionList {
+    /// 区域项列表
+    #[serde(rename = "Item", default)]
+    pub items: Vec<MaskRegion>,
+
+    /// 当前区域个数，当无区域时取值为0（必选）
+    #[serde(rename = "Num")]
+    pub num: i32,
+}
+
+/// 单个遮挡区域
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MaskRegion {
+    /// 区域编号（必选），取值范围 1~4
+    #[serde(rename = "Seq")]
+    pub seq: u8,
+
+    /// 区域坐标（必选），格式如 "20, 30, 50, 60"（左x, 左y, 右x, 右y），单位：像素
+    #[serde(rename = "Point")]
+    pub point: String,
+}
+
+/// 报警上报开关配置类型（GB/T 28181-2022 附录 A.2.1.18）
+///
+/// 对应 `<alarmReportCfgType>` 元素，用于配置设备报警事件的上报开关。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AlarmReportCfgType {
+    /// 移动侦测事件上报开关（必选）：0-关闭，1-打开
+    #[serde(rename = "MotionDetection")]
+    pub motion_detection: u8,
+
+    /// 区域入侵事件上报开关（必选）：0-关闭，1-打开
+    #[serde(rename = "FieldDetection")]
+    pub field_detection: u8,
+}
+
+/// 基本参数配置类型（GB/T 28181-2022 附录 A.2.1.19）
+///
+/// 对应 `<basicParamCfgType>` 元素，用于配置设备的基本网络和注册参数。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BasicParamCfgType {
+    /// 设备名称（可选）
+    #[serde(rename = "Name")]
+    pub name: Option<String>,
+
+    /// 注册过期时间（可选），单位：秒
+    #[serde(rename = "Expiration")]
+    pub expiration: Option<i32>,
+
+    /// 心跳间隔时间（可选），单位：秒
+    #[serde(rename = "HeartBeatInterval")]
+    pub heart_beat_interval: Option<i32>,
+
+    /// 心跳超时次数（可选）
+    #[serde(rename = "HeartBeatCount")]
+    pub heart_beat_count: Option<i32>,
+}
+
+/// 视频参数范围配置类型（GB/T 28181-2022 附录 A.2.1.20）
+///
+/// 对应 `<videoParamOptCfgType>` 元素，用于描述摄像机支持的视频参数范围。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct VideoParamOptCfgType {
+    /// 下载倍速范围（可选），各参数以 "/" 分隔，如 "1/2/4"
+    #[serde(rename = "DownloadSpeed")]
+    pub download_speed: Option<String>,
+
+    /// 摄像机支持的分辨率（可选），多个值以 "/" 分隔，应符合附录 G 中 SDP f 字段规定
+    #[serde(rename = "Resolution")]
+    pub resolution: Option<String>,
+}
+
+/// SVAC 编码配置类型（GB/T 28181-2022 附录 A.2.1.21）
+///
+/// 对应 `<SVACEncodeCfgType>` 元素，用于配置 SVAC 视频编码参数。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SVACEncodeCfgType {
+    /// 感兴趣区域参数（可选）
+    #[serde(rename = "ROIParam")]
+    pub roi_param: Option<ROIParam>,
+
+    /// SVC 参数（可选）
+    #[serde(rename = "SVCParam")]
+    pub svc_param: Option<SVCParam>,
+
+    /// 监控专用信息参数（仅查询应答可选）
+    #[serde(rename = "SurveillanceParam")]
+    pub surveillance_param: Option<SurveillanceParam>,
+
+    /// 音频参数（可选）
+    #[serde(rename = "AudioParam")]
+    pub audio_param: Option<AudioParam>,
+}
+
+/// ROI 感兴趣区域参数
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ROIParam {
+    /// 感兴趣区域开关（配置可选，查询应答必选）：0-关闭，1-打开
+    #[serde(rename = "ROIFlag")]
+    pub roi_flag: Option<u8>,
+
+    /// 感兴趣区域数量（配置可选，查询应答必选），取值范围 0~16
+    #[serde(rename = "ROINumber")]
+    pub roi_number: Option<u8>,
+
+    /// 感兴趣区域列表（可选），最多16个区域
+    #[serde(rename = "Item", default)]
+    pub items: Vec<ROIRegion>,
+}
+
+/// 单个 ROI 区域
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ROIRegion {
+    /// 区域编号（配置可选，查询应答必选），取值范围 1~16
+    #[serde(rename = "ROISeq")]
+    pub roi_seq: Option<u8>,
+
+    /// 左上角坐标（配置可选，查询应答必选），图像按 32x32 划分后的块序号
+    #[serde(rename = "TopLeft")]
+    pub top_left: Option<u32>,
+
+    /// 右下角坐标（配置可选，查询应答必选），图像按 32x32 划分后的块序号
+    #[serde(rename = "BottomRight")]
+    pub bottom_right: Option<u32>,
+
+    /// ROI 区域编码质量等级（配置可选，查询应答必选）：0-一般，1-较好，2-好，3-很好
+    #[serde(rename = "ROIQP")]
+    pub roi_qp: Option<u8>,
+}
+
+/// SVC 参数
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SVCParam {
+    /// 空域编码方式（必选）：0-基本层，1-1级增强，2-2级增强，3-3级增强
+    #[serde(rename = "SVCSpaceDomainMode")]
+    pub svc_space_domain_mode: u8,
+
+    /// 时域编码方式（必选）：0-基本层，1-1级增强，2-2级增强，3-3级增强
+    #[serde(rename = "SVCTimeDomainMode")]
+    pub svc_time_domain_mode: u8,
+
+    /// SSVC 增强层与基本层比例值（可选），如 "4:3"、"2:1"、"4:1" 等
+    #[serde(rename = "SSVCRatioValue")]
+    pub ssvc_ratio_value: Option<String>,
+
+    /// 空域编码能力（仅查询应答必选）：0-不支持，1-1级增强，2-2级增强，3-3级增强
+    #[serde(rename = "SVCSpaceSupportMode")]
+    pub svc_space_support_mode: Option<u8>,
+
+    /// 时域编码能力（仅查询应答必选）：0-不支持，1-1级增强，2-2级增强，3-3级增强
+    #[serde(rename = "SVCTimeSupportMode")]
+    pub svc_time_support_mode: Option<u8>,
+
+    /// SSVC 增强层与基本层比例能力（仅查询应答可选），多个值用 "/" 分隔
+    #[serde(rename = "SSVCRatioSupportList")]
+    pub ssvc_ratio_support_list: Option<String>,
+}
+
+/// 监控专用信息参数
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SurveillanceParam {
+    /// 绝对时间信息开关（必选）：0-关闭，1-打开
+    #[serde(rename = "TimeFlag")]
+    pub time_flag: Option<u8>,
+
+    /// OSD 信息开关（必选）：0-关闭，1-打开
+    #[serde(rename = "OSDFlag")]
+    pub osd_flag: Option<u8>,
+
+    /// 智能分析信息开关（必选）：0-关闭，1-打开
+    #[serde(rename = "AIFlag")]
+    pub ai_flag: Option<u8>,
+
+    /// 地理信息开关（必选）：0-关闭，1-打开
+    #[serde(rename = "GISFlag")]
+    pub gis_flag: Option<u8>,
+}
+
+/// 音频参数
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AudioParam {
+    /// 声音识别特征参数开关（必选）：0-关闭，1-打开
+    #[serde(rename = "AudioRecognitionFlag")]
+    pub audio_recognition_flag: u8,
+}
+
+/// SVAC 解码配置类型（GB/T 28181-2022 附录 A.2.1.22）
+///
+/// 对应 `<SVACDecodeCfgType>` 元素，用于配置 SVAC 视频解码参数。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SVACDecodeCfgType {
+    /// SVC 参数（可选）
+    #[serde(rename = "SVCParam")]
+    pub svc_param: Option<SVCDecodeSVCParam>,
+
+    /// 监控专用信息参数（可选）
+    #[serde(rename = "SurveillanceParam")]
+    pub surveillance_param: Option<DecodeSurveillanceParam>,
+}
+
+/// SVAC 解码的 SVC 参数
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SVCDecodeSVCParam {
+    /// 码流显示模式（配置必选，查询应答可选）：
+    /// 0-基本层码流单独显示方式
+    /// 1-基本层+1个增强层码流方式
+    /// 2-基本层+2个增强层码流方式
+    /// 3-基本层+3个增强层码流方式
+    #[serde(rename = "SVCSTMMode")]
+    pub svc_stm_mode: u8,
+
+    /// 空域编码能力（仅查询应答必选）：0-不支持，1-1级增强，2-2级增强，3-3级增强
+    #[serde(rename = "SVCSpaceSupportMode")]
+    pub svc_space_support_mode: Option<u8>,
+
+    /// 时域编码能力（仅查询应答必选）：0-不支持，1-1级增强，2-2级增强，3-3级增强
+    #[serde(rename = "SVCTimeSupportMode")]
+    pub svc_time_support_mode: Option<u8>,
+}
+
+/// 解码监控专用信息参数
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DecodeSurveillanceParam {
+    /// 绝对时间信息显示开关（配置可选，查询应答必选）：0-关闭，1-打开
+    #[serde(rename = "TimeShowFlag")]
+    pub time_show_flag: Option<u8>,
+
+    /// OSD 信息显示开关（配置可选，查询应答必选）：0-关闭，1-打开
+    #[serde(rename = "OSDShowFlag")]
+    pub osd_show_flag: Option<u8>,
+
+    /// 智能分析信息显示开关（配置可选，查询应答必选）：0-关闭，1-打开
+    #[serde(rename = "AIShowFlag")]
+    pub ai_show_flag: Option<u8>,
+
+    /// 地理信息显示开关（配置可选，查询应答必选）：0-关闭，1-打开
+    #[serde(rename = "GISShowFlag")]
+    pub gis_show_flag: Option<u8>,
+}
+
+/// 画面翻转配置类型（GB/T 28181-2022 附录 A.2.1.23）
+///
+/// 对应 `<frameMirrorCfgType>` 元素，用于配置视频画面镜像翻转方式。
+#[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
+pub enum FrameMirrorCfgType {
+    /// 不启用镜像，基准画面
+    None = 0,
+    /// 水平镜像（左右翻转）
+    Horizontal = 1,
+    /// 上下镜像（上下翻转）
+    Vertical = 2,
+    /// 中心镜像（上下左右都翻转）
+    Center = 3,
+}
+impl TryFrom<u8> for FrameMirrorCfgType {
+    type Error = &'static str;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(FrameMirrorCfgType::None),
+            1 => Ok(FrameMirrorCfgType::Horizontal),
+            2 => Ok(FrameMirrorCfgType::Vertical),
+            3 => Ok(FrameMirrorCfgType::Center),
+            _ => Err("Invalid FrameMirrorCfgType"),
+        }
+    }
+}
+
+/// 图像抓拍配置类型（GB/T 28181-2022 附录 A.2.1.24）
+///
+/// 对应 `<snapShotCfgType>` 元素，用于配置设备图像抓拍参数。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SnapShotCfgType {
+    /// 连拍张数（必选），最多10张，当手动抓拍时取值为1
+    #[serde(rename = "SnapNum")]
+    pub snap_num: u8,
+
+    /// 单张抓拍间隔时间（可选），单位：秒，最短1秒
+    #[serde(rename = "Interval")]
+    pub interval: Option<u32>,
+
+    /// 抓拍图像上传路径（必选）
+    #[serde(rename = "UploadURL")]
+    pub upload_url: String,
+
+    /// 会话 ID（必选），由平台生成，用于关联抓拍的图像与平台请求
+    /// 由大小写英文字母、数字、短划线组成，长度 32~128 字节
+    #[serde(rename = "SessionID")]
+    pub session_id: String,
+}
 
 #[cfg(test)]
 mod tests {
