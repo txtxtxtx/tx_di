@@ -330,6 +330,10 @@ impl FromStr for PhotoelectricImagingTypes {
     }
 }
 
+/// 采集部位类型（CapturePositionType）
+///
+/// 摄像机采集部位类型，应符合 GB/T 28181-2022 附录 O 中的规定。
+/// 当为摄像机时可选。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct CapturePositionType(String);
@@ -352,6 +356,16 @@ impl TryFrom<u8> for RoomType {
         }
     }
 }
+/// 摄像机补光属性（SupplyLightType）
+///
+/// 标识摄像机所采用的补光方式：
+/// - `1` — 无补光（缺省值）
+/// - `2` — 红外补光
+/// - `3` — 白光补光
+/// - `4` — 激光补光
+/// - `9` — 其他补光
+///
+/// 当为摄像机时可选，缺省为 `1`。
 #[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr, Default)]
 #[repr(u8)]
 pub enum SupplyLightType {
@@ -496,6 +510,17 @@ impl TryFrom<u8> for SVCSSIMode {
 }
 
 /// 移动采集设备类型
+/// 移动采集设备类型（MobileDeviceType）
+///
+/// 标识移动采集设备的类型：
+/// - `1` — 移动机器人
+/// - `2` — 佩戴式
+/// - `3` — 单兵
+/// - `4` — 车载视频
+/// - `5` — 无人机
+/// - `9` — 其他
+///
+/// 当为移动采集设备时可选。
 #[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum MobileDeviceType {
@@ -508,6 +533,15 @@ pub enum MobileDeviceType {
 }
 
 /// 监控点位类型
+/// 监控点位类型（PointType）
+///
+/// 标识监控点位的等级分类：
+/// - `1` — 一类监控点位
+/// - `2` — 二类监控点位
+/// - `3` — 三类监控点位
+/// - `9` — 其他
+///
+/// 当为摄像机时可选。
 #[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum PointType {
@@ -521,6 +555,15 @@ pub enum PointType {
 // 光电成像类型（单值枚举）
 // ---------------------------------------------------------------------------
 
+/// 光电成像类型单值（PhotoelectricImagingTypeValue）
+///
+/// 摄像机光电成像类型的单值枚举，取值：
+/// - `1` — 可见光成像
+/// - `2` — 热成像
+/// - `3` — 雷达成像
+/// - `4` — X光成像
+/// - `5` — 深度光场成像
+/// - `9` — 其他
 #[derive(Debug, Clone, PartialEq, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum PhotoelectricImagingTypeValue {
@@ -536,6 +579,15 @@ pub enum PhotoelectricImagingTypeValue {
 // 卡口功能类型（单值枚举，注意序列化为两位数字符串）
 // ---------------------------------------------------------------------------
 
+/// 卡口功能类型单值（FunctionTypeValue）
+///
+/// 标识卡口设备所支持的单一功能类型，序列化为两位数字符串：
+/// - `01` — 人脸
+/// - `02` — 人体
+/// - `03` — 机动车
+/// - `04` — 非机动车
+/// - `05` — 物体
+/// - `99` — 其他
 #[derive(Debug, Clone, PartialEq)]
 pub enum FunctionTypeValue {
     Face = 1,
@@ -569,6 +621,10 @@ impl<'de> Deserialize<'de> for FunctionTypeValue {
 }
 
 /// 卡口功能类型列表（如 "01/03/99"）
+/// 卡口功能类型列表（FunctionTypes）
+///
+/// 标识卡口设备所支持的功能类型列表，序列化为 "/" 分割的两位数字符串。
+/// 如 `"01/03/99"` 表示支持人脸、机动车和其他。
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionTypes(pub Vec<FunctionTypeValue>);
 
@@ -605,6 +661,10 @@ impl<'de> Deserialize<'de> for FunctionTypes {
 }
 
 /// 码流编号列表（如 "0/1/2"）
+/// 码流编号列表（StreamNumberList）
+///
+/// 摄像机支持的码流编号列表，用于实时点播时指定码流编号。
+/// 序列化为 "/" 分割的数字字符串，如 `"0/1/2"` 表示支持主码流、子码流 1、子码流 2。
 #[derive(Debug, Clone, PartialEq)]
 pub struct StreamNumberList(pub Vec<u8>);
 
@@ -628,6 +688,10 @@ impl<'de> Deserialize<'de> for StreamNumberList {
     }
 }
 /// 下载倍速列表（如 "1/2/4"）
+/// 下载倍速列表（DownloadSpeed）
+///
+/// 设备支持的下载倍速范围，序列化为 "/" 分割的数字字符串。
+/// 如 `"1/2/4"` 表示支持 1、2、4 倍速下载。
 #[derive(Debug, Clone, PartialEq)]
 pub struct DownloadSpeed(pub Vec<u8>);
 
@@ -651,7 +715,9 @@ impl<'de> Deserialize<'de> for DownloadSpeed {
     }
 }
 
-/// SSVC 比例（如 "4:3"）
+/// SSVC 分辨率比例（Ratio）
+///
+/// 表示 SSVC 编码中的宽高比，格式为 `"宽:高"`，如 `"4:3"`。
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ratio {
     pub numerator: u32,
@@ -677,7 +743,10 @@ impl FromStr for Ratio {
     }
 }
 
-/// SSVC 比例列表（如 "4:3/2:1/4:1"）
+/// SSVC 比例支持列表（SSVCRatioSupportList）
+///
+/// 标识设备支持的 SSVC（空域可伸缩视频编码）分辨率比例列表。
+/// 序列化为 "/" 分割的比例字符串，如 `"4:3/2:1/4:1"`。
 #[derive(Debug, Clone, PartialEq)]
 pub struct SSVCRatioSupportList(pub Vec<Ratio>);
 
@@ -705,117 +774,309 @@ impl<'de> Deserialize<'de> for SSVCRatioSupportList {
 // 简单 newtype 包装（用于语义化字符串）
 // ---------------------------------------------------------------------------
 
+/// 编码类型（EncodeType）
+///
+/// 摄像机支持的编码类型，多个编码类型用英文半角 "/" 分割。
+/// 如 `"H.264/H.265/MJPEG"`。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EncodeType(pub String);
 
+/// 行业分类代码（IndustrialClassification）
+///
+/// 摄像机所属的行业分类编码，应符合 GB/T 4754—2017 的规定。
+/// 如 `"I1300"` 表示软件和信息技术服务业。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IndustrialClassification(pub String);
 
+/// 基层组织代码（GrassrootsCode）
+///
+/// 摄像机所属基层组织的编码，使用行政区划代码标识。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GrassrootsCode(pub String);
 
+/// MAC 地址（MAC）
+///
+/// 设备的 MAC 地址，格式为 `"XX-XX-XX-XX-XX-XX"`。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct MAC(pub String); // 格式 "XX-XX-XX-XX-XX-XX"
+pub struct MAC(pub String);
 
+/// 管理单位（ManagementUnit）
+///
+/// 摄像机所属的管理单位名称或编码。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ManagementUnit(pub String);
 
+/// 联系人信息（ContactInfo）
+///
+/// 设备/监控点位的联系人信息，如电话号码等。多值用 / 分割
+/// 一类监控点必填
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ContactInfo(pub String);
 
+/// 监控点位常用名称（PointCommonName）
+///
+/// 监控点位的常用/通俗名称，便于日常识别和管理。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PointCommonName(pub String);
 
-// 安装时间使用字符串（ISO8601），也可替换为 chrono::NaiveDateTime
+/// 安装时间（InstallTime）
+///
+/// 摄像机的安装日期时间，使用 ISO 8601 格式字符串（如 `"2024-01-01T00:00:00"`）。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InstallTime(pub String);
 
 /// 目录项中摄像机的详细参数配置（GB/T 28181-2022 附录 A.2.1.9）
 ///
-/// Info 结构体（对应 <Info> 元素）
 /// 对应于 Catalog `<Item>` 中的 `<Info>` 子元素，包含摄像机的结构类型、
-/// 光电成像、补光、方位、分辨率、码流、SVC 编码能力等扩展信息。
+/// 光电成像、补光、方位、分辨率、码流、SVC 编码能力、移动设备类型、
+/// 视场角、监控点位、编码类型、安装信息等扩展参数。
 /// 所有字段均为可选，仅在摄像机节点中存在。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Info {
+    /// 摄像机结构类型（PTZType）
+    ///
+    /// 标识摄像机类型：
+    /// - `1` — 球机
+    /// - `2` — 半球
+    /// - `3` — 固定枪机
+    /// - `4` — 遥控枪机
+    /// - `5` — 遥控半球
+    /// - `6` — 多目设备的全景/拼接通道
+    /// - `7` — 多目设备的分割通道
+    ///
+    /// 当为摄像机时可选。
     #[serde(rename = "PTZType")]
     pub ptz_type: Option<PTZType>,
 
+    /// 摄像机光电成像类型（PhotoelectricImagingType）
+    ///
+    /// 标识摄像机所采用的光电成像方式：
+    /// - `1` — 可见光成像
+    /// - `2` — 热成像
+    /// - `3` — 雷达成像
+    /// - `4` — X光成像
+    /// - `5` — 深度光场成像
+    /// - `9` — 其他
+    ///
+    /// 可多值，用英文半角 "/" 分割。当为摄像机时可选。
     #[serde(rename = "PhotoelectricImagingType")]
     pub photoelectric_imaging_type: Option<PhotoelectricImagingTypes>,
 
+    /// 摄像机采集部位类型（CapturePositionType）
+    ///
+    /// 标识摄像机采集部位类型，应符合 GB/T 28181-2022 附录 O 中的规定。
+    /// 当为摄像机时可选。
     #[serde(rename = "CapturePositionType")]
     pub capture_position_type: Option<CapturePositionType>,
 
+    /// 摄像机安装位置（RoomType）
+    ///
+    /// 标识摄像机安装位置是室内还是室外：
+    /// - `1` — 室外（缺省值）
+    /// - `2` — 室内
+    ///
+    /// 当为摄像机时可选，缺省为 `1`。
     #[serde(rename = "RoomType")]
     pub room_type: Option<RoomType>,
 
+    /// 摄像机补光属性（SupplyLightType）
+    ///
+    /// 标识摄像机所采用的补光方式：
+    /// - `1` — 无补光（缺省值）
+    /// - `2` — 红外补光
+    /// - `3` — 白光补光
+    /// - `4` — 激光补光
+    /// - `9` — 其他补光
+    ///
+    /// 当为摄像机时可选，缺省为 `1`。
     #[serde(rename = "SupplyLightType")]
     pub supply_light_type: Option<SupplyLightType>,
 
+    /// 摄像机监视方位/光轴方向（DirectionType）
+    ///
+    /// 标识固定摄像机或设置看守位摄像机的光轴方向：
+    /// - `1` — 东（西向东）
+    /// - `2` — 西（东向西）
+    /// - `3` — 南（北向南）
+    /// - `4` — 北（南向北）
+    /// - `5` — 东南（西北到东南）
+    /// - `6` — 东北（西南到东北）
+    /// - `7` — 西南（东北到西南）
+    /// - `8` — 西北（东南到西北）
+    ///
+    /// 当为摄像机且为固定摄像机或设置看守位摄像机时可选。
     #[serde(rename = "DirectionType")]
     pub direction_type: Option<DirectionType>,
 
+    /// 摄像机支持的分辨率列表（Resolution）
+    ///
+    /// 可多值，用英文半角 "/" 分割。
+    /// 分辨率取值应符合附录 G 中 SDP `f` 字段规定。
     #[serde(rename = "Resolution")]
     pub resolution: Option<Resolution>,
 
+    /// 摄像机支持的码流编号列表（StreamNumberList）
+    ///
+    /// 用于实时点播时指定码流编号，多个取值间用英文半角 "/" 分割。
+    /// 如 `"0/1/2"` 表示支持主码流、子码流 1、子码流 2，以此类推。
     #[serde(rename = "StreamNumberList")]
     pub stream_number_list: Option<StreamNumberList>,
 
+    /// 下载倍速列表（DownloadSpeed）
+    ///
+    /// 标识设备支持的下载倍速范围，可多值，用英文半角 "/" 分割。
+    /// 如设备支持 1、2、4 倍速下载则应写为 `"1/2/4"`。
     #[serde(rename = "DownloadSpeed")]
     pub download_speed: Option<DownloadSpeed>,
 
+    /// 空域编码能力（SVCSpaceSupportMode）
+    ///
+    /// 标识设备对空域 SVC 增强层的支持能力：
+    /// - `0` — 不支持
+    /// - `1` — 1 级增强（1 个增强层）
+    /// - `2` — 2 级增强（2 个增强层）
+    /// - `3` — 3 级增强（3 个增强层）
+    ///
     #[serde(rename = "SVCSpaceSupportMode")]
     pub svc_space_support_mode: Option<SVCSpaceSupportMode>,
 
+    /// 时域编码能力（SVCTimeSupportMode）
+    ///
+    /// 标识设备对时域 SVC 增强层的支持能力：
+    /// - `0` — 不支持
+    /// - `1` — 1 级增强（1 个增强层）
+    /// - `2` — 2 级增强（2 个增强层）
+    /// - `3` — 3 级增强（3 个增强层）
+    ///
     #[serde(rename = "SVCTimeSupportMode")]
     pub svc_time_support_mode: Option<SVCTimeSupportMode>,
 
+    /// SSVC 争强层与基本层的比例支持列表（SSVCRatioSupportList）
+    ///
+    /// 标识设备支持的 SSVC（空域可伸缩视频编码）分辨率比例。
+    /// 多个比例用英文半角 "/" 分割，每个比例格式为 `"宽:高"`。
+    /// 如 `"4:3/2:1/4:1"`。
     #[serde(rename = "SSVCRatioSupportList")]
     pub ssvc_ratio_support_list: Option<SSVCRatioSupportList>,
 
+    /// 移动采集设备类型（MobileDeviceType）
+    ///
+    /// 标识移动采集设备的类型：
+    /// - `1` — 移动机器人
+    /// - `2` — 佩戴式
+    /// - `3` — 单兵
+    /// - `4` — 车载视频
+    /// - `5` — 无人机
+    /// - `9` — 其他
+    ///
+    /// 当为移动采集设备时必选。
     #[serde(rename = "MobileDeviceType")]
     pub mobile_device_type: Option<MobileDeviceType>,
 
+    /// 水平视场角（HorizontalFieldAngle）
+    ///
+    /// 摄像机的水平视场角，单位为度（°）。
+    /// 当为摄像机时可选。
     #[serde(rename = "HorizontalFieldAngle")]
     pub horizontal_field_angle: Option<f64>,
 
+    /// 垂直视场角（VerticalFieldAngle）
+    ///
+    /// 摄像机的垂直视场角，单位为度（°）。
+    /// 当为摄像机时可选。
     #[serde(rename = "VerticalFieldAngle")]
     pub vertical_field_angle: Option<f64>,
 
+    /// 最大可视距离（MaxViewDistance）
+    ///
+    /// 摄像机的最大可视距离，单位为米（m）。
+    /// 当为摄像机时可选。
     #[serde(rename = "MaxViewDistance")]
     pub max_view_distance: Option<f64>,
 
+    /// 基层组织代码（GrassrootsCode）
+    ///
+    /// 非基层建设时为 "000000"
+    /// 摄像机所属基层组织的编码，使用行政区划代码标识。
+    /// 当为摄像机且属于基层组织管理范围时可选。
     #[serde(rename = "GrassrootsCode")]
     pub grassroots_code: GrassrootsCode,
 
+    /// 监控点位类型（PointType）
+    ///
+    /// 标识监控点位的等级分类：
+    /// - `1` — 一类监控点位
+    /// - `2` — 二类监控点位
+    /// - `3` — 三类监控点位
+    /// - `9` — 其他
+    /// 当为摄像机必选
     #[serde(rename = "PointType")]
     pub point_type: Option<PointType>,
 
+    /// 监控点位常用名称（PointCommonName）
+    ///
+    /// 监控点位的常用/通俗名称，便于日常识别和管理。
     #[serde(rename = "PointCommonName")]
     pub point_common_name: Option<PointCommonName>,
 
+    /// MAC 地址（MAC）
+    ///
+    /// 设备的 MAC 地址，格式为 `"XX-XX-XX-XX-XX-XX"`。
     #[serde(rename = "MAC")]
     pub mac: Option<MAC>,
 
+    /// 卡口功能类型列表（FunctionType）
+    ///
+    /// 标识卡口设备所支持的功能类型：
+    /// - `01` — 人脸
+    /// - `02` — 人员
+    /// - `03` — 机动车
+    /// - `04` — 非机动车
+    /// - `05` — 物体
+    /// - `99` — 其他
+    ///
+    /// 可多值，用英文半角 "/" 分割，如 `"01/03/99"`。
+    /// 当为摄像机时可选。
     #[serde(rename = "FunctionType")]
     pub function_type: Option<FunctionTypes>,
 
+    /// 编码类型（EncodeType）
+    ///
+    /// 摄像机支持的编码类型，如 `"H.264/H.265/MJPEG"`。
+    /// 多个编码类型用英文半角 "/" 分割。
     #[serde(rename = "EncodeType")]
     pub encode_type: Option<EncodeType>,
 
+    /// 安装时间（InstallTime）
+    ///
+    /// 摄像机的安装日期时间，格式为 ISO 8601（如 `"2024-01-01T00:00:00"`）。
+    /// 一类监控点必填
     #[serde(rename = "InstallTime")]
     pub install_time: Option<InstallTime>,
 
+    /// 管理单位（ManagementUnit）
+    ///
+    /// 摄像机所属的管理单位名称。
     #[serde(rename = "ManagementUnit")]
     pub management_unit: Option<ManagementUnit>,
 
+    /// 联系人信息（ContactInfo）
+    ///
+    /// 设备/监控点位的联系人信息，如电话号码等。多值用 / 分割
+    /// 一类监控点必填
     #[serde(rename = "ContactInfo")]
     pub contact_info: Option<ContactInfo>,
 
+    /// 录像保存天数（RecordSaveDays）
+    ///
+    /// 一类视频监控点必填，2、3类可选
     #[serde(rename = "RecordSaveDays")]
     pub record_save_days: Option<i32>,
 
+    /// 国民经济行业分类代码（IndustrialClassification）
+    ///
+    /// 应符合 GB/T 4754—2017 第五章 的规定。
+    /// 如 `"I1300"` 表示软件和信息技术服务业。
     #[serde(rename = "IndustrialClassification")]
     pub industrial_classification: Option<IndustrialClassification>,
 }
