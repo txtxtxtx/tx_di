@@ -519,7 +519,8 @@ pub struct ItemType {
     pub latitude: Option<f64>,
     /// 虚拟组织所属的业务分组 ID, 业务分组根据特定的业务需求制定, 一个业务分组包含一组特定的虚拟组织。
     pub business_group_id: Option<DeviceIDType>,
-    pub info: Option<String>,
+    ///
+    pub info: Option<Info>,
 }
 
 /// 文件目录类型
