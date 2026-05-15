@@ -19,64 +19,14 @@
 //! | 2022 `CatalogItem` → `GbDevice` | `GbDevice::from_catalog_item()` |
 //! | `GbDevice` → 2022 `CatalogItem` | `gb_device.to_catalog_item()` |
 
-use crate::xml::CatalogItem;
+use crate::enums::{DeviceIDType, StatusType};
+use crate::xml::{CatalogItem, DeviceStatus};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
+use std::net::IpAddr;
 use std::str::FromStr;
 use tokio::time::{Duration, Instant};
-
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ChannelStatus
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-/// 通道在线状态
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(rename_all = "UPPERCASE")]
-#[serde(untagged)]
-pub enum ChannelStatus {
-    On,
-    Off,
-    Unknown(String),
-}
-
-impl<'de> Deserialize<'de> for ChannelStatus {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        // 使用 FromStr 实现，支持大小写不敏感
-        s.parse::<ChannelStatus>()
-            .map_err(serde::de::Error::custom)
-    }
-}
-
-impl FromStr for ChannelStatus {
-    /// 永远不会发生的错误
-    type Err = std::convert::Infallible;
-
-    /// 从字符串解析通道状态
-    /// 永远不会发生错误，可直接 unwrap
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s.to_uppercase().as_str() {
-            "ON" => ChannelStatus::On,
-            "OFF" => ChannelStatus::Off,
-            other => ChannelStatus::Unknown(other.to_string()),
-        })
-    }
-}
-
-impl ChannelStatus {
-    pub fn as_str(&self) -> &str {
-        match self {
-            ChannelStatus::On => "ON",
-            ChannelStatus::Off => "OFF",
-            ChannelStatus::Unknown(s) => s.as_str(),
-        }
-    }
-}
-
+use tx_di_core::RIE;
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // GbDeviceType — 2022 节点类型枚举
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -145,7 +95,7 @@ impl std::fmt::Display for GbDeviceType {
 #[derive(Debug, Clone)]
 pub struct ChannelInfo {
     /// 通道 ID（20 位）
-    pub channel_id: String,
+    pub channel_id: DeviceIDType,
     /// 通道名称
     pub name: String,
     /// 厂商
@@ -153,11 +103,11 @@ pub struct ChannelInfo {
     /// 设备型号
     pub model: String,
     /// 通道状态
-    pub status: ChannelStatus,
+    pub status: StatusType,
     /// 地址描述
     pub address: String,
     /// 父设备 ID
-    pub parent_id: String,
+    pub parent_id: DeviceIDType,
     /// 是否父节点（1=父节点/设备，0=叶节点/通道）
     pub parental: u8,
     /// 注册方式（1=主动注册，2=被动注册）
@@ -165,7 +115,7 @@ pub struct ChannelInfo {
     /// 保密属性（0=不涉密）
     pub secrecy: u8,
     /// 设备 IP
-    pub ip_address: String,
+    pub ip_address: IpAddr,
     /// 设备端口
     pub port: u16,
     /// 经度
@@ -190,7 +140,7 @@ pub struct ChannelInfo {
 #[derive(Debug, Clone)]
 pub struct DeviceInfo {
     /// 设备 ID（20 位）
-    pub device_id: String,
+    pub device_id: DeviceIDType,
 
     /// 设备的 SIP 联系地址（Contact URI），后续请求的直接目的地地址
     /// - 指定后续通信的地址
@@ -232,9 +182,9 @@ pub struct DeviceInfo {
 
 impl DeviceInfo {
     /// 创建新的设备信息
-    pub fn new(device_id: String, contact: String, expires: u32, remote_addr: String) -> Self {
-        Self {
-            device_id,
+    pub fn new(device_id: String, contact: String, expires: u32, remote_addr: String) -> RIE<Self> {
+        Ok(Self {
+            device_id: device_id.try_into()?,
             contact,
             registered_at: Utc::now(),
             last_heartbeat: Instant::now(),
@@ -245,7 +195,7 @@ impl DeviceInfo {
             manufacturer: String::new(),
             model: String::new(),
             firmware: String::new(),
-        }
+        })
     }
 
     /// 是否已超时（未在规定时间内收到心跳）
@@ -311,7 +261,7 @@ pub struct GbDevice {
     pub owner: String,
 
     /// 设备/子设备状态（Status）
-    pub status: ChannelStatus,
+    pub status: StatusType,
 
     /// 经度（Longitude），单位：度，取值范围 -180.0 ~ 180.0
     pub longitude: Option<f64>,
@@ -401,7 +351,7 @@ impl Default for GbDevice {
             model: String::new(),
             firmware: String::new(),
             owner: String::new(),
-            status: ChannelStatus::On,
+            status: StatusType::ON,
             longitude: None,
             latitude: None,
             civil_code: String::new(),
@@ -731,14 +681,8 @@ mod tests {
 
     #[test]
     fn channel_status_from_str() {
-        assert_eq!(
-            "ON".parse::<ChannelStatus>().unwrap(),
-            ChannelStatus::On
-        );
-        assert_eq!(
-            "off".parse::<ChannelStatus>().unwrap(),
-            ChannelStatus::Off
-        );
+        assert_eq!("ON".parse::<ChannelStatus>().unwrap(), ChannelStatus::On);
+        assert_eq!("off".parse::<ChannelStatus>().unwrap(), ChannelStatus::Off);
         assert_eq!(
             "Maintenance".parse::<ChannelStatus>().unwrap(),
             ChannelStatus::Unknown("MAINTENANCE".to_string())
@@ -781,8 +725,14 @@ mod tests {
 
     #[test]
     fn gb_device_type_from_str() {
-        assert_eq!("Device".parse::<GbDeviceType>().unwrap(), GbDeviceType::Device);
-        assert_eq!("SubDevice".parse::<GbDeviceType>().unwrap(), GbDeviceType::SubDevice);
+        assert_eq!(
+            "Device".parse::<GbDeviceType>().unwrap(),
+            GbDeviceType::Device
+        );
+        assert_eq!(
+            "SubDevice".parse::<GbDeviceType>().unwrap(),
+            GbDeviceType::SubDevice
+        );
         assert_eq!("Area".parse::<GbDeviceType>().unwrap(), GbDeviceType::Area);
         assert!("Unknown".parse::<GbDeviceType>().is_err());
     }
@@ -806,7 +756,8 @@ mod tests {
 
     #[test]
     fn gb_device_new_sub_device() {
-        let sub = GbDevice::new_sub_device("34020000001320000001", "Camera-01", "34020000001320000000");
+        let sub =
+            GbDevice::new_sub_device("34020000001320000001", "Camera-01", "34020000001320000000");
         assert_eq!(sub.device_type, GbDeviceType::SubDevice);
         assert_eq!(sub.parent_id, "34020000001320000000");
         assert_eq!(sub.parental, 0);
@@ -854,7 +805,10 @@ mod tests {
         assert_eq!(back.manufacturer, "Hikvision");
         assert_eq!(back.model, "DS-2CD2143G2-I");
         assert_eq!(back.firmware, "V5.7.10");
-        assert_eq!(back.contact, "<sip:34020000001320000001@192.168.1.100:5060>");
+        assert_eq!(
+            back.contact,
+            "<sip:34020000001320000001@192.168.1.100:5060>"
+        );
         assert_eq!(back.remote_addr, "192.168.1.100:5060");
         assert!(back.online);
         assert_eq!(back.expires, 3600);
