@@ -19,7 +19,6 @@
 
 use quick_xml::Reader;
 use quick_xml::events::Event;
-use crate::ChannelStatus;
 // ── 解析工具 ──────────────────────────────────────────────────────────────────
 
 /// 从 GB28181 XML 中提取指定字段值（使用 quick-xml）
@@ -328,8 +327,8 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                         register_way: cur_register_way,
                         security_level_code: None,
                         secrecy: cur_secrecy,
-                        ip_address: std::mem::take(&mut cur_ip_address),
-                        port: cur_port,
+                        ip_address: Some(std::mem::take(&mut cur_ip_address)),
+                        port: Some(cur_port),
                         longitude: cur_longitude,
                         latitude: cur_latitude,
                         block: std::mem::take(&mut cur_block),
