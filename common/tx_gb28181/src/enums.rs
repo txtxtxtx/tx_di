@@ -1,4 +1,3 @@
-use crate::ChannelStatus;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::fmt;
