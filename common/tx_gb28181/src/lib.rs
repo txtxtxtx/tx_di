@@ -21,7 +21,7 @@ mod enums;
 // ── 便捷再导出 ──────────────────────────────────────────────────────────────
 
 pub use cmd_type::Gb28181CmdType;
-pub use device::{ChannelInfo, ChannelStatus, DeviceInfo, GbDevice, GbDeviceType};
+pub use device::{ChannelInfo, DeviceInfo, GbDevice, GbDeviceType};
 pub use event::{Gb28181Event, add_event_listener, emit, subscribe};
 pub use sip::extract_user_from_sip_uri;
 pub use xml::AlarmType;
