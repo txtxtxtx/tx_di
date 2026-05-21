@@ -118,6 +118,16 @@ impl TryFrom<String> for StatusType {
     }
 }
 
+impl StatusType {
+    /// 返回状态对应的字符串表示（"ON" / "OFF"）
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            StatusType::ON => "ON",
+            StatusType::OFF => "OFF",
+        }
+    }
+}
+
 /// 结果类型
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
