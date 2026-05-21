@@ -19,6 +19,7 @@
 
 use quick_xml::Reader;
 use quick_xml::events::Event;
+use crate::enums::{DeviceIDType, ItemType, StatusType};
 // ── 解析工具 ──────────────────────────────────────────────────────────────────
 
 /// 从 GB28181 XML 中提取指定字段值（使用 quick-xml）
@@ -103,48 +104,13 @@ pub fn build_catalog_query_xml(platform_id: &str, sn: u32) -> String {
 /// 解析目录响应中的通道列表（使用 quick-xml 流式解析）
 ///
 /// 返回 `Vec<CatalogItem>`，包含通道完整信息
-pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
+pub fn parse_catalog_items(xml: &str) -> Vec<ItemType> {
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
     let mut result = Vec::new();
     let mut buf = Vec::new();
     let mut in_item = false;
-
-    // 当前 Item 的字段
-    // 国标id
-    let mut cur_device_id = String::new();
-    // 名称
-    let mut cur_name = String::new();
-    // 生产厂商
-    let mut cur_manufacturer = String::new();
-    // 型号
-    let mut cur_model = String::new();
-    // 状态
-    let mut cur_status = String::new();
-    // 地址
-    let mut cur_address = String::new();
-    // 父级国标id
-    let mut cur_parent_id = String::new();
-    // 父级级联
-    let mut cur_parental: u8 = 0;
-    // 注册方式
-    let mut cur_register_way: u8 = 0;
-    // 保密级别
-    let mut cur_secrecy: u8 = 0;
-    // IP地址
-    let mut cur_ip_address = String::new();
-    // 端口
-    let mut cur_port: u16 = 0;
-    // 经度
-    let mut cur_longitude: Option<f64> = None;
-    // 纬度
-    let mut cur_latitude: Option<f64> = None;
-    // 警区
-    let mut cur_block = String::new();
-    // 警区编号
-    let mut cur_civil_code = String::new();
-    // 通道数
-    let mut cur_channel_num: u32 = 0;
+    let mut cur_item = ItemType::default();
 
     loop {
         match reader.read_event_into(&mut buf) {
@@ -152,31 +118,14 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                 match e.name().as_ref() {
                     b"Item" => {
                         in_item = true;
-                        // 重置当前 Item 字段
-                        cur_device_id.clear();
-                        cur_name.clear();
-                        cur_manufacturer.clear();
-                        cur_model.clear();
-                        cur_status.clear();
-                        cur_address.clear();
-                        cur_parent_id.clear();
-                        cur_parental = 0;
-                        cur_register_way = 0;
-                        cur_secrecy = 0;
-                        cur_ip_address.clear();
-                        cur_port = 0;
-                        cur_longitude = None;
-                        cur_latitude = None;
-                        cur_block.clear();
-                        cur_civil_code.clear();
-                        cur_channel_num = 0;
+                        cur_item = ItemType::default();
                     }
                     b"DeviceID" => {
                         if in_item
                             && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
                             && let Ok(s) = t.xml_content()
                         {
-                            cur_device_id = s.trim().to_string();
+                            cur_item.device_id = DeviceIDType::Len20(s.trim().to_string());
                         }
                     }
                     b"Name" => {
@@ -184,7 +133,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                             && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
                             && let Ok(s) = t.xml_content()
                         {
-                            cur_name = s.trim().to_string();
+                            cur_item.name = s.trim().to_string();
                         }
                     }
                     b"Manufacturer" => {
@@ -192,7 +141,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                             && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
                             && let Ok(s) = t.xml_content()
                         {
-                            cur_manufacturer = s.trim().to_string();
+                            cur_item.manufacturer = s.trim().to_string();
                         }
                     }
                     b"Model" => {
@@ -200,7 +149,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                             && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
                             && let Ok(s) = t.xml_content()
                         {
-                            cur_model = s.trim().to_string();
+                            cur_item.model = s.trim().to_string();
                         }
                     }
                     b"Status" => {
@@ -208,7 +157,8 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                             && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
                             && let Ok(s) = t.xml_content()
                         {
-                            cur_status = s.trim().to_string();
+                            cur_item.status =
+                                StatusType::try_from(s.trim().to_string()).unwrap_or_default();
                         }
                     }
                     b"Address" => {
@@ -216,7 +166,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                             && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
                             && let Ok(s) = t.xml_content()
                         {
-                            cur_address = s.trim().to_string();
+                            cur_item.address = s.trim().to_string();
                         }
                     }
                     b"ParentID" => {
@@ -224,7 +174,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                             && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
                             && let Ok(s) = t.xml_content()
                         {
-                            cur_parent_id = s.trim().to_string();
+                            cur_item.parent_id = s.trim().to_string();
                         }
                     }
                     b"Parental" => {
@@ -232,7 +182,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                             && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
                             && let Ok(s) = t.xml_content()
                         {
-                            cur_parental = s.trim().parse().unwrap_or(0);
+                            cur_item.parental = s.trim().parse().unwrap_or(0);
                         }
                     }
                     b"RegisterWay" => {
@@ -240,7 +190,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                             && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
                             && let Ok(s) = t.xml_content()
                         {
-                            cur_register_way = s.trim().parse().unwrap_or(0);
+                            cur_item.register_way = s.trim().parse().unwrap_or(1);
                         }
                     }
                     b"Secrecy" => {
@@ -248,7 +198,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                             && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
                             && let Ok(s) = t.xml_content()
                         {
-                            cur_secrecy = s.trim().parse().unwrap_or(0);
+                            cur_item.secrecy = s.trim().parse().unwrap_or(0);
                         }
                     }
                     b"IPAddress" => {
@@ -256,7 +206,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                             && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
                             && let Ok(s) = t.xml_content()
                         {
-                            cur_ip_address = s.trim().to_string();
+                            cur_item.ip_address = Some(s.trim().to_string());
                         }
                     }
                     b"Port" => {
@@ -264,7 +214,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                             && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
                             && let Ok(s) = t.xml_content()
                         {
-                            cur_port = s.trim().parse().unwrap_or(0);
+                            cur_item.port = s.trim().parse().ok();
                         }
                     }
                     b"Longitude" => {
@@ -272,7 +222,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                             && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
                             && let Ok(s) = t.xml_content()
                         {
-                            cur_longitude = s.trim().parse().ok();
+                            cur_item.longitude = s.trim().parse().ok();
                         }
                     }
                     b"Latitude" => {
@@ -280,7 +230,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                             && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
                             && let Ok(s) = t.xml_content()
                         {
-                            cur_latitude = s.trim().parse().ok();
+                            cur_item.latitude = s.trim().parse().ok();
                         }
                     }
                     b"Block" => {
@@ -288,7 +238,7 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                             && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
                             && let Ok(s) = t.xml_content()
                         {
-                            cur_block = s.trim().to_string();
+                            cur_item.block = Some(s.trim().to_string());
                         }
                     }
                     b"CivilCode" => {
@@ -296,46 +246,18 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
                             && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
                             && let Ok(s) = t.xml_content()
                         {
-                            cur_civil_code = s.trim().to_string();
+                            cur_item.civil_code = s.trim().to_string();
                         }
                     }
                     b"Num" => {
-                        if in_item
-                            && let Ok(Event::Text(t)) = reader.read_event_into(&mut buf)
-                            && let Ok(s) = t.xml_content()
-                        {
-                            cur_channel_num = s.trim().parse().unwrap_or(0);
-                        }
+                        // 跳过 Num 字段
                     }
                     _ => {}
                 }
             }
             Ok(Event::End(e)) if e.name().as_ref() == b"Item" => {
-                if !cur_device_id.is_empty() {
-                    if cur_status.is_empty() {
-                        cur_status = "Unknown".to_string();
-                    }
-                    result.push(CatalogItem {
-                        device_id: std::mem::take(&mut cur_device_id),
-                        name: std::mem::take(&mut cur_name),
-                        manufacturer: std::mem::take(&mut cur_manufacturer),
-                        model: std::mem::take(&mut cur_model),
-                        status: std::mem::take(&mut cur_status),
-                        address: std::mem::take(&mut cur_address),
-                        parent_id: std::mem::take(&mut cur_parent_id),
-                        parental: cur_parental,
-                        register_way: cur_register_way,
-                        security_level_code: None,
-                        secrecy: cur_secrecy,
-                        ip_address: Some(std::mem::take(&mut cur_ip_address)),
-                        port: Some(cur_port),
-                        longitude: cur_longitude,
-                        latitude: cur_latitude,
-                        block: std::mem::take(&mut cur_block),
-                        civil_code: std::mem::take(&mut cur_civil_code),
-                        channel_num: cur_channel_num,
-                        password: None,
-                    });
+                if !matches!(cur_item.device_id, DeviceIDType::Len20(ref s) if s.is_empty()) {
+                    result.push(std::mem::take(&mut cur_item));
                 }
                 in_item = false;
             }
@@ -345,59 +267,6 @@ pub fn parse_catalog_items(xml: &str) -> Vec<CatalogItem> {
         buf.clear();
     }
     result
-}
-
-/// 目录条目信息
-#[derive(Debug, Clone)]
-pub struct CatalogItem {
-    /// - 行政区划分时可为 2、4、6、8位
-    /// - 其他情况为20位
-    pub device_id: String,
-    /// 设备名称
-    pub name: String,
-    /// 制造商名称
-    pub manufacturer: String,
-    /// 设备型号
-    pub model: String,
-    /// 行政区划代码 可选 2，4，6，8位
-    pub civil_code: String,
-    /// 警区
-    pub block: Option<String>,
-    /// 设备地址信息
-    pub address: String,
-    /// 是否有子设备（0=无，1=有）
-    pub parental: u8,
-    /// 父节点ID，可多值 / 分割
-    pub parent_id: String,
-    /// 注册方式（1=标准，2=基于口令的双向认证注册模式，3=基于数字证书的双向认证模式（高安全级别），4=基于数字证书的单向认证模式（高安全级别））
-    ///
-    /// 默认 1
-    pub register_way: u8,
-    /// 摄像机安全能力等级代码
-    /// - A-GB 35114 前端设备安全能力A级
-    /// - B-GB 35114 前端设备安全能力B级
-    /// - C-GB 35114 前端设备安全能力C级
-    pub security_level_code: Option<String>,
-    /// 保密属性（0=非保密，1=保密）
-    ///
-    /// 默认 0
-    pub secrecy: u8,
-    /// 设备/系统 ipv4/ipv6 地址
-    pub ip_address: Option<String>,
-    /// 设备/系统 端口
-    pub port: Option<u16>,
-    /// 设备口令
-    pub password: Option<String>,
-    /// 设备状态（ON/OFF/Unknown）
-    pub status: ChannelStatus,
-    /// 经度坐标，一二类监控点位必选
-    pub longitude: Option<f64>,
-    /// 纬度坐标，一二类监控点位必选
-    pub latitude: Option<f64>,
-    pub
-
-    /// 通道数量
-    pub channel_num: u32,
 }
 
 /// 构建设备目录响应 XML（设备 → 平台）
@@ -2529,14 +2398,14 @@ pub fn build_guard_control_xml_v2(
     };
 
     format!(
-"<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
-<Control>\r\n\
-<CmdType>DeviceControl</CmdType>\r\n\
-<SN>{sn}</SN>\r\n\
-<DeviceID>{channel_id}</DeviceID>\r\n\
-<GuardCmd>{guard_cmd}</GuardCmd>\r\n\
-<PTZCmd>{ptz_cmd}</PTZCmd>\r\n\
-</Control>",
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
+         <Control>\r\n\
+         <CmdType>DeviceControl</CmdType>\r\n\
+         <SN>{sn}</SN>\r\n\
+         <DeviceID>{channel_id}</DeviceID>\r\n\
+         <GuardCmd>{guard_cmd}</GuardCmd>\r\n\
+         <PTZCmd>{ptz_cmd}</PTZCmd>\r\n\
+         </Control>",
         sn = sn,
         channel_id = channel_id,
         guard_cmd = guard_cmd,
@@ -2652,12 +2521,12 @@ pub fn build_mobile_position_query_xml(
         .map(|i| format!("\r\n<Interval>{}</Interval>", i))
         .unwrap_or_default();
     format!(
-"<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
-<Query>\r\n\
-<CmdType>MobilePosition</CmdType>\r\n\
-<SN>{sn}</SN>\r\n\
-<DeviceID>{device_id}</DeviceID>\r\n\
-{interval}</Query>",
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
+         <Query>\r\n\
+         <CmdType>MobilePosition</CmdType>\r\n\
+         <SN>{sn}</SN>\r\n\
+         <DeviceID>{device_id}</DeviceID>\r\n\
+         {interval}</Query>",
         sn = sn,
         device_id = device_id,
         interval = interval_str,
@@ -2678,15 +2547,15 @@ pub fn build_mobile_position_unsubscribe_xml(device_id: &str, sn: u32) -> String
 /// 锁定后其他平台无法控制该设备的云台
 pub fn build_ptz_lock_xml(channel_id: &str, sn: u32) -> String {
     format!(
-"<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
-<Control>\r\n\
-<CmdType>DeviceControl</CmdType>\r\n\
-<SN>{sn}</SN>\r\n\
-<DeviceID>{channel_id}</DeviceID>\r\n\
-<PTZ>\r\n\
-<lock>1</lock>\r\n\
-</PTZ>\r\n\
-</Control>",
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
+         <Control>\r\n\
+         <CmdType>DeviceControl</CmdType>\r\n\
+         <SN>{sn}</SN>\r\n\
+         <DeviceID>{channel_id}</DeviceID>\r\n\
+         <PTZ>\r\n\
+         <lock>1</lock>\r\n\
+         </PTZ>\r\n\
+         </Control>",
         sn = sn,
         channel_id = channel_id,
     )
@@ -2695,15 +2564,15 @@ pub fn build_ptz_lock_xml(channel_id: &str, sn: u32) -> String {
 /// PTZ 云台解锁（A.2.3.1.12）
 pub fn build_ptz_unlock_xml(channel_id: &str, sn: u32) -> String {
     format!(
-"<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
-<Control>\r\n\
-<CmdType>DeviceControl</CmdType>\r\n\
-<SN>{sn}</SN>\r\n\
-<DeviceID>{channel_id}</DeviceID>\r\n\
-<PTZ>\r\n\
-<lock>0</lock>\r\n\
-</PTZ>\r\n\
-</Control>",
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
+         <Control>\r\n\
+         <CmdType>DeviceControl</CmdType>\r\n\
+         <SN>{sn}</SN>\r\n\
+         <DeviceID>{channel_id}</DeviceID>\r\n\
+         <PTZ>\r\n\
+         <lock>0</lock>\r\n\
+         </PTZ>\r\n\
+         </Control>",
         sn = sn,
         channel_id = channel_id,
     )
@@ -2716,13 +2585,13 @@ pub fn build_ptz_unlock_xml(channel_id: &str, sn: u32) -> String {
 /// 通过 RecordCmd 控制设备抓拍，设备收到后主动推送图片
 pub fn build_snapshot_control_xml(channel_id: &str, sn: u32) -> String {
     format!(
-"<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
-<Control>\r\n\
-<CmdType>DeviceControl</CmdType>\r\n\
-<SN>{sn}</SN>\r\n\
-<DeviceID>{channel_id}</DeviceID>\r\n\
-<RecordCmd>SHOOT</RecordCmd>\r\n\
-</Control>",
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
+         <Control>\r\n\
+         <CmdType>DeviceControl</CmdType>\r\n\
+         <SN>{sn}</SN>\r\n\
+         <DeviceID>{channel_id}</DeviceID>\r\n\
+         <RecordCmd>SHOOT</RecordCmd>\r\n\
+         </Control>",
         sn = sn,
         channel_id = channel_id,
     )
@@ -2749,16 +2618,16 @@ pub fn build_config_push_xml(
         .join("\r\n");
     let config_type_str = config_type.as_str();
     format!(
-"<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
-<Control>\r\n\
-<CmdType>ConfigDownload</CmdType>\r\n\
-<SN>{sn}</SN>\r\n\
-<DeviceID>{device_id}</DeviceID>\r\n\
-<ConfigType>{config_type_str}</ConfigType>\r\n\
-<ConfigParam>\r\n\
-{params}\r\n\
-</ConfigParam>\r\n\
-</Control>",
+        "<?xml version=\"1.0\" encoding=\"GB18030\"?>\r\n\
+         <Control>\r\n\
+         <CmdType>ConfigDownload</CmdType>\r\n\
+         <SN>{sn}</SN>\r\n\
+         <DeviceID>{device_id}</DeviceID>\r\n\
+         <ConfigType>{config_type_str}</ConfigType>\r\n\
+         <ConfigParam>\r\n\
+         {params}\r\n\
+         </ConfigParam>\r\n\
+         </Control>",
         sn = sn,
         device_id = device_id,
         params = params_xml,
@@ -2796,7 +2665,7 @@ mod tests {
 </DeviceList>"#;
         let items = parse_catalog_items(xml);
         assert_eq!(items.len(), 2);
-        assert_eq!(items[0].device_id, "ch01");
+        assert_eq!(items[0].device_id, DeviceIDType::Len4("ch01".to_string()));
         assert_eq!(items[0].manufacturer, "Hikvision");
         assert_eq!(items[1].status.as_str(), "OFF");
     }
