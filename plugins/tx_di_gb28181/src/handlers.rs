@@ -13,7 +13,8 @@
 
 use crate::config::Gb28181ServerConfig;
 use crate::crypto::{generate_nonce, verify_digest_auth};
-use crate::device_registry::{ChannelInfo, ChannelStatus, DeviceInfo, DeviceRegistry};
+use crate::device_registry::{DeviceRegistry};
+use tx_gb28181::device::GbDevice;
 use crate::event::{emit, Gb28181Event};
 use crate::xml::{
     parse_alarm_notify, parse_catalog_items, parse_config_download_response,
@@ -246,13 +247,17 @@ async fn handle_register(
     } else {
         // 注册或刷新
         let is_new = !registry.is_registered(&device_id);
-        let dev_info = DeviceInfo::new(
-            device_id.clone(),
-            contact.clone(),
+        let dev = GbDevice {
+            device_id: device_id.clone(),
+            contact: contact.clone(),
             expires,
-            remote_addr,
-        );
-        registry.register(dev_info);
+            remote_addr: remote_addr.clone(),
+            online: true,
+            registered_at: chrono::Utc::now(),
+            last_heartbeat: tokio::time::Instant::now(),
+            ..Default::default()
+        };
+        registry.register(dev);
 
         // 回 200 OK（带 Expires 头）
         let headers = vec![Header::Expires(config.register_ttl.into())];
@@ -391,33 +396,20 @@ async fn handle_catalog_response(
         "📂 收到目录响应"
     );
 
-    let channels: Vec<ChannelInfo> = items
+    let sub_devices: Vec<GbDevice> = items
         .iter()
-        .map(|item| ChannelInfo {
-            channel_id: item.device_id.clone(),
-            name: item.name.clone(),
-            manufacturer: item.manufacturer.clone(),
-            model: item.model.clone(),
-            status: ChannelStatus::from_str(&item.status).unwrap(),
-            address: item.address.clone(),
-            parent_id: item.parent_id.clone(),
-            ip_address: item.ip_address.clone(),
-            port: item.port,
-            longitude: item.longitude,
-            latitude: item.latitude,
-            parental: item.parental,
-            register_way: item.register_way,
-            secrecy: item.secrecy,
-            civil_code: item.civil_code.clone(),
-        })
+        .map(|item| GbDevice::from_item_type(item))
         .collect();
 
-    registry.update_channels(device_id, channels.clone());
+    // 批量注册子设备（2022 模型：每个通道是独立的 GbDevice 节点）
+    for sub in &sub_devices {
+        registry.register(sub.clone());
+    }
 
     tokio::spawn(emit(Gb28181Event::CatalogReceived {
         device_id: device_id.to_string(),
         channel_count,
-        channels,
+        channels: items,
     }));
 
     Ok(())

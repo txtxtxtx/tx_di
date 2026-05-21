@@ -53,6 +53,18 @@ impl<'de> Deserialize<'de> for DeviceIDType {
         }
     }
 }
+impl Display for DeviceIDType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DeviceIDType::Len2(s)
+            | DeviceIDType::Len4(s)
+            | DeviceIDType::Len6(s)
+            | DeviceIDType::Len8(s)
+            | DeviceIDType::Len20(s) => f.write_str(s),
+        }
+    }
+}
+
 impl TryFrom<String> for DeviceIDType {
     type Error = &'static str;
 

@@ -10,7 +10,8 @@
 //! - 后台运行心跳超时检测
 
 use crate::config::Gb28181ServerConfig;
-use crate::device_registry::{DeviceInfo, DeviceRegistry};
+use crate::device_registry::DeviceRegistry;
+use tx_gb28181::device::GbDevice;
 use crate::event::{self, Gb28181Event};
 use crate::handlers::{NonceStore, register_server_handlers};
 use crate::media::{MediaBackend, OpenRtpRequest, PlayUrls, build_backend};
@@ -242,12 +243,12 @@ impl Gb28181ServerHandle {
     // ── 注册表查询 ───────────────────────────────────────────────────────────
 
     /// 获取设备信息
-    pub fn get_device(&self, device_id: &str) -> Option<DeviceInfo> {
+    pub fn get_device(&self, device_id: &str) -> Option<GbDevice> {
         self.inner.registry.get(device_id)
     }
 
     /// 获取所有在线设备
-    pub fn online_devices(&self) -> Vec<DeviceInfo> {
+    pub fn online_devices(&self) -> Vec<GbDevice> {
         self.inner.registry.online_devices()
     }
 
@@ -261,13 +262,9 @@ impl Gb28181ServerHandle {
         self.inner.registry.online_count()
     }
 
-    /// 获取设备下所有通道
-    pub fn get_channels(&self, device_id: &str) -> Vec<crate::device_registry::ChannelInfo> {
-        self.inner
-            .registry
-            .get(device_id)
-            .map(|d| d.channels)
-            .unwrap_or_default()
+    /// 获取设备下所有子设备（原通道）
+    pub fn get_channels(&self, device_id: &str) -> Vec<GbDevice> {
+        self.inner.registry.sub_devices(device_id)
     }
 
     // ── 主动查询 ─────────────────────────────────────────────────────────────
@@ -1359,7 +1356,7 @@ impl Gb28181ServerHandle {
 
     // ── 内部工具 ─────────────────────────────────────────────────────────────
 
-    fn get_dev_or_err(&self, device_id: &str) -> anyhow::Result<DeviceInfo> {
+    fn get_dev_or_err(&self, device_id: &str) -> anyhow::Result<GbDevice> {
         self.inner
             .registry
             .get(device_id)

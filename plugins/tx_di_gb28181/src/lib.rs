@@ -112,7 +112,7 @@ pub mod xml;
 pub mod media;
 
 pub use config::{Gb28181ServerConfig, MediaConfig, CascadeConfig};
-pub use device_registry::{ChannelInfo, ChannelStatus, DeviceInfo, DeviceRegistry};
+pub use device_registry::DeviceRegistry;
 pub use event::{Gb28181Event, subscribe as subscribe_events};
 pub use handlers::Gb28181CmdType;
 pub use plugin::{Gb28181Server, Gb28181ServerHandle, SessionInfo};

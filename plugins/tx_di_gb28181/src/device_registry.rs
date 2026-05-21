@@ -11,14 +11,14 @@ use std::sync::Arc;
 use tracing::{info, warn};
 
 // ── 从公共模块 re-export（向后兼容）─────────────────────────────────────────
-pub use tx_gb28181::device::{ChannelInfo, ChannelStatus, DeviceInfo};
+pub use tx_gb28181::device::{GbDevice};
 
 /// GB28181 设备注册表
 ///
 /// 使用 `Arc<DashMap>` 可跨线程共享，无锁并发访问。
 #[derive(Clone)]
 pub struct DeviceRegistry {
-    inner: Arc<DashMap<String, DeviceInfo>>,
+    inner: Arc<DashMap<String, GbDevice>>,
 }
 
 impl Default for DeviceRegistry {
@@ -37,7 +37,7 @@ impl DeviceRegistry {
     // ── 注册/注销 ────────────────────────────────────────────────────────────
 
     /// 注册或更新设备
-    pub fn register(&self, info: DeviceInfo) {
+    pub fn register(&self, info: GbDevice) {
         let device_id = info.device_id.clone();
         let is_new = !self.inner.contains_key(&device_id);
         self.inner.insert(device_id.clone(), info);
@@ -87,12 +87,12 @@ impl DeviceRegistry {
     // ── 查询 ─────────────────────────────────────────────────────────────────
 
     /// 获取设备信息（克隆）
-    pub fn get(&self, device_id: &str) -> Option<DeviceInfo> {
+    pub fn get(&self, device_id: &str) -> Option<GbDevice> {
         self.inner.get(device_id).map(|r| r.clone())
     }
 
     /// 获取所有在线设备列表
-    pub fn online_devices(&self) -> Vec<DeviceInfo> {
+    pub fn online_devices(&self) -> Vec<GbDevice> {
         self.inner
             .iter()
             .filter(|r| r.online)
@@ -120,18 +120,28 @@ impl DeviceRegistry {
         self.inner.contains_key(device_id)
     }
 
+    /// 获取指定父设备下所有子设备
+    pub fn sub_devices(&self, parent_id: &str) -> Vec<GbDevice> {
+        self.inner
+            .iter()
+            .filter(|r| r.item.parent_id == parent_id)
+            .map(|r| r.clone())
+            .collect()
+    }
+
     // ── 更新 ─────────────────────────────────────────────────────────────────
 
-    /// 更新设备通道列表（收到 Catalog 响应时调用）
-    pub fn update_channels(&self, device_id: &str, channels: Vec<ChannelInfo>) {
-        if let Some(mut dev) = self.inner.get_mut(device_id) {
-            info!(
-                device_id = %device_id,
-                channel_count = channels.len(),
-                "📂 更新设备通道列表"
-            );
-            dev.channels = channels;
+    /// 批量注册子设备（收到 Catalog 响应时调用）
+    ///
+    /// 在 2022 模型中，通道/子设备是独立的 [`GbDevice`] 节点，
+    /// 存储在同一个 DashMap 中，通过 `parent_id` 区分层级关系。
+    pub fn register_batch(&self, devices: Vec<GbDevice>) {
+        let count = devices.len();
+        for dev in devices {
+            let id = dev.device_id.clone();
+            self.inner.insert(id, dev);
         }
+        info!(count = count, "📂 批量注册设备");
     }
 
     /// 更新设备信息（收到 DeviceInfo 响应时调用）
@@ -143,8 +153,8 @@ impl DeviceRegistry {
         firmware: &str,
     ) {
         if let Some(mut dev) = self.inner.get_mut(device_id) {
-            dev.manufacturer = manufacturer.to_string();
-            dev.model = model.to_string();
+            dev.item.manufacturer = manufacturer.to_string();
+            dev.item.model = model.to_string();
             dev.firmware = firmware.to_string();
         }
     }

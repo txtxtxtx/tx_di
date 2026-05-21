@@ -100,7 +100,7 @@ pub struct GbDevice {
     // ==================== 运行时节点属性 ====================
     /// 节点类型（2022 版新增，区分设备/子设备/区域/系统/分组/虚拟组织）
     pub device_type: GbDeviceType,
-
+    pub device_id: String,
     /// 固件版本（Firmware）
     pub firmware: String,
 
@@ -133,6 +133,7 @@ impl Default for GbDevice {
         Self {
             item: ItemType::default(),
             device_type: GbDeviceType::Device,
+            device_id: String::new(),
             firmware: String::new(),
             channel: 0,
             contact: String::new(),
@@ -300,6 +301,7 @@ impl GbDevice {
         Self {
             item: item.clone(),
             device_type,
+            device_id: item.device_id.to_string(),
             firmware: String::new(),
             channel: 0,
             contact: String::new(),
