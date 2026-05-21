@@ -158,6 +158,34 @@ impl GbDevice {
         self.item.parental == 1
     }
 
+    /// 是否在线
+    pub fn is_online(&self) -> bool {
+        self.online
+    }
+
+    /// 是否已超时（超过指定秒数未收到心跳）
+    pub fn is_timeout(&self, timeout_secs: u64) -> bool {
+        self.last_heartbeat.elapsed() > Duration::from_secs(timeout_secs)
+    }
+
+    // ==================== 运行时状态维护 ====================
+
+    /// 刷新心跳时间戳
+    pub fn refresh_heartbeat(&mut self) {
+        self.last_heartbeat = Instant::now();
+    }
+
+    /// 设置为在线
+    pub fn set_online(&mut self) {
+        self.online = true;
+        self.refresh_heartbeat();
+    }
+
+    /// 设置为离线
+    pub fn set_offline(&mut self) {
+        self.online = false;
+    }
+
     // ==================== 工厂方法 — 2022 版节点类型 ====================
 
     /// 创建设备节点（2022 版父设备）
