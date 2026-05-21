@@ -1128,7 +1128,7 @@ pub struct ItemType {
     pub latitude: Option<f64>,
     /// 虚拟组织所属的业务分组 ID, 业务分组根据特定的业务需求制定, 一个业务分组包含一组特定的虚拟组织。
     pub business_group_id: Option<DeviceIDType>,
-    ///
+    /// 目录项中摄像机的详细参数配置
     pub info: Option<Info>,
 }
 
