@@ -12,12 +12,12 @@
 //! - **向后兼容**：`tx_di_gb28181`（服务端插件）和 `tx_di_gb28181_client`（设备客户端插件）
 //!   均通过 `pub use tx_gb28181::event::*` 重新导出，对外 API 不变。
 
-use crate::device::ChannelInfo;
 use crate::xml::CruiseTrack;
 use crate::xml::RecordItem;
 use std::future::Future;
 use std::sync::OnceLock;
 use tokio::sync::broadcast;
+use crate::enums::ItemType;
 
 /// GB28181 事件类型（GB28181-2022 完整版）
 #[derive(Debug, Clone)]
@@ -52,7 +52,7 @@ pub enum Gb28181Event {
     CatalogReceived {
         device_id: String,
         channel_count: usize,
-        channels: Vec<ChannelInfo>,
+        channels: Vec<ItemType>,
     },
 
     /// 收到设备信息响应

@@ -87,145 +87,10 @@ impl std::fmt::Display for GbDeviceType {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ChannelInfo — 2016 版通道信息（保持向后兼容）
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-/// 设备通道信息（GB28181-2016 目录结构，保持向后兼容）
-#[derive(Debug, Clone)]
-pub struct ChannelInfo {
-    /// 通道 ID（20 位）
-    pub channel_id: DeviceIDType,
-    /// 通道名称
-    pub name: String,
-    /// 厂商
-    pub manufacturer: String,
-    /// 设备型号
-    pub model: String,
-    /// 通道状态
-    pub status: StatusType,
-    /// 地址描述
-    pub address: String,
-    /// 父设备 ID
-    pub parent_id: DeviceIDType,
-    /// 是否父节点（1=父节点/设备，0=叶节点/通道）
-    pub parental: u8,
-    /// 注册方式（1=主动注册，2=被动注册）
-    pub register_way: u8,
-    /// 保密属性（0=不涉密）
-    pub secrecy: u8,
-    /// 设备 IP
-    pub ip_address: IpAddr,
-    /// 设备端口
-    pub port: u16,
-    /// 经度
-    pub longitude: Option<f64>,
-    /// 纬度
-    pub latitude: Option<f64>,
-    /// 行政区划代码
-    pub civil_code: String,
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// DeviceInfo — 2016 版设备注册信息（保持向后兼容）
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-/// 单个设备的注册信息（含运行时状态）
-///
-/// 存储设备通过 SIP REGISTER 注册后的完整信息，包括：
-/// - **协议层数据**：device_id / contact / channels / manufacturer 等
-/// - **运行时状态**：注册时间、最后心跳时间、在线标记
-///
-/// `DeviceRegistry` 内部存储此类型，外部通过 `get()` / `online_devices()` 获取。
-#[derive(Debug, Clone)]
-pub struct DeviceInfo {
-    /// 设备 ID（20 位）
-    pub device_id: DeviceIDType,
-
-    /// 设备的 SIP 联系地址（Contact URI），后续请求的直接目的地地址
-    /// - 指定后续通信的地址
-    /// - 实现 NAT（网络地址转换）穿透
-    /// - 支持移动性和分机
-    ///
-    /// case
-    /// - Contact: <sip:34020000001320000001@192.168.1.100:5060>
-    /// - Contact: <sip:34020000001320000001@192.168.1.100:5060>;expires=3600
-    pub contact: String,
-
-    /// 注册时间
-    pub registered_at: DateTime<Utc>,
-
-    /// 最后一次心跳时间
-    pub last_heartbeat: Instant,
-
-    /// 注册有效期（秒）
-    pub expires: u32,
-
-    /// 设备的 IP 地址（来自 Via 头）
-    pub remote_addr: String,
-
-    /// 设备通道列表（目录查询后填充）
-    pub channels: Vec<ChannelInfo>,
-
-    /// 是否在线（由心跳超时检测更新）
-    pub online: bool,
-
-    /// 制造商（DeviceInfo 查询后填充）
-    pub manufacturer: String,
-
-    /// 型号（DeviceInfo 查询后填充）
-    pub model: String,
-
-    /// 固件版本
-    pub firmware: String,
-}
-
-impl DeviceInfo {
-    /// 创建新的设备信息
-    pub fn new(device_id: String, contact: String, expires: u32, remote_addr: String) -> RIE<Self> {
-        Ok(Self {
-            device_id: device_id.try_into()?,
-            contact,
-            registered_at: Utc::now(),
-            last_heartbeat: Instant::now(),
-            expires,
-            remote_addr,
-            channels: Vec::new(),
-            online: true,
-            manufacturer: String::new(),
-            model: String::new(),
-            firmware: String::new(),
-        })
-    }
-
-    /// 是否已超时（未在规定时间内收到心跳）
-    pub fn is_timeout(&self, timeout_secs: u64) -> bool {
-        self.last_heartbeat.elapsed() > Duration::from_secs(timeout_secs)
-    }
-
-    /// 刷新心跳时间戳
-    pub fn refresh_heartbeat(&mut self) {
-        self.last_heartbeat = Instant::now();
-    }
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // GbDevice — 统一设备/子设备描述结构体
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 /// 国标设备/子设备统一描述结构体（GB/T 28181-2022 完整目录属性 + 运行时状态）
-///
-/// 2022 版统一了设备和通道的概念，用一棵目录树描述所有节点。
-/// 本结构体既能表达 2022 版的所有节点类型，也能与 2016 版的
-/// [`DeviceInfo`] + [`ChannelInfo`] 互相转换。
-///
-/// # 节点类型
-/// - `device_type == GbDeviceType::Device && parental == 1`：2022 版父设备（等同 2016 版 `DeviceInfo`）
-/// - `device_type == GbDeviceType::SubDevice && parental == 0`：2022 版子设备（等同 2016 版 `ChannelInfo`）
-/// - 其他 `device_type`：2022 版特有的节点类型（区域/系统/分组/虚拟组织）
-///
-/// # 转换
-/// 通过 `from_device_info` / `to_device_info` 与 2016 版互相转换，
-/// 通过 `from_catalog_item` / `to_item_type` 与 2022 版 Catalog 响应互相转换。
 #[derive(Debug, Clone)]
 pub struct GbDevice {
     // ==================== 协议层（嵌入 ItemType）====================
@@ -239,26 +104,8 @@ pub struct GbDevice {
     /// 固件版本（Firmware）
     pub firmware: String,
 
-    /// 归属平台编码（Owner），20 位，可为空
-    pub owner: String,
-
-    /// 安全传输方式（SafetyWay）：0=不采用 TLS, 1=采用 TLS
-    pub safety_way: u8,
-
-    /// 是否移动设备（Mobile）：0=非移动, 1=移动
-    pub mobile: u8,
-
-    /// 下载倍速范围，可空
-    pub download_speed: Option<String>,
-
-    /// 空域编码能力，可空
-    pub svc_space_domain_mode: Option<String>,
-
-    /// 时域编码能力，可空
-    pub svc_time_domain_mode: Option<String>,
-
-    /// SSIM 编码能力，可空
-    pub svc_ssim_mode: Option<String>,
+    /// 子设备数
+    pub channel: u32,
 
     // ==================== SIP 协议层 ====================
     /// SIP 联系地址（Contact URI）
@@ -287,13 +134,7 @@ impl Default for GbDevice {
             item: ItemType::default(),
             device_type: GbDeviceType::Device,
             firmware: String::new(),
-            owner: String::new(),
-            safety_way: 0,
-            mobile: 0,
-            download_speed: None,
-            svc_space_domain_mode: None,
-            svc_time_domain_mode: None,
-            svc_ssim_mode: None,
+            channel: 0,
             contact: String::new(),
             remote_addr: String::new(),
             registered_at: Utc::now(),
@@ -417,130 +258,7 @@ impl GbDevice {
             ..Default::default()
         }
     }
-
-    // ==================== 2016 版转换 ====================
-
-    /// 从 2016 版 [`DeviceInfo`] 构建
-    ///
-    /// 映射 SIP 运行时状态字段（contact / registered_at / last_heartbeat / expires / remote_addr / online），
-    /// 以及设备属性字段（manufacturer / model / firmware）。
-    /// 注意：`DeviceInfo.channels` 不在此映射中（channels 是子节点列表，需要单独转换）。
-    pub fn from_device_info(info: &DeviceInfo) -> Self {
-        let device_id_str = match &info.device_id {
-            DeviceIDType::Len2(s) | DeviceIDType::Len4(s) | DeviceIDType::Len6(s)
-            | DeviceIDType::Len8(s) | DeviceIDType::Len20(s) => s.clone(),
-        };
-        Self {
-            item: ItemType {
-                device_id: info.device_id.clone(),
-                name: device_id_str,
-                parental: 1,
-                manufacturer: info.manufacturer.clone(),
-                model: info.model.clone(),
-                status: if info.online { StatusType::ON } else { StatusType::OFF },
-                ..ItemType::default()
-            },
-            device_type: GbDeviceType::Device,
-            firmware: info.firmware.clone(),
-            owner: String::new(),
-            safety_way: 0,
-            mobile: 0,
-            download_speed: None,
-            svc_space_domain_mode: None,
-            svc_time_domain_mode: None,
-            svc_ssim_mode: None,
-            contact: info.contact.clone(),
-            remote_addr: info.remote_addr.clone(),
-            registered_at: info.registered_at,
-            last_heartbeat: info.last_heartbeat,
-            expires: info.expires,
-            online: info.online,
-        }
-    }
-
-    /// 转为 2016 版 [`DeviceInfo`]
-    ///
-    /// `channels` 返回空 Vec，需要外部根据子节点列表单独填充。
-    pub fn to_device_info(&self) -> DeviceInfo {
-        DeviceInfo {
-            device_id: self.item.device_id.clone(),
-            contact: self.contact.clone(),
-            registered_at: self.registered_at,
-            last_heartbeat: self.last_heartbeat,
-            expires: self.expires,
-            remote_addr: self.remote_addr.clone(),
-            channels: Vec::new(),
-            online: self.online,
-            manufacturer: self.item.manufacturer.clone(),
-            model: self.item.model.clone(),
-            firmware: self.firmware.clone(),
-        }
-    }
-
-    /// 从 2016 版 [`ChannelInfo`] 构建
-    pub fn from_channel_info(info: &ChannelInfo) -> Self {
-        Self {
-            item: ItemType {
-                device_id: info.channel_id.clone(),
-                name: info.name.clone(),
-                parent_id: match &info.parent_id {
-                    DeviceIDType::Len2(s) | DeviceIDType::Len4(s) | DeviceIDType::Len6(s)
-                    | DeviceIDType::Len8(s) | DeviceIDType::Len20(s) => s.clone(),
-                },
-                parental: info.parental,
-                manufacturer: info.manufacturer.clone(),
-                model: info.model.clone(),
-                status: info.status.clone(),
-                longitude: info.longitude,
-                latitude: info.latitude,
-                civil_code: info.civil_code.clone(),
-                address: info.address.clone(),
-                register_way: info.register_way,
-                secrecy: info.secrecy,
-                ip_address: Some(info.ip_address.to_string()),
-                port: Some(info.port),
-                ..ItemType::default()
-            },
-            device_type: GbDeviceType::SubDevice,
-            firmware: String::new(),
-            owner: String::new(),
-            safety_way: 0,
-            mobile: 0,
-            download_speed: None,
-            svc_space_domain_mode: None,
-            svc_time_domain_mode: None,
-            svc_ssim_mode: None,
-            contact: String::new(),
-            remote_addr: String::new(),
-            registered_at: Utc::now(),
-            last_heartbeat: Instant::now(),
-            expires: 3600,
-            online: info.status == StatusType::ON,
-        }
-    }
-
-    /// 转为 2016 版 [`ChannelInfo`]
-    pub fn to_channel_info(&self) -> ChannelInfo {
-        let ip_str = self.item.ip_address.clone().unwrap_or_default();
-        ChannelInfo {
-            channel_id: self.item.device_id.clone(),
-            name: self.item.name.clone(),
-            manufacturer: self.item.manufacturer.clone(),
-            model: self.item.model.clone(),
-            status: self.item.status.clone(),
-            address: self.item.address.clone(),
-            parent_id: DeviceIDType::Len20(self.item.parent_id.clone()),
-            parental: self.item.parental,
-            register_way: self.item.register_way,
-            secrecy: self.item.secrecy,
-            port: self.item.port.unwrap_or(0),
-            ip_address: ip_str.parse().unwrap_or_else(|_| "0.0.0.0".parse().unwrap()),
-            longitude: self.item.longitude,
-            latitude: self.item.latitude,
-            civil_code: self.item.civil_code.clone(),
-        }
-    }
-
+    
     // ==================== 2022 版 CatalogItem 转换 ====================
 
     /// 从 2022 版 [`ItemType`] 构建
@@ -555,13 +273,7 @@ impl GbDevice {
             item: item.clone(),
             device_type,
             firmware: String::new(),
-            owner: String::new(),
-            safety_way: 0,
-            mobile: 0,
-            download_speed: None,
-            svc_space_domain_mode: None,
-            svc_time_domain_mode: None,
-            svc_ssim_mode: None,
+            channel: 0,
             contact: String::new(),
             remote_addr: String::new(),
             registered_at: Utc::now(),
@@ -599,22 +311,7 @@ mod tests {
         assert_eq!(StatusType::ON.as_str(), "ON");
         assert_eq!(StatusType::OFF.as_str(), "OFF");
     }
-
-    // ── DeviceInfo ─────────────────────────────────────────────────────────────
-
-    #[test]
-    fn device_info_new() {
-        let dev = DeviceInfo::new(
-            "34020000001320000001".into(),
-            "<sip:34020000001320000001@192.168.1.100:5060>".into(),
-            3600,
-            "192.168.1.100:5060".into(),
-        ).unwrap();
-        assert_eq!(dev.device_id, DeviceIDType::Len2("34020000001320000001".into()));
-        assert!(dev.online);
-        assert!(!dev.is_timeout(60)); // 刚创建，不应超时
-    }
-
+    
     // ── GbDeviceType ───────────────────────────────────────────────────────────
 
     #[test]
@@ -675,102 +372,7 @@ mod tests {
         assert_eq!(area.item.device_id, DeviceIDType::Len2("330100".into()));
         assert!(area.is_parent());
     }
-
-    // ── 2016 DeviceInfo <-> GbDevice 往返 ──────────────────────────────────────
-
-    #[test]
-    fn device_info_to_gb_device_and_back() {
-        let original = DeviceInfo::new(
-            "34020000001320000001".into(),
-            "<sip:34020000001320000001@192.168.1.100:5060>".into(),
-            3600,
-            "192.168.1.100:5060".into(),
-        ).unwrap();
-        let mut original = original;
-        original.manufacturer = "Hikvision".into();
-        original.model = "DS-2CD2143G2-I".into();
-        original.firmware = "V5.7.10".into();
-
-        // DeviceInfo -> GbDevice
-        let gb = GbDevice::from_device_info(&original);
-        assert_eq!(gb.item.name, "34020000001320000001");
-        assert_eq!(gb.device_type, GbDeviceType::Device);
-        assert_eq!(gb.item.parental, 1);
-        assert_eq!(gb.item.manufacturer, "Hikvision");
-        assert_eq!(gb.item.model, "DS-2CD2143G2-I");
-        assert_eq!(gb.firmware, "V5.7.10");
-        assert_eq!(gb.contact, "<sip:34020000001320000001@192.168.1.100:5060>");
-        assert_eq!(gb.remote_addr, "192.168.1.100:5060");
-        assert!(gb.online);
-
-        // GbDevice -> DeviceInfo
-        let back = gb.to_device_info();
-        assert_eq!(back.device_id, original.device_id);
-        assert_eq!(back.manufacturer, "Hikvision");
-        assert_eq!(back.model, "DS-2CD2143G2-I");
-        assert_eq!(back.firmware, "V5.7.10");
-        assert_eq!(
-            back.contact,
-            "<sip:34020000001320000001@192.168.1.100:5060>"
-        );
-        assert_eq!(back.remote_addr, "192.168.1.100:5060");
-        assert!(back.online);
-        assert_eq!(back.expires, 3600);
-        assert!(back.channels.is_empty());
-    }
-
-    // ── 2016 ChannelInfo <-> GbDevice 往返 ─────────────────────────────────────
-
-    #[test]
-    fn channel_info_to_gb_device_and_back() {
-        let original = ChannelInfo {
-            channel_id: DeviceIDType::Len20("34020000001320000001".into()),
-            name: "Camera-01".into(),
-            manufacturer: "Dahua".into(),
-            model: "IPC-HDW5442T".into(),
-            status: StatusType::ON,
-            address: "杭州市".into(),
-            parent_id: DeviceIDType::Len20("34020000001320000000".into()),
-            parental: 0,
-            register_way: 1,
-            secrecy: 0,
-            ip_address: "192.168.1.200".parse().unwrap(),
-            port: 5060,
-            longitude: Some(120.15),
-            latitude: Some(30.28),
-            civil_code: "330100".into(),
-        };
-
-        // ChannelInfo -> GbDevice
-        let gb = GbDevice::from_channel_info(&original);
-        assert_eq!(gb.item.device_id, DeviceIDType::Len20("34020000001320000001".into()));
-        assert_eq!(gb.device_type, GbDeviceType::SubDevice);
-        assert_eq!(gb.item.parent_id, "34020000001320000000");
-        assert_eq!(gb.item.parental, 0);
-        assert!(gb.is_leaf());
-        assert_eq!(gb.item.manufacturer, "Dahua");
-        assert_eq!(gb.item.longitude, Some(120.15));
-        assert_eq!(gb.item.latitude, Some(30.28));
-        assert_eq!(gb.item.civil_code, "330100");
-        assert_eq!(gb.item.ip_address, Some("192.168.1.200".into()));
-        assert_eq!(gb.item.port, Some(5060));
-
-        // GbDevice -> ChannelInfo
-        let back = gb.to_channel_info();
-        assert_eq!(back.channel_id, DeviceIDType::Len20("34020000001320000001".into()));
-        assert_eq!(back.name, "Camera-01");
-        assert_eq!(back.manufacturer, "Dahua");
-        assert_eq!(back.model, "IPC-HDW5442T");
-        assert_eq!(back.status, StatusType::ON);
-        assert_eq!(back.parent_id, DeviceIDType::Len20("34020000001320000000".into()));
-        assert_eq!(back.parental, 0);
-        assert_eq!(back.ip_address, "192.168.1.200".parse::<IpAddr>().unwrap());
-        assert_eq!(back.port, 5060);
-        assert_eq!(back.longitude, Some(120.15));
-        assert_eq!(back.latitude, Some(30.28));
-        assert_eq!(back.civil_code, "330100");
-    }
-
+    
     // ── 2022 ItemType <-> GbDevice 往返 ────────────────────────────────────
 
     #[test]
