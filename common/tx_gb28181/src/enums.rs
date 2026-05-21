@@ -15,6 +15,11 @@ pub enum DeviceIDType {
     Len8(String),
     Len20(String),
 }
+impl Default for DeviceIDType {
+    fn default() -> Self {
+        Self::Len20(String::new())
+    }
+}
 impl Serialize for DeviceIDType {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -100,10 +105,11 @@ impl TryFrom<u32> for SNType {
 }
 
 /// 状态类型
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 #[serde(untagged)]
 pub enum StatusType {
+    #[default]
     ON,
     OFF,
 }
@@ -800,7 +806,7 @@ pub struct IndustrialClassification(pub String);
 /// 基层组织代码（GrassrootsCode）
 ///
 /// 摄像机所属基层组织的编码，使用行政区划代码标识。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct GrassrootsCode(pub String);
 
 /// MAC 地址（MAC）
@@ -840,7 +846,7 @@ pub struct InstallTime(pub String);
 /// 光电成像、补光、方位、分辨率、码流、SVC 编码能力、移动设备类型、
 /// 视场角、监控点位、编码类型、安装信息等扩展参数。
 /// 所有字段均为可选，仅在摄像机节点中存在。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Info {
     /// 摄像机结构类型（PTZType）
     ///
@@ -1091,6 +1097,7 @@ pub struct Info {
 }
 
 /// 目录项类型
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ItemType {
     /// - 行政区划分时可为 2、4、6、8位
     /// - 其他情况为20位
