@@ -257,8 +257,8 @@ impl TryFrom<String> for GuardType {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.to_uppercase().as_str() {
-            "SetGuard" => Ok(GuardType::SetGuard),
-            "ResetGuard" => Ok(GuardType::ResetGuard),
+            "SETGUARD" => Ok(GuardType::SetGuard),
+            "RESETGUARD" => Ok(GuardType::ResetGuard),
             _ => Err("Invalid GuardType"),
         }
     }
