@@ -17,12 +17,11 @@
 //! | 2016 `ChannelInfo` → `GbDevice` | `GbDevice::from_channel_info()` |
 //! | `GbDevice` → 2016 `ChannelInfo` | `gb_device.to_channel_info()` |
 //! | 2022 `CatalogItem` → `GbDevice` | `GbDevice::from_catalog_item()` |
-//! | `GbDevice` → 2022 `CatalogItem` | `gb_device.to_catalog_item()` |
+//! | `GbDevice` → 2022 `ItemType` | `gb_device.to_item_type()` |
 
-use crate::enums::{DeviceIDType, StatusType};
-use crate::xml::{CatalogItem, DeviceStatus};
+use crate::enums::{DeviceIDType, ItemType, StatusType};
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 use std::str::FromStr;
 use tokio::time::{Duration, Instant};
@@ -226,7 +225,7 @@ impl DeviceInfo {
 ///
 /// # 转换
 /// 通过 `from_device_info` / `to_device_info` 与 2016 版互相转换，
-/// 通过 `from_catalog_item` / `to_catalog_item` 与 2022 版 Catalog 响应互相转换。
+/// 通过 `from_catalog_item` / `to_item_type` 与 2022 版 Catalog 响应互相转换。
 #[derive(Debug, Clone)]
 pub struct GbDevice {
     // ==================== 统一标识与层级 ====================
@@ -483,8 +482,14 @@ impl GbDevice {
     pub fn from_device_info(info: &DeviceInfo) -> Self {
         Self {
             device_type: GbDeviceType::Device,
-            device_id: info.device_id.clone(),
-            name: info.device_id.clone(), // 2016 DeviceInfo 无 name 字段，用 device_id 兜底
+            device_id: match &info.device_id {
+                DeviceIDType::Len2(s) | DeviceIDType::Len4(s) | DeviceIDType::Len6(s)
+                | DeviceIDType::Len8(s) | DeviceIDType::Len20(s) => s.clone(),
+            },
+            name: match &info.device_id {
+                DeviceIDType::Len2(s) | DeviceIDType::Len4(s) | DeviceIDType::Len6(s)
+                | DeviceIDType::Len8(s) | DeviceIDType::Len20(s) => s.clone(),
+            },
             parent_id: String::new(),
             parental: 1, // DeviceInfo 始终是父节点
             manufacturer: info.manufacturer.clone(),
@@ -492,9 +497,9 @@ impl GbDevice {
             firmware: info.firmware.clone(),
             owner: String::new(),
             status: if info.online {
-                ChannelStatus::On
+                StatusType::ON
             } else {
-                ChannelStatus::Off
+                StatusType::OFF
             },
             longitude: None,
             latitude: None,
@@ -525,7 +530,7 @@ impl GbDevice {
     /// `channels` 返回空 Vec，需要外部根据子节点列表单独填充。
     pub fn to_device_info(&self) -> DeviceInfo {
         DeviceInfo {
-            device_id: self.device_id.clone(),
+            device_id: DeviceIDType::Len20(self.device_id.clone()),
             contact: self.contact.clone(),
             registered_at: self.registered_at,
             last_heartbeat: self.last_heartbeat,
@@ -543,9 +548,15 @@ impl GbDevice {
     pub fn from_channel_info(info: &ChannelInfo) -> Self {
         Self {
             device_type: GbDeviceType::SubDevice,
-            device_id: info.channel_id.clone(),
+            device_id: match &info.channel_id {
+                DeviceIDType::Len2(s) | DeviceIDType::Len4(s) | DeviceIDType::Len6(s)
+                | DeviceIDType::Len8(s) | DeviceIDType::Len20(s) => s.clone(),
+            },
             name: info.name.clone(),
-            parent_id: info.parent_id.clone(),
+            parent_id: match &info.parent_id {
+                DeviceIDType::Len2(s) | DeviceIDType::Len4(s) | DeviceIDType::Len6(s)
+                | DeviceIDType::Len8(s) | DeviceIDType::Len20(s) => s.clone(),
+            },
             parental: info.parental,
             manufacturer: info.manufacturer.clone(),
             model: info.model.clone(),
@@ -565,31 +576,31 @@ impl GbDevice {
             svc_space_domain_mode: None,
             svc_time_domain_mode: None,
             svc_ssim_mode: None,
-            ip_address: info.ip_address.clone(),
+            ip_address: info.ip_address.to_string(),
             port: info.port,
             contact: String::new(),
             remote_addr: String::new(),
             registered_at: Utc::now(),
             last_heartbeat: Instant::now(),
             expires: 3600,
-            online: info.status == ChannelStatus::On,
+            online: info.status == StatusType::ON,
         }
     }
 
     /// 转为 2016 版 [`ChannelInfo`]
     pub fn to_channel_info(&self) -> ChannelInfo {
         ChannelInfo {
-            channel_id: self.device_id.clone(),
+            channel_id: DeviceIDType::Len20(self.device_id.clone()),
             name: self.name.clone(),
             manufacturer: self.manufacturer.clone(),
             model: self.model.clone(),
             status: self.status.clone(),
             address: self.address.clone(),
-            parent_id: self.parent_id.clone(),
+            parent_id: DeviceIDType::Len20(self.parent_id.clone()),
             parental: self.parental,
             register_way: self.register_way,
             secrecy: self.secrecy,
-            ip_address: self.ip_address.clone(),
+            ip_address: self.ip_address.parse().unwrap_or_else(|_| "0.0.0.0".parse().unwrap()),
             port: self.port,
             longitude: self.longitude,
             latitude: self.latitude,
@@ -599,10 +610,8 @@ impl GbDevice {
 
     // ==================== 2022 版 CatalogItem 转换 ====================
 
-    /// 从 2022 版 [`CatalogItem`] 构建
-    ///
-    /// `CatalogItem` 是 GB28181-2022 目录查询响应解析后的条目结构（定义在 [`crate::xml`]）。
-    pub fn from_catalog_item(item: &CatalogItem) -> Self {
+    /// 从 2022 版 [`ItemType`] 构建
+    pub fn from_item_type(item: &ItemType) -> Self {
         // 根据 parental 字段推断节点类型
         let device_type = if item.parental == 0 {
             GbDeviceType::SubDevice
@@ -612,7 +621,10 @@ impl GbDevice {
 
         Self {
             device_type,
-            device_id: item.device_id.clone(),
+            device_id: match &item.device_id {
+                DeviceIDType::Len2(s) | DeviceIDType::Len4(s) | DeviceIDType::Len6(s)
+                | DeviceIDType::Len8(s) | DeviceIDType::Len20(s) => s.clone(),
+            },
             name: item.name.clone(),
             parent_id: item.parent_id.clone(),
             parental: item.parental,
@@ -620,7 +632,7 @@ impl GbDevice {
             model: item.model.clone(),
             firmware: String::new(),
             owner: String::new(),
-            status: ChannelStatus::from_str(&item.status).unwrap(),
+            status: item.status.clone(),
             longitude: item.longitude,
             latitude: item.latitude,
             civil_code: item.civil_code.clone(),
@@ -634,37 +646,40 @@ impl GbDevice {
             svc_space_domain_mode: None,
             svc_time_domain_mode: None,
             svc_ssim_mode: None,
-            ip_address: item.ip_address.clone(),
-            port: item.port,
+            ip_address: item.ip_address.clone().unwrap_or_default(),
+            port: item.port.unwrap_or(0),
             contact: String::new(),
             remote_addr: String::new(),
             registered_at: Utc::now(),
             last_heartbeat: Instant::now(),
             expires: 3600,
-            online: item.status.to_uppercase() == "ON",
+            online: item.status == StatusType::ON,
         }
     }
 
-    /// 转为 2022 版 [`CatalogItem`]
-    pub fn to_catalog_item(&self) -> CatalogItem {
-        CatalogItem {
-            device_id: self.device_id.clone(),
+    /// 转为 2022 版 [`ItemType`]
+    pub fn to_item_type(&self) -> ItemType {
+        ItemType {
+            device_id: DeviceIDType::Len20(self.device_id.clone()),
             name: self.name.clone(),
             manufacturer: self.manufacturer.clone(),
             model: self.model.clone(),
-            status: self.status.as_str().to_string(),
+            status: self.status.clone(),
             address: self.address.clone(),
             parent_id: self.parent_id.clone(),
             parental: self.parental,
             register_way: self.register_way,
+            security_level_code: None,
             secrecy: self.secrecy,
-            ip_address: self.ip_address.clone(),
-            port: self.port,
+            ip_address: Some(self.ip_address.clone()),
+            port: Some(self.port),
             longitude: self.longitude,
             latitude: self.latitude,
-            block: String::new(),
+            block: Some(String::new()),
             civil_code: self.civil_code.clone(),
-            channel_num: 0,
+            password: None,
+            business_group_id: None,
+            info: None,
         }
     }
 }
@@ -677,23 +692,19 @@ impl GbDevice {
 mod tests {
     use super::*;
 
-    // ── ChannelStatus ──────────────────────────────────────────────────────────
+    // ── StatusType ──────────────────────────────────────────────────────────────
 
     #[test]
-    fn channel_status_from_str() {
-        assert_eq!("ON".parse::<ChannelStatus>().unwrap(), ChannelStatus::On);
-        assert_eq!("off".parse::<ChannelStatus>().unwrap(), ChannelStatus::Off);
-        assert_eq!(
-            "Maintenance".parse::<ChannelStatus>().unwrap(),
-            ChannelStatus::Unknown("MAINTENANCE".to_string())
-        );
+    fn status_type_from_str() {
+        assert_eq!(StatusType::try_from("ON".to_string()).unwrap(), StatusType::ON);
+        assert_eq!(StatusType::try_from("OFF".to_string()).unwrap(), StatusType::OFF);
+        assert!(StatusType::try_from("Unknown".to_string()).is_err());
     }
 
     #[test]
-    fn channel_status_as_str() {
-        assert_eq!(ChannelStatus::On.as_str(), "ON");
-        assert_eq!(ChannelStatus::Off.as_str(), "OFF");
-        assert_eq!(ChannelStatus::Unknown("X".into()).as_str(), "X");
+    fn status_type_as_str() {
+        assert_eq!(StatusType::ON.as_str(), "ON");
+        assert_eq!(StatusType::OFF.as_str(), "OFF");
     }
 
     // ── DeviceInfo ─────────────────────────────────────────────────────────────
@@ -705,8 +716,8 @@ mod tests {
             "<sip:34020000001320000001@192.168.1.100:5060>".into(),
             3600,
             "192.168.1.100:5060".into(),
-        );
-        assert_eq!(dev.device_id, "34020000001320000001");
+        ).unwrap();
+        assert_eq!(dev.device_id, DeviceIDType::Len2("34020000001320000001".into()));
         assert!(dev.online);
         assert!(!dev.is_timeout(60)); // 刚创建，不应超时
     }
@@ -748,7 +759,7 @@ mod tests {
     fn gb_device_new_device() {
         let dev = GbDevice::new_device("34020000001320000001", "TestDevice");
         assert_eq!(dev.device_type, GbDeviceType::Device);
-        assert_eq!(dev.device_id, "34020000001320000001");
+        assert_eq!(dev.device_id, DeviceIDType::Len2("34020000001320000001".into()));
         assert_eq!(dev.name, "TestDevice");
         assert_eq!(dev.parental, 1);
         assert!(dev.is_parent());
@@ -820,17 +831,17 @@ mod tests {
     #[test]
     fn channel_info_to_gb_device_and_back() {
         let original = ChannelInfo {
-            channel_id: "34020000001320000001".into(),
+            channel_id: DeviceIDType::Len20("34020000001320000001".into()),
             name: "Camera-01".into(),
             manufacturer: "Dahua".into(),
             model: "IPC-HDW5442T".into(),
-            status: ChannelStatus::On,
+            status: StatusType::ON,
             address: "杭州市".into(),
-            parent_id: "34020000001320000000".into(),
+            parent_id: DeviceIDType::Len20("34020000001320000000".into()),
             parental: 0,
             register_way: 1,
             secrecy: 0,
-            ip_address: "192.168.1.200".into(),
+            ip_address: "192.168.1.200".parse().unwrap(),
             port: 5060,
             longitude: Some(120.15),
             latitude: Some(30.28),
@@ -851,86 +862,92 @@ mod tests {
 
         // GbDevice -> ChannelInfo
         let back = gb.to_channel_info();
-        assert_eq!(back.channel_id, "34020000001320000001");
+        assert_eq!(back.channel_id, DeviceIDType::Len20("34020000001320000001".into()));
         assert_eq!(back.name, "Camera-01");
         assert_eq!(back.manufacturer, "Dahua");
         assert_eq!(back.model, "IPC-HDW5442T");
-        assert_eq!(back.status, ChannelStatus::On);
-        assert_eq!(back.parent_id, "34020000001320000000");
+        assert_eq!(back.status, StatusType::ON);
+        assert_eq!(back.parent_id, DeviceIDType::Len20("34020000001320000000".into()));
         assert_eq!(back.parental, 0);
-        assert_eq!(back.ip_address, "192.168.1.200");
+        assert_eq!(back.ip_address, "192.168.1.200".parse::<IpAddr>().unwrap());
         assert_eq!(back.port, 5060);
         assert_eq!(back.longitude, Some(120.15));
         assert_eq!(back.latitude, Some(30.28));
         assert_eq!(back.civil_code, "330100");
     }
 
-    // ── 2022 CatalogItem <-> GbDevice 往返 ────────────────────────────────────
+    // ── 2022 ItemType <-> GbDevice 往返 ────────────────────────────────────
 
     #[test]
     fn catalog_item_to_gb_device_and_back() {
-        let original = CatalogItem {
-            device_id: "34020000001320000001".into(),
+        let original = ItemType {
+            device_id: DeviceIDType::Len20("34020000001320000001".into()),
             name: "Camera-01".into(),
             manufacturer: "Hikvision".into(),
             model: "DS-2CD2143G2-I".into(),
-            status: "ON".into(),
+            status: StatusType::ON,
             address: "杭州市".into(),
             parent_id: "34020000001320000000".into(),
             parental: 0,
             register_way: 1,
             secrecy: 0,
-            ip_address: "192.168.1.200".into(),
-            port: 5060,
+            ip_address: Some("192.168.1.200".into()),
+            port: Some(5060),
             longitude: Some(120.15),
             latitude: Some(30.28),
-            block: "警区1".into(),
+            block: Some("警区1".into()),
             civil_code: "330100".into(),
-            channel_num: 0,
+            password: None,
+            security_level_code: None,
+            business_group_id: None,
+            info: None,
         };
 
-        // CatalogItem (parental=0) -> GbDevice
-        let gb = GbDevice::from_catalog_item(&original);
+        // ItemType (parental=0) -> GbDevice
+        let gb = GbDevice::from_item_type(&original);
         assert_eq!(gb.device_id, "34020000001320000001");
         assert_eq!(gb.device_type, GbDeviceType::SubDevice);
         assert_eq!(gb.parent_id, "34020000001320000000");
         assert_eq!(gb.parental, 0);
-        assert_eq!(gb.status, ChannelStatus::On);
+        assert_eq!(gb.status, StatusType::ON);
         assert!(gb.online);
 
-        // GbDevice -> CatalogItem
-        let back = gb.to_catalog_item();
-        assert_eq!(back.device_id, "34020000001320000001");
+        // GbDevice -> ItemType
+        let back = gb.to_item_type();
+        assert_eq!(back.device_id, DeviceIDType::Len20("34020000001320000001".into()));
         assert_eq!(back.name, "Camera-01");
         assert_eq!(back.manufacturer, "Hikvision");
-        assert_eq!(back.status, "ON");
+        assert_eq!(back.status, StatusType::ON);
         assert_eq!(back.parental, 0);
         assert_eq!(back.civil_code, "330100");
     }
 
     #[test]
     fn catalog_item_parental_device() {
-        let item = CatalogItem {
-            device_id: "34020000001320000000".into(),
+        let item = ItemType {
+            device_id: DeviceIDType::Len20("34020000001320000000".into()),
             name: "NVR".into(),
             manufacturer: "Hikvision".into(),
             model: "DS-7804N-K1".into(),
-            status: "ON".into(),
+            status: StatusType::ON,
             address: String::new(),
             parent_id: String::new(),
             parental: 1, // 父节点
             register_way: 1,
             secrecy: 0,
-            ip_address: "192.168.1.1".into(),
-            port: 5060,
+            ip_address: Some("192.168.1.1".into()),
+            port: Some(5060),
             longitude: None,
             latitude: None,
-            block: String::new(),
+            block: Some(String::new()),
             civil_code: "330100".into(),
-            channel_num: 4,
+            password: None,
+            security_level_code: None,
+            business_group_id: None,
+            info: None,
         };
 
-        let gb = GbDevice::from_catalog_item(&item);
+        let gb = GbDevice::from_item_type(&item);
         assert_eq!(gb.device_type, GbDeviceType::Device);
         assert_eq!(gb.parental, 1);
     }
