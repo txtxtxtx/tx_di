@@ -364,7 +364,10 @@ where
                         "GB28181 事件订阅者落后，跳过了 {n} 条事件"
                     );
                 }
-                Err(broadcast::error::RecvError::Closed) => break,
+                Err(broadcast::error::RecvError::Closed) => {
+                    tracing::info!("GB28181 事件订阅者已关闭");
+                    break
+                },
             }
         }
     });

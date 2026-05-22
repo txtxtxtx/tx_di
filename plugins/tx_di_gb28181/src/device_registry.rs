@@ -42,9 +42,9 @@ impl DeviceRegistry {
         let is_new = !self.inner.contains_key(&device_id);
         self.inner.insert(device_id.clone(), info);
         if is_new {
-            info!(device_id = %device_id, "✅ 设备注册成功");
+            info!(device_id = %device_id, "设备注册成功");
         } else {
-            info!(device_id = %device_id, "🔄 设备注册刷新");
+            info!(device_id = %device_id, "设备注册刷新");
         }
     }
 
@@ -62,7 +62,7 @@ impl DeviceRegistry {
         if let Some(mut dev) = self.inner.get_mut(device_id)
             && dev.online
         {
-            warn!(device_id = %device_id, "⚠️ 设备心跳超时，标记离线");
+            warn!(device_id = %device_id, "设备心跳超时，标记离线");
             dev.online = false;
         }
     }
@@ -91,7 +91,7 @@ impl DeviceRegistry {
         self.inner.get(device_id).map(|r| r.clone())
     }
 
-    /// 获取所有在线设备列表
+    /// 获取所有在线设备列表, 包含子设备
     pub fn online_devices(&self) -> Vec<GbDevice> {
         self.inner
             .iter()
@@ -100,12 +100,12 @@ impl DeviceRegistry {
             .collect()
     }
 
-    /// 获取所有设备数量
+    /// 获取所有设备数量，包含子设备
     pub fn total_count(&self) -> usize {
         self.inner.len()
     }
 
-    /// 获取在线设备数量
+    /// 获取在线设备数量，包含子设备
     pub fn online_count(&self) -> usize {
         self.inner.iter().filter(|r| r.online).count()
     }
@@ -131,7 +131,7 @@ impl DeviceRegistry {
 
     // ── 更新 ─────────────────────────────────────────────────────────────────
 
-    /// 批量注册子设备（收到 Catalog 响应时调用）
+    /// 批量注册子设备（收到 Catalog 响应时调用） todo
     ///
     /// 在 2022 模型中，通道/子设备是独立的 [`GbDevice`] 节点，
     /// 存储在同一个 DashMap 中，通过 `parent_id` 区分层级关系。
