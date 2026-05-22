@@ -101,8 +101,8 @@ pub struct SipPlugin {
     pub cancel_token: OnceLock<CancellationToken>,
 
     /// SipRouter
-    #[tx_cst(OnceLock::new())]
-    pub sip_router: OnceLock<SipRouter>
+    #[tx_cst(SipRouter::new())]
+    pub sip_router: SipRouter
 }
 
 impl CompInit for SipPlugin {
@@ -150,21 +150,65 @@ impl CompInit for SipPlugin {
 
 impl SipPlugin {
 
+    /// 注册 SIP 消息处理器
+    ///
+    /// 向 SIP 路由器注册一个异步消息处理器，用于处理特定类型的 SIP 请求。
+    ///
+    /// # 参数
+    ///
+    /// - `method`: SIP 方法名过滤器
+    ///   - `Some("REGISTER")`: 仅处理 REGISTER 方法的请求
+    ///   - `Some("INVITE")`: 仅处理 INVITE 方法的请求
+    ///   - `None`: 作为 catch-all 处理器，匹配所有未精确匹配的方法
+    ///
+    /// - `priority`: 处理器优先级，数值越小优先级越高
+    ///   - 同一方法可以注册多个处理器，按优先级升序执行
+    ///   - 推荐范围：0-100，catch-all 建议使用较高值（如 99）
+    ///
+    /// - `handler`: 异步处理函数，接收 `Transaction` 并返回 `RIE<()>`
+    ///   - 函数签名：`async fn(Transaction) -> RIE<()>`
+    ///   - 必须实现 `Send + Sync + 'static` 以支持跨线程执行
+    ///
+    /// # 返回值
+    ///
+    /// - `Ok(())`: 成功注册处理器
+    /// - `Err(_)`: SipRouter 未初始化时返回错误
+    ///
+    /// # 示例
+    ///
+    /// ```rust,no_run
+    /// use tx_di_sip::SipPlugin;
+    /// use rsipstack::sip::StatusCode;
+    ///
+    /// // 注册 REGISTER 处理器
+    /// plugin.add_sip_handler(
+    ///     Some("REGISTER"),
+    ///     0,
+    ///     |mut tx| async move {
+    ///         println!("收到 REGISTER 请求");
+    ///         tx.reply(StatusCode::OK).await?;
+    ///         Ok(())
+    ///     }
+    /// )?;
+    ///
+    /// // 注册 catch-all 处理器（兜底）
+    /// plugin.add_sip_handler(
+    ///     None,
+    ///     99,
+    ///     |mut tx| async move {
+    ///         tx.reply(StatusCode::MethodNotAllowed).await?;
+    ///         Ok(())
+    ///     }
+    /// )?;
+    /// ```
     pub fn add_sip_handler<F, Fut>(&self, method: Option<impl AsRef<str>>, priority: i32, handler: F) -> RIE<()>
     where
         F: Fn(Transaction) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = RIE<()>> + Send + 'static, {
-        // 如果 sip_router 不存在，则创建并初始化
-        if self.sip_router.get().is_none() {
-            let sip_router = SipRouter::new();
-            self.sip_router.set(sip_router).map_err(|_| "SipRouter 已经初始化")?;
-        }
-        
-        // 获取 sip_router 并添加 handler
-        let sip_router = self.sip_router.get().ok_or("SipRouter 未初始化")?;
-        sip_router.add_handler(method, priority, handler);
+        self.sip_router.add_handler(method, priority, handler);
         Ok(())
     }
+    
     pub fn in_coming(&self)->RIE<()>{
         // 获取消息接收通道
         let mut incoming = self.endpoint.get().ok_or("获取 SIP 端点失败")?
@@ -194,7 +238,7 @@ impl SipPlugin {
         let log_messages = self.config.log_messages;
         let ep_clone = self.endpoint.get().ok_or("获取 SIP 端点失败")?.inner.clone();
         let token_clone = self.cancel_token.get().ok_or("获取 cancel_token 失败")?.clone();
-        let sip_router = self.sip_router.get().ok_or("SipRouter 未初始化")?.clone();
+        let sip_router = self.sip_router.clone();
 
         // Endpoint serve 任务
         let _ = tokio::spawn(async move {
