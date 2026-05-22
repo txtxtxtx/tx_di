@@ -38,9 +38,9 @@ async fn main() -> anyhow::Result<()> {
         .build()?
         .ins_run()
         .await?;
-    info!("✅ GB28181 管理后台启动完成");
-    info!("📡 API:      http://localhost:8080/api/gb28181/");
-    info!("🖥️  前端:     http://localhost:8080/admin/");
+    // info!("✅ GB28181 管理后台启动完成");
+    // info!("📡 API:      http://localhost:8080/api/gb28181/");
+    // info!("🖥️  前端:     http://localhost:8080/admin/");
 
     app.waiting_exit().await;
     Ok(())
