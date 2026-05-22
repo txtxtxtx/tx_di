@@ -7,6 +7,7 @@ mod layers;
 
 pub use config::*;
 pub use comp::*;
+pub use bound::DiComp;
 pub use r::R;
 pub use layers::{add_arc_layer, add_layer};
 #[cfg(test)]

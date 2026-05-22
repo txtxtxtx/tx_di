@@ -7,13 +7,13 @@ use axum::{
 use serde::Deserialize;
 use tx_di_axum::R;
 use tx_di_core::ApiR;
+use tx_di_axum::DiComp;
 use tx_di_gb28181::Gb28181Server;
 
 use crate::dto::SessionDto;
 
 /// GET /api/gb28181/sessions — 活跃会话列表
-pub async fn list() -> impl IntoResponse {
-    let srv = Gb28181Server::instance();
+pub async fn list(srv: DiComp<Gb28181Server>) -> impl IntoResponse {
     let sessions: Vec<SessionDto> = srv.active_sessions().into_iter().map(SessionDto::from).collect();
     R::from(ApiR::success(sessions))
 }
@@ -26,8 +26,7 @@ pub struct InviteReq {
 }
 
 /// POST /api/gb28181/sessions — 发起实时点播
-pub async fn invite(ExtJson(req): ExtJson<InviteReq>) -> impl IntoResponse {
-    let srv = Gb28181Server::instance();
+pub async fn invite(srv: DiComp<Gb28181Server>, ExtJson(req): ExtJson<InviteReq>) -> impl IntoResponse {
     match srv.invite(&req.device_id, &req.channel_id).await {
         Ok((call_id, urls)) => R::from(ApiR::success(serde_json::json!({
             "call_id": call_id,
@@ -42,8 +41,7 @@ pub async fn invite(ExtJson(req): ExtJson<InviteReq>) -> impl IntoResponse {
 }
 
 /// DELETE /api/gb28181/sessions/:call_id — 挂断
-pub async fn hangup(Path(call_id): Path<String>) -> impl IntoResponse {
-    let srv = Gb28181Server::instance();
+pub async fn hangup(Path(call_id): Path<String>, srv: DiComp<Gb28181Server>) -> impl IntoResponse {
     match srv.hangup(&call_id).await {
         Ok(_) => R::from(ApiR::success("会话已挂断".to_string())),
         Err(e) => R::from(ApiR::<String>::error_with_data(-1, e.to_string(), String::new())),

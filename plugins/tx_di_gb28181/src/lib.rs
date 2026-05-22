@@ -74,9 +74,9 @@
 //!
 //! // 2. 启动
 //! let mut ctx = BuildContext::new(Some("configs/gb28181-server.toml"));
-//! ctx.build().await.unwrap();
+//! let app = ctx.build().await.unwrap();
 //!
-//! let server = Gb28181Server::instance();
+//! let server = app.inject::<Gb28181Server>();
 //!
 //! // 3. 查询目录
 //! server.query_catalog("34020000001320000001").await.unwrap();
@@ -110,12 +110,13 @@ mod plugin;
 pub mod sdp;
 pub mod xml;
 pub mod media;
+mod plugin_tail;
 
 pub use config::{Gb28181ServerConfig, MediaConfig, CascadeConfig};
 pub use device_registry::DeviceRegistry;
 pub use event::{Gb28181Event, subscribe as subscribe_events};
 pub use handlers::Gb28181CmdType;
-pub use plugin::{Gb28181Server, Gb28181ServerHandle, SessionInfo};
+pub use plugin::{Gb28181Server, SessionInfo};
 pub use sdp::{parse_sdp_ssrc, AudioCodec, AudioSessionInfo, SnapshotInfo};
 pub use xml::{
     build_catalog_query_xml, build_device_info_query_xml, build_keepalive_xml,
