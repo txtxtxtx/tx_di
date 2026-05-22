@@ -27,14 +27,14 @@ use crate::xml::{
 pub use tx_gb28181::Gb28181CmdType;
 use rsipstack::sip::{Header, HeadersExt, StatusCode};
 use rsipstack::transaction::transaction::Transaction;
-use std::str::FromStr;
 use std::sync::Arc;
 use dashmap::DashMap;
 use tracing::{debug, info, warn};
+use tx_di_core::RIE;
 use tx_di_sip::SipRouter;
 
 /// 创建简单的 SIP 响应处理器（回复 200 OK）
-fn create_ok_handler(method_name: &'static str) -> impl Fn(Transaction) -> std::pin::Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send>> + Send + Sync + 'static {
+fn create_ok_handler(method_name: &'static str) -> impl Fn(Transaction) -> std::pin::Pin<Box<dyn Future<Output = RIE<()>> + Send>> + Send + Sync + 'static {
     move |mut tx| {
         let method = method_name;
         Box::pin(async move {
@@ -129,7 +129,7 @@ async fn handle_register(
     registry: DeviceRegistry,
     config: Arc<Gb28181ServerConfig>,
     nonce_store: NonceStore,
-) -> anyhow::Result<()> {
+) -> RIE<()> {
     // 解析 From 头中的 device_id
     let from_str = tx
         .original
@@ -283,7 +283,7 @@ async fn handle_message(
     mut tx: Transaction,
     registry: DeviceRegistry,
     _config: Arc<Gb28181ServerConfig>,
-) -> anyhow::Result<()> {
+) -> RIE<()> {
     // 先回 200 OK（GB28181 要求先确认再处理）
     // create_ok_handler("MESSAGE")(tx).await?;
     tx.reply(StatusCode::OK)
@@ -350,7 +350,7 @@ async fn handle_keepalive(
     device_id: &str,
     body: &str,
     registry: &DeviceRegistry,
-) -> anyhow::Result<()> {
+) -> RIE<()> {
     let status = parse_xml_field(body, "Status").unwrap_or_else(|| "OK".to_string());
     let was_offline = registry
         .get(device_id)
@@ -386,7 +386,7 @@ async fn handle_catalog_response(
     device_id: &str,
     body: &str,
     registry: &DeviceRegistry,
-) -> anyhow::Result<()> {
+) -> RIE<()> {
     let items = parse_catalog_items(body);
     let channel_count = items.len();
 
@@ -416,7 +416,7 @@ async fn handle_catalog_response(
 }
 
 /// 设备信息处理器
-async fn handle_device_info(device_id: &str, body: &str) -> anyhow::Result<()> {
+async fn handle_device_info(device_id: &str, body: &str) -> RIE<()> {
     let manufacturer = parse_xml_field(body, "Manufacturer").unwrap_or_default();
     let model = parse_xml_field(body, "Model").unwrap_or_default();
     let firmware = parse_xml_field(body, "Firmware").unwrap_or_default();
@@ -444,7 +444,7 @@ async fn handle_device_info(device_id: &str, body: &str) -> anyhow::Result<()> {
 }
 
 /// 设备状态处理器
-async fn handle_device_status(device_id: &str, body: &str) -> anyhow::Result<()> {
+async fn handle_device_status(device_id: &str, body: &str) -> RIE<()> {
     // 优先检查是否为校时响应（包含 TimeRequest 则为校时）
     if body.contains("<TimeRequest>") {
         let sync_info = parse_time_sync_response(body);
@@ -484,7 +484,7 @@ async fn handle_device_status(device_id: &str, body: &str) -> anyhow::Result<()>
 }
 
 /// 录像文件列表处理器
-async fn handle_record_info(device_id: &str, body: &str) -> anyhow::Result<()> {
+async fn handle_record_info(device_id: &str, body: &str) -> RIE<()> {
     let items = parse_record_items(body);
     let sum_num = parse_xml_field(body, "SumNum")
         .and_then(|s| s.parse().ok())
@@ -507,7 +507,7 @@ async fn handle_record_info(device_id: &str, body: &str) -> anyhow::Result<()> {
 }
 
 /// 报警通知处理器
-async fn handle_alarm(device_id: &str, body: &str) -> anyhow::Result<()> {
+async fn handle_alarm(device_id: &str, body: &str) -> RIE<()> {
     if let Some(alarm) = parse_alarm_notify(body) {
         info!(
             device_id = %device_id,
@@ -531,7 +531,7 @@ async fn handle_alarm(device_id: &str, body: &str) -> anyhow::Result<()> {
 }
 
 /// 媒体状态通知处理器
-async fn handle_media_status(device_id: &str, body: &str) -> anyhow::Result<()> {
+async fn handle_media_status(device_id: &str, body: &str) -> RIE<()> {
     let notify_type = parse_media_status(body).unwrap_or_else(|| "121".to_string());
     info!(
         device_id = %device_id,
@@ -548,7 +548,7 @@ async fn handle_media_status(device_id: &str, body: &str) -> anyhow::Result<()> 
 }
 
 /// 移动位置通知处理器
-async fn handle_mobile_position(device_id: &str, body: &str) -> anyhow::Result<()> {
+async fn handle_mobile_position(device_id: &str, body: &str) -> RIE<()> {
     let longitude = parse_xml_field(body, "Longitude")
         .and_then(|s| s.parse().ok())
         .unwrap_or(0.0f64);
@@ -581,7 +581,7 @@ async fn handle_mobile_position(device_id: &str, body: &str) -> anyhow::Result<(
 }
 
 /// 配置下载处理器
-async fn handle_config_download(device_id: &str, body: &str) -> anyhow::Result<()> {
+async fn handle_config_download(device_id: &str, body: &str) -> RIE<()> {
     let config_type = parse_xml_field(body, "ConfigType").unwrap_or_default();
     let items = parse_config_download_response(body);
     info!(
@@ -601,7 +601,7 @@ async fn handle_config_download(device_id: &str, body: &str) -> anyhow::Result<(
 }
 
 /// 预置位列表处理器
-async fn handle_preset_list(device_id: &str, body: &str) -> anyhow::Result<()> {
+async fn handle_preset_list(device_id: &str, body: &str) -> RIE<()> {
     let channel_id = parse_xml_field(body, "DeviceID").unwrap_or_else(|| device_id.to_string());
     let presets = parse_preset_list(body);
     info!(
@@ -621,7 +621,7 @@ async fn handle_preset_list(device_id: &str, body: &str) -> anyhow::Result<()> {
 }
 
 /// 巡航轨迹列表处理器
-async fn handle_cruise_list(device_id: &str, body: &str) -> anyhow::Result<()> {
+async fn handle_cruise_list(device_id: &str, body: &str) -> RIE<()> {
     let channel_id = parse_xml_field(body, "DeviceID").unwrap_or_else(|| device_id.to_string());
     let cruises = parse_cruise_list(body);
     info!(
@@ -641,7 +641,7 @@ async fn handle_cruise_list(device_id: &str, body: &str) -> anyhow::Result<()> {
 }
 
 /// 处理看守位信息
-async fn handle_guard_info(device_id: &str, body: &str) -> anyhow::Result<()> {
+async fn handle_guard_info(device_id: &str, body: &str) -> RIE<()> {
     let guard_info = match parse_guard_info(body) {
         Some(info) => info,
         None => {
@@ -668,7 +668,7 @@ async fn handle_guard_info(device_id: &str, body: &str) -> anyhow::Result<()> {
 /// 处理巡航轨迹详情响应
 ///
 /// GB28181-2022 A.2.4.12：巡航轨迹查询响应（2022 新增）
-async fn handle_cruise_track_response(device_id: &str, body: &str) -> anyhow::Result<()> {
+async fn handle_cruise_track_response(device_id: &str, body: &str) -> RIE<()> {
     let channel_id = parse_xml_field(body, "DeviceID").unwrap_or_else(|| device_id.to_string());
     let tracks = parse_cruise_track(body);
 
@@ -691,7 +691,7 @@ async fn handle_cruise_track_response(device_id: &str, body: &str) -> anyhow::Re
 /// 处理 PTZ 精准状态响应
 ///
 /// GB28181-2022 A.2.4.13：PTZ 精准状态查询响应（2022 新增）
-async fn handle_ptz_precise_status_response(device_id: &str, body: &str) -> anyhow::Result<()> {
+async fn handle_ptz_precise_status_response(device_id: &str, body: &str) -> RIE<()> {
     let channel_id = parse_xml_field(body, "DeviceID").unwrap_or_else(|| device_id.to_string());
 
     match parse_ptz_precise_status(body) {
@@ -728,7 +728,7 @@ async fn handle_ptz_precise_status_response(device_id: &str, body: &str) -> anyh
 /// GB28181-2022 §9.12：
 /// - Invite：设备邀请平台接收广播
 /// - TearDown：广播结束通知
-async fn handle_broadcast(device_id: &str, body: &str) -> anyhow::Result<()> {
+async fn handle_broadcast(device_id: &str, body: &str) -> RIE<()> {
     let source_id = parse_xml_field(body, "SourceID").unwrap_or_default();
     let notify_type = parse_xml_field(body, "NotifyType");
 

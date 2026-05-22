@@ -69,7 +69,7 @@ pub use sender::SipSender;
 mod tests {
     use super::*;
     use std::net::{Ipv4Addr, SocketAddr};
-
+    use tx_di_core::RIE;
     // ─────────────────────────────────────────────────────────────────────
     //  SipConfig 单元测试
     // ─────────────────────────────────────────────────────────────────────
@@ -487,7 +487,7 @@ mod tests {
     /// 注意：此 handler 不调用 `tx.reply()`，仅用于验证注册/分发机制本身。
     /// 真正的分发集成测试需要构造真实的 rsipstack Transaction，
     /// 那属于端到端集成测试范畴（需启动 UDP/TCP transport）。
-    async fn dummy_handler(_tx: rsipstack::transaction::transaction::Transaction) -> anyhow::Result<()> {
+    async fn dummy_handler(_tx: rsipstack::transaction::transaction::Transaction) -> RIE<()> {
         Ok(())
     }
 }
