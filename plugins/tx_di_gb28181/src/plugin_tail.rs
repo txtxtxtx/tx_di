@@ -1096,6 +1096,29 @@ impl Gb28181Server {
             .fetch_add(1, Ordering::Relaxed)
     }
 
+    /// 发起GB28181视频点播邀请（内部实现）
+    ///
+    /// 该函数负责向GB28181设备发起视频流邀请，支持实时点播和历史回放两种模式。
+    /// 主要流程包括：分配RTP端口、构建SDP报价、发送SIP INVITE请求、创建会话记录，
+    /// 并启动异步任务监听会话状态变化。
+    ///
+    /// # 参数说明
+    /// - `device_id`: 设备ID，用于标识目标GB28181设备
+    /// - `channel_id`: 通道ID，指定设备上的视频通道
+    /// - `is_realtime`: 是否为实时点播模式，`true`表示实时点播，`false`表示历史回放
+    /// - `start_time`: 历史回放开始时间（可选），格式为"YYYY-MM-DDTHH:MM:SS"或"YYYY-MM-DDTHH:MM:SSZ"
+    /// - `end_time`: 历史回放结束时间（可选），格式为"YYYY-MM-DDTHH:MM:SS"或"YYYY-MM-DDTHH:MM:SSZ"
+    ///
+    /// # 返回值
+    /// 成功时返回元组 `(call_id, play_urls)`：
+    /// - `call_id`: SIP呼叫ID，用于唯一标识此次会话
+    /// - `play_urls`: 播放地址集合，包含多种协议的播放URL
+    ///
+    /// # 错误处理
+    /// - 设备不存在时返回错误
+    /// - RTP端口分配失败时返回错误
+    /// - SIP INVITE请求失败时返回错误
+    /// - URI格式无效时返回错误
     async fn invite_internal(
         &self,
         device_id: &str,
@@ -1106,12 +1129,14 @@ impl Gb28181Server {
     ) -> anyhow::Result<(String, PlayUrls)> {
         let dev = self.get_dev_or_err(device_id)?;
 
+        // 确定媒体IP地址：如果配置的本地IP为未指定地址，则使用SIP IP
         let media_ip = if is_unspecified_ip(&self.config.media.local_ip) {
             self.config.sip_ip.clone()
         } else {
             self.config.media.local_ip.clone()
         };
 
+        // 生成流ID并分配RTP端口
         let stream_id = format!("{}_{}", channel_id, self.next_sn_for(device_id));
         let media = self.media.get().expect("MediaBackend not initialized");
         let rtp_handle = media
@@ -1129,11 +1154,14 @@ impl Gb28181Server {
             "🎥 媒体后端分配 RTP 端口"
         );
 
+        // 生成SSRC标识符并构建SDP报价（根据实时/回放模式）
         let ssrc = format!("{:010}", self.next_sn_for(device_id));
         let sdp_offer = if is_realtime {
+            // 实时点播模式：构建播放SDP
             build_invite_sdp(&media_ip, rtp_port, &ssrc, SessionType::Play, None, None)
                 .unwrap_or_default()
         } else {
+            // 历史回放模式：解析时间参数并构建回放SDP
             let parse_ts = |s: &str| -> u64 {
                 chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
                     .or_else(|_| chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%SZ"))
@@ -1169,11 +1197,13 @@ impl Gb28181Server {
             if is_realtime { "实时点播" } else { "历史回放" }
         );
 
+        // 创建SIP对话层并建立状态通道
         let sender = self.sip_plugin.sender()?;
         let endpoint = sender.inner();
         let dialog_layer = Arc::new(DialogLayer::new(endpoint.clone()));
         let (state_tx, mut state_rx) = dialog_layer.new_dialog_state_channel();
 
+        // 解析主叫和被叫SIP URI
         let caller_uri = rsip::Uri::try_from(caller_str.as_str())
             .map_err(|e| anyhow::anyhow!("无效的主叫 URI: {}", e))?;
         let callee_uri = rsip::Uri::try_from(callee_str.as_str())
@@ -1189,6 +1219,7 @@ impl Gb28181Server {
             ..Default::default()
         };
 
+        // 发送SIP INVITE请求并等待响应
         let (dialog, _resp) = dialog_layer
             .do_invite(invite_option, state_tx)
             .await
@@ -1196,6 +1227,7 @@ impl Gb28181Server {
 
         let call_id = dialog.id().call_id.clone();
 
+        // 创建会话信息并保存到会话管理器
         let session = SessionInfo {
             call_id: call_id.clone(),
             device_id: device_id.to_string(),
@@ -1207,8 +1239,10 @@ impl Gb28181Server {
         };
         self.sessions.insert(call_id.clone(), session);
 
+        // 获取播放地址
         let play_urls = media.get_play_urls(&stream_id);
 
+        // 克隆必要变量用于异步任务
         let call_id_clone = call_id.clone();
         let device_id_owned = device_id.to_string();
         let channel_id_owned = channel_id.to_string();
@@ -1218,10 +1252,12 @@ impl Gb28181Server {
         let ssrc_clone = ssrc.clone();
         let stream_id_clone = stream_id.clone();
 
+        // 启动异步任务监听会话状态变化（确认/终止）
         tokio::spawn(async move {
             while let Some(state) = state_rx.recv().await {
                 match state {
                     DialogState::Confirmed(id, _resp) => {
+                        // 会话已确认：触发SessionStarted事件
                         info!(
                             call_id = %call_id_clone,
                             dialog_id = %id,
@@ -1236,6 +1272,7 @@ impl Gb28181Server {
                         }));
                     }
                     DialogState::Terminated(id, reason) => {
+                        // 会话已终止：清理资源、关闭RTP端口、触发SessionEnded事件
                         info!(
                             call_id = %call_id_clone,
                             dialog_id = %id,

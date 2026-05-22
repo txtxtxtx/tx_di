@@ -163,7 +163,7 @@ pub struct RtpServerHandle {
 ///
 /// 包含明文和加密（TLS/HTTPS）两种版本的地址。
 /// 当后端未配置 TLS 时，对应的 `_tls` 字段为空字符串。
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default,Serialize)]
 pub struct PlayUrls {
     /// 流标识
     pub stream_id: String,

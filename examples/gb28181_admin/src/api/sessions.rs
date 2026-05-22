@@ -29,9 +29,7 @@ pub async fn invite(srv: DiComp<Gb28181Server>, ExtJson(req): ExtJson<InviteReq>
     match srv.invite(&req.device_id, &req.channel_id).await {
         Ok((call_id, urls)) => R::ok(serde_json::json!({
             "call_id": call_id,
-            "hls":  urls.hls,
-            "rtsp": urls.rtsp,
-            "rtmp": urls.rtmp,
+            "urls": urls,
         })),
         Err(e) => R::fail(e.to_string()),
     }
