@@ -7,7 +7,7 @@
 //!
 //! - **IPv4 / IPv6 双栈支持** — 通过配置 `host` 字段选择监听地址
 //! - **UDP + TCP 双传输层** — 可单独或同时启用
-//! - **消息处理注册** — 类似 axum 路由的 [`SipRouter::add_handler`] 机制
+//! - **消息处理注册** — 类似 axum 路由的 [`sip_router.add_handler`] 机制
 //! - **消息发送接口** — [`SipSender`] 提供 `register()`/`invite()` 等便捷 API
 //! - **优雅停止** — 通过 `CancellationToken` 支持 shutdown
 //!
@@ -39,13 +39,13 @@
 //! use tx_di_core::BuildContext;
 //!
 //! // 启动前注册处理器
-//! SipRouter::add_handler(Some("REGISTER"), 0, |mut tx| async move {
+//! sip_router.add_handler(Some("REGISTER"), 0, |mut tx| async move {
 //!     println!("收到 REGISTER: {}", tx.original);
 //!     tx.reply(StatusCode::OK).await?;
 //!     Ok(())
 //! });
 //!
-//! SipRouter::add_handler(Some("OPTIONS"), 0, |mut tx| async move {
+//! sip_router.add_handler(Some("OPTIONS"), 0, |mut tx| async move {
 //!     tx.reply(StatusCode::OK).await?;
 //!     Ok(())
 //! });
@@ -379,46 +379,44 @@ mod tests {
 
     #[test]
     fn router_lifecycle() {
-        // ── 初始状态为空 ───────────────────────────────────────────
-        SipRouter::clear();
-        assert_eq!(SipRouter::handler_count(), 0, "初始应为空");
+        let sip_router = SipRouter::new();
 
         // ── 逐个注册并计数 ─────────────────────────────────────────
-        SipRouter::add_handler(Some("REGISTER"), 0, dummy_handler);
-        assert_eq!(SipRouter::handler_count(), 1);
+        sip_router.add_handler(Some("REGISTER"), 0, dummy_handler);
+        assert_eq!(sip_router.handler_count(), 1);
 
-        SipRouter::add_handler(Some("INVITE"), 0, dummy_handler);
-        SipRouter::add_handler(Some("OPTIONS"), 10, dummy_handler);
-        assert_eq!(SipRouter::handler_count(), 3);
+        sip_router.add_handler(Some("INVITE"), 0, dummy_handler);
+        sip_router.add_handler(Some("OPTIONS"), 10, dummy_handler);
+        assert_eq!(sip_router.handler_count(), 3);
 
         // ── clear 重置 ──────────────────────────────────────────────
-        SipRouter::add_handler(Some("BYE"), 0, dummy_handler);
-        SipRouter::add_handler(None, 99, dummy_handler); // catch-all
-        assert_eq!(SipRouter::handler_count(), 5);
+        sip_router.add_handler(Some("BYE"), 0, dummy_handler);
+        sip_router.add_handler(None, 99, dummy_handler); // catch-all
+        assert_eq!(sip_router.handler_count(), 5);
 
-        SipRouter::clear();
-        assert_eq!(SipRouter::handler_count(), 0);
+        sip_router.clear();
+        assert_eq!(sip_router.handler_count(), 0);
 
         // ── 方法名自动转大写 ────────────────────────────────────────
-        SipRouter::add_handler(Some("register"), 0, dummy_handler);  // 小写 → 大写
-        SipRouter::add_handler(Some("Invite"), 0, dummy_handler);   // 混合 → 大写
-        SipRouter::add_handler(Some("options"), 0, dummy_handler);  // 小写 → 大写
-        assert_eq!(SipRouter::handler_count(), 3);
+        sip_router.add_handler(Some("register"), 0, dummy_handler);  // 小写 → 大写
+        sip_router.add_handler(Some("Invite"), 0, dummy_handler);   // 混合 → 大写
+        sip_router.add_handler(Some("options"), 0, dummy_handler);  // 小写 → 大写
+        assert_eq!(sip_router.handler_count(), 3);
 
         // ── catch-all (method = None) ──────────────────────────────
-        SipRouter::clear();
-        SipRouter::add_handler(None, 100, dummy_handler);
-        assert_eq!(SipRouter::handler_count(), 1);
+        sip_router.clear();
+        sip_router.add_handler(None, 100, dummy_handler);
+        assert_eq!(sip_router.handler_count(), 1);
 
         // ── 同方法多优先级 ─────────────────────────────────────────
-        SipRouter::clear();
-        SipRouter::add_handler(Some("REGISTER"), 0, |_tx| async move { Ok(()) });
-        SipRouter::add_handler(Some("REGISTER"), 10, |_tx| async move { Ok(()) });
-        SipRouter::add_handler(Some("REGISTER"), 5, |_tx| async move { Ok(()) });
-        assert_eq!(SipRouter::handler_count(), 3);
+        sip_router.clear();
+        sip_router.add_handler(Some("REGISTER"), 0, |_tx| async move { Ok(()) });
+        sip_router.add_handler(Some("REGISTER"), 10, |_tx| async move { Ok(()) });
+        sip_router.add_handler(Some("REGISTER"), 5, |_tx| async move { Ok(()) });
+        assert_eq!(sip_router.handler_count(), 3);
 
         // 最终清理
-        SipRouter::clear();
+        sip_router.clear();
     }
 
     // ─────────────────────────────────────────────────────────────────────
