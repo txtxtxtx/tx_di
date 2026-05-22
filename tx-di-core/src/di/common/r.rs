@@ -63,6 +63,15 @@ impl ApiRes {
             msg,
         }
     }
+
+    /// 将无数据响应转为带数据类型的响应（data 丢弃，保留 code/msg）
+    pub fn into_typed<T>(self) -> ApiR<T> {
+        ApiR {
+            code: self.code,
+            msg: self.msg,
+            data: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
