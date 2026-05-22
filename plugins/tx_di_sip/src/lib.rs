@@ -391,7 +391,7 @@ mod tests {
 
         // ── clear 重置 ──────────────────────────────────────────────
         sip_router.add_handler(Some("BYE"), 0, dummy_handler);
-        sip_router.add_handler(None, 99, dummy_handler); // catch-all
+        sip_router.add_handler(None::<&str>, 99, dummy_handler); // catch-all
         assert_eq!(sip_router.handler_count(), 5);
 
         sip_router.clear();
@@ -405,7 +405,7 @@ mod tests {
 
         // ── catch-all (method = None) ──────────────────────────────
         sip_router.clear();
-        sip_router.add_handler(None, 100, dummy_handler);
+        sip_router.add_handler(None::<&str>, 100, dummy_handler);
         assert_eq!(sip_router.handler_count(), 1);
 
         // ── 同方法多优先级 ─────────────────────────────────────────

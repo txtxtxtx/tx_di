@@ -96,9 +96,8 @@ impl SipRouter {
     ///   `None` 表示作为 catch‑all（匹配所有未精确匹配的方法）。
     /// - `priority`: 优先级，数值越小越优先（同方法内有效）。
     /// - `handler`: 异步处理函数，签名为 `async fn(Transaction) -> RIE<()>`。
-    pub fn add_handler<M, F, Fut>(&self, method: Option<M>, priority: i32, handler: F)
+    pub fn add_handler<F, Fut>(&self, method: Option<impl AsRef<str>>, priority: i32, handler: F)
     where
-        M: AsRef<str>,
         F: Fn(Transaction) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = RIE<()>> + Send + 'static,
     {

@@ -150,9 +150,8 @@ impl CompInit for SipPlugin {
 
 impl SipPlugin {
 
-    pub fn add_sip_handler<M, F, Fut>(&self, method: Option<M>, priority: i32, handler: F) -> RIE<()>
+    pub fn add_sip_handler<F, Fut>(&self, method: Option<impl AsRef<str>>, priority: i32, handler: F) -> RIE<()>
     where
-        M: AsRef<str>,
         F: Fn(Transaction) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = RIE<()>> + Send + 'static, {
         // 如果 sip_router 不存在，则创建并初始化
