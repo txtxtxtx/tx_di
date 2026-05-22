@@ -39,7 +39,11 @@ pub async fn detail(Path(id): Path<String>) -> impl IntoResponse {
     let srv = Gb28181Server::instance();
     match srv.get_device(&id) {
         Some(dev) => {
-            let channels: Vec<ChannelDto> = dev.channels.iter().map(ChannelDto::from).collect();
+            let channels: Vec<ChannelDto> = srv
+                .get_channels(&id)
+                .iter()
+                .map(ChannelDto::from)
+                .collect();
             let mut dto = DeviceDto::from(dev);
             dto.channels = Some(channels);
             R::from(ApiR::success(dto))

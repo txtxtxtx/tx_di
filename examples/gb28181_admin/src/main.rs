@@ -20,6 +20,7 @@ use tx_di_core::BuildContext;
 use tx_di_gb28181::Gb28181Server;
 use tx_di_axum::WebPlugin;
 use tracing::info;
+#[allow(unused_imports)]
 use tx_di_log;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
