@@ -85,6 +85,8 @@ pub(crate) struct Gb28181ServerInner {
     pub(crate) broadcast_sessions: DashMap<String, BroadcastSessionInfo>,
     /// 统一流媒体后端（ZLM / MediaMTX / Null）
     pub(crate) media: Arc<dyn MediaBackend>,
+    /// sip 插件
+    pub sip_plugin: Arc<SipPlugin>,
 }
 
 /// GB28181 服务端插件
@@ -118,7 +120,8 @@ pub struct Gb28181Server {
     /// 随机数存储
     #[tx_cst(NonceStore::new())]
     pub nonce_store: NonceStore,
-
+    /// sip 插件
+    pub sip_plugin: Arc<SipPlugin>,
 }
 
 impl CompInit for Gb28181Server {
@@ -129,12 +132,12 @@ impl CompInit for Gb28181Server {
             let config = gb28181_server.config.clone();
             let registry = gb28181_server.device_registry.clone();
             let nonce_store = gb28181_server.nonce_store.clone();
-
+            let sip_plugin = gb28181_server.sip_plugin.clone();
             // 构建流媒体后端（优先 media_backend，兼容旧版 zlm 配置）
             let media_backend = build_backend(&config.media_backend);
 
             // 注册 SIP 消息处理器
-            register_server_handlers(registry.clone(), config.clone(), nonce_store);
+            register_server_handlers(sip_plugin.clone(),registry.clone(), config.clone(), nonce_store)?;
 
             info!(
                 platform_id = %config.platform_id,
@@ -154,6 +157,7 @@ impl CompInit for Gb28181Server {
                 sessions: DashMap::new(),
                 broadcast_sessions: DashMap::new(),
                 media: media_backend,
+                sip_plugin,
             });
             let _ = INSTANCE.set(inner.clone());
 
@@ -205,10 +209,9 @@ async fn heartbeat_watchdog(inner: Arc<Gb28181ServerInner>, timeout_secs: u64) -
     let check_interval = Duration::from_secs(timeout_secs.min(30));
     let mut ticker = interval(check_interval);
     ticker.tick().await; // 跳过立即触发的第一次
-    
+
     // 获取 SIP 插件的取消令牌
-    let cancel_token = SipPlugin::cancel_token()
-        .ok_or_else(|| IE::Other("SIP 插件未初始化，无法获取取消令牌".to_string()))?;
+    let cancel_token = inner.sip_plugin.get_cancel_token()?;
     
     loop {
         tokio::select! {
@@ -254,7 +257,7 @@ impl Gb28181ServerHandle {
 
     /// 获取注册设备总数
     pub fn device_count(&self) -> usize {
-        self.inner.registry.total_count()
+        self.inner.registry.all_devices_count()
     }
 
     /// 获取在线设备数
@@ -277,7 +280,7 @@ impl Gb28181ServerHandle {
         let sn = self.next_sn();
         let xml = build_catalog_query_xml(&self.inner.config.platform_id, sn);
         self.send_message_to_device(&dev.contact, &xml, sn).await?;
-        info!(device_id = %device_id, sn = sn, "📂 发送目录查询");
+        info!(device_id = %device_id, sn = sn, "发送目录查询");
         Ok(())
     }
 
@@ -615,7 +618,7 @@ impl Gb28181ServerHandle {
             "📸 发起抓拍 INVITE"
         );
 
-        let sender = SipPlugin::sender();
+        let sender = self.inner.sip_plugin.sender()?;
         let endpoint = sender.inner();
         let dialog_layer = Arc::new(DialogLayer::new(endpoint.clone()));
         let (state_tx, mut state_rx) = dialog_layer.new_dialog_state_channel();
@@ -712,7 +715,7 @@ impl Gb28181ServerHandle {
         let sn = self.next_sn();
         let xml = build_broadcast_invite_xml(&self.inner.config.platform_id, device_id, sn);
         self.send_message_to_device(&dev.contact, &xml, sn).await?;
-        info!(device_id = %device_id, sn = sn, "📢 发起语音广播邀请");
+        info!(device_id = %device_id, sn = sn, "发起语音广播邀请");
         Ok(())
     }
 
@@ -763,7 +766,7 @@ impl Gb28181ServerHandle {
         info!(
             device_id = %device_id,
             audio_port = audio_port,
-            "📢 确认广播接收，监听端口"
+            "确认广播接收，监听端口"
         );
 
         tokio::spawn(event::emit(Gb28181Event::BroadcastSessionStarted {
@@ -780,12 +783,9 @@ impl Gb28181ServerHandle {
         let sn = self.next_sn();
         let xml = build_broadcast_cancel_xml(&self.inner.config.platform_id, device_id, sn);
         self.send_message_to_device(&dev.contact, &xml, sn).await?;
-
         // 清除广播会话
         self.inner.broadcast_sessions.remove(device_id);
-
-        info!(device_id = %device_id, "📢 结束语音广播");
-
+        info!(device_id = %device_id, "结束语音广播");
         tokio::spawn(event::emit(Gb28181Event::BroadcastSessionEnded {
             device_id: device_id.to_string(),
         }));
@@ -853,7 +853,7 @@ impl Gb28181ServerHandle {
             "🎤 发起对讲 INVITE"
         );
 
-        let sender = SipPlugin::sender();
+        let sender = self.inner.sip_plugin.sender()?;
         let endpoint = sender.inner();
         let dialog_layer = Arc::new(DialogLayer::new(endpoint.clone()));
         let (state_tx, mut state_rx) = dialog_layer.new_dialog_state_channel();
@@ -1453,7 +1453,7 @@ impl Gb28181ServerHandle {
             if is_realtime { "实时点播" } else { "历史回放" }
         );
 
-        let sender = SipPlugin::sender();
+        let sender = self.inner.sip_plugin.sender()?;
         let endpoint = sender.inner();
         let dialog_layer = Arc::new(DialogLayer::new(endpoint.clone()));
         let (state_tx, mut state_rx) = dialog_layer.new_dialog_state_channel();
@@ -1573,7 +1573,7 @@ impl Gb28181ServerHandle {
         body: &str,
         seq: u32,
     ) -> anyhow::Result<()> {
-        let sender = SipPlugin::sender();
+        let sender = self.inner.sip_plugin.sender()?;
         let inner = sender.inner();
 
         let req_uri = rsip::Uri::try_from(contact)

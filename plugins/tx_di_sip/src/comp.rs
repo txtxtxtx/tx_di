@@ -112,16 +112,6 @@ pub struct SipPlugin {
 }
 
 impl CompInit for SipPlugin {
-    fn inner_init(&mut self, _: &InnerContext ) -> RIE<()> {
-
-        info!(
-            host = %self.config.host,
-            port = self.config.port,
-            transport = ?self.config.transport,
-            "SIP 插件初始化中..."
-        );
-        Ok(())
-    }
     fn init(ctx: Arc<App>, token: CancellationToken) -> RIE<()> {
         let sip_plugin = ctx.inject::<SipPlugin>();
         // 存储取消令牌,确保在异步任务中可以使用
@@ -220,7 +210,7 @@ impl SipPlugin {
     ///     }
     /// )?;
     /// ```
-    pub fn add_sip_handler<F, Fut>(&self, method: Option<impl AsRef<str>>, priority: i32, handler: F) -> RIE<()>
+    pub fn add_handler<F, Fut>(&self, method: Option<impl AsRef<str>>, priority: i32, handler: F) -> RIE<()>
     where
         F: Fn(Transaction) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = RIE<()>> + Send + 'static, {

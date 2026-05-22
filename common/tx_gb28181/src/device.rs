@@ -144,6 +144,7 @@ impl Default for GbDevice {
             online: true,
         }
     }
+
 }
 
 impl GbDevice {
@@ -164,6 +165,10 @@ impl GbDevice {
         self.online
     }
 
+    /// 是否为指定父级的子节点
+    pub fn is_son(&self, id: &str) -> bool {
+        self.item.parent_id == id
+    }
     /// 是否已超时（超过指定秒数未收到心跳）
     pub fn is_timeout(&self, timeout_secs: u64) -> bool {
         self.last_heartbeat.elapsed() > Duration::from_secs(timeout_secs)

@@ -31,7 +31,7 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use tracing::{debug, info, warn};
 use tx_di_core::RIE;
-use tx_di_sip::SipRouter;
+use tx_di_sip::{SipPlugin};
 
 /// 创建简单的 SIP 响应处理器（回复 200 OK）
 fn create_ok_handler(method_name: &'static str) -> impl Fn(Transaction) -> std::pin::Pin<Box<dyn Future<Output = RIE<()>> + Send>> + Send + Sync + 'static {
@@ -48,10 +48,11 @@ fn create_ok_handler(method_name: &'static str) -> impl Fn(Transaction) -> std::
 
 /// 向 SipRouter 注册所有 GB28181 服务端消息处理器
 pub fn register_server_handlers(
+    sip_plugin: Arc<SipPlugin>,
     registry: DeviceRegistry,
     config: Arc<Gb28181ServerConfig>,
     nonce_store: NonceStore,
-) {
+) ->RIE<()> {
     let reg_register = registry.clone();
     let cfg_register = config.clone();
     let nonce_register = nonce_store.clone();
@@ -59,28 +60,30 @@ pub fn register_server_handlers(
     let cfg_message = config.clone();
 
     // REGISTER — 设备注册/注销/刷新（含摘要认证）
-    SipRouter::add_handler(Some("REGISTER"), 0, move |tx| {
+    sip_plugin.add_handler(Some("REGISTER"), 0, move |tx| {
         let reg = reg_register.clone();
         let cfg = cfg_register.clone();
         let nonce = nonce_register.clone();
         async move { handle_register(tx, reg, cfg, nonce).await }
-    });
+    })?;
 
     // MESSAGE — 心跳、目录响应、设备信息响应、报警、录像等
-    SipRouter::add_handler(Some("MESSAGE"), 0, move |tx| {
+    sip_plugin.add_handler(Some("MESSAGE"), 0, move |tx| {
         let reg = reg_message.clone();
         let cfg = cfg_message.clone();
         async move { handle_message(tx, reg, cfg).await }
-    });
+    })?;
 
     // NOTIFY — 报警订阅通知
-    SipRouter::add_handler(Some("NOTIFY"), 0, create_ok_handler("NOTIFY"));
+    sip_plugin.add_handler(Some("NOTIFY"), 0, create_ok_handler("NOTIFY"))?;
 
     // SUBSCRIBE — 订阅请求（简单回 200 OK）
-    SipRouter::add_handler(Some("SUBSCRIBE"), 0, create_ok_handler("SUBSCRIBE"));
+    sip_plugin.add_handler(Some("SUBSCRIBE"), 0, create_ok_handler("SUBSCRIBE"))?;
 
     // OPTIONS — 探活 / keep-alive
-    SipRouter::add_handler(Some("OPTIONS"), 0, create_ok_handler("OPTIONS"));
+    sip_plugin.add_handler(Some("OPTIONS"), 0, create_ok_handler("OPTIONS"))?;
+
+    Ok(())
 }
 
 // ── Nonce 存储（用于摘要认证）────────────────────────────────────────────────

@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tracing::{info, warn};
 
 // ── 从公共模块 re-export（向后兼容）─────────────────────────────────────────
-pub use tx_gb28181::device::{GbDevice};
+pub use tx_gb28181::device::GbDevice;
 
 /// GB28181 设备注册表
 ///
@@ -52,7 +52,7 @@ impl DeviceRegistry {
     pub fn unregister(&self, device_id: &str) -> bool {
         let removed = self.inner.remove(device_id).is_some();
         if removed {
-            info!(device_id = %device_id, "🔌 设备主动注销");
+            info!(device_id = %device_id, "设备主动注销");
         }
         removed
     }
@@ -76,7 +76,7 @@ impl DeviceRegistry {
         if let Some(mut dev) = self.inner.get_mut(device_id) {
             dev.refresh_heartbeat();
             if !dev.online {
-                info!(device_id = %device_id, "🟢 设备重新上线");
+                info!(device_id = %device_id, "设备重新上线");
                 dev.online = true;
             }
             return true;
@@ -91,8 +91,17 @@ impl DeviceRegistry {
         self.inner.get(device_id).map(|r| r.clone())
     }
 
-    /// 获取所有在线设备列表, 包含子设备
+    /// 获取所有在线设备列表
     pub fn online_devices(&self) -> Vec<GbDevice> {
+        self.inner
+            .iter()
+            .filter(|r| r.online && r.is_parent())
+            .map(|r| r.clone())
+            .collect()
+    }
+    
+    /// 获取所有在线设备列表, 包含子设备
+    pub fn online_devices_with_sub(&self) -> Vec<GbDevice> {
         self.inner
             .iter()
             .filter(|r| r.online)
@@ -100,18 +109,51 @@ impl DeviceRegistry {
             .collect()
     }
 
+    /// 获取所有设备列表
+    pub fn all_devices(&self) -> Vec<GbDevice> {
+        self.inner
+            .iter()
+            .filter(|r| r.is_parent())
+            .map(|r| r.clone())
+            .collect()
+    }
+
+    /// 获取所有设备，包含子设备
+    pub fn all_devices_with_sub(&self) -> Vec<GbDevice> {
+        self.inner.iter().map(|r| r.clone()).collect()
+    }
+    
+    /// 获取所有设备数量
+    pub fn all_devices_count(&self) -> usize {
+        self.inner.iter().filter(|r| r.is_parent()).count()
+    }
+    
     /// 获取所有设备数量，包含子设备
-    pub fn total_count(&self) -> usize {
+    pub fn total_count_with_sub(&self) -> usize {
         self.inner.len()
     }
 
-    /// 获取在线设备数量，包含子设备
+    /// 获取在线设备数量
     pub fn online_count(&self) -> usize {
+        self.inner
+            .iter()
+            .filter(|r| r.is_parent() && r.is_online())
+            .count()
+    }
+    /// 获取在线设备数量，包含子设备
+    pub fn online_count_with_sub(&self) -> usize {
         self.inner.iter().filter(|r| r.online).count()
     }
 
     /// 列出所有设备 ID
-    pub fn device_ids(&self) -> Vec<String> {
+    pub fn list_device_ids(&self) -> Vec<String> {
+        self.inner.iter()
+            .filter(|r| r.is_parent())
+            .map(|r| r.device_id.clone()).collect()
+    }
+    
+    /// 列出所有设备 ID, 包含子设备
+    pub fn device_ids_with_sub(&self) -> Vec<String> {
         self.inner.iter().map(|r| r.device_id.clone()).collect()
     }
 
@@ -124,7 +166,7 @@ impl DeviceRegistry {
     pub fn sub_devices(&self, parent_id: &str) -> Vec<GbDevice> {
         self.inner
             .iter()
-            .filter(|r| r.item.parent_id == parent_id)
+            .filter(|r| r.is_son(parent_id))
             .map(|r| r.clone())
             .collect()
     }
@@ -146,12 +188,12 @@ impl DeviceRegistry {
         // 收集本批次涉及的所有父设备 ID
         let mut parent_ids: Vec<String> = Vec::new();
         for dev in &devices {
-            if !dev.item.parent_id.is_empty() && !parent_ids.contains(&dev.item.parent_id) {
-                parent_ids.push(dev.item.parent_id.clone());
+            if dev.is_parent() && !parent_ids.contains(&dev.device_id) {
+                parent_ids.push(dev.device_id.clone());
             }
         }
 
-        // 插入所有子设备
+        // 插入所有设备
         for dev in devices {
             let id = dev.device_id.clone();
             self.inner.insert(id, dev);
@@ -162,14 +204,14 @@ impl DeviceRegistry {
             let sub_count = self
                 .inner
                 .iter()
-                .filter(|r| r.item.parent_id == *parent_id)
+                .filter(|r| r.is_son(parent_id))
                 .count() as u32;
             if let Some(mut parent) = self.inner.get_mut(parent_id) {
                 parent.channel = sub_count;
             }
         }
 
-        info!(count = count, "📂 批量注册设备");
+        info!(count = count, "批量注册设备");
     }
 
     /// 更新设备信息（收到 DeviceInfo 响应时调用）
