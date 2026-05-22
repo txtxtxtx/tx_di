@@ -131,16 +131,44 @@ impl DeviceRegistry {
 
     // ── 更新 ─────────────────────────────────────────────────────────────────
 
-    /// 批量注册子设备（收到 Catalog 响应时调用） todo
+    /// 批量注册子设备（收到 Catalog 响应时调用）
     ///
     /// 在 2022 模型中，通道/子设备是独立的 [`GbDevice`] 节点，
     /// 存储在同一个 DashMap 中，通过 `parent_id` 区分层级关系。
+    ///
+    /// 注册完成后会自动更新所有相关父设备的 `channel` 字段。
     pub fn register_batch(&self, devices: Vec<GbDevice>) {
         let count = devices.len();
+        if count == 0 {
+            return;
+        }
+
+        // 收集本批次涉及的所有父设备 ID
+        let mut parent_ids: Vec<String> = Vec::new();
+        for dev in &devices {
+            if !dev.item.parent_id.is_empty() && !parent_ids.contains(&dev.item.parent_id) {
+                parent_ids.push(dev.item.parent_id.clone());
+            }
+        }
+
+        // 插入所有子设备
         for dev in devices {
             let id = dev.device_id.clone();
             self.inner.insert(id, dev);
         }
+
+        // 更新每个父设备的 channel 字段为实际子设备数量
+        for parent_id in &parent_ids {
+            let sub_count = self
+                .inner
+                .iter()
+                .filter(|r| r.item.parent_id == *parent_id)
+                .count() as u32;
+            if let Some(mut parent) = self.inner.get_mut(parent_id) {
+                parent.channel = sub_count;
+            }
+        }
+
         info!(count = count, "📂 批量注册设备");
     }
 
