@@ -197,4 +197,5 @@ impl DeviceRegistry {
             .map(|r| r.device_id.clone())
             .collect()
     }
+    // todo 补充其他有用的方法
 }

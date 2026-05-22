@@ -33,8 +33,8 @@ use dashmap::DashMap;
 use tracing::{debug, info, warn};
 use tx_di_sip::SipRouter;
 
-// ── 创建简单的 SIP 响应处理器（回复 200 OK）─────────────────────────────────
-fn create_ok_handler(method_name: &'static str) -> impl Fn(Transaction) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + Send>> + Send + Sync + 'static {
+/// 创建简单的 SIP 响应处理器（回复 200 OK）
+fn create_ok_handler(method_name: &'static str) -> impl Fn(Transaction) -> std::pin::Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send>> + Send + Sync + 'static {
     move |mut tx| {
         let method = method_name;
         Box::pin(async move {

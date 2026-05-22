@@ -14,11 +14,13 @@ use rsipstack::transaction::transaction::Transaction;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, LazyLock, RwLock};
+use rsipstack::sip::StatusCode;
 use tracing::{error, info};
+use tx_di_core::{IE, RIE};
 
 /// 异步 SIP 消息处理函数类型
 pub type SipHandlerFn = Arc<
-    dyn Fn(Transaction) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send + 'static>>
+    dyn Fn(Transaction) -> Pin<Box<dyn Future<Output = RIE<()>> + Send + 'static>>
         + Send
         + Sync,
 >;
@@ -109,7 +111,7 @@ impl SipRouter {
     where
         M: Into<Option<&'static str>>,
         F: Fn(Transaction) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
+        Fut: Future<Output = RIE<()>> + Send + 'static,
     {
         let method_str = method.into().map(|m| m.to_uppercase());
         let handler_fn: SipHandlerFn = Arc::new(move |tx| Box::pin(handler(tx)));
@@ -214,11 +216,10 @@ impl SipRouter {
 }
 
 /// 默认处理器：对没有注册处理器的方法回复 405 Method Not Allowed 方法不允许
-async fn default_handler(mut tx: Transaction) -> anyhow::Result<()> {
-    use rsipstack::sip::StatusCode;
+async fn default_handler(mut tx: Transaction) -> RIE<()> {
     info!(method = %tx.original.method, "收到未注册方法，回复 405");
     tx.reply(StatusCode::MethodNotAllowed)
         .await
-        .map_err(|e| anyhow::anyhow!("回复 405 失败: {}", e))?;
+        .map_err(|e| IE::from(anyhow::anyhow!("回复 405 失败: {}", e)))?;
     Ok(())
 }
