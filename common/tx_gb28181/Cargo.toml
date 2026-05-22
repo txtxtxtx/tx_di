@@ -26,3 +26,4 @@ serde_json.workspace = true
 serde_repr.workspace = true
 
 deku.workspace = true
+rand.workspace = true

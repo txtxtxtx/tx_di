@@ -3012,6 +3012,7 @@ dependencies = [
  "deku",
  "encoding_rs",
  "quick-xml",
+ "rand 0.9.4",
  "serde",
  "serde_json",
  "serde_repr",
