@@ -251,21 +251,27 @@ impl SipPlugin {
         // 共享信号量：限制并发 handler 数量
         let sem = Arc::new(Semaphore::new(max_handlers));
 
-        // 过载标志（避免日志刷屏）
-        let overload_flag = Arc::new(AtomicBool::new(false));
-
         let log_messages = self.config.log_messages;
         let ep_clone = self.endpoint.get().ok_or("获取 SIP 端点失败")?.inner.clone();
         let token_clone = self.cancel_token.get().ok_or("获取 cancel_token 失败")?.clone();
         let sip_router = self.sip_router.clone();
-
+        let producer_token_clone = token_clone.clone();
 
         // 生产者：将 rsipstack incoming 消息送入 bounded channel
         // 队列满时：send().await 自动 park，形成背压
         // 接收sip消息放入队列
         let producer = async move {
-            while let Some(tx_msg) = incoming.recv().await {
-                if tx.send(tx_msg).await.is_err() { break; }
+            tokio::select! {
+                _ = producer_token_clone.cancelled() => {
+                    info!("SIP 消息生产者收到停止信号");
+                }
+                _ = async {
+                    while let Some(tx_msg) = incoming.recv().await {
+                        if tx.send(tx_msg).await.is_err() { break; }
+                    }
+                } => {
+                    info!("SIP 消息生产者已退出");
+                }
             }
         };
         self.tasks.lock().await.spawn(producer);
@@ -277,29 +283,49 @@ impl SipPlugin {
         // 使用handler 处理队列里面的sip消息
         let consumer = async move {
             let mut handlers = FuturesUnordered::new();
-            while let Some(msg) = rx.recv().await {
-                let permit = match sem.clone().acquire_owned().await {
-                    Ok(permit) => permit,
-                    Err(e) => {
-                        error!("Semaphore 获取失败: {}，停止消费者", e);
+            
+            // 主循环：接收消息或等待取消信号
+            loop {
+                tokio::select! {
+                    _ = token_clone.cancelled() => {
+                        info!("SIP 消息消费者收到停止信号，停止接收新消息");
                         break;
                     }
-                };
-                let router = sip_router.clone();
-                let fut = async move {
-                    if log_messages {
-                        let method = msg.original.method.to_string();
-                        info!("收到 SIP 消息：{}", method);
+                    msg_opt = rx.recv() => {
+                        match msg_opt {
+                            Some(msg) => {
+                                let permit = match sem.clone().acquire_owned().await {
+                                    Ok(permit) => permit,
+                                    Err(e) => {
+                                        error!("Semaphore 获取失败: {}，停止消费者", e);
+                                        break;
+                                    }
+                                };
+                                let router = sip_router.clone();
+                                let fut = async move {
+                                    if log_messages {
+                                        let method = msg.original.method.to_string();
+                                        info!("收到 SIP 消息：{}", method);
+                                    }
+                                    router.dispatch(msg).await;
+                                    drop(permit);
+                                };
+                                handlers.push(fut);
+                            }
+                            None => {
+                                info!("SIP 消息接收通道已关闭");
+                                break;
+                            }
+                        }
                     }
-                    router.dispatch(msg).await;
-                    drop(permit);
-                };
-                handlers.push(fut);
+                }
             }
             
-            info!("SIP 消息接收通道已关闭，等待 {} 个处理中的任务完成", handlers.len());
-            // 等待所有剩余 handler 完成
-            while let Some(_) = handlers.next().await {}
+            // 等待所有处理中的任务完成
+            if !handlers.is_empty() {
+                info!("等待 {} 个处理中的任务完成", handlers.len());
+                while let Some(_) = handlers.next().await {}
+            }
             info!("SIP 消息分发引擎已退出");
         };
 
