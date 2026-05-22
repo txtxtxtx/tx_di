@@ -76,7 +76,7 @@ rsipstack = { version = "0.5",features = ["default"]}
 tokio-util = { version = "0.7", features = ["rt"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 futures-core = "0.3"
-
+futures = "0.3"
 # 日志
 time = {version = "0.3"}
 log = {version = "0.4",features = ["serde"]}

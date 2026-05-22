@@ -2990,6 +2990,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "dashmap",
+ "futures",
  "rsipstack",
  "serde",
  "tokio",

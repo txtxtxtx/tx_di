@@ -27,7 +27,10 @@ use std::sync::{Arc, RwLock};
 use std::sync::OnceLock;
 use anyhow::anyhow;
 use rsipstack::transaction::transaction::Transaction;
-use tokio::sync::{mpsc, Semaphore};
+use tokio::sync::{mpsc, Mutex, Semaphore};
+use tokio::task::JoinSet;
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 use tx_di_core::{tx_comp, App, BoxFuture, CompInit, InnerContext, RIE};
@@ -102,11 +105,15 @@ pub struct SipPlugin {
 
     /// SipRouter
     #[tx_cst(SipRouter::new())]
-    pub sip_router: SipRouter
+    pub sip_router: SipRouter,
+    // 任务
+    #[tx_cst(Mutex::new(JoinSet::new()))]
+    tasks: Mutex<JoinSet<()>>
 }
 
 impl CompInit for SipPlugin {
     fn inner_init(&mut self, _: &InnerContext ) -> RIE<()> {
+
         info!(
             host = %self.config.host,
             port = self.config.port,
@@ -136,7 +143,19 @@ impl CompInit for SipPlugin {
                 .build();
             // 存储 Endpoint 供 Sender 使用
             sip_plugin.set_end_point(endpoint)?;
-            sip_plugin.in_coming()?;
+            let ep_clone = sip_plugin.endpoint.get().unwrap().inner.clone();
+            // Endpoint serve 任务
+            let _ = tokio::spawn(async move {
+                tokio::select! {
+                    _ = ep_clone.serve() => {
+                        info!("SIP endpoint 服务已退出");
+                    }
+                    _ = cancel_token.cancelled() => {
+                        info!("SIP endpoint 收到停止信号");
+                    }
+                }
+            });
+            sip_plugin.in_coming().await?;
             // 注册sip消息处理器
             info!("SIP 插件启动成功，监听 {}", config.bind_addr());
             Ok(())
@@ -209,7 +228,7 @@ impl SipPlugin {
         Ok(())
     }
     
-    pub fn in_coming(&self)->RIE<()>{
+    pub async fn in_coming(&self) ->RIE<()>{
         // 获取消息接收通道
         let mut incoming = self.endpoint.get().ok_or("获取 SIP 端点失败")?
             .incoming_transactions()
@@ -227,7 +246,7 @@ impl SipPlugin {
             .unwrap_or(MAX_CONCURRENT_HANDLERS);
 
         // Bounded mpsc channel：send() 在队列满时 await → 天然背压 多生产者单消费者
-        let (tx, mut rx) = mpsc::channel::<rsipstack::transaction::transaction::Transaction>(queue_size);
+        let (tx, mut rx) = mpsc::channel::<Transaction>(queue_size);
 
         // 共享信号量：限制并发 handler 数量
         let sem = Arc::new(Semaphore::new(max_handlers));
@@ -240,84 +259,52 @@ impl SipPlugin {
         let token_clone = self.cancel_token.get().ok_or("获取 cancel_token 失败")?.clone();
         let sip_router = self.sip_router.clone();
 
-        // Endpoint serve 任务
-        let _ = tokio::spawn(async move {
-            tokio::select! {
-                    _ = ep_clone.serve() => {
-                        info!("SIP endpoint 服务已退出");
-                    }
-                    _ = token_clone.cancelled() => {
-                        info!("SIP endpoint 收到停止信号");
-                    }
-                }
-        });
 
         // 生产者：将 rsipstack incoming 消息送入 bounded channel
         // 队列满时：send().await 自动 park，形成背压
         // 接收sip消息放入队列
-        tokio::spawn(async move {
-            while let Some(sip_tx) = incoming.recv().await {
-                if tx.send(sip_tx).await.is_err() {
-                    warn!("dispatch channel 已关闭，停止生产者");
-                    break;
-                }
+        let producer = async move {
+            while let Some(tx_msg) = incoming.recv().await {
+                if tx.send(tx_msg).await.is_err() { break; }
             }
-            info!("SIP 消息生产者已退出");
-        });
+        };
+        self.tasks.lock().await.spawn(producer);
 
+        // 消费者任务：使用 FuturesUnordered 代替手动 spawn
         // 消费者：顺序从 channel 取消息，并发执行 handler
         // 关键：消息接收顺序是串行的（保证同设备消息有序），
         //       但 handler 执行是并发的（Semaphore 控制并发数）
         // 使用handler 处理队列里面的sip消息
-        tokio::spawn(async move {
-            info!(
-                    queue_capacity = queue_size,
-                    max_handlers = max_handlers,
-                    "SIP 消息分发引擎已启动"
-                );
-            while let Some(tx) = rx.recv().await {
-                // Semaphore permit：超过并发上限时 park
-                let permit = sem.clone().acquire_owned().await;
-                let Ok(_permit) = permit else {
-                    error!("Semaphore 获取失败，停止消费者");
-                    break;
+        let consumer = async move {
+            let mut handlers = FuturesUnordered::new();
+            while let Some(msg) = rx.recv().await {
+                let permit = match sem.clone().acquire_owned().await {
+                    Ok(permit) => permit,
+                    Err(e) => {
+                        error!("Semaphore 获取失败: {}，停止消费者", e);
+                        break;
+                    }
                 };
-
-                let flag = overload_flag.clone();
-                let sem_clone = sem.clone();
-                let log = log_messages;
-                let sip_router_clone = sip_router.clone();
-
-                // Handler 在独立 task 中执行，不阻塞后续消息接收
-                tokio::spawn(async move {
-                    // 感知并发压力
-                    let available = sem_clone.available_permits();
-                    if available == 0 {
-                        if !flag.load(Ordering::Relaxed) {
-                            flag.store(true, Ordering::Relaxed);
-                            warn!(
-                                    "SIP handler 并发已达上限({})，消息处理排队中",
-                                    max_handlers
-                                );
-                        }
-                    } else if available > max_handlers / 4
-                        && flag.load(Ordering::Relaxed)
-                    {
-                        flag.store(false, Ordering::Relaxed);
-                        info!("SIP handler 并发压力已缓解");
+                let router = sip_router.clone();
+                let fut = async move {
+                    if log_messages {
+                        let method = msg.original.method.to_string();
+                        info!("收到 SIP 消息：{}", method);
                     }
-
-                    if log {
-                        let method = tx.original.method.to_string();
-                        info!(method = %method, "SIP 分发消息");
-                    }
-
-                    sip_router_clone.dispatch(tx).await;
-                    // drop(permit); // permit 在此 drop，自动释放
-                });
+                    router.dispatch(msg).await;
+                    drop(permit);
+                };
+                handlers.push(fut);
             }
+            
+            info!("SIP 消息接收通道已关闭，等待 {} 个处理中的任务完成", handlers.len());
+            // 等待所有剩余 handler 完成
+            while let Some(_) = handlers.next().await {}
             info!("SIP 消息分发引擎已退出");
-        });
+        };
+
+        self.tasks.lock().await.spawn(consumer);
+
         Ok(())
     }
     /// 设置 SIP 端点
@@ -374,6 +361,7 @@ impl SipPlugin {
         if let Some(token) = self.cancel_token.get() {
             info!("优雅关闭 SIP 服务...");
             token.cancel();
+
         }
     }
 
