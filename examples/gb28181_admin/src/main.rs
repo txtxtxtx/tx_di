@@ -35,13 +35,9 @@ async fn main() -> anyhow::Result<()> {
         Ok(())
     });
 
-    // 2. 注册 REST API 路由（在 DI build 之后设置，需要 db 和 sa_plugin）
-    //    这里先占位，实际路由在 DI 完成后通过 WebPlugin::add_router 设置
-    //    注意：router 需要 (Db, DiComp<SaTokenPlugin>) 作为 State
-
-    // 3. 使用 toasty::models! 注册所有数据库模型
-    //    模型注册必须在 Db::builder() 阶段完成
-    let models = toasty::models!(
+    // 2. 【关键】在 BuildContext::new() 之后、build() 之前注册数据库模型
+    //    可以多次调用 register_models()，模型会合并（重复 ModelId 自动覆盖）
+    ToastyPlugin::register_models(toasty::models!(
         models::User,
         models::GbDeviceRecord,
         models::GbSessionRecord,
@@ -50,31 +46,25 @@ async fn main() -> anyhow::Result<()> {
         models::GbDeviceGroup,
         models::GbDeviceGroupMember,
         models::GbRegisterAudit,
-    );
+    ));
+    // 如果其他插件也有模型要注册，可以在这里继续追加：
+    // ToastyPlugin::register_models(toasty::models!(OtherModel));
 
-    // 4. 启动 DI 框架（加载配置 → 初始化所有组件）
+    // 3. 启动 DI 框架（加载配置 → 初始化所有组件 → async_init 自动读取全局模型）
     let app = BuildContext::new(Some("examples/gb28181_admin/config/config.toml"))
         .build()?
         .ins_run()
         .await?;
 
-    // 5. 用注册的模型构建数据库（在 DI 完成后）
+    // 4. 获取已初始化的 Db（由 ToastyPlugin::async_init 自动构建）
     let toasty_plugin = app.inject::<ToastyPlugin>();
-    let config = toasty_plugin.config.clone();
-    let db = if toasty_plugin.try_db().is_none() {
-        let d = ToastyPlugin::build_db_with_models(models, &config).await?;
-        let _ = toasty_plugin.db.set(d.clone());
-        info!("数据库已初始化（带模型注册）");
-        d
-    } else {
-        toasty_plugin.db.get().cloned().expect("db 已初始化")
-    };
+    let db = toasty_plugin.db().clone();
 
-    // 6. 获取 sa_token 插件实例，提取 SaTokenState
+    // 5. 获取 sa_token 插件实例，提取 SaTokenState
     let sa_plugin = app.inject::<SaTokenPlugin>();
     let sa_state = sa_plugin.state().clone();
 
-    // 7. 注册带 State 的 API 路由
+    // 6. 注册带 State 的 API 路由
     WebPlugin::add_router(api::router(db, sa_state));
 
     app.waiting_exit().await;
