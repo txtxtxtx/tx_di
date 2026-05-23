@@ -39,3 +39,21 @@ transport = "both" #tcp udp both
 [log_config]
 level     = "debug"
 console_output = true
+
+# 数据库配置（toasty ORM）
+[toasty_config]
+database_url = "sqlite://gb28181.db"
+auto_schema = true
+max_pool_size = 10
+
+# 认证配置（sa-token）
+[sa_token_config]
+token_name = "Authorization"
+timeout = 86400
+is_concurrent = true
+is_share = true
+token_style = "uuid"
+is_read_header = true
+is_read_cookie = false
+auto_renew = true
+active_timeout = 1800

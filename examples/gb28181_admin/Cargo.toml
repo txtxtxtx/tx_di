@@ -14,6 +14,8 @@ tx_di_axum        = { path = "../../plugins/tx_di_axum" }
 tx_di_sip         = { path = "../../plugins/tx_di_sip" }
 tx_di_gb28181     = { path = "../../plugins/tx_di_gb28181" }
 tx_gb28181        = { path = "../../common/tx_gb28181" }
+tx_di_toasty      = { path = "../../plugins/tx_di_toasty" }
+tx_di_sa_token    = { path = "../../plugins/tx_di_sa_token" }
 
 tokio.workspace     = true
 axum.workspace      = true
@@ -24,3 +26,6 @@ tracing.workspace   = true
 chrono              = { workspace = true }
 tokio-stream        = { workspace = true }
 futures-core        = { workspace = true }
+toasty              = { version = "0.6", features = ["sqlite", "serde", "jiff"] }
+jiff                = "0.2"
+bcrypt              = "0.16"

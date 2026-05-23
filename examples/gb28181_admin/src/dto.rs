@@ -6,6 +6,7 @@
 use serde::Serialize;
 use tx_gb28181::device::GbDevice;
 use tx_di_gb28181::SessionInfo;
+use crate::models::GbDeviceRecord;
 
 /// 统计概要
 #[derive(Serialize)]
@@ -16,7 +17,7 @@ pub struct StatsDto {
 }
 
 /// 设备 DTO
-#[derive(Serialize, Default)]
+#[derive(Serialize, Default, Clone)]
 pub struct DeviceDto {
     pub device_id: String,
     pub contact: String,
@@ -48,8 +49,27 @@ impl From<GbDevice> for DeviceDto {
     }
 }
 
+impl From<GbDeviceRecord> for DeviceDto {
+    fn from(r: GbDeviceRecord) -> Self {
+        Self {
+            device_id: r.device_id,
+            contact: r.contact,
+            remote_addr: r.remote_addr,
+            online: r.online,
+            manufacturer: r.manufacturer,
+            model: r.model,
+            firmware: r.firmware,
+            registered_at: r.registered_at
+                .strftime("%Y-%m-%d %H:%M:%S")
+                .to_string(),
+            channel_count: r.channel_count as usize,
+            channels: None,
+        }
+    }
+}
+
 /// 通道 DTO
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct ChannelDto {
     pub channel_id: String,
     pub name: String,
@@ -106,6 +126,36 @@ impl From<SessionInfo> for SessionDto {
             ssrc: s.ssrc,
             stream_id: s.stream_id,
             is_realtime: s.is_realtime,
+        }
+    }
+}
+
+// ============ 分页响应 ============
+
+/// 通用分页数据包装
+#[derive(Serialize)]
+pub struct PageData<T: Serialize> {
+    pub items: Vec<T>,
+    pub total: u64,
+    pub page: u64,
+    pub page_size: u64,
+    pub total_pages: u64,
+}
+
+impl<T: Serialize> PageData<T> {
+    /// 从数据向量构建分页响应
+    pub fn from_vec(items: Vec<T>, total: u64, pag: &crate::api::devices::Pagination) -> Self {
+        let total_pages = if pag.page_size == 0 {
+            0
+        } else {
+            (total + pag.page_size - 1) / pag.page_size
+        };
+        Self {
+            items,
+            total,
+            page: pag.page,
+            page_size: pag.page_size,
+            total_pages,
         }
     }
 }

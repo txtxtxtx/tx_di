@@ -33,12 +33,16 @@ button { cursor: pointer; font-family: inherit; }
 .flex { display: flex; }
 .items-center { align-items: center; }
 .justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
 .gap-8 { gap: 8px; }
 .gap-12 { gap: 12px; }
 .gap-16 { gap: 16px; }
 .mt-16 { margin-top: 16px; }
 .mt-24 { margin-top: 24px; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.text-sm { font-size: 12px; }
+.text-muted { color: var(--text-muted); font-size: 12px; }
+.mono { font-family: monospace; font-size: 12px; }
 
 /* 卡片 */
 .card {
