@@ -1,5 +1,5 @@
 [package]
-name = "tx_di_toasty"
+name = "tx_di_sa_token"
 edition.workspace = true
 version.workspace = true
 authors.workspace = true
@@ -8,18 +8,18 @@ readme.workspace = true
 repository.workspace = true
 
 [features]
-default = ["sqlite"]
-sqlite = ["toasty/sqlite"]
-postgresql = ["toasty/postgresql"]
-mysql = ["toasty/mysql"]
-dynamodb = ["toasty/dynamodb"]
+default = ["memory"]
+memory = ["sa-token-plugin-axum/memory"]
+redis = ["sa-token-plugin-axum/redis"]
+database = ["sa-token-plugin-axum/database"]
 
 [dependencies]
 tx-di-core = { path = "../../tx-di-core" }
-toasty = { version = "0.6", default-features = false, features = ["serde"] }
+sa-token-plugin-axum = { version = "0.1", default-features = false, features = ["axum-08"] }
+axum = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
-tokio = { workspace = true }
-tokio-util = { workspace = true }

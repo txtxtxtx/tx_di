@@ -28,6 +28,8 @@ members = [
     "common/tx_gb28181",
     # 数据库orm
     "plugins/tx_di_toasty",
+    # 认证授权
+    "plugins/tx_di_sa_token",
 ]
 resolver = "3"
 [workspace.package]
