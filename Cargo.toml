@@ -15,8 +15,6 @@ members = [
     "plugins/tx_di_log",
     # gb28181
     "plugins/tx_di_gb28181",
-    # gb28181_client
-    "plugins/tx_di_gb28181_client",
     # can todo 暂时未审查代码，ai生成
     "plugins/tx_di_can",
     # app

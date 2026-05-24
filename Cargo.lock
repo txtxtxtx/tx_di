@@ -4872,24 +4872,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tx_di_gb28181_client"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "dashmap",
- "rsipstack",
- "serde",
- "tokio",
- "tokio-util",
- "tracing",
- "tx-di-core",
- "tx_di_gb28181",
- "tx_di_sip",
- "tx_gb28181",
-]
-
-[[package]]
 name = "tx_di_log"
 version = "0.1.0"
 dependencies = [
