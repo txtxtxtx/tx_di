@@ -3,8 +3,7 @@
 use crate::config::SaTokenConf;
 use std::sync::Arc;
 use tx_di_core::{tx_comp, CompInit, InnerContext, RIE};
-use tx_di_core::App;
-use tokio_util::sync::CancellationToken;
+use tracing::info;
 
 /// sa-token 插件
 ///
@@ -67,38 +66,27 @@ impl SaTokenPlugin {
 
 impl CompInit for SaTokenPlugin {
     fn inner_init(&mut self, _ctx: &InnerContext) -> RIE<()> {
-        tracing::info!("SaTokenPlugin 初始化（同步阶段）");
-        Ok(())
-    }
-
-    fn async_init(ctx: Arc<App>, _token: CancellationToken) -> tx_di_core::BoxFuture {
-        Box::pin(async move {
-            let plugin = ctx.inject::<SaTokenPlugin>();
-            let config = plugin.config.clone();
-
-            tracing::info!("正在构建 SaToken 状态...");
-
-            // 使用 Builder 模式构建 SaTokenState
-            let builder = sa_token_plugin_axum::SaTokenStateBuilder::default();
-            let state = config.apply_to_builder(builder).build();
-
-            // 写入 OnceLock
-            if plugin.state.set(state).is_err() {
-                tracing::warn!("SaTokenPlugin: state concurrently initialized");
-            }
-
-            tracing::info!(
+        info!("SaTokenPlugin 初始化");
+        let config = self.config.clone();
+        info!("正在构建 SaToken 状态...");
+        // 使用 Builder 模式构建 SaTokenState
+        let builder = sa_token_plugin_axum::SaTokenStateBuilder::default();
+        let state = config.apply_to_builder(builder).build();
+        // 写入 OnceLock
+        if self.state.set(state).is_err() {
+            tracing::warn!("SaTokenPlugin: state concurrently initialized");
+        }
+        info!(
                 token_name = %config.token_name,
                 timeout = config.timeout,
                 "SaToken 初始化完成"
             );
-            Ok(())
-        })
+        Ok(())
     }
 
     fn init_sort() -> i32 {
         // 在 SaTokenConf(90) 之后、业务组件之前
-        190
+        i32::MIN + 1
     }
 }
 

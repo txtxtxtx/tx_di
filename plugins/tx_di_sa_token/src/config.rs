@@ -132,8 +132,8 @@ impl CompInit for SaTokenConf {
     }
 
     fn init_sort() -> i32 {
-        // 配置阶段，在 toasty 之前
-        90
+        // 配置阶段，在 toasty 之前,日志之后，可以说是第二优先级
+        i32::MIN + 1
     }
 }
 
