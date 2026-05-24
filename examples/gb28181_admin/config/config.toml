@@ -44,8 +44,8 @@ prefix = "tx_gb28181"
 
 # 数据库配置（toasty ORM）
 [toasty_config]
-database_url = "sqlite://gb28181.db"
-auto_schema = true
+database_url = "sqlite:./gb28181.db"
+auto_schema = false
 max_pool_size = 3
 
 # 认证配置（sa-token）

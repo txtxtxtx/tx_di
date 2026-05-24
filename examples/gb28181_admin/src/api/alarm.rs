@@ -16,7 +16,7 @@ use tx_di_axum::{DiComp, R};
 use tx_di_gb28181::Gb28181Server;
 use toasty::Db;
 
-use crate::dto::PageData;
+use crate::dto::{PageData, Pagination};
 use crate::models::GbAlarmRecord;
 
 // ============ 报警订阅 ============
@@ -118,15 +118,10 @@ pub struct AlarmQueryParams {
     pub alarm_type: Option<String>,
     /// 处理状态：0=未处理 1=已确认 2=已处理
     pub status: Option<i32>,
-    /// 页码
-    #[serde(default = "default_page")]
-    pub page: u64,
-    /// 每页条数
-    #[serde(default = "default_page_size")]
-    pub page_size: u64,
+    /// 分页参数
+    #[serde(flatten)]
+    pub pagination: Pagination,
 }
-fn default_page() -> u64 { 1 }
-fn default_page_size() -> u64 { 20 }
 
 /// GET /api/v1/gb28181/alarms — 报警记录列表（分页）
 ///
@@ -162,17 +157,18 @@ pub async fn list_alarms(
     };
 
     // 分页查询
-    let offset = (qp.page.saturating_sub(1)) * qp.page_size as u64;
+    let offset = qp.pagination.offset();
+    let page_size = qp.pagination.page_size as usize;
     let records = if let Some(ref did) = qp.device_id {
         GbAlarmRecord::filter_by_device_id(did.clone())
             .offset(offset as usize)
-            .limit(qp.page_size as usize)
+            .limit(page_size)
             .exec(&mut db)
             .await
     } else {
         GbAlarmRecord::all()
             .offset(offset as usize)
-            .limit(qp.page_size as usize)
+            .limit(page_size)
             .exec(&mut db)
             .await
     };
@@ -197,19 +193,7 @@ pub async fn list_alarms(
         })
         .collect();
 
-    let total_pages = if qp.page_size == 0 {
-        0
-    } else {
-        (total + qp.page_size - 1) / qp.page_size
-    };
-
-    R::ok(PageData {
-        items: filtered,
-        total,
-        page: qp.page,
-        page_size: qp.page_size,
-        total_pages,
-    })
+    R::ok(PageData::from_offset(filtered, total, qp.pagination))
 }
 
 /// GET /api/v1/gb28181/alarms/:id — 报警详情

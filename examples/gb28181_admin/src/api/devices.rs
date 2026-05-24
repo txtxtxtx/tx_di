@@ -9,37 +9,16 @@
 //! `DiComp<T>` 通过 `FromRequestParts` 实现，从请求 extensions 中的 `AppStatus`
 //! → `App` → DI 容器提取已注册的单例组件。
 
-use axum::{
-    extract::{Path, Query, State, Json as ExtJson},
-};
-use serde::{Deserialize, Serialize};
+use axum::extract::{Json as ExtJson, Path, Query as AxumQuery, State};
+use serde::Deserialize;
+use toasty::Db;
+use toasty::stmt::{List, Paginate, Query as ToastyQuery};
 use tx_di_axum::{DiComp, R};
 use tx_di_gb28181::Gb28181Server;
 use tx_di_gb28181::xml::{PtzCommand, PtzSpeed};
-use toasty::Db;
 
-use crate::dto::{ChannelDto, DeviceDto, PageData, StatsDto};
+use crate::dto::{ChannelDto, DeviceDto, PageData, Pagination, StatsDto};
 use crate::models::GbDeviceRecord;
-
-// ============ 分页参数 ============
-
-/// 分页查询参数
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Pagination {
-    #[serde(default = "default_page")]
-    pub page: u64,
-    #[serde(default = "default_page_size")]
-    pub page_size: u64,
-}
-
-fn default_page() -> u64 { 1 }
-fn default_page_size() -> u64 { 20 }
-
-impl Pagination {
-    pub fn offset(&self) -> u64 {
-        (self.page.saturating_sub(1)) * self.page_size
-    }
-}
 
 // ============ 统计 ============
 
@@ -56,10 +35,10 @@ pub async fn stats(srv: DiComp<Gb28181Server>) -> R<StatsDto> {
 
 // ============ 设备列表/详情 ============
 
-/// GET /api/v1/gb28181/devices — 设备列表（从数据库查询，支持分页）
+/// GET /api/v1/gb28181/devices — 设备列表（从数据库查询，支持游标分页）
 pub async fn list(
     State(mut db): State<Db>,
-    Query(pagination): Query<Pagination>,
+    AxumQuery(pagination): AxumQuery<Pagination>,
 ) -> R<PageData<DeviceDto>> {
     // 查询总数
     let total = match GbDeviceRecord::all().count().exec(&mut db).await {
@@ -67,21 +46,38 @@ pub async fn list(
         Err(e) => return R::error(500, format!("查询设备总数失败: {}", e)),
     };
 
-    // 分页查询
-    let offset = pagination.offset() as usize;
-    let limit = pagination.page_size as usize;
-    let devices = match GbDeviceRecord::all()
-        .offset(offset)
-        .limit(limit)
+    // 构建查询并按 ID 排序（游标分页必需）
+    let mut query = ToastyQuery::<List<GbDeviceRecord>>::all();
+    query.order_by(GbDeviceRecord::fields().id().asc());
+
+    // 创建分页器并执行查询
+    let page = match Paginate::new(query, pagination.page_size as usize)
         .exec(&mut db)
         .await
     {
-        Ok(d) => d,
+        Ok(p) => p,
         Err(e) => return R::error(500, format!("查询设备列表失败: {}", e)),
     };
 
-    let dtos: Vec<DeviceDto> = devices.into_iter().map(DeviceDto::from).collect();
-    R::ok(PageData::from_vec(dtos, total, &pagination))
+    // 转换数据
+    let dtos: Vec<DeviceDto> = page.items.into_iter().map(DeviceDto::from).collect();
+    let next_cursor = page.next_cursor.and_then(|c| match c {
+        toasty::stmt::Value::I64(id) => Some(id.to_string()),
+        _ => None,
+    });
+
+    R::ok(PageData {
+        items: dtos,
+        total,
+        page: pagination.page,
+        page_size: pagination.page_size,
+        total_pages: if pagination.page_size == 0 {
+            0
+        } else {
+            (total + pagination.page_size - 1) / pagination.page_size
+        },
+        next_cursor,
+    })
 }
 
 /// GET /api/v1/gb28181/devices/:id — 设备详情（含通道）
@@ -108,11 +104,7 @@ pub async fn detail(
     dto.online = srv.get_device(&id).is_some();
 
     // 补充通道信息（从 Gb28181Server 内存获取）
-    let channels: Vec<ChannelDto> = srv
-        .get_channels(&id)
-        .iter()
-        .map(ChannelDto::from)
-        .collect();
+    let channels: Vec<ChannelDto> = srv.get_channels(&id).iter().map(ChannelDto::from).collect();
     if !channels.is_empty() {
         dto.channels = Some(channels);
     }
@@ -123,10 +115,7 @@ pub async fn detail(
 // ============ 设备操作（SIP 指令） ============
 
 /// POST /api/v1/gb28181/devices/:id/catalog — 触发目录查询
-pub async fn query_catalog(
-    Path(id): Path<String>,
-    srv: DiComp<Gb28181Server>,
-) -> R<String> {
+pub async fn query_catalog(Path(id): Path<String>, srv: DiComp<Gb28181Server>) -> R<String> {
     match srv.query_catalog(&id).await {
         Ok(_) => R::ok("已发送目录查询".to_string()),
         Err(e) => R::fail(e.to_string()),
@@ -134,10 +123,7 @@ pub async fn query_catalog(
 }
 
 /// POST /api/v1/gb28181/devices/:id/info — 触发设备信息查询
-pub async fn query_info(
-    Path(id): Path<String>,
-    srv: DiComp<Gb28181Server>,
-) -> R<String> {
+pub async fn query_info(Path(id): Path<String>, srv: DiComp<Gb28181Server>) -> R<String> {
     match srv.query_device_info(&id).await {
         Ok(_) => R::ok("已发送设备信息查询".to_string()),
         Err(e) => R::fail(e.to_string()),
@@ -145,10 +131,7 @@ pub async fn query_info(
 }
 
 /// POST /api/v1/gb28181/devices/:id/status — 触发设备状态查询
-pub async fn query_status(
-    Path(id): Path<String>,
-    srv: DiComp<Gb28181Server>,
-) -> R<String> {
+pub async fn query_status(Path(id): Path<String>, srv: DiComp<Gb28181Server>) -> R<String> {
     match srv.query_device_status(&id).await {
         Ok(_) => R::ok("已发送状态查询".to_string()),
         Err(e) => R::fail(e.to_string()),
@@ -174,7 +157,9 @@ pub struct PtzReq {
     pub zoom: u8,
 }
 
-fn default_speed() -> u8 { 64 }
+fn default_speed() -> u8 {
+    64
+}
 
 /// POST /api/v1/gb28181/devices/:id/ptz — PTZ 控制
 pub async fn ptz(
@@ -182,19 +167,23 @@ pub async fn ptz(
     Path(id): Path<String>,
     ExtJson(req): ExtJson<PtzReq>,
 ) -> R<String> {
-    let speed = PtzSpeed { pan: req.pan, tilt: req.tilt, zoom: req.zoom };
+    let speed = PtzSpeed {
+        pan: req.pan,
+        tilt: req.tilt,
+        zoom: req.zoom,
+    };
     let cmd = match req.direction.to_lowercase().as_str() {
-        "left"      => PtzCommand::Left(speed),
-        "right"     => PtzCommand::Right(speed),
-        "up"        => PtzCommand::Up(speed),
-        "down"      => PtzCommand::Down(speed),
-        "upleft"    => PtzCommand::LeftUp(speed),
-        "upright"   => PtzCommand::RightUp(speed),
-        "downleft"  => PtzCommand::LeftDown(speed),
+        "left" => PtzCommand::Left(speed),
+        "right" => PtzCommand::Right(speed),
+        "up" => PtzCommand::Up(speed),
+        "down" => PtzCommand::Down(speed),
+        "upleft" => PtzCommand::LeftUp(speed),
+        "upright" => PtzCommand::RightUp(speed),
+        "downleft" => PtzCommand::LeftDown(speed),
         "downright" => PtzCommand::RightDown(speed),
-        "zoomin"    => PtzCommand::ZoomIn(speed),
-        "zoomout"   => PtzCommand::ZoomOut(speed),
-        _           => PtzCommand::Stop,
+        "zoomin" => PtzCommand::ZoomIn(speed),
+        "zoomout" => PtzCommand::ZoomOut(speed),
+        _ => PtzCommand::Stop,
     };
     match srv.ptz_control(&id, &req.channel_id, cmd).await {
         Ok(_) => R::ok("PTZ 指令已发送".to_string()),
@@ -203,10 +192,7 @@ pub async fn ptz(
 }
 
 /// POST /api/v1/gb28181/devices/:id/teleboot — 远程重启
-pub async fn teleboot(
-    Path(id): Path<String>,
-    srv: DiComp<Gb28181Server>,
-) -> R<String> {
+pub async fn teleboot(Path(id): Path<String>, srv: DiComp<Gb28181Server>) -> R<String> {
     match srv.teleboot(&id).await {
         Ok(_) => R::ok("重启指令已发送".to_string()),
         Err(e) => R::fail(e.to_string()),
@@ -219,7 +205,9 @@ pub struct AlarmResetReq {
     #[serde(default = "default_alarm_type")]
     pub alarm_type: String,
 }
-fn default_alarm_type() -> String { "0".to_string() }
+fn default_alarm_type() -> String {
+    "0".to_string()
+}
 
 pub async fn alarm_reset(
     srv: DiComp<Gb28181Server>,

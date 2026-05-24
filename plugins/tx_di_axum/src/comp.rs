@@ -3,7 +3,7 @@ use crate::bound::{AppStatus, DiComp};
 use crate::{WebConfig, R};
 use axum::http::{Request};
 use axum::{routing::get, Router};
-use std::sync::{Arc, LazyLock, RwLock};
+use std::sync::{Arc, LazyLock, OnceLock, RwLock};
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::TcpListener as TokioTcpListener;
 use tokio_util::sync::CancellationToken;
@@ -28,50 +28,56 @@ pub struct WebPlugin {
     pub config: Arc<WebConfig>,
 
     /// Axum 路由器
-    #[tx_cst(skip)]
-    pub router: Router,
+    #[tx_cst(Arc::new(OnceLock::new()))]
+    pub router: Arc<OnceLock<Router>>,
 }
 
 impl CompInit for WebPlugin {
-    fn inner_init(&mut self, _: &InnerContext) -> RIE<()> {
-        info!("Web 服务器插件初始化中...");
-        self.router = WebPlugin::merge_routers();
-        Ok(())
-    }
     fn async_init(ctx: Arc<App>,token: CancellationToken) -> BoxFuture {
         let config = ctx.inject::<WebConfig>();
         let web = ctx.inject::<WebPlugin>();
-        let app_status = AppStatus { app: ctx.clone() };
-        let mut router = web.router.clone()
-            // 吧 app 注入到 extensions
-            .layer(tower::ServiceBuilder::new()
-            .map_request(move |mut req: Request<_>| {
-                req.extensions_mut().insert(app_status.clone());
-                req
-            })
-            .into_inner());
-        // 如果配置了静态文件目录，添加静态文件服务
-        let static_dir = config.static_dir();
-        if static_dir.exists() {
-            info!("静态文件目录已配置: {:?}", static_dir);
-            router = router.nest_service(
-                "/static",
-                tower_http::services::ServeDir::new(&static_dir)
-                    .precompressed_gzip()
-                    .precompressed_br()
-            );
-        } else {
-            debug!("静态文件目录不存在，跳过静态文件服务: {:?}", static_dir);
-        }
-        router = WebPlugin::setup_spa_apps(router, &config);
-        // 添加中间件
-        router = WebPlugin::layer_with_router(router);
+
+        Box::pin(async move {
+            let router = WebPlugin::merge_routers();
+            let app_status = AppStatus { app: ctx.clone() };
+            let mut router = router
+                // todo 这里可以全局注入 DB
+                // 吧 app 注入到 extensions
+                .layer(tower::ServiceBuilder::new()
+                    .map_request(move |mut req: Request<_>| {
+                        req.extensions_mut().insert(app_status.clone());
+                        req
+                    })
+                    .into_inner());
+            // 如果配置了静态文件目录，添加静态文件服务
+            let static_dir = config.static_dir();
+            if static_dir.exists() {
+                info!("静态文件目录已配置: {:?}", static_dir);
+                router = router.nest_service(
+                    "/static",
+                    tower_http::services::ServeDir::new(&static_dir)
+                        .precompressed_gzip()
+                        .precompressed_br()
+                );
+            } else {
+                debug!("静态文件目录不存在，跳过静态文件服务: {:?}", static_dir);
+            }
+            router = WebPlugin::setup_spa_apps(router, &config);
+            // 添加中间件
+            router = WebPlugin::layer_with_router(router);
+            web.router.set(router).map_err(|_| "已经设置过路由了")?;
+            Ok(())
+        })
+    }
+
+    fn async_run(ctx: Arc<App>, token: CancellationToken) -> BoxFuture {
+        let config = ctx.inject::<WebConfig>();
+        let router = ctx.inject::<WebPlugin>().router.get().unwrap().clone();
         Box::pin(async move {
             start_server(config, router,token).await?;
             Ok(())
         })
     }
-
     /// 插件初始化排序，最后初始化
     fn init_sort() -> i32 {
         i32::MAX

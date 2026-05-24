@@ -3,7 +3,7 @@
 //! GB28181 内部类型（DeviceInfo、ChannelInfo 等）不实现 Serialize，
 //! 这里创建镜像 DTO 供 JSON 序列化。
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tx_gb28181::device::GbDevice;
 use tx_di_gb28181::SessionInfo;
 use crate::models::GbDeviceRecord;
@@ -130,9 +130,43 @@ impl From<SessionInfo> for SessionDto {
     }
 }
 
+// ============ 分页 ============
+
+/// 通用分页查询参数（可被其他查询参数通过 #[serde(flatten)] 复用）
+#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
+pub struct Pagination {
+    #[serde(default = "default_page")]
+    pub page: u64,
+    #[serde(default = "default_page_size")]
+    pub page_size: u64,
+}
+
+fn default_page() -> u64 {
+    1
+}
+fn default_page_size() -> u64 {
+    20
+}
+
+impl Pagination {
+    pub fn offset(&self) -> u64 {
+        (self.page.saturating_sub(1)) * self.page_size
+    }
+    pub fn limit(&self) -> u64 {
+        self.page_size
+    }
+    fn total_pages(&self, total: u64) -> u64 {
+        if self.page_size == 0 {
+            0
+        } else {
+            (total + self.page_size - 1) / self.page_size
+        }
+    }
+}
+
 // ============ 分页响应 ============
 
-/// 通用分页数据包装
+/// 通用分页数据包装（支持游标分页）
 #[derive(Serialize)]
 pub struct PageData<T: Serialize> {
     pub items: Vec<T>,
@@ -140,22 +174,21 @@ pub struct PageData<T: Serialize> {
     pub page: u64,
     pub page_size: u64,
     pub total_pages: u64,
+    /// 下一页游标（用于游标分页）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<String>,
 }
 
 impl<T: Serialize> PageData<T> {
-    /// 从数据向量构建分页响应
-    pub fn from_vec(items: Vec<T>, total: u64, pag: &crate::api::devices::Pagination) -> Self {
-        let total_pages = if pag.page_size == 0 {
-            0
-        } else {
-            (total + pag.page_size - 1) / pag.page_size
-        };
+    /// offset/limit 分页：从已查出的 items + total 构建
+    pub fn from_offset(items: Vec<T>, total: u64, pag: Pagination) -> Self {
         Self {
             items,
             total,
             page: pag.page,
             page_size: pag.page_size,
-            total_pages,
+            total_pages: pag.total_pages(total),
+            next_cursor: None,
         }
     }
 }

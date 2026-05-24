@@ -51,7 +51,7 @@ use tx_di_gb28181::Gb28181Server;
 use tx_di_gb28181::xml::{ConfigType, GuardMode, PtzPreciseParam, ZoomRect, PlaybackControl};
 use toasty::Db;
 
-use crate::dto::PageData;
+use crate::dto::{PageData, Pagination};
 use crate::models::{GbAlarmRecord, GbAuditLog};
 
 // ══════════════════════════════════
@@ -640,15 +640,10 @@ pub struct AuditLogQueryParams {
     pub action: Option<String>,
     /// 按操作结果筛选
     pub result: Option<String>,
-    /// 页码
-    #[serde(default = "default_audit_page")]
-    pub page: u64,
-    /// 每页条数
-    #[serde(default = "default_audit_page_size")]
-    pub page_size: u64,
+    /// 分页参数
+    #[serde(flatten)]
+    pub pagination: Pagination,
 }
-fn default_audit_page() -> u64 { 1 }
-fn default_audit_page_size() -> u64 { 20 }
 
 /// GET /api/v1/gb28181/audit_logs — 审计日志列表（分页）
 ///
@@ -677,18 +672,18 @@ pub async fn list_audit_logs(
     };
 
     // 分页查询（按 ID 倒序：最新的在前）
-    // 注意：toasty 0.6 不直接支持 order_by，这里按默认顺序查询后反转
-    let offset = (qp.page.saturating_sub(1)) * qp.page_size;
+    let offset = qp.pagination.offset();
+    let page_size = qp.pagination.page_size as usize;
     let records = if let Some(ref act) = qp.action {
         GbAuditLog::filter_by_action(act.clone())
             .offset(offset as usize)
-            .limit(qp.page_size as usize)
+            .limit(page_size)
             .exec(&mut db)
             .await
     } else {
         GbAuditLog::all()
             .offset(offset as usize)
-            .limit(qp.page_size as usize)
+            .limit(page_size)
             .exec(&mut db)
             .await
     };
@@ -713,15 +708,7 @@ pub async fn list_audit_logs(
         })
         .collect();
 
-    let total_pages = if qp.page_size == 0 { 0 } else { (total + qp.page_size - 1) / qp.page_size };
-
-    R::ok(PageData {
-        items: filtered,
-        total,
-        page: qp.page,
-        page_size: qp.page_size,
-        total_pages,
-    })
+    R::ok(PageData::from_offset(filtered, total, qp.pagination))
 }
 
 /// GET /api/v1/gb28181/audit_logs/:id — 审计日志详情

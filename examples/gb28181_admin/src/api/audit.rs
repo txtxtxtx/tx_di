@@ -18,7 +18,7 @@ use tx_di_sa_token::LoginIdExtractor;
 use toasty::Db;
 
 use crate::models::GbRegisterAudit;
-use crate::dto::PageData;
+use crate::dto::{PageData, Pagination};
 
 // ════════════════════════════════
 //  DTO
@@ -29,13 +29,9 @@ use crate::dto::PageData;
 pub struct AuditListQuery {
     #[serde(default)]
     pub status: Option<String>,
-    #[serde(default = "default_audit_page")]
-    pub page: u64,
-    #[serde(default = "default_audit_page_size")]
-    pub page_size: u64,
+    #[serde(flatten)]
+    pub pagination: Pagination,
 }
-fn default_audit_page() -> u64 { 1 }
-fn default_audit_page_size() -> u64 { 20 }
 
 /// 审核记录 DTO
 #[derive(Serialize)]
@@ -106,17 +102,18 @@ pub async fn list_audits(
         }
     };
 
-    let offset = (q.page.saturating_sub(1)) * q.page_size;
+    let offset = q.pagination.offset();
+    let page_size = q.pagination.page_size as usize;
     let records = if let Some(ref s) = q.status {
         GbRegisterAudit::filter_by_status(s.clone())
             .offset(offset as usize)
-            .limit(q.page_size as usize)
+            .limit(page_size)
             .exec(&mut db)
             .await
     } else {
         GbRegisterAudit::all()
             .offset(offset as usize)
-            .limit(q.page_size as usize)
+            .limit(page_size)
             .exec(&mut db)
             .await
     };
@@ -127,15 +124,8 @@ pub async fn list_audits(
     };
 
     let items: Vec<RegisterAuditDto> = records.into_iter().map(RegisterAuditDto::from).collect();
-    let total_pages = if q.page_size == 0 { 0 } else { (total + q.page_size - 1) / q.page_size };
 
-    R::ok(PageData {
-        items,
-        total,
-        page: q.page,
-        page_size: q.page_size,
-        total_pages,
-    })
+    R::ok(PageData::from_offset(items, total, q.pagination))
 }
 
 /// GET /api/v1/gb28181/register_audit/:id — 审核详情

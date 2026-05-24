@@ -22,7 +22,7 @@ use tx_di_axum::R;
 use tx_di_sa_token::LoginIdExtractor;
 use toasty::Db;
 
-use crate::dto::PageData;
+use crate::dto::{PageData, Pagination};
 use crate::models::{GbDeviceGroup, GbDeviceGroupMember, GbDeviceRecord};
 
 // ══════════════════════════════════
@@ -322,7 +322,7 @@ async fn delete_group_recursive(db: &mut Db, id: u64) -> Result<(), String> {
 pub async fn list_members(
     Path(id): Path<u64>,
     State(mut db): State<Db>,
-    Query(p): Query<crate::api::devices::Pagination>,
+    Query(p): Query<Pagination>,
 ) -> R<PageData<crate::dto::DeviceDto>> {
     let offset = p.offset();
     let members = match GbDeviceGroupMember::filter_by_group_id(id)
@@ -342,21 +342,13 @@ pub async fn list_members(
 
     let mut items = vec![];
     for m in members {
-        // first() 返回 Option<GbDeviceRecord>
         match GbDeviceRecord::filter_by_device_id(m.device_id.clone()).first().exec(&mut db).await {
             Ok(Some(d)) => { items.push(crate::dto::DeviceDto::from(d)); }
             _ => {}
         }
     }
 
-    let total_pages = if p.page_size == 0 { 0 } else { (total + p.page_size - 1) / p.page_size };
-    R::ok(PageData {
-        items,
-        total,
-        page: p.page,
-        page_size: p.page_size,
-        total_pages,
-    })
+    R::ok(PageData::from_offset(items, total, p))
 }
 
 /// POST /api/v1/gb28181/groups/:id/members — 添加设备到分组
