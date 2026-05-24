@@ -33,7 +33,6 @@ pub struct BuildContext {
 }
 
 impl crate::BuildContext {
-
     /// 创建一个新的 BuildContext,只是为了使用依赖注入方法
     pub fn inner_new(ctx: InnerContext) -> Self {
         BuildContext {
@@ -96,8 +95,7 @@ impl crate::BuildContext {
         type_id: TypeId,
         scope: Scope,
         factory: StoreFactoryFn,
-    )
-    {
+    ) {
         match scope {
             Scope::Singleton => {
                 // 单例：立即调用 factory 传入 store 引用，构造 Arc 后缓存
@@ -108,10 +106,11 @@ impl crate::BuildContext {
             Scope::Prototype => {
                 // 原型：存闭包，每次注入时从 store 解析依赖并构造新实例
                 // 包装为闭包类型：Fn(&DashMap<TypeId, CompRef>) -> Arc<dyn Any>
-                let closure = move |store: &DashMap<TypeId, CompRef>| -> Arc<dyn Any + Send + Sync> {
-                    let boxed = factory(store);
-                    Arc::from(boxed)
-                };
+                let closure =
+                    move |store: &DashMap<TypeId, CompRef>| -> Arc<dyn Any + Send + Sync> {
+                        let boxed = factory(store);
+                        Arc::from(boxed)
+                    };
                 self.store
                     .insert(type_id, CompRef::Factory(Arc::new(closure)));
             }
@@ -307,40 +306,14 @@ impl App {
 
         metas.sort_by_key(|m| (m.init_sort_fn)());
 
-        // 收集所有异步初始化任务并并行执行
-        let futures: Vec<_> = metas
-            .iter()
-            .filter_map(|meta| {
-                meta.async_init_fn
-                    .map(|init_fn| init_fn(app.clone(), token.clone()))
-            })
-            .collect();
-
-        if futures.is_empty() {
-            return Ok(());
+        for x in metas {
+            x.async_init_fn
+                .map(|init_fn| init_fn(app.clone(), token.clone()))
+                .ok_or_else(|| IE::Other("async_init_fn 错误".to_string()))?
+                .await?;
         }
 
-        // 使用 tokio::spawn 并行执行所有任务
-        let handles: Vec<_> = futures
-            .into_iter()
-            .map(|future| tokio::spawn(future))
-            .collect();
-
-        // 等待所有任务完成并收集结果
-        let mut errors = Vec::new();
-        for handle in handles {
-            match handle.await {
-                Ok(Ok(_)) => {}
-                Ok(Err(e)) => errors.push(e),
-                Err(e) => errors.push(IE::Other(format!("Task panicked: {}", e))),
-            }
-        }
-
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors.remove(0)) // 返回第一个错误
-        }
+        Ok(())
     }
 
     /// 阻塞运行 App
@@ -392,7 +365,7 @@ impl App {
         } else {
             Err(errors.remove(0)) // 返回第一个错误
         }
-     }
+    }
 
     /// 通过 app 实例异步运行 App，并返回 Arc<App>
     ///
@@ -479,7 +452,8 @@ impl App {
             let ctrl_c = signal::ctrl_c();
             let mut ctrl_break = windows::ctrl_break().expect("无法注册 Ctrl+Break 处理器");
             let mut ctrl_close = windows::ctrl_close().expect("无法注册 Ctrl+Close 处理器");
-            let mut ctrl_shutdown = windows::ctrl_shutdown().expect("无法注册 Ctrl+Shutdown 处理器");
+            let mut ctrl_shutdown =
+                windows::ctrl_shutdown().expect("无法注册 Ctrl+Shutdown 处理器");
 
             tokio::select! {
                 _ = ctrl_c => {},
@@ -513,10 +487,5 @@ pub fn inject_from_store<T: Any + Send + Sync + 'static>(
             )
         })
         .downcast::<T>()
-        .unwrap_or_else(|_| {
-            panic!(
-                "[di] inject downcast 失败：{}",
-                std::any::type_name::<T>()
-            )
-        })
+        .unwrap_or_else(|_| panic!("[di] inject downcast 失败：{}", std::any::type_name::<T>()))
 }

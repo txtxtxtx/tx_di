@@ -4,10 +4,9 @@
 //! 确保 WebPlugin::inner_init 调用 merge_routers() 时路由已经就位。
 
 use std::sync::Arc;
-use axum::Router;
 use tracing::info;
-use tx_di_axum::{WebConfig, WebPlugin};
-use tx_di_core::{BuildContext, CompInit, InnerContext, RIE, tx_comp, App, CancellationToken};
+use tx_di_axum::{ WebPlugin};
+use tx_di_core::{BuildContext, CompInit, InnerContext, RIE, tx_comp, App, CancellationToken, BoxFuture};
 use tx_di_gb28181::Gb28181Server;
 use tx_di_sa_token::SaTokenPlugin;
 use tx_di_toasty::ToastyPlugin;
@@ -22,7 +21,9 @@ use crate::{api, models};
 pub struct ApiRegisterComponent {}
 
 impl CompInit for ApiRegisterComponent {
-    fn init(ctx: Arc<App>, _token: CancellationToken) -> RIE<()> {
+
+    fn inner_init(&mut self, ctx: &InnerContext) -> RIE<()>{
+        let ctx: BuildContext = ctx.into();
         let toasty_plugin = ctx.inject::<ToastyPlugin>();
         // 1. 在 build 之前注册事件监听器（用于 SSE 推送）
         Gb28181Server::on_event(|event| async move {
@@ -42,7 +43,11 @@ impl CompInit for ApiRegisterComponent {
             models::GbDeviceGroupMember,
             models::GbRegisterAudit,
         ));
-        
+        Ok(())
+    }
+    fn async_init(ctx: Arc<App>, _token: CancellationToken) -> BoxFuture {
+        let toasty_plugin = ctx.inject::<ToastyPlugin>();
+
         let db = toasty_plugin.db().clone();
 
         // 5. 获取 sa_token 插件实例，提取 SaTokenState
@@ -52,7 +57,10 @@ impl CompInit for ApiRegisterComponent {
         // 6. 注册带 State 的 API 路由
         WebPlugin::add_router(api::router(db, sa_state));
         info!("gb28181_admin 初始化完成");
-        Ok(())
+
+        Box::pin(async {
+            Ok(())
+        })
     }
 
     fn init_sort() -> i32 {

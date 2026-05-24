@@ -30,8 +30,7 @@
 use crate::config::ToastyConfig;
 use std::sync::{Arc, OnceLock, RwLock};
 use toasty::ModelSet;
-use tokio::runtime::Handle;
-use tx_di_core::{tx_comp, CompInit, RIE};
+use tx_di_core::{tx_comp, BoxFuture, CompInit, RIE};
 use tx_di_core::App;
 use tokio_util::sync::CancellationToken;
 
@@ -134,81 +133,78 @@ impl ToastyPlugin {
 }
 
 impl CompInit for ToastyPlugin {
-    fn init(ctx: Arc<App>, _token: CancellationToken) -> RIE<()> {
-        let plugin = ctx.inject::<ToastyPlugin>();
-        let config = plugin.config.clone();
+    fn async_init(ctx: Arc<App>, _token: CancellationToken) -> BoxFuture {
+        Box::pin(async move {
+            let plugin = ctx.inject::<ToastyPlugin>();
+            let config = plugin.config.clone();
 
-        // 防止重复初始化
-        if plugin.db.get().is_some() {
-            tracing::warn!("ToastyPlugin: db already initialized, skipping");
-            return Ok(());
-        }
-
-        // ── 同步读取全局模型（不持有锁跨越 await）────────────────
-        let models = {
-            let models = plugin.models.read()
-                .map_err(|e| anyhow::anyhow!("无法获取注册的模型:{e}"))?;
-            models.clone()
-        }; // models guard 在这里 drop
-        tracing::debug!(url = %config.database_url, "正在连接数据库...");
-        // 构建 Builder 并应用配置
-        let mut builder = toasty::Db::builder();
-        tracing::debug!(model_count = models.len(), "注册模型到 Toasty Db");
-        builder.models(models);
-
-        // 连接池配置
-        if let Some(max) = config.max_pool_size {
-            builder.max_pool_size(max);
-        }
-        if let Some(ref prefix) = config.table_name_prefix {
-            builder.table_name_prefix(prefix);
-        }
-        if let Some(secs) = config.pool_wait_timeout_secs {
-            builder.pool_wait_timeout(Some(std::time::Duration::from_secs(secs)));
-        }
-        if let Some(secs) = config.pool_create_timeout_secs {
-            builder.pool_create_timeout(Some(std::time::Duration::from_secs(secs)));
-        }
-        if let Some(secs) = config.pool_health_check_interval_secs {
-            if secs == 0 {
-                builder.pool_health_check_interval(None);
-            } else {
-                builder.pool_health_check_interval(Some(std::time::Duration::from_secs(secs)));
+            // 防止重复初始化
+            if plugin.db.get().is_some() {
+                tracing::warn!("ToastyPlugin: db already initialized, skipping");
+                return Ok(());
             }
-        }
-        if let Some(secs) = config.pool_max_connection_lifetime_secs {
-            builder.pool_max_connection_lifetime(Some(std::time::Duration::from_secs(secs)));
-        }
-        if let Some(secs) = config.pool_max_connection_idle_time_secs {
-            builder.pool_max_connection_idle_time(Some(std::time::Duration::from_secs(secs)));
-        }
-        if config.pool_pre_ping {
-            builder.pool_pre_ping(true);
-        }
-        let rt_handle = Handle::current();
-        // 通过 URL 连接（自动选择驱动）
-        let db = rt_handle.block_on(async {
-            builder
+
+            // ── 同步读取全局模型（不持有锁跨越 await）────────────────
+            let models = {
+                let models = plugin.models.read()
+                    .map_err(|e| anyhow::anyhow!("无法获取注册的模型:{e}"))?;
+                models.clone()
+            }; // models guard 在这里 drop
+            tracing::debug!(url = %config.database_url, "正在连接数据库...");
+            // 构建 Builder 并应用配置
+            let mut builder = toasty::Db::builder();
+            tracing::debug!(model_count = models.len(), "注册模型到 Toasty Db");
+            builder.models(models);
+
+            // 连接池配置
+            if let Some(max) = config.max_pool_size {
+                builder.max_pool_size(max);
+            }
+            if let Some(ref prefix) = config.table_name_prefix {
+                builder.table_name_prefix(prefix);
+            }
+            if let Some(secs) = config.pool_wait_timeout_secs {
+                builder.pool_wait_timeout(Some(std::time::Duration::from_secs(secs)));
+            }
+            if let Some(secs) = config.pool_create_timeout_secs {
+                builder.pool_create_timeout(Some(std::time::Duration::from_secs(secs)));
+            }
+            if let Some(secs) = config.pool_health_check_interval_secs {
+                if secs == 0 {
+                    builder.pool_health_check_interval(None);
+                } else {
+                    builder.pool_health_check_interval(Some(std::time::Duration::from_secs(secs)));
+                }
+            }
+            if let Some(secs) = config.pool_max_connection_lifetime_secs {
+                builder.pool_max_connection_lifetime(Some(std::time::Duration::from_secs(secs)));
+            }
+            if let Some(secs) = config.pool_max_connection_idle_time_secs {
+                builder.pool_max_connection_idle_time(Some(std::time::Duration::from_secs(secs)));
+            }
+            if config.pool_pre_ping {
+                builder.pool_pre_ping(true);
+            }
+            // 通过 URL 连接（自动选择驱动）
+            let db = builder
                 .connect(&config.database_url)
                 .await
-                .map_err(|e| anyhow::anyhow!("数据库连接失败 '{}': {}", config.database_url, e))
-        })?;
-        // 自动推送 Schema（开发环境）
-        if config.auto_schema {
-            tracing::debug!("正在推送数据库 Schema...");
-            rt_handle.block_on(async {
+                .map_err(|e| anyhow::anyhow!("数据库连接失败 '{}': {}", config.database_url, e))?;
+            // 自动推送 Schema（开发环境）
+            if config.auto_schema {
+                tracing::debug!("正在推送数据库 Schema...");
                 db.push_schema().await.map_err(|e| {
                     anyhow::anyhow!("Schema 推送失败: {}", e)
-                })
-            })?;
-            tracing::debug!("Schema 推送完成");
-        }
-        // 写入 OnceLock
-        if plugin.db.set(db).is_err() {
-            tracing::warn!("ToastyPlugin: db concurrently initialized");
-        }
-        tracing::debug!("ToastyPlugin 数据库初始化完成");
-        Ok(())
+                })?;
+                tracing::debug!("Schema 推送完成");
+            }
+            // 写入 OnceLock
+            if plugin.db.set(db).is_err() {
+                tracing::warn!("ToastyPlugin: db concurrently initialized");
+            }
+            tracing::debug!("ToastyPlugin 数据库初始化完成");
+            Ok(())
+        })
     }
 
     fn init_sort() -> i32 {
