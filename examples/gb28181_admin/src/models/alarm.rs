@@ -8,7 +8,7 @@ use toasty::Model;
 pub struct GbAlarmRecord {
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     #[index]
     pub device_id: String,

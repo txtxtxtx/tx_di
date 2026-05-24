@@ -32,9 +32,9 @@ use crate::models::{GbDeviceGroup, GbDeviceGroupMember, GbDeviceRecord};
 /// 分组 DTO（含子分组 + 成员数量）
 #[derive(Serialize, Clone)]
 pub struct GroupDto {
-    pub id: i64,
+    pub id: u64,
     pub name: String,
-    pub parent_id: i64,
+    pub parent_id: u64,
     pub description: String,
     pub sort_order: i32,
     pub created_by: String,
@@ -69,7 +69,7 @@ impl From<GbDeviceGroup> for GroupDto {
 pub struct SaveGroupReq {
     pub name: String,
     #[serde(default)]
-    pub parent_id: i64,
+    pub parent_id: u64,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
@@ -109,7 +109,7 @@ pub async fn list_groups(
 }
 
 /// 递归构建分组树（注意：需要 owned 返回，不能用引用）
-fn build_group_tree(mut all: Vec<GroupDto>, parent_id: i64) -> Vec<GroupDto> {
+fn build_group_tree(mut all: Vec<GroupDto>, parent_id: u64) -> Vec<GroupDto> {
     let mut children: Vec<GroupDto> = vec![];
     let mut rest: Vec<GroupDto> = vec![];
 
@@ -194,7 +194,7 @@ pub async fn create_group(
 
 /// GET /api/v1/gb28181/groups/:id — 分组详情
 pub async fn get_group(
-    Path(id): Path<i64>,
+    Path(id): Path<u64>,
     State(mut db): State<Db>,
 ) -> R<GroupDto> {
     let group = match GbDeviceGroup::get_by_id(&mut db, id).await {
@@ -212,7 +212,7 @@ pub async fn get_group(
 
 /// PUT /api/v1/gb28181/groups/:id — 更新分组
 pub async fn update_group(
-    Path(id): Path<i64>,
+    Path(id): Path<u64>,
     State(mut db): State<Db>,
     LoginIdExtractor(login_id): LoginIdExtractor,
     ExtJson(req): ExtJson<SaveGroupReq>,
@@ -261,7 +261,7 @@ pub async fn update_group(
 
 /// DEL /api/v1/gb28181/groups/:id — 删除分组（递归）
 pub async fn delete_group(
-    Path(id): Path<i64>,
+    Path(id): Path<u64>,
     State(mut db): State<Db>,
     LoginIdExtractor(login_id): LoginIdExtractor,
 ) -> R<String> {
@@ -283,7 +283,7 @@ pub async fn delete_group(
 
 /// 递归删除分组及其子分组 + 成员关联
 /// 使用 Box::pin 打包递归 async 调用，避免无限大小的 future
-async fn delete_group_recursive(db: &mut Db, id: i64) -> Result<(), String> {
+async fn delete_group_recursive(db: &mut Db, id: u64) -> Result<(), String> {
     // 删除成员关联
     let members = match GbDeviceGroupMember::filter_by_group_id(id).exec(db).await {
         Ok(m) => m,
@@ -320,7 +320,7 @@ async fn delete_group_recursive(db: &mut Db, id: i64) -> Result<(), String> {
 
 /// GET /api/v1/gb28181/groups/:id/members — 分组内设备列表
 pub async fn list_members(
-    Path(id): Path<i64>,
+    Path(id): Path<u64>,
     State(mut db): State<Db>,
     Query(p): Query<crate::api::devices::Pagination>,
 ) -> R<PageData<crate::dto::DeviceDto>> {
@@ -361,7 +361,7 @@ pub async fn list_members(
 
 /// POST /api/v1/gb28181/groups/:id/members — 添加设备到分组
 pub async fn add_members(
-    Path(id): Path<i64>,
+    Path(id): Path<u64>,
     State(mut db): State<Db>,
     LoginIdExtractor(login_id): LoginIdExtractor,
     ExtJson(req): ExtJson<AddMemberReq>,
@@ -428,7 +428,7 @@ pub async fn add_members(
 
 /// DEL /api/v1/gb28181/groups/:id/members/:did — 从分组移除设备
 pub async fn remove_member(
-    Path((id, did)): Path<(i64, String)>,
+    Path((id, did)): Path<(u64, String)>,
     State(mut db): State<Db>,
     LoginIdExtractor(login_id): LoginIdExtractor,
 ) -> R<String> {

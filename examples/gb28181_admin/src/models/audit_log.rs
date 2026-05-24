@@ -11,7 +11,7 @@ pub struct GbAuditLog {
     /// 主键 ID（自增）
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     /// 操作人
     #[default("".to_string())]

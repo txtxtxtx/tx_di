@@ -12,7 +12,7 @@ use toasty::Model;
 pub struct GbDeviceGroup {
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     /// 分组名称
     #[index]
@@ -21,7 +21,7 @@ pub struct GbDeviceGroup {
     /// 父分组 ID（0 = 根分组）
     #[default(0)]
     #[index]
-    pub parent_id: i64,
+    pub parent_id: u64,
 
     /// 分组描述
     #[default("".to_string())]

@@ -604,7 +604,7 @@ pub async fn dashboard(
 /// 审计日志 DTO
 #[derive(Serialize)]
 pub struct AuditLogDto {
-    pub id: i64,
+    pub id: u64,
     pub operator: String,
     pub action: String,
     pub target: String,
@@ -727,7 +727,7 @@ pub async fn list_audit_logs(
 /// GET /api/v1/gb28181/audit_logs/:id — 审计日志详情
 pub async fn get_audit_log(
     State(mut db): State<Db>,
-    Path(id): Path<i64>,
+    Path(id): Path<u64>,
 ) -> R<AuditLogDto> {
     match GbAuditLog::get_by_id(&mut db, id).await {
         Ok(record) => R::ok(AuditLogDto::from(record)),

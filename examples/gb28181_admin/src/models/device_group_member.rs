@@ -11,11 +11,11 @@ use toasty::Model;
 pub struct GbDeviceGroupMember {
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     /// 分组 ID
     #[index]
-    pub group_id: i64,
+    pub group_id: u64,
 
     /// 设备国标编码（关联 gb_device.device_id）
     #[index]

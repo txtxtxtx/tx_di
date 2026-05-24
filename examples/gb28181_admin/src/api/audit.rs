@@ -40,7 +40,7 @@ fn default_audit_page_size() -> u64 { 20 }
 /// 审核记录 DTO
 #[derive(Serialize)]
 pub struct RegisterAuditDto {
-    pub id: i64,
+    pub id: u64,
     pub device_id: String,
     pub contact: String,
     pub remote_ip: String,
@@ -140,7 +140,7 @@ pub async fn list_audits(
 
 /// GET /api/v1/gb28181/register_audit/:id — 审核详情
 pub async fn get_audit(
-    Path(id): Path<i64>,
+    Path(id): Path<u64>,
     State(mut db): State<Db>,
 ) -> R<RegisterAuditDto> {
     match GbRegisterAudit::get_by_id(&mut db, id).await {
@@ -155,7 +155,7 @@ pub async fn get_audit(
 
 /// POST /api/v1/gb28181/register_audit/:id/approve — 批准注册
 pub async fn approve(
-    Path(id): Path<i64>,
+    Path(id): Path<u64>,
     State(mut db): State<Db>,
     LoginIdExtractor(login_id): LoginIdExtractor,
     ExtJson(req): ExtJson<AuditActionReq>,
@@ -202,7 +202,7 @@ pub async fn approve(
 
 /// POST /api/v1/gb28181/register_audit/:id/reject — 拒绝注册
 pub async fn reject(
-    Path(id): Path<i64>,
+    Path(id): Path<u64>,
     State(mut db): State<Db>,
     LoginIdExtractor(login_id): LoginIdExtractor,
     ExtJson(req): ExtJson<AuditActionReq>,
@@ -240,7 +240,7 @@ pub async fn reject(
 
 /// DEL /api/v1/gb28181/register_audit/:id — 删除审核记录
 pub async fn delete_audit(
-    Path(id): Path<i64>,
+    Path(id): Path<u64>,
     State(mut db): State<Db>,
     LoginIdExtractor(login_id): LoginIdExtractor,
 ) -> R<String> {

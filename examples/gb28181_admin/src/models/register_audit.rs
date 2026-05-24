@@ -44,7 +44,7 @@ impl From<String> for AuditStatus {
 pub struct GbRegisterAudit {
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     /// 设备国标编码（20位）
     #[index]

@@ -8,7 +8,7 @@ use toasty::Model;
 pub struct GbSessionRecord {
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     #[unique]
     pub call_id: String,

@@ -76,7 +76,7 @@ pub async fn reset_alarm(
 /// 报警记录 DTO（序列化友好）
 #[derive(Serialize)]
 pub struct AlarmDto {
-    pub id: i64,
+    pub id: u64,
     pub device_id: String,
     pub channel_id: String,
     pub alarm_method: i32,
@@ -217,7 +217,7 @@ pub async fn list_alarms(
 /// toasty Model derive 对 #[key] 字段生成 get_by_id(db, key) → Result<Model, Error>
 pub async fn get_alarm(
     State(mut db): State<Db>,
-    Path(id): Path<i64>,
+    Path(id): Path<u64>,
 ) -> R<AlarmDto> {
     match GbAlarmRecord::get_by_id(&mut db, id).await {
         Ok(record) => R::ok(AlarmDto::from(record)),
@@ -244,7 +244,7 @@ pub struct AlarmHandleReq {
 /// toasty 更新方式：先 get 到实例，修改字段后 save。
 pub async fn handle_alarm(
     State(mut db): State<Db>,
-    Path(id): Path<i64>,
+    Path(id): Path<u64>,
     ExtJson(req): ExtJson<AlarmHandleReq>,
 ) -> R<String> {
     let mut record = match GbAlarmRecord::get_by_id(&mut db, id).await {

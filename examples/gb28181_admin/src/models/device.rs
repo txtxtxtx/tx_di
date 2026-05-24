@@ -9,7 +9,7 @@ pub struct GbDeviceRecord {
     /// 主键 ID（自增）
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     /// 设备国标编码（20位）
     #[unique]
@@ -65,5 +65,5 @@ pub struct GbDeviceRecord {
 
     /// 所属分组 ID（0 = 未分组）
     #[default(0)]
-    pub group_id: i64,
+    pub group_id: u64,
 }

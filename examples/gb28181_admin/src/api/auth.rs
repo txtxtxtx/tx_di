@@ -36,7 +36,7 @@ pub struct LoginRes {
 
 #[derive(Serialize, Clone)]
 pub struct UserInfo {
-    pub id: i64,
+    pub id: u64,
     pub username: String,
     pub nickname: String,
     /// 第一个角色（兼容前端）
@@ -130,7 +130,7 @@ pub async fn get_info(
     State(mut db): State<Db>,
     LoginIdExtractor(login_id): LoginIdExtractor,
 ) -> R<UserInfo> {
-    let uid: i64 = match login_id.parse() {
+    let uid: u64 = match login_id.parse() {
         Ok(id) => id,
         Err(_) => return R::error(400, "无效的用户ID格式".into()),
     };
@@ -194,7 +194,7 @@ pub async fn get_user(
     Path(id): Path<String>,
     State(mut db): State<Db>,
 ) -> R<UserInfo> {
-    let id_val: i64 = match id.parse() {
+    let id_val: u64 = match id.parse() {
         Ok(v) => v,
         Err(_) => return R::error(400, "无效的用户ID".to_string()),
     };
@@ -211,7 +211,7 @@ pub async fn update_user(
     State(mut db): State<Db>,
     ExtJson(req): ExtJson<UpdateUserReq>,
 ) -> R<UserInfo> {
-    let id_val: i64 = match id.parse() {
+    let id_val: u64 = match id.parse() {
         Ok(v) => v,
         Err(_) => return R::error(400, "无效的用户ID".to_string()),
     };
@@ -251,7 +251,7 @@ pub async fn delete_user(
     Path(id): Path<String>,
     State(mut db): State<Db>,
 ) -> R<String> {
-    let id_val: i64 = match id.parse() {
+    let id_val: u64 = match id.parse() {
         Ok(v) => v,
         Err(_) => return R::error(400, "无效的用户ID".to_string()),
     };
