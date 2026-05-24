@@ -111,8 +111,7 @@ impl CompInit for ToastyConfig {
     }
 
     fn init_sort() -> i32 {
-        // 日志之后、业务之前
-        100
+        i32::MAX - 1
     }
 }
 
