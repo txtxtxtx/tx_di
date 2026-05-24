@@ -101,7 +101,7 @@ impl Default for ToastyConfig {
 
 impl CompInit for ToastyConfig {
     fn inner_init(&mut self, _ctx: &InnerContext) -> RIE<()> {
-        tracing::info!(
+        tracing::debug!(
             url = %self.database_url,
             auto_schema = self.auto_schema,
             max_pool = ?self.max_pool_size,
@@ -111,7 +111,7 @@ impl CompInit for ToastyConfig {
     }
 
     fn init_sort() -> i32 {
-        i32::MAX - 1
+        i32::MIN + 2
     }
 }
 

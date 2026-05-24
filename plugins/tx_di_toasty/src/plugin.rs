@@ -31,7 +31,7 @@ use crate::config::ToastyConfig;
 use std::sync::{Arc, OnceLock, RwLock};
 use toasty::ModelSet;
 use tokio::runtime::Handle;
-use tx_di_core::{tx_comp, CompInit, InnerContext, RIE};
+use tx_di_core::{tx_comp, CompInit, RIE};
 use tx_di_core::App;
 use tokio_util::sync::CancellationToken;
 
@@ -134,11 +134,6 @@ impl ToastyPlugin {
 }
 
 impl CompInit for ToastyPlugin {
-    fn inner_init(&mut self, _ctx: &InnerContext) -> RIE<()> {
-        tracing::info!("ToastyPlugin 初始化（同步阶段）");
-        Ok(())
-    }
-
     fn init(ctx: Arc<App>, _token: CancellationToken) -> RIE<()> {
         let plugin = ctx.inject::<ToastyPlugin>();
         let config = plugin.config.clone();
@@ -155,10 +150,10 @@ impl CompInit for ToastyPlugin {
                 .map_err(|e| anyhow::anyhow!("无法获取注册的模型:{e}"))?;
             models.clone()
         }; // models guard 在这里 drop
-        tracing::info!(url = %config.database_url, "正在连接数据库...");
+        tracing::debug!(url = %config.database_url, "正在连接数据库...");
         // 构建 Builder 并应用配置
         let mut builder = toasty::Db::builder();
-        tracing::info!(model_count = models.len(), "注册模型到 Toasty Db::builder");
+        tracing::debug!(model_count = models.len(), "注册模型到 Toasty Db");
         builder.models(models);
 
         // 连接池配置
@@ -200,24 +195,24 @@ impl CompInit for ToastyPlugin {
         })?;
         // 自动推送 Schema（开发环境）
         if config.auto_schema {
-            tracing::info!("正在推送数据库 Schema...");
+            tracing::debug!("正在推送数据库 Schema...");
             rt_handle.block_on(async {
                 db.push_schema().await.map_err(|e| {
                     anyhow::anyhow!("Schema 推送失败: {}", e)
                 })
             })?;
-            tracing::info!("Schema 推送完成");
+            tracing::debug!("Schema 推送完成");
         }
         // 写入 OnceLock
         if plugin.db.set(db).is_err() {
             tracing::warn!("ToastyPlugin: db concurrently initialized");
         }
-        tracing::info!("ToastyPlugin 数据库初始化完成");
+        tracing::debug!("ToastyPlugin 数据库初始化完成");
         Ok(())
     }
 
     fn init_sort() -> i32 {
-        i32::MAX - 1
+        i32::MIN + 2
     }
 }
 
