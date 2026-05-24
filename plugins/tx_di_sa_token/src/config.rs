@@ -1,7 +1,9 @@
 //! sa-token 配置组件
 
 use serde::Deserialize;
+use std::sync::Arc;
 use tx_di_core::{tx_comp, CompInit, InnerContext, RIE};
+use sa_token_plugin_axum::{SaStorage, MemoryStorage};
 
 /// sa-token 配置结构体
 ///
@@ -145,6 +147,7 @@ impl SaTokenConf {
         builder: sa_token_plugin_axum::SaTokenStateBuilder,
     ) -> sa_token_plugin_axum::SaTokenStateBuilder {
         let mut b = builder
+            .storage(Arc::new(MemoryStorage::new()))
             .token_name(&self.token_name)
             .timeout(self.timeout)
             .active_timeout(self.active_timeout)

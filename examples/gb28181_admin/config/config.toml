@@ -17,7 +17,7 @@ layers = [
 [gb28181_server_config]
 platform_id            = "34020000002000000001"
 realm                  = "3402000000"
-sip_ip                 = "127.0.0.1"
+sip_ip                 = "192.168.0.200"
 heartbeat_timeout_secs = 120
 enable_auth            = true
 auth_password          = "tx123456"
@@ -39,12 +39,14 @@ transport = "both" #tcp udp both
 [log_config]
 level     = "debug"
 console_output = true
+time_format = "local"
+prefix = "tx_gb28181"
 
 # 数据库配置（toasty ORM）
 [toasty_config]
 database_url = "sqlite://gb28181.db"
 auto_schema = true
-max_pool_size = 10
+max_pool_size = 3
 
 # 认证配置（sa-token）
 [sa_token_config]

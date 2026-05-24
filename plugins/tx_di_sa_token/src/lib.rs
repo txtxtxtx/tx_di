@@ -49,4 +49,5 @@ pub use sa_token_plugin_axum::{
     sa_check_permissions_and, sa_check_permissions_or,
     sa_check_roles_and, sa_check_roles_or,
     sa_ignore,
+    SaStorage, MemoryStorage,
 };

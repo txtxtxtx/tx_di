@@ -28,4 +28,5 @@ pub use di::{BuildContext,scopes::Scope,App,InnerContext,
              comp::comp_ref::{CompRef,ComponentDescriptor,CompInit,BoxFuture,inject_from_store},
 common::*
 };
+pub use tokio_util::sync::CancellationToken;
 
