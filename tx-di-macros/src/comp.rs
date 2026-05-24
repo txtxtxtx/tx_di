@@ -209,6 +209,7 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
             init_sort_fn: <#struct_name as ::tx_di_core::CompInit>::init_sort,
             init_fn: Some(<#struct_name as ::tx_di_core::CompInit>::init),
             async_init_fn: Some(<#struct_name as ::tx_di_core::CompInit>::async_init),
+            async_run_fn: Some(<#struct_name as ::tx_di_core::CompInit>::async_run),
         };
     };
 

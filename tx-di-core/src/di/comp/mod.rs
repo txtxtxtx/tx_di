@@ -14,8 +14,12 @@ use tokio_util::sync::CancellationToken;
 
 // 类型别名：简化复杂函数指针类型的定义
 pub type StoreFactoryFn = fn(&DashMap<TypeId, CompRef>) -> Box<dyn Any + Send + Sync>;
+/// 同步初始化
 type InitFn = fn(Arc<App>,CancellationToken) -> RIE<()>;
+/// 异步初始化
 type AsyncInitFn = fn(Arc<App>, CancellationToken) -> BoxFuture;
+/// 异步run方法
+type AsyncRunFn = fn(Arc<App>, CancellationToken) -> BoxFuture;
 
 #[linkme::distributed_slice]
 pub static COMPONENT_REGISTRY: [ComponentMeta] = [..];
@@ -65,6 +69,7 @@ pub struct ComponentMeta {
     pub init_sort_fn: fn() -> i32,
     pub init_fn: Option<InitFn>,
     pub async_init_fn: Option<AsyncInitFn>,
+    pub async_run_fn: Option<AsyncRunFn>,
 }
 
 /// 对组件元数据进行拓扑排序，确定组件的构建顺序。 `Kahn算法`

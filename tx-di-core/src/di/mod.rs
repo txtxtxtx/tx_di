@@ -346,9 +346,53 @@ impl App {
     /// 阻塞运行 App
     async fn run(app: Arc<App>, token: CancellationToken) -> RIE<()> {
         App::init(app.clone())?;
-        App::async_init(app, token).await?;
+        App::async_init(app.clone(), token.clone()).await?;
+        App::comp_run(app, token).await?;
         Ok(())
     }
+    async fn comp_run(app: Arc<App>, token: CancellationToken) -> RIE<()> {
+        let mut metas: Vec<&ComponentMeta> = COMPONENT_REGISTRY
+            .iter()
+            .filter(|m| m.async_run_fn.is_some())
+            .collect();
+
+        metas.sort_by_key(|m| (m.init_sort_fn)());
+
+        // 收集所有异步初始化任务并并行执行
+        let futures: Vec<_> = metas
+            .iter()
+            .filter_map(|meta| {
+                meta.async_run_fn
+                    .map(|init_fn| init_fn(app.clone(), token.clone()))
+            })
+            .collect();
+
+        if futures.is_empty() {
+            return Ok(());
+        }
+
+        // 使用 tokio::spawn 并行执行所有任务
+        let handles: Vec<_> = futures
+            .into_iter()
+            .map(|future| tokio::spawn(future))
+            .collect();
+
+        // 等待所有任务完成并收集结果
+        let mut errors = Vec::new();
+        for handle in handles {
+            match handle.await {
+                Ok(Ok(_)) => {}
+                Ok(Err(e)) => errors.push(e),
+                Err(e) => errors.push(IE::Other(format!("Task panicked: {}", e))),
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors.remove(0)) // 返回第一个错误
+        }
+     }
 
     /// 通过 app 实例异步运行 App，并返回 Arc<App>
     ///

@@ -179,7 +179,13 @@ pub trait CompInit :Any + Send + Sync + 'static{
             Ok(())
         })
     }
-
+    /// 异步运行方法
+    #[allow(unused_variables)]
+    fn async_run(ctx: Arc<App>,token: CancellationToken) -> BoxFuture {
+        Box::pin(async {
+            Ok(())
+        })
+    }
     /// 初始化排序方法
     fn init_sort() -> i32 {
         10000
