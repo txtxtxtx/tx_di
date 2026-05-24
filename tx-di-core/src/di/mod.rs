@@ -33,6 +33,15 @@ pub struct BuildContext {
 }
 
 impl crate::BuildContext {
+
+    /// 创建一个新的 BuildContext,只是为了使用依赖注入方法
+    pub fn inner_new(ctx: InnerContext) -> Self {
+        BuildContext {
+            store: ctx,
+            metas: vec![],
+        }
+    }
+
     /// 创建一个新的 BuildContext。
     ///
     /// # 参数
@@ -210,6 +219,19 @@ impl crate::BuildContext {
 impl Default for crate::BuildContext {
     fn default() -> Self {
         Self::new::<PathBuf>(None)
+    }
+}
+
+impl From<InnerContext> for crate::BuildContext {
+    fn from(ctx: InnerContext) -> Self {
+        BuildContext::inner_new(ctx)
+    }
+}
+
+impl From<&InnerContext> for crate::BuildContext {
+    fn from(ctx: &InnerContext) -> Self {
+        // DashMap clone：Arc 引用只增加引用计数，开销很小
+        BuildContext::inner_new(ctx.clone())
     }
 }
 
