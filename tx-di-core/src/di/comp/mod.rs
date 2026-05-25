@@ -12,6 +12,7 @@ use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
 // 类型别名：简化复杂函数指针类型的定义
+/// 构建组件函数类型
 pub type StoreFactoryFn = fn(&DashMap<TypeId, CompRef>) -> Box<dyn Any + Send + Sync>;
 /// 同步初始化函数类型
 type InitFn = fn(Arc<App>, CancellationToken) -> RIE<()>;
