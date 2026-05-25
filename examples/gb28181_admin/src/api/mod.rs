@@ -1,4 +1,4 @@
-//! API 路由汇总（版本化 v1）
+//! API 路由汇总（版本化 v1，已移除旧版 /api/gb28181 兼容路由）
 //!
 //! 路由结构：
 //!   POST /api/v1/auth/login       — 登录
@@ -189,87 +189,8 @@ pub fn router(db: ToastyDb, sa_state: SaTokenState) -> Router {
         // 第2层：检查是否已登录
         .layer(SaCheckLoginLayer::new());
 
-    // 合并路由，兼容旧版无版本号前缀
+    // 合并路由（仅保留版本化 v1 路由）
     Router::new()
         .nest("/api/v1", public)
         .nest("/api/v1", protected)
-        // 兼容旧版路由（无版本号前缀）— 可后续移除
-        .nest("/api/gb28181", Router::new()
-            .route("/stats", get(devices::stats))
-            .route("/devices", get(devices::list))
-            .route("/devices/{id}", get(devices::detail))
-            .route("/devices/{id}/catalog", post(devices::query_catalog))
-            .route("/devices/{id}/info", post(devices::query_info))
-            .route("/devices/{id}/status", post(devices::query_status))
-            .route("/devices/{id}/ptz", post(devices::ptz))
-            .route("/devices/{id}/teleboot", post(devices::teleboot))
-            .route("/devices/{id}/alarm_reset", post(devices::alarm_reset))
-            // ── 报警订阅/复位 ──
-            .route("/devices/{id}/alarm/subscribe", post(alarm::subscribe_alarm))
-            .route("/devices/{id}/alarm/reset", post(alarm::reset_alarm))
-            // ── 报警记录 CRUD（DB）──
-            .route("/alarms", get(alarm::list_alarms))
-            .route("/alarms/{id}", get(alarm::get_alarm))
-            .route("/alarms/{id}", put(alarm::handle_alarm))
-            // ── 移动位置 ──
-            .route("/devices/{id}/mobile_position/query", post(alarm::query_mobile_position))
-            .route("/devices/{id}/mobile_position/unsubscribe", post(alarm::unsubscribe_mobile_position))
-            // ── 录像 / 回放 / 下载 ──
-            .route("/devices/{id}/records/query", post(playback::query_records))
-            .route("/devices/{id}/playback/start", post(playback::start_playback))
-            .route("/devices/{id}/playback/control", post(playback::playback_control))
-            .route("/devices/{id}/record/control", post(playback::record_control))
-            .route("/devices/{id}/download/start", post(playback::start_download))
-            // ── 广播 / 对讲 ──
-            .route("/devices/{id}/broadcast/invite", post(broadcast::broadcast_invite))
-            .route("/devices/{id}/broadcast/accept", post(broadcast::broadcast_accept))
-            .route("/devices/{id}/broadcast/stop", post(broadcast::broadcast_stop))
-            .route("/devices/{id}/talkback/start", post(broadcast::start_talkback))
-            .route("/sessions", get(sessions::list))
-            .route("/sessions", post(sessions::invite))
-            .route("/sessions/{call_id}", delete(sessions::hangup))
-            .route("/events", get(sse::handler))
-            // ── 管理能力增强（Task #13，legacy 兼容）──
-            .route("/dashboard", get(admin::dashboard))
-            .route("/devices/{id}/time_sync", post(admin::time_sync))
-            .route("/devices/{id}/sync_time", post(admin::sync_time))
-            .route("/devices/{id}/config", post(admin::query_config))
-            .route("/devices/{id}/guard/control", post(admin::guard_control))
-            .route("/devices/{id}/guard/info", post(admin::guard_info))
-            .route("/devices/{id}/guard/basic", post(admin::guard_basic))
-            .route("/devices/{id}/preset/goto", post(admin::goto_preset))
-            .route("/devices/{id}/preset/set", post(admin::set_preset))
-            .route("/devices/{id}/cruise/start", post(admin::start_cruise))
-            .route("/devices/{id}/cruise/stop", post(admin::stop_cruise))
-            .route("/devices/{id}/cruise/list", post(admin::cruise_list))
-            .route("/devices/{id}/cruise_track", post(admin::cruise_track))
-            .route("/devices/{id}/make_key_frame", post(admin::make_key_frame))
-            .route("/devices/{id}/zoom/in", post(admin::zoom_in))
-            .route("/devices/{id}/zoom/out", post(admin::zoom_out))
-            .route("/devices/{id}/ptz_precise", post(admin::ptz_precise))
-            .route("/devices/{id}/ptz_precise_status", post(admin::ptz_precise_status))
-            .route("/devices/{id}/target_track", post(admin::target_track))
-            .route("/devices/{id}/storage/format", post(admin::storage_format))
-            .route("/devices/{id}/storage/status", post(admin::storage_status))
-            .route("/devices/{id}/playback_ctrl", post(admin::playback_ctrl))
-            .route("/audit_logs", get(admin::list_audit_logs))
-            .route("/audit_logs/{id}", get(admin::get_audit_log))
-            // ── 设备分组管理（legacy 兼容）──
-            .route("/groups", get(group::list_groups))
-            .route("/groups", post(group::create_group))
-            .route("/groups/{id}", get(group::get_group))
-            .route("/groups/{id}", put(group::update_group))
-            .route("/groups/{id}", delete(group::delete_group))
-            .route("/groups/{id}/members", get(group::list_members))
-            .route("/groups/{id}/members", post(group::add_members))
-            .route("/groups/{id}/members/{did}", delete(group::remove_member))
-            // ── 注册审核（legacy 兼容）──
-            .route("/register_audit", get(audit::list_audits))
-            .route("/register_audit/{id}", get(audit::get_audit))
-            .route("/register_audit/{id}/approve", post(audit::approve))
-            .route("/register_audit/{id}/reject", post(audit::reject))
-            .route("/register_audit/{id}", delete(audit::delete_audit))
-            .route("/register_audit/auto_approve", post(audit::auto_approve))
-            .with_state(db)
-        )
 }
