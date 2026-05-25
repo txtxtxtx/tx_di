@@ -7,7 +7,7 @@ use tracing::{error, info, warn};
 // ---------- 从依赖中导入的类型 ----------
 use rsipstack::sip::StatusCode;
 use rsipstack::transaction::transaction::Transaction;
-use tx_di_core::{IE, RIE};
+use tx_di_core::{RIE};
 
 // ---------- 异步处理器类型 ----------
 /// SIP 消息异步处理函数（线程安全、可共享）

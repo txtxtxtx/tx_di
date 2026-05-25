@@ -15,25 +15,23 @@
 use crate::config::SipConfig;
 use crate::handler::SipRouter;
 use crate::sender::SipSender;
+use anyhow::anyhow;
+use futures::StreamExt;
+use futures::stream::FuturesUnordered;
+use rsipstack::transaction::transaction::Transaction;
+use rsipstack::transport::SipAddr;
+use rsipstack::transport::TransportLayer;
 use rsipstack::transport::tcp_listener::TcpListenerConnection;
 use rsipstack::transport::udp::UdpConnection;
-use rsipstack::transport::TransportLayer;
-use rsipstack::transport::SipAddr;
-use rsipstack::transaction::endpoint::EndpointInnerRef;
-use rsipstack::{transaction::Endpoint, EndpointBuilder};
+use rsipstack::{EndpointBuilder, transaction::Endpoint};
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::sync::OnceLock;
-use anyhow::anyhow;
-use rsipstack::transaction::transaction::Transaction;
-use tokio::sync::{mpsc, Mutex, Semaphore};
+use tokio::sync::{Mutex, Semaphore, mpsc};
 use tokio::task::JoinSet;
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, warn};
-use tx_di_core::{tx_comp, App, BoxFuture, CompInit, InnerContext, RIE};
+use tracing::{error, info};
+use tx_di_core::{App, CompInit, RIE, tx_comp};
 
 // ── 性能配置常量 ──────────────────────────────────────────────────────────────
 
@@ -42,12 +40,6 @@ const MAX_CONCURRENT_HANDLERS: usize = 1000;
 
 /// 消息分发 channel 容量（生产者 → 消费者队列）
 const DISPATCH_CHANNEL_CAPACITY: usize = 10_000;
-
-// /// 全局 SIP 端点 Inner 引用，供 `SipSender` 在异步 init 之后访问
-// static ENDPOINT_INNER: OnceLock<EndpointInnerRef> = OnceLock::new();
-//
-// /// 全局取消令牌（用于优雅停止 SIP 服务）
-// static CANCEL_TOKEN: OnceLock<CancellationToken> = OnceLock::new();
 
 /// SIP 插件组件
 ///
@@ -108,7 +100,7 @@ pub struct SipPlugin {
     pub sip_router: SipRouter,
     // 任务
     #[tx_cst(Mutex::new(JoinSet::new()))]
-    tasks: Mutex<JoinSet<()>>
+    tasks: Mutex<JoinSet<()>>,
 }
 
 impl CompInit for SipPlugin {
@@ -118,11 +110,11 @@ impl CompInit for SipPlugin {
         sip_plugin.set_cancel_token(token)?;
         Ok(())
     }
-    
-    fn async_init(ctx: Arc<App>,cancel_token: CancellationToken) -> BoxFuture {
-        let config = ctx.inject::<SipConfig>();
-        let sip_plugin = ctx.inject::<SipPlugin>();
-        Box::pin(async move {
+
+    tx_di_core::async_method!(
+        fn async_init_impl(ctx: Arc<App>, cancel_token: CancellationToken) -> RIE<()> {
+            let config = ctx.inject::<SipConfig>();
+            let sip_plugin = ctx.inject::<SipPlugin>();
             // 构建传输层
             let transport_layer = build_transport_layer(&config, cancel_token.clone()).await?;
             // 构建 Endpoint
@@ -149,8 +141,8 @@ impl CompInit for SipPlugin {
             // 注册sip消息处理器
             info!("SIP 插件启动成功，监听 {}", config.bind_addr());
             Ok(())
-        })
-    }
+        }
+    );
 
     fn init_sort() -> i32 {
         10000
@@ -158,7 +150,6 @@ impl CompInit for SipPlugin {
 }
 
 impl SipPlugin {
-
     /// 注册 SIP 消息处理器
     ///
     /// 向 SIP 路由器注册一个异步消息处理器，用于处理特定类型的 SIP 请求。
@@ -210,17 +201,26 @@ impl SipPlugin {
     ///     }
     /// )?;
     /// ```
-    pub fn add_handler<F, Fut>(&self, method: Option<impl AsRef<str>>, priority: i32, handler: F) -> RIE<()>
+    pub fn add_handler<F, Fut>(
+        &self,
+        method: Option<impl AsRef<str>>,
+        priority: i32,
+        handler: F,
+    ) -> RIE<()>
     where
         F: Fn(Transaction) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = RIE<()>> + Send + 'static, {
+        Fut: Future<Output = RIE<()>> + Send + 'static,
+    {
         self.sip_router.add_handler(method, priority, handler);
         Ok(())
     }
-    
-    pub async fn in_coming(&self) ->RIE<()>{
+
+    pub async fn in_coming(&self) -> RIE<()> {
         // 获取消息接收通道
-        let mut incoming = self.endpoint.get().ok_or("获取 SIP 端点失败")?
+        let mut incoming = self
+            .endpoint
+            .get()
+            .ok_or("获取 SIP 端点失败")?
             .incoming_transactions()
             .map_err(|e| anyhow!("获取 SIP 消息接收通道失败: {}", e))?;
 
@@ -242,8 +242,12 @@ impl SipPlugin {
         let sem = Arc::new(Semaphore::new(max_handlers));
 
         let log_messages = self.config.log_messages;
-        let ep_clone = self.endpoint.get().ok_or("获取 SIP 端点失败")?.inner.clone();
-        let token_clone = self.cancel_token.get().ok_or("获取 cancel_token 失败")?.clone();
+
+        let token_clone = self
+            .cancel_token
+            .get()
+            .ok_or("获取 cancel_token 失败")?
+            .clone();
         let sip_router = self.sip_router.clone();
         let producer_token_clone = token_clone.clone();
 
@@ -273,7 +277,7 @@ impl SipPlugin {
         // 使用handler 处理队列里面的sip消息
         let consumer = async move {
             let mut handlers = FuturesUnordered::new();
-            
+
             // 主循环：接收消息或等待取消信号
             loop {
                 tokio::select! {
@@ -310,7 +314,7 @@ impl SipPlugin {
                     }
                 }
             }
-            
+
             // 等待所有处理中的任务完成
             if !handlers.is_empty() {
                 info!("等待 {} 个处理中的任务完成", handlers.len());
@@ -324,10 +328,11 @@ impl SipPlugin {
         Ok(())
     }
     /// 设置 SIP 端点
-    pub fn set_end_point(&self,end_point: Endpoint)->RIE<()>{
-        Ok(
-            self.endpoint.set(end_point).map_err(|_e|"已经设置过sip端点了")?
-        )
+    pub fn set_end_point(&self, end_point: Endpoint) -> RIE<()> {
+        Ok(self
+            .endpoint
+            .set(end_point)
+            .map_err(|_e| "已经设置过sip端点了")?)
     }
 
     /// 获取 SIP 发送器
@@ -345,7 +350,11 @@ impl SipPlugin {
     /// sender.register("sip:192.168.1.1", "1001", "password").await?;
     /// ```
     pub fn sender(&self) -> RIE<SipSender> {
-        let inner = self.endpoint.get().as_ref().ok_or("未设置sip端点")?
+        let inner = self
+            .endpoint
+            .get()
+            .as_ref()
+            .ok_or("未设置sip端点")?
             .inner
             .clone();
         Ok(SipSender::new(inner))
@@ -356,8 +365,8 @@ impl SipPlugin {
     /// # 返回
     /// - `Ok(())`：成功设置
     /// - `Err(CancellationToken)`：令牌已存在
-    pub fn set_cancel_token(&self,token: CancellationToken)-> RIE<()>{
-        self.cancel_token.set(token).map_err(|_e|"令牌已存在")?;
+    pub fn set_cancel_token(&self, token: CancellationToken) -> RIE<()> {
+        self.cancel_token.set(token).map_err(|_e| "令牌已存在")?;
         Ok(())
     }
 
@@ -366,10 +375,7 @@ impl SipPlugin {
     /// # 返回
     /// - `Ok(CancellationToken)`：成功获取
     pub fn get_cancel_token(&self) -> RIE<CancellationToken> {
-        Ok(self.cancel_token
-            .get()
-            .cloned()
-            .ok_or("令牌尚未设置")?)
+        Ok(self.cancel_token.get().cloned().ok_or("令牌尚未设置")?)
     }
 
     /// 触发优雅关闭（如果令牌已设置）
@@ -377,10 +383,8 @@ impl SipPlugin {
         if let Some(token) = self.cancel_token.get() {
             info!("优雅关闭 SIP 服务...");
             token.cancel();
-
         }
     }
-
 }
 
 // ── 内部辅助函数 ─────────────────────────────────────────────────────────────
@@ -398,11 +402,10 @@ async fn build_transport_layer(
         let udp_conn = UdpConnection::create_connection(
             addr,
             // external_ip 用于 NAT 场景
-            config.external_ip.as_ref().and_then(|ip| {
-                format!("{}:{}", ip, config.port)
-                    .parse::<SocketAddr>()
-                    .ok()
-            }),
+            config
+                .external_ip
+                .as_ref()
+                .and_then(|ip| format!("{}:{}", ip, config.port).parse::<SocketAddr>().ok()),
             Some(cancel_token.child_token()),
         )
         .await
@@ -418,11 +421,10 @@ async fn build_transport_layer(
             r#type: Some(rsipstack::sip::transport::Transport::Tcp),
             addr: addr.into(),
         };
-        let external = config.external_ip.as_ref().and_then(|ip| {
-            format!("{}:{}", ip, config.port)
-                .parse::<SocketAddr>()
-                .ok()
-        });
+        let external = config
+            .external_ip
+            .as_ref()
+            .and_then(|ip| format!("{}:{}", ip, config.port).parse::<SocketAddr>().ok());
 
         let tcp_conn = TcpListenerConnection::new(local_addr, external)
             .await
