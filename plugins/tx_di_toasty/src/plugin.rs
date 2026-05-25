@@ -122,7 +122,7 @@ impl ToastyPlugin {
     pub fn db(&self) -> &ToastyDb {
         self.db
             .get()
-            .expect("ToastyPlugin: db not initialized yet, async_init not completed")
+            .expect("ToastyPlugin: db 还未初始化")
     }
 
     /// 尝试获取 Db 引用（安全版本）
@@ -212,16 +212,16 @@ impl CompInit for ToastyPlugin {
     }
 }
 
-// ── 兼容辅助：手动构建数据库（不依赖 DI 异步初始化）─────────────────────
-//
-// 适用于：
-// - 测试代码
-// - 需要在 DI build() 之前拿到 Db 实例的场景
-// - 工具程序（迁移生成器等）
-//
-// 注意：如果在调用此函数之前已经调用过 `register_models()`，
-//       此处会**重新注册**全局模型并构建新 Db 实例，
-//       DI 容器中的 ToastyPlugin 不会自动感知此次构建。
+/// ── 兼容辅助：手动构建数据库（不依赖 DI 异步初始化）─────────────────────
+///
+/// 适用于：
+/// - 测试代码
+/// - 需要在 DI build() 之前拿到 Db 实例的场景
+/// - 工具程序（迁移生成器等）
+///
+/// 注意：如果在调用此函数之前已经调用过 `register_models()`，
+///       此处会**重新注册**全局模型并构建新 Db 实例，
+///       DI 容器中的 ToastyPlugin 不会自动感知此次构建。
 impl ToastyPlugin {
     /// 使用指定的模型集合和配置构建数据库
     ///
@@ -242,7 +242,7 @@ impl ToastyPlugin {
     /// ).await?;
     /// ```
     pub async fn build_db_with_models(
-        models: toasty::ModelSet,
+        models: ModelSet,
         config: &ToastyConfig,
     ) -> RIE<toasty::Db> {
         let mut builder = toasty::Db::builder();
