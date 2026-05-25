@@ -8,6 +8,61 @@ use crate::di::common::RIE;
 
 pub type BoxFuture = Pin<Box<dyn Future<Output = RIE<()>> + Send>>;
 
+/// 简化异步方法实现的宏
+/// 
+/// 自动生成 `impl Future<Output = RIE<()>> + Send` 返回类型，避免手动编写冗长的类型签名。
+/// 
+/// # 使用场景
+/// 
+/// 在实现 `CompInit` trait 的异步方法时使用此宏，可以简化代码书写。
+/// 
+/// # 示例
+/// 
+/// ```ignore
+/// impl CompInit for MyComponent {
+///     tx_di_core::async_method!(
+///         fn async_init_impl(ctx: Arc<App>, token: CancellationToken) -> RIE<()> {
+///             // 你的初始化逻辑
+///             let plugin = ctx.inject::<MyComponent>();
+///             // ...
+///             Ok(())
+///         }
+///     );
+///     
+///     tx_di_core::async_method!(
+///         fn async_run_impl(ctx: Arc<App>, token: CancellationToken) -> RIE<()> {
+///             // 你的运行逻辑
+///             Ok(())
+///         }
+///     );
+/// }
+/// ```
+/// 
+/// # 展开后
+/// 
+/// 上述代码会被展开为：
+/// 
+/// ```ignore
+/// fn async_init_impl(ctx: Arc<App>, token: CancellationToken) -> impl Future<Output = RIE<()>> + Send {
+///     async move {
+///         // 你的初始化逻辑
+///         Ok(())
+///     }
+/// }
+/// ```
+#[macro_export]
+macro_rules! async_method {
+    (
+        $(#[$meta:meta])*
+        $vis:vis fn $name:ident($($param:ident: $ty:ty),* $(,)?) -> $ret:ty $body:block
+    ) => {
+        $(#[$meta])*
+        $vis fn $name($($param: $ty),*) -> impl ::std::future::Future<Output = $ret> + Send {
+            async move $body
+        }
+    };
+}
+
 /// 工厂函数类型别名
 ///
 /// 用于从组件存储中创建组件实例的工厂闭包类型。
@@ -173,18 +228,39 @@ pub trait CompInit :Any + Send + Sync + 'static{
     }
 
     /// 异步初始化方法
+    #[doc(hidden)]
     #[allow(unused_variables)]
     fn async_init(ctx: Arc<App>,token: CancellationToken) -> BoxFuture {
-        Box::pin(async {
-            Ok(())
-        })
+        Box::pin(Self::async_init_impl(ctx,token))
     }
+    
+    /// 异步初始化实现方法（供用户覆盖）
+    /// 
+    /// 用户应实现此方法而非 `async_init`。
+    /// 可以使用 `tx_di_core::async_method!` 宏简化实现。
+    #[allow(unused_variables)]
+    fn async_init_impl(ctx: Arc<App>, token: CancellationToken) -> impl Future<Output = RIE<()>> + Send {
+        async {
+            Ok(())
+        }
+    }
+    
     /// 异步运行方法
     #[allow(unused_variables)]
+    #[doc(hidden)]
     fn async_run(ctx: Arc<App>,token: CancellationToken) -> BoxFuture {
-        Box::pin(async {
+        Box::pin(Self::async_run_impl(ctx, token))
+    }
+    
+    /// 异步运行实现方法（供用户覆盖）
+    /// 
+    /// 用户应实现此方法而非 `async_run`。
+    /// 可以使用 `tx_di_core::async_method!` 宏简化实现。
+    #[allow(unused_variables)]
+    fn async_run_impl(ctx: Arc<App>, token: CancellationToken) -> impl Future<Output = RIE<()>> + Send {
+        async {
             Ok(())
-        })
+        }
     }
     /// 初始化排序方法
     fn init_sort() -> i32 {
