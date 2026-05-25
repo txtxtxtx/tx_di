@@ -4,7 +4,7 @@
 //!
 //! # State 策略
 //!
-//! 所有 handler 使用 `State<Db>`。
+//! 所有 handler 使用 `State<ToastyDb>`。
 //! SaToken 认证通过 `SaTokenLayer` 完成（注入 extensions），
 //! handler 通过 `LoginIdExtractor` 从 extensions 提取 login_id，
 //! 无需将 `SaTokenState` 放入 axum State。
@@ -16,7 +16,7 @@ use bcrypt::{hash, verify, DEFAULT_COST};
 use serde::{Deserialize, Serialize};
 use tx_di_sa_token::{StpUtil, LoginIdExtractor};
 use tx_di_axum::R;
-use toasty::Db;
+use tx_di_toasty::ToastyDb;
 use crate::models::User;
 
 // ============ 请求/响应 DTO ============
@@ -81,7 +81,7 @@ pub struct UpdateUserReq {
 ///
 /// 返回 `R<LoginRes>`（非 generic impl IntoResponse），确保 R<T> 类型正确推断
 pub async fn login(
-    State(mut db): State<Db>,
+    State(mut db): State<ToastyDb>,
     ExtJson(req): ExtJson<LoginReq>,
 ) -> R<LoginRes> {
     // 查询用户 — toasty 0.6 正确 API
@@ -127,7 +127,7 @@ pub async fn logout() -> R<String> {
 
 /// GET /api/v1/auth/info — 获取当前登录用户信息
 pub async fn get_info(
-    State(mut db): State<Db>,
+    State(mut db): State<ToastyDb>,
     LoginIdExtractor(login_id): LoginIdExtractor,
 ) -> R<UserInfo> {
     let uid: u64 = match login_id.parse() {
@@ -146,7 +146,7 @@ pub async fn get_info(
 
 /// POST /api/v1/users — 创建用户
 pub async fn create_user(
-    State(mut db): State<Db>,
+    State(mut db): State<ToastyDb>,
     ExtJson(req): ExtJson<CreateUserReq>,
 ) -> R<UserInfo> {
     // 检查用户名是否已存在
@@ -179,7 +179,7 @@ pub async fn create_user(
 }
 
 /// GET /api/v1/users — 用户列表
-pub async fn list_users(State(mut db): State<Db>) -> R<Vec<UserInfo>> {
+pub async fn list_users(State(mut db): State<ToastyDb>) -> R<Vec<UserInfo>> {
     match crate::models::User::all().exec(&mut db).await {
         Ok(users) => {
             let infos: Vec<UserInfo> = users.into_iter().map(UserInfo::from).collect();
@@ -192,7 +192,7 @@ pub async fn list_users(State(mut db): State<Db>) -> R<Vec<UserInfo>> {
 /// GET /api/v1/users/:id — 用户详情
 pub async fn get_user(
     Path(id): Path<String>,
-    State(mut db): State<Db>,
+    State(mut db): State<ToastyDb>,
 ) -> R<UserInfo> {
     let id_val: u64 = match id.parse() {
         Ok(v) => v,
@@ -208,7 +208,7 @@ pub async fn get_user(
 /// PUT /api/v1/users/:id — 更新用户
 pub async fn update_user(
     Path(id): Path<String>,
-    State(mut db): State<Db>,
+    State(mut db): State<ToastyDb>,
     ExtJson(req): ExtJson<UpdateUserReq>,
 ) -> R<UserInfo> {
     let id_val: u64 = match id.parse() {
@@ -249,7 +249,7 @@ pub async fn update_user(
 /// DELETE /api/v1/users/:id — 删除用户
 pub async fn delete_user(
     Path(id): Path<String>,
-    State(mut db): State<Db>,
+    State(mut db): State<ToastyDb>,
 ) -> R<String> {
     let id_val: u64 = match id.parse() {
         Ok(v) => v,

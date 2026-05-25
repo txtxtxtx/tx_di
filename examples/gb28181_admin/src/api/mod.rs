@@ -58,6 +58,7 @@ use tx_di_sa_token::{
     SaTokenState,
 };
 use toasty::Db;
+use tx_di_toasty::ToastyDb;
 
 /// 构建 /api/v1/ 路由树
 ///
@@ -67,7 +68,7 @@ use toasty::Db;
 /// # 参数
 /// - `db`: toasty 数据库连接（Clone，线程安全）
 /// - `sa_state`: sa-token 认证状态（Clone，内部用 Arc<SaTokenManager>）
-pub fn router(db: Db, sa_state: SaTokenState) -> Router {
+pub fn router(db: ToastyDb, sa_state: SaTokenState) -> Router {
     // ════════════════════════════════
     //  公开路由（无需认证）
     //  使用 State<Db>，通过 .with_state(db) 注入
