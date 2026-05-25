@@ -11,14 +11,15 @@ use std::cmp::Reverse;
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
-
 // 类型别名：简化复杂函数指针类型的定义
 pub type StoreFactoryFn = fn(&DashMap<TypeId, CompRef>) -> Box<dyn Any + Send + Sync>;
-/// 同步初始化
-type InitFn = fn(Arc<App>,CancellationToken) -> RIE<()>;
-/// 异步初始化
+/// 同步初始化函数类型
+type InitFn = fn(Arc<App>, CancellationToken) -> RIE<()>;
+/// 异步初始化函数类型
+/// 
+/// 使用 BoxFuture 实现动态分发，这是当前 Rust 中处理异构异步函数的标准方式
 type AsyncInitFn = fn(Arc<App>, CancellationToken) -> BoxFuture;
-/// 异步run方法
+/// 异步运行函数类型
 type AsyncRunFn = fn(Arc<App>, CancellationToken) -> BoxFuture;
 
 #[linkme::distributed_slice]
@@ -68,7 +69,9 @@ pub struct ComponentMeta {
 
     pub init_sort_fn: fn() -> i32,
     pub init_fn: Option<InitFn>,
+    /// 异步初始化函数，返回 BoxFuture 以支持动态分发
     pub async_init_fn: Option<AsyncInitFn>,
+    /// 异步运行函数，返回 BoxFuture 以支持动态分发
     pub async_run_fn: Option<AsyncRunFn>,
 }
 
