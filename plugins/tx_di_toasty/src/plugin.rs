@@ -30,9 +30,9 @@
 use crate::config::ToastyConfig;
 use std::sync::{Arc, OnceLock, RwLock};
 use toasty::ModelSet;
-use tx_di_core::{tx_comp, BoxFuture, CompInit, RIE};
-use tx_di_core::App;
 use tokio_util::sync::CancellationToken;
+use tx_di_core::App;
+use tx_di_core::{CompInit, RIE, tx_comp};
 
 /// Toasty 数据库实例的类型别名
 ///
@@ -84,7 +84,6 @@ pub struct ToastyPlugin {
 }
 
 impl ToastyPlugin {
-
     /// 注册数据库模型到插件的模型集合中
     ///
     /// 此方法用于在 DI 容器构建之前将业务模型注册到 Toasty ORM。
@@ -133,8 +132,8 @@ impl ToastyPlugin {
 }
 
 impl CompInit for ToastyPlugin {
-    fn async_init(ctx: Arc<App>, _token: CancellationToken) -> BoxFuture {
-        Box::pin(async move {
+    tx_di_core::async_method!(
+        fn async_init_impl(ctx: Arc<App>, _token: CancellationToken) -> RIE<()> {
             let plugin = ctx.inject::<ToastyPlugin>();
             let config = plugin.config.clone();
 
@@ -146,7 +145,9 @@ impl CompInit for ToastyPlugin {
 
             // ── 同步读取全局模型（不持有锁跨越 await）────────────────
             let models = {
-                let models = plugin.models.read()
+                let models = plugin
+                    .models
+                    .read()
                     .map_err(|e| anyhow::anyhow!("无法获取注册的模型:{e}"))?;
                 models.clone()
             }; // models guard 在这里 drop
@@ -193,9 +194,9 @@ impl CompInit for ToastyPlugin {
             // 自动推送 Schema（开发环境）
             if config.auto_schema {
                 tracing::debug!("正在推送数据库 Schema...");
-                db.push_schema().await.map_err(|e| {
-                    anyhow::anyhow!("Schema 推送失败: {}", e)
-                })?;
+                db.push_schema()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Schema 推送失败: {}", e))?;
                 tracing::debug!("Schema 推送完成");
             }
             // 写入 OnceLock
@@ -204,9 +205,8 @@ impl CompInit for ToastyPlugin {
             }
             tracing::debug!("ToastyPlugin 数据库初始化完成");
             Ok(())
-        })
-    }
-
+        }
+    );
     fn init_sort() -> i32 {
         i32::MIN + 2
     }
@@ -284,9 +284,9 @@ impl ToastyPlugin {
             .map_err(|e| anyhow::anyhow!("数据库连接失败 '{}': {}", config.database_url, e))?;
 
         if config.auto_schema {
-            db.push_schema().await.map_err(|e| {
-                anyhow::anyhow!("Schema 推送失败: {}", e)
-            })?;
+            db.push_schema()
+                .await
+                .map_err(|e| anyhow::anyhow!("Schema 推送失败: {}", e))?;
         }
 
         Ok(db)
@@ -298,7 +298,8 @@ impl ToastyPlugin {
     pub fn build_schema(models: toasty::ModelSet) -> RIE<toasty::schema::app::Schema> {
         let mut builder = toasty::Db::builder();
         builder.models(models);
-        Ok(builder.build_app_schema()
+        Ok(builder
+            .build_app_schema()
             .map_err(|e| anyhow::anyhow!("Schema 构建失败: {}", e))?)
     }
 }
