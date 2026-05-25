@@ -4898,6 +4898,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tx-di-core",
+ "tx_di_axum",
 ]
 
 [[package]]

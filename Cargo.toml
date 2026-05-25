@@ -106,3 +106,5 @@ encoding_rs = "0.8"
 image = {version = "0.25.9", default-features = false}
 
 deku = {version = "0.20"}
+
+sa-token-plugin-axum = {version = "0.1" , default-features = false}

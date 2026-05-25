@@ -3,7 +3,17 @@
 use serde::Deserialize;
 use std::sync::Arc;
 use tx_di_core::{tx_comp, CompInit, InnerContext, RIE};
-use sa_token_plugin_axum::{SaStorage, MemoryStorage};
+use sa_token_plugin_axum::SaStorage;
+// 根据特性导入不同的存储后端
+#[cfg(feature = "memory")]
+use sa_token_plugin_axum::MemoryStorage;
+
+#[cfg(feature = "redis")]
+use sa_token_plugin_axum::RedisStorage;
+
+#[cfg(feature = "database")]
+use sa_token_plugin_axum::DatabaseStorage;
+
 
 /// sa-token 配置结构体
 ///
@@ -146,8 +156,11 @@ impl SaTokenConf {
         &self,
         builder: sa_token_plugin_axum::SaTokenStateBuilder,
     ) -> sa_token_plugin_axum::SaTokenStateBuilder {
+        // 根据特性选择存储后端
+        let storage = Self::create_storage();
+        
         let mut b = builder
-            .storage(Arc::new(MemoryStorage::new()))
+            .storage(storage)
             .token_name(&self.token_name)
             .timeout(self.timeout)
             .active_timeout(self.active_timeout)
@@ -164,6 +177,40 @@ impl SaTokenConf {
         }
 
         b
+    }
+    
+    /// 根据编译特性创建存储后端
+    fn create_storage() -> Arc<dyn SaStorage + Send + Sync> {
+        #[cfg(feature = "memory")]
+        {
+            tracing::info!("使用内存存储后端 (MemoryStorage)");
+            Arc::new(MemoryStorage::new())
+        }
+        
+        #[cfg(feature = "redis")]
+        {
+            tracing::info!("使用 Redis 存储后端 (RedisStorage)");
+            // TODO: 从配置中读取 Redis 连接信息
+            let redis_url = std::env::var("REDIS_URL")
+                .unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+            Arc::new(RedisStorage::new(&redis_url))
+        }
+        
+        #[cfg(feature = "database")]
+        {
+            tracing::info!("使用数据库存储后端 (DatabaseStorage)");
+            // TODO: 从配置中读取数据库连接信息
+            let db_url = std::env::var("DATABASE_URL")
+                .unwrap_or_else(|_| "sqlite://sa_token.db".to_string());
+            Arc::new(DatabaseStorage::new(&db_url))
+        }
+        
+        // 如果没有启用任何存储特性，默认使用内存存储
+        #[cfg(not(any(feature = "memory", feature = "redis", feature = "database")))]
+        {
+            tracing::warn!("未启用任何存储特性，使用默认内存存储");
+            Arc::new(MemoryStorage::new())
+        }
     }
 }
 

@@ -9,13 +9,21 @@ repository.workspace = true
 
 [features]
 default = ["memory"]
+
+# 存储后端特性（互斥，只能选择一个）
+## 内存存储（默认，适用于开发和测试）
 memory = ["sa-token-plugin-axum/memory"]
+
+## Redis 存储（适用于生产环境，支持分布式部署）
 redis = ["sa-token-plugin-axum/redis"]
+
+## 数据库存储（适用于需要持久化的场景）
 database = ["sa-token-plugin-axum/database"]
 
 [dependencies]
 tx-di-core = { path = "../../tx-di-core" }
-sa-token-plugin-axum = { version = "0.1", default-features = false, features = ["axum-08"] }
+tx_di_axum = { path = "../tx_di_axum" }
+sa-token-plugin-axum = { workspace = true, features = ["axum-08"] }
 axum = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
