@@ -76,6 +76,8 @@ impl CompInit for SaTokenPlugin {
         if self.state.set(state).is_err() {
             tracing::warn!("SaTokenPlugin: state concurrently initialized");
         }
+        // todo 注册权限拦截器
+        // tx_di_axum::add_layer(self.build_layer(),9999);
         info!(
                 token_name = %config.token_name,
                 timeout = config.timeout,
