@@ -28,16 +28,15 @@ pub struct WebPlugin {
     pub config: Arc<WebConfig>,
 
     /// Axum 路由器
-    #[tx_cst(Arc::new(OnceLock::new()))]
-    pub router: Arc<OnceLock<Router>>,
+    #[tx_cst(OnceLock::new())]
+    pub router: OnceLock<Router>,
 }
 
 impl CompInit for WebPlugin {
-    fn async_init(ctx: Arc<App>,token: CancellationToken) -> BoxFuture {
+    fn async_init_impl(ctx: Arc<App>,_token: CancellationToken) -> impl Future<Output = RIE<()>> + Send {
         let config = ctx.inject::<WebConfig>();
         let web = ctx.inject::<WebPlugin>();
-
-        Box::pin(async move {
+        async move {
             let router = WebPlugin::merge_routers();
             let app_status = AppStatus { app: ctx.clone() };
             let mut router = router
@@ -67,16 +66,16 @@ impl CompInit for WebPlugin {
             router = WebPlugin::layer_with_router(router);
             web.router.set(router).map_err(|_| "已经设置过路由了")?;
             Ok(())
-        })
+        }
     }
 
-    fn async_run(ctx: Arc<App>, token: CancellationToken) -> BoxFuture {
+    fn async_run_impl(ctx: Arc<App>, token: CancellationToken) -> impl Future<Output = RIE<()>> + Send {
         let config = ctx.inject::<WebConfig>();
         let router = ctx.inject::<WebPlugin>().router.get().unwrap().clone();
-        Box::pin(async move {
+        async move {
             start_server(config, router,token).await?;
             Ok(())
-        })
+        }
     }
     /// 插件初始化排序，最后初始化
     fn init_sort() -> i32 {
