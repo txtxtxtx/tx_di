@@ -230,6 +230,7 @@ pub trait CompInit :Any + Send + Sync + 'static{
     /// 异步初始化方法
     #[doc(hidden)]
     #[allow(unused_variables)]
+    #[inline(always)]
     fn async_init(ctx: Arc<App>,token: CancellationToken) -> BoxFuture {
         Box::pin(Self::async_init_impl(ctx,token))
     }
@@ -248,6 +249,7 @@ pub trait CompInit :Any + Send + Sync + 'static{
     /// 异步运行方法
     #[allow(unused_variables)]
     #[doc(hidden)]
+    #[inline(always)]
     fn async_run(ctx: Arc<App>,token: CancellationToken) -> BoxFuture {
         Box::pin(Self::async_run_impl(ctx, token))
     }
