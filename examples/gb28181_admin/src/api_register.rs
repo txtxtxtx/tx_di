@@ -21,6 +21,7 @@
 //! ```
 
 use std::sync::{Arc, OnceLock};
+use bcrypt::{hash, DEFAULT_COST};
 use toasty::Db;
 use tracing::{error, info, warn};
 use tx_di_axum::WebPlugin;
@@ -91,6 +92,12 @@ impl CompInit for ApiRegisterComponent {
 
             // 4. 设置静态 DB（事件监听器将在后续事件中可用）
             let _ = DB.set(db.clone());
+
+            // 4.5 种子数据：数据库为空时创建默认管理员
+            let toasty_config = ctx.inject::<tx_di_toasty::ToastyConfig>();
+            if let Err(e) = seed_default_admin(&db, &toasty_config.default_admin_password).await {
+                error!(error = %e, "创建默认管理员失败");
+            }
 
             // 5. 从数据库恢复之前在线设备到内存注册表
             if let Err(e) = restore_devices_from_db(&db, &ctx).await {
@@ -247,4 +254,51 @@ async fn restore_devices_from_db(db: &Db, app: &App) -> RIE<()> {
 
     Gb28181Server::restore_devices(app, devices);
     Ok(())
+}
+
+// ── 种子数据 ─────────────────────────────────────────────────────────────────
+
+/// 数据库为空时创建默认管理员用户
+///
+/// - 无用户 → 创建 `admin` / 默认密码
+/// - 已有用户 → 跳过（幂等）
+async fn seed_default_admin(db: &Db, default_password: &str) -> RIE<()> {
+    use crate::models::User;
+
+    // 检查是否已有用户
+    let count = User::all().count().exec(&mut db.clone()).await
+        .unwrap_or(0);
+
+    if count > 0 {
+        info!(user_count = count, "数据库已有用户，跳过种子数据");
+        return Ok(());
+    }
+
+    // 创建默认管理员
+    let password_hash = hash(default_password, DEFAULT_COST)
+        .map_err(|e| anyhow::anyhow!("密码哈希失败: {e}"))?;
+
+    let roles: Vec<String> = vec!["admin".to_string()];
+    let permissions: Vec<String> = Vec::new();
+
+    match toasty::create!(User {
+        username: "admin".to_string(),
+        password_hash,
+        nickname: "管理员".to_string(),
+        roles,
+        permissions,
+    })
+    .exec(&mut db.clone())
+    .await
+    {
+        Ok(_) => {
+            info!("已创建默认管理员 (用户名: admin)");
+            Ok(())
+        }
+        Err(e) => {
+            // 唯一索引冲突（并发场景，另一个进程先创建了）
+            warn!("创建默认管理员失败（可能已存在）: {e}");
+            Ok(()) // 不报错，不阻塞启动
+        }
+    }
 }
