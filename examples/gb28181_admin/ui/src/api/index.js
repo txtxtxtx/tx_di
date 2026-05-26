@@ -10,20 +10,18 @@ const http = axios.create({
 http.interceptors.request.use(config => {
   const token = localStorage.getItem('satoken')
   if (token) {
-    config.headers['Authorization'] = `Bearer ${token}`
+    config.headers['Authorization'] = token
   }
   return config
 })
 
-// 自动处理 401 → 跳登录页
+// 自动处理 401 → 清 token，让路由守卫处理跳转
 http.interceptors.response.use(
   res => res,
   err => {
     if (err.response?.status === 401) {
       localStorage.removeItem('satoken')
-      if (window.location.pathname !== '/admin/login') {
-        window.location.href = '/admin/login'
-      }
+      // 不再手动跳转，路由守卫会自动处理
     }
     return Promise.reject(err)
   }

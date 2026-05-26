@@ -152,7 +152,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useGb28181Store } from '../stores/gb28181.js'
 import api from '../api/index.js'
 

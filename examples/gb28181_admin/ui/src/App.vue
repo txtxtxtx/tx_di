@@ -1,7 +1,7 @@
 <template>
   <div class="layout">
-    <!-- 侧边栏 -->
-    <aside class="sidebar">
+    <!-- 侧边栏（仅登录后显示） -->
+    <aside v-if="isLoggedIn" class="sidebar">
       <div class="sidebar-logo">
         <span class="logo-icon">📡</span>
         <span class="logo-text">GB28181</span>
@@ -24,33 +24,67 @@
     </aside>
 
     <!-- 主内容 -->
-    <main class="main-content">
+    <main :class="isLoggedIn ? 'main-content' : 'main-content--full'">
       <RouterView />
     </main>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useGb28181Store } from './stores/gb28181.js'
 
 const router = useRouter()
+const route  = useRoute()
 const store = useGb28181Store()
 const sseConnected = ref(false)
 
-const navRoutes = computed(() =>
-  router.getRoutes().filter(r => r.meta?.icon)
-)
+// 登录状态（ref，保证响应式）
+const isLoggedIn = ref(!!localStorage.getItem('satoken'))
 
-onMounted(() => {
+// 初始化：连接 SSE + 拉取数据（仅登录后执行）
+function initApp() {
+  if (!isLoggedIn.value) return
   store.connectSSE()
   store.fetchStats()
   store.fetchDevices()
   store.fetchSessions()
   sseConnected.value = true
+}
+
+// 启动时执行一次
+onMounted(() => {
+  initApp()
+  window.addEventListener('storage', syncLoginState)
 })
-onUnmounted(() => store.disconnectSSE())
+onUnmounted(() => {
+  window.removeEventListener('storage', syncLoginState)
+  store.disconnectSSE()
+})
+
+// 跨标签页 localStorage 变化同步
+function syncLoginState() {
+  isLoggedIn.value = !!localStorage.getItem('satoken')
+}
+
+// 路由变化时同步登录状态（同标签页登录后 router.replace 会触发）
+watch(() => route.fullPath, () => {
+  isLoggedIn.value = !!localStorage.getItem('satoken')
+  // 如果刚登录成功，补执行初始化
+  if (isLoggedIn.value && !sseConnected.value) {
+    initApp()
+  }
+})
+
+// 登录状态变为 true 时执行初始化
+watch(isLoggedIn, (val) => {
+  if (val) initApp()
+})
+
+const navRoutes = computed(() =>
+  router.getRoutes().filter(r => r.meta?.icon)
+)
 </script>
 
 <style>
@@ -97,5 +131,10 @@ onUnmounted(() => store.disconnectSSE())
   flex: 1; min-width: 0;
   padding: 28px 32px;
   overflow-y: auto;
+}
+
+/* 全宽（登录页等场景） */
+.main-content--full {
+  flex: 1; min-width: 0;
 }
 </style>

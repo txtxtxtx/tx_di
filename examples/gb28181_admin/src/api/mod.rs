@@ -34,9 +34,9 @@
 //! ## 中间件架构（readonly / write 组）
 //!
 //! ```text
-//! 请求 → SaTokenLayer (解析 token，注入 extensions)
-//!     → SaCheckLoginLayer (检查是否已登录, 401 if not)
-//!         → Handler (通过 LoginIdExtractor 获取 login_id)
+//! 请求 → SaTokenLayer (最外层，解析 token，注入 extensions)
+//!     → SaCheckLoginLayer (检查 extensions 中的 login_id, 401 if not)
+//!         → Handler
 //! ```
 
 pub mod admin;
@@ -117,8 +117,8 @@ pub fn router(db: ToastyDb, sa_state: SaTokenState) -> Router {
         .route("/gb28181/register_audit", get(audit::list_audits))
         .route("/gb28181/register_audit/{id}", get(audit::get_audit))
         .with_state(db.clone())
-        .layer(SaTokenLayer::new(sa_state.clone()))
-        .layer(SaCheckLoginLayer::new());
+        .layer(SaCheckLoginLayer::new())
+        .layer(SaTokenLayer::new(sa_state.clone()));
 
     // ════════════════════════════════
     //  写/控制受保护路由（需登录，POST / PUT / DELETE 操作）
@@ -193,8 +193,8 @@ pub fn router(db: ToastyDb, sa_state: SaTokenState) -> Router {
         .route("/gb28181/register_audit/{id}", delete(audit::delete_audit))
         .route("/gb28181/register_audit/auto_approve", post(audit::auto_approve))
         .with_state(db.clone())
-        .layer(SaTokenLayer::new(sa_state.clone()))
-        .layer(SaCheckLoginLayer::new());
+        .layer(SaCheckLoginLayer::new())
+        .layer(SaTokenLayer::new(sa_state.clone()));
 
     // 合并路由（仅保留版本化 v1 路由）
     Router::new()
