@@ -124,6 +124,31 @@ pub struct Gb28181ServerConfig {
     /// 若同时配置了 `zlm` 和 `media_backend`，`media_backend` 优先生效。
     #[serde(default)]
     pub media_backend: MediaBackendConfig,
+
+    // ── 访问控制 ──────────────────────────────────────────────────────────────
+
+    /// 设备注册白名单（device_id 列表）
+    ///
+    /// 非空时：**仅白名单中的设备允许注册**，其余设备返回 403 Forbidden。
+    /// 空列表（默认）：不启用白名单，所有设备均可注册（但仍受黑名单限制）。
+    ///
+    /// ```toml
+    /// [gb28181_server_config]
+    /// allowed_device_ids = ["34020000001320000001", "34020000001320000002"]
+    /// ```
+    #[serde(default)]
+    pub allowed_device_ids: Vec<String>,
+
+    /// 设备注册黑名单（device_id 列表）
+    ///
+    /// 黑名单中的设备**始终被拒绝注册**（403 Forbidden），优先级高于白名单。
+    ///
+    /// ```toml
+    /// [gb28181_server_config]
+    /// blocked_device_ids = ["34020000001990000099"]
+    /// ```
+    #[serde(default)]
+    pub blocked_device_ids: Vec<String>,
 }
 
 impl Default for Gb28181ServerConfig {
@@ -140,6 +165,8 @@ impl Default for Gb28181ServerConfig {
             media: MediaConfig::default(),
             media_backend: MediaBackendConfig::default(),
             cascade: CascadeConfig::default(),
+            allowed_device_ids: Vec::new(),
+            blocked_device_ids: Vec::new(),
         }
     }
 }
@@ -208,5 +235,27 @@ impl Gb28181ServerConfig {
             .get(device_id)
             .map(|s| s.as_str())
             .unwrap_or(&self.auth_password)
+    }
+
+    /// 检查设备是否允许注册（ACL 白名单/黑名单）
+    ///
+    /// 返回 `Ok(())` 表示允许，`Err(reason)` 表示拒绝。
+    ///
+    /// 规则优先级：
+    /// 1. 黑名单命中 → 拒绝（黑名单优先）
+    /// 2. 白名单非空且未命中 → 拒绝
+    /// 3. 其余情况 → 允许
+    pub fn check_device_allowed(&self, device_id: &str) -> Result<(), String> {
+        // 黑名单优先
+        if self.blocked_device_ids.iter().any(|id| id == device_id) {
+            return Err(format!("设备 {device_id} 在黑名单中"));
+        }
+        // 白名单非空时，必须在白名单中
+        if !self.allowed_device_ids.is_empty()
+            && !self.allowed_device_ids.iter().any(|id| id == device_id)
+        {
+            return Err(format!("设备 {device_id} 不在白名单中"));
+        }
+        Ok(())
     }
 }

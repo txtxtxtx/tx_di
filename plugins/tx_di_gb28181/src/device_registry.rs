@@ -229,6 +229,23 @@ impl DeviceRegistry {
         }
     }
 
+    /// 静默恢复设备（不触发日志，用于服务启动时从数据库恢复）
+    ///
+    /// 与 `register()` 不同，此方法不输出 info 日志，且默认标记为离线，
+    /// 因为服务刚启动时无法确定设备是否仍在网。
+    pub fn restore(&self, mut device: GbDevice) {
+        device.online = false;
+        let device_id = device.device_id.clone();
+        self.inner.insert(device_id, device);
+    }
+
+    /// 批量静默恢复设备
+    pub fn restore_batch(&self, devices: Vec<GbDevice>) {
+        for dev in devices {
+            self.restore(dev);
+        }
+    }
+
     // ── 超时检测 ─────────────────────────────────────────────────────────────
 
     /// 检查所有设备心跳超时，返回超时设备 ID 列表

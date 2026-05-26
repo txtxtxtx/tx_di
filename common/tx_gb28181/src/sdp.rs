@@ -106,6 +106,7 @@ c=IN {addr_type} {addr}\r\n\
 {t_field}\
 m=video {rtp_port} RTP/AVP 96\r\n\
 a=recvonly\r\n\
+a=rtcp:{rtcp_port}\r\n\
 a=rtpmap:96 PS/90000\r\n\
 y={ssrc}\r\n",
         session_id = session_id,
@@ -114,6 +115,7 @@ y={ssrc}\r\n",
         session_name = session_name,
         t_field = t_field,
         rtp_port = rtp_port,
+        rtcp_port = rtp_port + 1,
         ssrc = ssrc
     );
 
@@ -179,6 +181,7 @@ c=IN {addrtype} {addr}\r\n\
 {t_field}\
 m=video {rtp_port} RTP/AVP 96\r\n\
 a=sendonly\r\n\
+a=rtcp:{rtcp_port}\r\n\
 a=rtpmap:96 PS/90000\r\n\
 y={ssrc}\r\n",
         device_id = device_id,
@@ -188,6 +191,7 @@ y={ssrc}\r\n",
         session_name = session_name,
         t_field = t_field,
         rtp_port = rtp_port,
+        rtcp_port = rtp_port + 1,
         ssrc = ssrc
     );
 
@@ -413,17 +417,21 @@ c=IN {addrtype} {addr}\r\n\
 t=0 0\r\n\
 m=video {video_port} RTP/AVP 96\r\n\
 a=sendonly\r\n\
+a=rtcp:{video_rtcp_port}\r\n\
 a=rtpmap:96 PS/90000\r\n\
 y={ssrc}\r\n\
 m=audio {audio_port} RTP/AVP {audio_pt}\r\n\
 a=sendonly\r\n\
+a=rtcp:{audio_rtcp_port}\r\n\
 a=rtpmap:{audio_pt} {audio_rtpmap}\r\n\
 y={ssrc}\r\n",
         session_id = session_id,
         addrtype = addrtype,
         addr = addr,
         video_port = video_port,
+        video_rtcp_port = video_port + 1,
         audio_port = audio_port,
+        audio_rtcp_port = audio_port + 1,
         audio_pt = audio_pt,
         audio_rtpmap = audio_rtpmap,
         ssrc = ssrc

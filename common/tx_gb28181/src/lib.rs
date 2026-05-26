@@ -9,6 +9,7 @@
 //! - [`event`]：事件类型（`Gb28181Event`）+ 全局广播基础设施（`subscribe` / `emit`）
 //! - [`xml`]：MANSCDP XML 构建与解析（PTZ / 目录 / 录像 / 报警 / 时间同步…）
 //! - [`sdp`]：SDP 构建与解析（点播 / 回放 / 对讲 / 抓拍…）
+//! - [`rtcp`]：RTCP 包解析与流媒体 QoS 统计（丢包率 / 抖动 / RTT / 码率）
 
 pub mod cmd_type;
 pub mod device;
@@ -19,6 +20,7 @@ pub mod xml;
 pub mod ps;
 pub mod enums;
 pub mod utils;
+pub mod rtcp;
 // ── 便捷再导出 ──────────────────────────────────────────────────────────────
 
 pub use cmd_type::Gb28181CmdType;
