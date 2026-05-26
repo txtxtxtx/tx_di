@@ -33,7 +33,8 @@ use tx_di_log;
 async fn main() -> anyhow::Result<()> {
     // examples/gb28181_admin/config/config.toml
     // C:\a_me\proj\rust\tx_di\examples\gb28181_admin\config\config.toml
-    let app = BuildContext::new(Some(r"C:\a_me\proj\rust\tx_di\examples\gb28181_admin\config\config.toml"))
+    // D:\proj\tx_di\examples\gb28181_admin\config\config.toml
+    let app = BuildContext::new(Some(r"D:\proj\tx_di\examples\gb28181_admin\config\config.toml"))
         .build()?
         .ins_run()
         .await?;
