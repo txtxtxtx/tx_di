@@ -1,0 +1,16 @@
+[package]
+name = "tx_di_meeting"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Server API
+livekit-api = {workspace = true,features = ["default"]}
+# Real-time SDK
+#livekit = {workspace = true,features = ["default"]}
+
+tokio= {workspace = true}

@@ -19,7 +19,7 @@ members = [
     "plugins/tx_di_can",
     # app
     # 国标设备模拟
-    "examples/gb_cams",
+#    "examples/gb_cams",
     # 国标服务
     "examples/gb28181_admin",
     # 国标公共模块
@@ -27,7 +27,7 @@ members = [
     # 数据库orm
     "plugins/tx_di_toasty",
     # 认证授权
-    "plugins/tx_di_sa_token",
+    "plugins/tx_di_sa_token", "examples/tx_di_meeting",
 ]
 resolver = "3"
 [workspace.package]
@@ -108,3 +108,6 @@ image = {version = "0.25.9", default-features = false}
 deku = {version = "0.20"}
 
 sa-token-plugin-axum = {version = "0.1" , default-features = false}
+
+livekit-api = {version = "0.4",default-features = false}
+livekit = {version = "0.7.42" , default-features = false}
