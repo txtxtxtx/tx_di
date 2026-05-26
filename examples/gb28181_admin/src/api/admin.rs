@@ -575,16 +575,15 @@ pub async fn dashboard(
         Err(_) => 0,
     };
 
-    // 未处理报警（status = 0）— 用内存过滤（status 无 index 时用通用查询）
-    let pending_records = match GbAlarmRecord::all()
-        .limit(10000)   // 合理上限
+    // 未处理报警（status = 0）— 数据库层 count，避免全表加载
+    let pending_alarms = match GbAlarmRecord::filter_by_status(0)
+        .count()
         .exec(&mut db)
         .await
     {
-        Ok(r) => r,
-        Err(_) => vec![],
+        Ok(n) => n,
+        Err(_) => 0,
     };
-    let pending_alarms = pending_records.iter().filter(|r| r.status == 0).count() as u64;
     let handled_alarms = total_alarms.saturating_sub(pending_alarms);
 
     R::ok(DashboardDto {
