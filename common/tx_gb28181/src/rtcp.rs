@@ -96,7 +96,9 @@ impl RtcpStatsCollector {
 /// RTCP 包类型常量
 const RTCP_SR: u8 = 200;
 const RTCP_RR: u8 = 201;
+#[allow(dead_code)]
 const RTCP_SDES: u8 = 202;
+#[allow(dead_code)]
 const RTCP_BYE: u8 = 203;
 
 /// RTCP 公共头大小（字节）：V/P/RC(1) + PT(1) + length(2) = 4

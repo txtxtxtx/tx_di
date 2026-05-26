@@ -21,8 +21,8 @@ http.interceptors.response.use(
   err => {
     if (err.response?.status === 401) {
       localStorage.removeItem('satoken')
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
+      if (window.location.pathname !== '/admin/login') {
+        window.location.href = '/admin/login'
       }
     }
     return Promise.reject(err)

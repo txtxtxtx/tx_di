@@ -147,7 +147,7 @@
           <label>备注</label>
           <textarea v-model="handleRemark" class="textarea" rows="3" placeholder="处理说明..."></textarea>
         </div>
-        <div style="text-align:right;margin-top:16px" class="flex gap-8" style="justify-content:flex-end">
+        <div style="text-align:right;margin-top:16px;justify-content:flex-end" class="flex gap-8">
           <button class="btn btn-primary" @click="submitHandle" :disabled="handleLoading">
             <span v-if="handleLoading" class="spinner" style="width:12px;height:12px;border-width:2px"></span>
             提交
