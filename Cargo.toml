@@ -28,6 +28,10 @@ members = [
     "plugins/tx_di_toasty",
     # 认证授权
     "plugins/tx_di_sa_token", "examples/tx_di_meeting",
+    # 文件存储
+    "plugins/tx_di_file",
+    # 后台管理系统
+    "examples/admin_server",
 ]
 resolver = "3"
 [workspace.package]
@@ -48,6 +52,7 @@ tx_gb28181 = { path = "common/tx_gb28181" }
 # linkme 用于跨 crate 在链接期收集静态数组切片
 # 基于 ELF/Mach-O/PE 的自定义 link section，完全零运行时开销
 linkme = "0.3"
+tx_di_file = { path = "plugins/tx_di_file"}
 
 # DashMap：无锁并发 HashMap，支持跨线程共享的组件注册表
 dashmap = "6"
