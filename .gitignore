@@ -4,3 +4,6 @@ local/
 logs
 .workbuddy
 plugins/tx_di_axum/static
+examples/gb_cams/ui/dist
+examples/gb_cams/ui/node_modules
+gb28181.db
