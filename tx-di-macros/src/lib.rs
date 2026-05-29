@@ -70,7 +70,7 @@ pub fn tx_cst(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     Unknown,
 /// }
 /// ```
-#[proc_macro_derive(CodeMsg, attributes(err))]
+#[proc_macro_derive(CodeMsg, attributes(err, ie))]
 pub fn derive_code_msg(input: TokenStream) -> TokenStream {
     code_msg::derive_code_msg_impl(input)
 }

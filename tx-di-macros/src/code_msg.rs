@@ -149,6 +149,15 @@ fn expand_code_msg(input: &DeriveInput) -> SynResult<TokenStream2> {
         }
     };
 
+    // 解析可选的 #[ie(tx_di_core::IE)] 属性
+    let ie_path: Option<syn::Path> = input.attrs.iter().find_map(|attr| {
+        if attr.path().is_ident("ie") {
+            attr.parse_args::<syn::Path>().ok()
+        } else {
+            None
+        }
+    });
+
     // 解析每个变体
     let variants = match &input.data {
         Data::Enum(data) => &data.variants,
@@ -199,7 +208,7 @@ fn expand_code_msg(input: &DeriveInput) -> SynResult<TokenStream2> {
         })
         .collect();
 
-    let output = quote! {
+    let mut output = quote! {
         impl #crate_path::CodeMsg for #enum_name {
             fn err_code(self) -> #crate_path::AppErrCode {
                 match self {
@@ -222,6 +231,17 @@ fn expand_code_msg(input: &DeriveInput) -> SynResult<TokenStream2> {
             }
         }
     };
+
+    // 如果指定了 #[ie(...)]，额外生成 From<EnumName> for IE
+    if let Some(ie_ty) = ie_path {
+        output.extend(quote! {
+            impl From<#enum_name> for #ie_ty {
+                fn from(e: #enum_name) -> Self {
+                    #ie_ty::Business(<#enum_name as #crate_path::CodeMsg>::err_code(e))
+                }
+            }
+        });
+    }
 
     Ok(output)
 }

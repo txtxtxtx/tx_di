@@ -357,7 +357,7 @@ impl App {
             match handle.await {
                 Ok(Ok(_)) => {}
                 Ok(Err(e)) => errors.push(e),
-                Err(e) => errors.push(IE::Other(format!("{}: {}", DiErr::TaskPanic.message(), e))),
+                Err(e) => errors.push(IE::Internal(anyhow::anyhow!("{}: {}", DiErr::TaskPanic.message(), e))),
             }
         }
 
