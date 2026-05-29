@@ -62,6 +62,8 @@ pub mod mediamtx;
 pub mod null;
 pub mod zlm;
 
+use crate::err::GbErr;
+use tx_di_core::IE;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::sync::Arc;
@@ -362,7 +364,7 @@ pub trait MediaBackend: Send + Sync + 'static {
         _stream_id: &str,
         _source_url: &str,
     ) -> RIE<StreamProxyHandle> {
-        Err("当前流媒体后端不支持拉流代理".into())
+        Err(IE::from(GbErr::UnsupportedOperation))
     }
 
     /// 删除拉流代理

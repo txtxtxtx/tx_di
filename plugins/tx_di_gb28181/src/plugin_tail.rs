@@ -1,3 +1,4 @@
+use crate::err::GbErr;
 use crate::event::{self, Gb28181Event};
 use crate::media::{OpenRtpRequest, PlayUrls};
 use crate::plugin::{Gb28181Server, SessionInfo};
@@ -406,9 +407,9 @@ impl Gb28181Server {
         let (state_tx, mut state_rx) = dialog_layer.new_dialog_state_channel();
 
         let caller_uri = rsip::Uri::try_from(caller_str.as_str())
-            .map_err(|e| anyhow::anyhow!("无效的主叫 URI: {}", e))?;
+            .map_err(|_| GbErr::InvalidUri)?;
         let callee_uri = rsip::Uri::try_from(callee_str.as_str())
-            .map_err(|e| anyhow::anyhow!("无效的被叫 URI: {}", e))?;
+            .map_err(|_| GbErr::InvalidUri)?;
 
         let invite_option = InviteOption {
             caller: caller_uri.clone(),
@@ -423,7 +424,7 @@ impl Gb28181Server {
         let (dialog, resp) = dialog_layer
             .do_invite(invite_option, state_tx)
             .await
-            .map_err(|e| anyhow::anyhow!("抓拍 INVITE 失败: {}", e))?;
+            .map_err(|_| GbErr::InviteFailed)?;
 
         let call_id = dialog.id().call_id.clone();
         let image_url = if let Some(response) = resp {
@@ -623,9 +624,9 @@ impl Gb28181Server {
         let (state_tx, mut state_rx) = dialog_layer.new_dialog_state_channel();
 
         let caller_uri = rsip::Uri::try_from(caller_str.as_str())
-            .map_err(|e| anyhow::anyhow!("无效的主叫 URI: {}", e))?;
+            .map_err(|_| GbErr::InvalidUri)?;
         let callee_uri = rsip::Uri::try_from(callee_str.as_str())
-            .map_err(|e| anyhow::anyhow!("无效的被叫 URI: {}", e))?;
+            .map_err(|_| GbErr::InvalidUri)?;
 
         let invite_option = InviteOption {
             caller: caller_uri.clone(),
@@ -640,7 +641,7 @@ impl Gb28181Server {
         let (dialog, resp) = dialog_layer
             .do_invite(invite_option, state_tx)
             .await
-            .map_err(|e| anyhow::anyhow!("对讲 INVITE 失败: {}", e))?;
+            .map_err(|_| GbErr::InviteFailed)?;
 
         let call_id = dialog.id().call_id.clone();
 
@@ -1081,7 +1082,7 @@ impl Gb28181Server {
     fn get_dev_or_err(&self, device_id: &str) -> anyhow::Result<GbDevice> {
         self.device_registry
             .get(device_id)
-            .ok_or_else(|| anyhow::anyhow!("设备 {} 未注册或已离线", device_id))
+            .ok_or_else(|| anyhow::Error::from(GbErr::DeviceNotFound))
     }
 
     fn next_sn(&self) -> u32 {
@@ -1142,7 +1143,7 @@ impl Gb28181Server {
         let rtp_handle = media
             .open_rtp_server(OpenRtpRequest::udp(&stream_id))
             .await
-            .map_err(|e| anyhow::anyhow!("开启 RTP 端口失败: {}，请检查流媒体后端配置", e))?;
+            .map_err(|_| GbErr::RtpPortFailed)?;
         let rtp_port = rtp_handle.port;
 
         info!(
@@ -1205,9 +1206,9 @@ impl Gb28181Server {
 
         // 解析主叫和被叫SIP URI
         let caller_uri = rsip::Uri::try_from(caller_str.as_str())
-            .map_err(|e| anyhow::anyhow!("无效的主叫 URI: {}", e))?;
+            .map_err(|_| GbErr::InvalidUri)?;
         let callee_uri = rsip::Uri::try_from(callee_str.as_str())
-            .map_err(|e| anyhow::anyhow!("无效的被叫 URI: {}", e))?;
+            .map_err(|_| GbErr::InvalidUri)?;
 
         let invite_option = InviteOption {
             caller: caller_uri.clone(),
@@ -1223,7 +1224,7 @@ impl Gb28181Server {
         let (dialog, _resp) = dialog_layer
             .do_invite(invite_option, state_tx)
             .await
-            .map_err(|e| anyhow::anyhow!("INVITE 失败: {}", e))?;
+            .map_err(|_| GbErr::InviteFailed)?;
 
         let call_id = dialog.id().call_id.clone();
 
@@ -1326,7 +1327,7 @@ impl Gb28181Server {
         let inner = sender.inner();
 
         let req_uri = rsip::Uri::try_from(contact)
-            .map_err(|e| anyhow::anyhow!("无效的设备 Contact URI '{}': {}", contact, e))?;
+            .map_err(|_| GbErr::InvalidUri)?;
 
         let platform_id = &self.config.platform_id;
         let sip_ip = &self.config.sip_ip;
@@ -1372,7 +1373,7 @@ impl Gb28181Server {
         let mut tx = Transaction::new_client(key, request, inner, None);
         tx.send()
             .await
-            .map_err(|e| anyhow::anyhow!("发送 MESSAGE 失败: {}", e))?;
+            .map_err(|_| GbErr::MessageSendFailed)?;
 
         Ok(())
     }

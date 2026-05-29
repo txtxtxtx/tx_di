@@ -1,5 +1,6 @@
 //! CAN/CANFD 上位机插件主体
 
+use crate::err::CanErr;
 use crate::adapter::create_adapter;
 use crate::adapter::CanAdapter;
 use crate::config::CanConfig;

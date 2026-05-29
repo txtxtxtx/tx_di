@@ -17,6 +17,7 @@
 
 use crate::config::CascadeConfig;
 use crate::device_registry::DeviceRegistry;
+use crate::err::GbErr;
 use rsipstack::sip as rsip;
 use rsipstack::sip::{SipMessage, StatusCode};
 use rsipstack::transaction::key::{TransactionKey, TransactionRole};
@@ -147,15 +148,15 @@ impl CascadeLower {
 
         let req_uri_str = &self.upper_sip;
         let req_uri = rsip::Uri::try_from(req_uri_str.as_str())
-            .map_err(|e| anyhow::anyhow!("无效的上级 URI '{req_uri_str}': {e}"))?;
+            .map_err(|_| GbErr::InvalidUri)?;
 
         let from_str = format!("sip:{}@{}", self.local_platform_id, self.local_sip_ip);
         let from_uri = rsip::Uri::try_from(from_str.as_str())
-            .map_err(|e| anyhow::anyhow!("无效的 From URI: {e}"))?;
+            .map_err(|_| GbErr::InvalidUri)?;
 
         let to_str = format!("sip:{}@{}", self.upper_platform_id, self.local_sip_ip);
         let to_uri = rsip::Uri::try_from(to_str.as_str())
-            .map_err(|e| anyhow::anyhow!("无效的 To URI: {e}"))?;
+            .map_err(|_| GbErr::InvalidUri)?;
 
         let via = inner
             .get_via(None, None)
@@ -216,7 +217,7 @@ impl CascadeLower {
         let mut tx = Transaction::new_client(key, request, inner, None);
         tx.send()
             .await
-            .map_err(|e| anyhow::anyhow!("发送 REGISTER 失败: {e}"))?;
+            .map_err(|_| GbErr::RegisterFailed)?;
 
         // 等待响应（超时 5 秒）
         match tokio::time::timeout(Duration::from_secs(5), tx.tu_receiver.recv()).await {
@@ -282,11 +283,11 @@ impl CascadeLower {
         let inner = sender.inner();
 
         let req_uri = rsip::Uri::try_from(self.upper_sip.as_str())
-            .map_err(|e| anyhow::anyhow!("无效的上级 URI: {e}"))?;
+            .map_err(|_| GbErr::InvalidUri)?;
 
         let from_str = format!("sip:{}@{}", self.local_platform_id, self.local_sip_ip);
         let from_uri = rsip::Uri::try_from(from_str.as_str())
-            .map_err(|e| anyhow::anyhow!("无效的 From URI: {e}"))?;
+            .map_err(|_| GbErr::InvalidUri)?;
 
         let via = inner
             .get_via(None, None)
@@ -326,7 +327,7 @@ impl CascadeLower {
         let mut tx = Transaction::new_client(key, request, inner, None);
         tx.send()
             .await
-            .map_err(|e| anyhow::anyhow!("发送注销失败: {e}"))?;
+            .map_err(|_| GbErr::UnregisterFailed)?;
 
         info!("下级平台已向上级注销");
         Ok(())
@@ -375,11 +376,11 @@ impl CascadeLower {
         let inner = sender.inner();
 
         let req_uri = rsip::Uri::try_from(self.upper_sip.as_str())
-            .map_err(|e| anyhow::anyhow!("无效的上级 URI: {e}"))?;
+            .map_err(|_| GbErr::InvalidUri)?;
 
         let from_str = format!("sip:{}@{}", self.local_platform_id, self.local_sip_ip);
         let from_uri = rsip::Uri::try_from(from_str.as_str())
-            .map_err(|e| anyhow::anyhow!("无效的 From URI: {e}"))?;
+            .map_err(|_| GbErr::InvalidUri)?;
 
         let via = inner
             .get_via(None, None)
@@ -394,7 +395,7 @@ impl CascadeLower {
         };
 
         let to_uri = rsip::Uri::try_from(self.upper_sip.as_str())
-            .map_err(|e| anyhow::anyhow!("无效的 To URI: {e}"))?;
+            .map_err(|_| GbErr::InvalidUri)?;
 
         let mut request = inner.make_request(
             rsip::method::Method::Message,
@@ -423,7 +424,7 @@ impl CascadeLower {
         let mut tx = Transaction::new_client(key, request, inner, None);
         tx.send()
             .await
-            .map_err(|e| anyhow::anyhow!("发送级联 MESSAGE 失败: {e}"))?;
+            .map_err(|_| GbErr::MessageSendFailed)?;
 
         debug!(sn = seq, "级联 MESSAGE 发送成功");
         Ok(())

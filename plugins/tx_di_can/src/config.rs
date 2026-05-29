@@ -1,5 +1,6 @@
 //! CAN/CANFD 插件配置（纯配置结构，不进入 DI）
 
+use crate::err::CanErr;
 use serde::{Deserialize, Serialize};
 
 /// 适配器类型
@@ -121,7 +122,7 @@ impl CanConfig {
         let table: Option<&toml::map::Map<String, toml::Value>> =
             value.get("can_config").and_then(|v| v.as_table());
         let table = table.ok_or_else(|| {
-            anyhow::anyhow!("配置文件中缺少 [can_config] 段")
+            CanErr::ConfigLoadFailed
         })?;
         let config: CanConfig = toml::from_str(&toml::to_string(table)?)?;
         Ok(config)

@@ -33,6 +33,7 @@ use toasty::ModelSet;
 use tokio_util::sync::CancellationToken;
 use tx_di_core::App;
 use tx_di_core::{CompInit, RIE, tx_comp};
+use crate::ToastyErr;
 
 /// Toasty 数据库实例的类型别名
 ///
@@ -148,7 +149,7 @@ impl CompInit for ToastyPlugin {
                 let models = plugin
                     .models
                     .read()
-                    .map_err(|e| anyhow::anyhow!("无法获取注册的模型:{e}"))?;
+                    .map_err(|_| ToastyErr::ModelRegistryError)?;
                 models.clone()
             }; // models guard 在这里 drop
             tracing::debug!(url = %config.database_url, "正在连接数据库...");
@@ -190,13 +191,13 @@ impl CompInit for ToastyPlugin {
             let db = builder
                 .connect(&config.database_url)
                 .await
-                .map_err(|e| anyhow::anyhow!("数据库连接失败 '{}': {}", config.database_url, e))?;
+                .map_err(|_| ToastyErr::ConnectionFailed)?;
             // 自动推送 Schema（开发环境）
             if config.auto_schema {
                 tracing::debug!("正在推送数据库 Schema...");
                 db.push_schema()
                     .await
-                    .map_err(|e| anyhow::anyhow!("Schema 推送失败: {}", e))?;
+                    .map_err(|_| ToastyErr::SchemaPushFailed)?;
                 tracing::debug!("Schema 推送完成");
             }
             // 写入 OnceLock
@@ -300,6 +301,6 @@ impl ToastyPlugin {
         builder.models(models);
         Ok(builder
             .build_app_schema()
-            .map_err(|e| anyhow::anyhow!("Schema 构建失败: {}", e))?)
+            .map_err(|_| ToastyErr::SchemaBuildFailed)?)
     }
 }

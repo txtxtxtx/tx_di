@@ -6,6 +6,7 @@
 //! - **PCAN**：PEAK PCAN USB 设备（Windows），需要 `features = ["pcan"]`
 
 pub use crate::config::AdapterKind;
+use crate::err::CanErr;
 use crate::frame::{CanFdFrame, CanFrame};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -380,7 +381,7 @@ impl CanAdapter for SocketCanAdapter {
         }
 
         #[cfg(not(target_os = "linux"))]
-        Err(anyhow::anyhow!("SocketCAN TX 不支持当前平台"))
+        Err(anyhow::Error::from(CanErr::UnsupportedPlatform))
     }
 
     async fn send_fd(&self, _frame: &CanFdFrame) -> Result<()> {
@@ -430,7 +431,7 @@ impl CanAdapter for SocketCanAdapter {
         }
 
         #[cfg(not(target_os = "linux"))]
-        Err(anyhow::anyhow!("SocketCAN FD TX 不支持当前平台"))
+        Err(anyhow::Error::from(CanErr::UnsupportedPlatform))
     }
 
     fn subscribe(&self) -> broadcast::Receiver<CanFrame> {
@@ -549,7 +550,7 @@ mod pcan_impl {
             }
 
             let dll = dll.ok_or_else(|| {
-                anyhow::anyhow!("未找到 pcanbasic.dll。请安装 PEAK PCAN-Basic SDK。")
+                anyhow::Error::from(CanErr::DllNotFound)
             })?;
 
             let get_sym = |name: &str| -> anyhow::Result<unsafe extern "system" fn() -> isize> {
@@ -702,12 +703,12 @@ impl CanAdapter for PcanAdapter {
     async fn send(&self, _frame: &CanFrame) -> Result<()> {
         #[allow(unused_variables)]
         let _ = _frame;
-        Err(anyhow::anyhow!("PCAN 适配器不可用"))
+        Err(CanErr::AdapterUnavailable)
     }
     async fn send_fd(&self, _frame: &CanFdFrame) -> Result<()> {
         #[allow(unused_variables)]
         let _ = _frame;
-        Err(anyhow::anyhow!("PCAN FD 适配器不可用"))
+        Err(CanErr::AdapterUnavailable)
     }
     fn subscribe(&self) -> broadcast::Receiver<CanFrame> {
         let (tx, _) = broadcast::channel(1);
@@ -741,7 +742,7 @@ impl CanAdapter for PcanAdapter {
         // 打开设备
         let handle = unsafe { (pcan.CAN_Open)(channel) };
         if handle == 0 || handle == -1isize {
-            return Err(anyhow::anyhow!("PCAN: CAN_Open({:#x}) 失败", channel));
+            return Err(anyhow::Error::from(CanErr::AdapterOpenFailed));
         }
 
         // 初始化波特率（hwtype=0 表示 USB）

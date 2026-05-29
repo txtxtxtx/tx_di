@@ -8,6 +8,7 @@ use rsipstack::dialog::invitation::InviteOption;
 use rsipstack::dialog::registration::Registration;
 use rsipstack::sip as rsip;
 use rsipstack::transaction::endpoint::EndpointInnerRef;
+use crate::SipErr;
 use std::sync::Arc;
 use tracing::info;
 
@@ -65,7 +66,7 @@ impl SipSender {
             }
             .as_str(),
         )
-        .map_err(|e| anyhow::anyhow!("无效的注册服务器地址 '{}': {}", registrar, e))?;
+        .map_err(|_| SipErr::InvalidUri)?;
 
         // 认证信息
         let credential = Credential {
@@ -78,7 +79,7 @@ impl SipSender {
         let resp = reg
             .register(registrar_uri, None)
             .await
-            .map_err(|e| anyhow::anyhow!("REGISTER 失败: {}", e))?;
+            .map_err(|_| SipErr::RegisterFailed)?;
 
         info!(status = %resp.status_code, "REGISTER 响应");
         Ok(resp)
@@ -120,9 +121,9 @@ impl SipSender {
         Option<rsip::Response>,
     )> {
         let caller_uri = rsip::Uri::try_from(caller)
-            .map_err(|e| anyhow::anyhow!("无效的主叫 URI '{}': {}", caller, e))?;
+            .map_err(|_| SipErr::InvalidUri)?;
         let callee_uri = rsip::Uri::try_from(callee)
-            .map_err(|e| anyhow::anyhow!("无效的被叫 URI '{}': {}", callee, e))?;
+            .map_err(|_| SipErr::InvalidUri)?;
 
         let dialog_layer = Arc::new(DialogLayer::new(self.endpoint.clone()));
         let (state_sender, _state_receiver) = dialog_layer.new_dialog_state_channel();
@@ -140,7 +141,7 @@ impl SipSender {
         let (dialog, resp) = dialog_layer
             .do_invite(invite_option, state_sender)
             .await
-            .map_err(|e| anyhow::anyhow!("INVITE 失败: {}", e))?;
+            .map_err(|_| SipErr::InviteFailed)?;
 
         Ok((dialog, resp))
     }

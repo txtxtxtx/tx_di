@@ -37,6 +37,7 @@
 use super::{
     MediaBackend, MediaStreamInfo, OpenRtpRequest, PlayUrls, RtpServerHandle,
 };
+use crate::err::GbErr;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::net::UdpSocket;
@@ -253,7 +254,7 @@ impl MediaBackend for MediaMtxBackend {
         let port = if req.port != 0 {
             req.port
         } else {
-            self.allocate_port().map_err(|e| IE::Internal(anyhow::anyhow!(e)))?
+            self.allocate_port().map_err(|_| IE::from(GbErr::MediaApiRequestFailed))?
         };
 
         self.rtp_ports
@@ -331,7 +332,7 @@ impl MediaBackend for MediaMtxBackend {
         let resp: MtxPathListResponse = self
             .api_get("/v3/paths/list")
             .await
-            .map_err(|e| IE::Internal(anyhow::anyhow!(e)))?;
+            .map_err(|_| IE::from(GbErr::MediaApiRequestFailed))?;
 
         Ok(resp
             .items
@@ -366,6 +367,6 @@ impl MediaBackend for MediaMtxBackend {
             .send()
             .await
             .map(|_| ())
-            .map_err(|e| IE::Internal(anyhow::anyhow!(e)))
+            .map_err(|_| IE::from(GbErr::MediaApiRequestFailed))
     }
 }

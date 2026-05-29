@@ -13,6 +13,8 @@
 use super::{
     MediaBackend, MediaStreamInfo, OpenRtpRequest, PlayUrls, RtpServerHandle, StreamProxyHandle,
 };
+use crate::err::GbErr;
+use tx_di_core::IE;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 use tx_di_core::RIE;
@@ -178,7 +180,7 @@ impl ZlmClient {
         let p = val
             .get("port")
             .and_then(|v| v.as_u64())
-            .ok_or_else(|| anyhow::anyhow!("ZLM openRtpServer 响应缺少 port 字段"))?;
+            .ok_or_else(|| IE::from(GbErr::MediaApiResponseInvalid))?;
 
         Ok(p as u16)
     }
@@ -241,7 +243,7 @@ impl ZlmClient {
         let key = val
             .get("key")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow::anyhow!("ZLM addStreamProxy 响应缺少 key 字段"))?
+            .ok_or_else(|| IE::from(GbErr::MediaApiResponseInvalid))?
             .to_string();
 
         Ok(key)
@@ -295,7 +297,7 @@ impl ZlmClient {
             .query(&all_params)
             .send()
             .await
-            .map_err(|e| anyhow::anyhow!("ZLM HTTP 请求失败 [{}]: {}", path, e))?;
+            .map_err(|_| GbErr::MediaApiRequestFailed)?;
 
         let text = resp
             .text()
@@ -495,8 +497,8 @@ impl MediaBackend for ZlmBackend {
             .get_media_list("", "")
             .await
             .map(|_| ())
-            .map_err(|e| {
-                tx_di_core::IE::Internal(anyhow::anyhow!("ZLM 健康检查失败: {}", e))
+            .map_err(|_| {
+                IE::from(GbErr::MediaApiRequestFailed)
             })
     }
 }

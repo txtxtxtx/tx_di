@@ -1,6 +1,7 @@
 use serde::Deserialize;
 use std::net::SocketAddr;
 use tx_di_core::{tx_comp, CompInit, RIE};
+use crate::SipErr;
 
 /// SIP 传输协议类型
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq,Default)]
@@ -119,8 +120,8 @@ impl SipConfig {
     /// 将配置转换为 `SocketAddr`
     pub fn socket_addr(&self) -> RIE<SocketAddr> {
         let raw = format!("{}:{}", self.host, self.port);
-        raw.parse::<SocketAddr>()
-            .map_err(|e| tx_di_core::IE::Internal(anyhow::anyhow!("无效的 SIP 地址 '{}': {}", raw, e)))
+        Ok(raw.parse::<SocketAddr>()
+            .map_err(|_| SipErr::InvalidAddress)?)
     }
 
     /// 获取对外可见的 IP（用于 Contact/Via 头）
