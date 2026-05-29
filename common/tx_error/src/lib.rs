@@ -8,57 +8,32 @@
 //! - **`CodeMsg`**: 错误码转换 trait，连接业务错误枚举与统一 `AppError`
 //! - **`AppError`**: 统一错误枚举，只存储归一化后的值字段
 //! - **`AppResult<T>`**: `Result<T, AppError>` 类型别名
-//! - **`impl_code_msg!`**: 宏，为已定义的枚举补全 `CodeMsg` + `Display` + `From` 实现
-//! - **`gen_err!`**: 宏，一步到位定义枚举 + 实现所有 trait
+//! - **`#[derive(CodeMsg)]`**: proc-macro，为枚举自动实现 `CodeMsg` + `Display` + `From<AppError>`
 //!
-//! ## 推荐用法（编辑器友好）
+//! ## 使用示例
 //!
-//! 手写枚举定义（编辑器可识别类型、支持跳转），再用 `impl_code_msg!` 补全 trait：
+//! ```rust,ignore
+//! use tx_error::{AppErrCode, AppError, AppResult, CodeMsg};
+//! use tx_di_macros::CodeMsg;
 //!
-//! ```rust
-//! use tx_error::{AppError, AppResult, CodeMsg, AppErrCode, impl_code_msg};
-//!
-//! // 1. 手写枚举 — 编辑器可识别
-//! #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+//! #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
+//! #[err(domain = "SYS")]
 //! pub enum SysErr {
+//!     #[err(code = 0, msg = "Success")]
 //!     Success,
+//!     #[err(code = 1001, msg = "Config load failed")]
 //!     ConfigLoadFailed,
+//!     #[err(code = 9999, msg = "Unknown error")]
 //!     Unknown,
 //! }
 //!
-//! // 2. 宏补全 trait 实现
-//! impl_code_msg! {
-//!     SysErr("SYS") {
-//!         Success          = (0,    "Success"),
-//!         ConfigLoadFailed = (1001, "Config load failed"),
-//!         Unknown          = (9999, "Unknown error"),
-//!     }
-//! }
-//!
-//! // 使用
 //! fn load_config() -> AppResult<()> {
 //!     Err(SysErr::ConfigLoadFailed.into())
 //! }
-//!
-//! // 比较错误身份（domain + code）
-//! assert!(AppErrCode::new("SYS", 1001, "Config load failed") == AppErrCode::new("SYS", 1001, "其他消息"));
 //! ```
-//!
-//! ## 简洁用法（`gen_err!`）
-//!
-//! 如果不在意编辑器跳转，`gen_err!` 一步到位：
-//!
-//! ```rust
-//! use tx_error::gen_err;
-//!
-//! gen_err! {
-//!     SysErr("SYS") {
-//!         Success          = (0,    "Success"),
-//!         ConfigLoadFailed = (1001, "Config load failed"),
-//!         Unknown          = (9999, "Unknown error"),
-//!     }
-//! }
-//! ```
+
+// 允许 derive 宏生成的 `tx_error::AppErrCode` 等路径在 crate 内部也能解析
+extern crate self as tx_error;
 
 mod code;
 mod error;
@@ -66,3 +41,6 @@ mod macros;
 
 pub use code::{AppErrCode, CodeMsg};
 pub use error::{AppError, AppResult};
+
+// re-export derive 宏，用户可以直接 use tx_error::CodeMsg 来作为 derive
+pub use tx_di_macros::CodeMsg;

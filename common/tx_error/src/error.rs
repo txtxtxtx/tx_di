@@ -85,32 +85,26 @@ pub type AppResult<T> = Result<T, AppError>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{gen_err, impl_code_msg};
+    use crate::CodeMsg; // derive 宏通过 tx_error re-export
 
-    // === 推荐方式：手写枚举 + impl_code_msg!（编辑器友好） ===
-
-    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
+    #[err(domain = "SYS")]
     pub enum SysErr {
+        #[err(code = 0, msg = "Success")]
         Success,
+        #[err(code = 1001, msg = "Config load failed")]
         ConfigLoadFailed,
+        #[err(code = 9999, msg = "Unknown error")]
         Unknown,
     }
 
-    impl_code_msg! {
-        SysErr("SYS") {
-            Success          = (0,    "Success"),
-            ConfigLoadFailed = (1001, "Config load failed"),
-            Unknown          = (9999, "Unknown error"),
-        }
-    }
-
-    // === 简洁方式：gen_err! 一步到位 ===
-
-    gen_err! {
-        UserErr("USER") {
-            NotFound         = (2001, "User not found"),
-            PermissionDenied = (2002, "Permission denied"),
-        }
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
+    #[err(domain = "USER")]
+    pub enum UserErr {
+        #[err(code = 2001, msg = "User not found")]
+        NotFound,
+        #[err(code = 2002, msg = "Permission denied")]
+        PermissionDenied,
     }
 
     #[test]

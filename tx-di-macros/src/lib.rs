@@ -1,3 +1,4 @@
+mod code_msg;
 mod comp;
 mod utils;
 
@@ -47,4 +48,29 @@ pub fn tx_comp(attr: TokenStream, item: TokenStream) -> TokenStream{
 pub fn tx_cst(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // 空操作：直接返回原始项，不做任何修改
     item
+}
+
+/// 统一错误码 derive 宏。
+///
+/// 为枚举实现 `CodeMsg` + `Display` + `From<AppError>`。
+///
+/// # 用法
+///
+/// ```rust,ignore
+/// use tx_di_macros::CodeMsg;
+///
+/// #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
+/// #[err(domain = "SYS")]
+/// pub enum SysErr {
+///     #[err(code = 0, msg = "Success")]
+///     Success,
+///     #[err(code = 1001, msg = "Config load failed")]
+///     ConfigLoadFailed,
+///     #[err(code = 9999, msg = "Unknown error")]
+///     Unknown,
+/// }
+/// ```
+#[proc_macro_derive(CodeMsg, attributes(err))]
+pub fn derive_code_msg(input: TokenStream) -> TokenStream {
+    code_msg::derive_code_msg_impl(input)
 }
