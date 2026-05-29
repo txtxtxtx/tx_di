@@ -4,6 +4,7 @@
 //! 则不会立即接受注册，而是写入待审核记录，
 //! 由管理员批准/拒绝后，设备才能上线。
 
+use std::fmt::Display;
 use toasty::Model;
 use serde::{Serialize, Deserialize};
 
@@ -18,13 +19,14 @@ pub enum AuditStatus {
     Rejected,
 }
 
-impl ToString for AuditStatus {
-    fn to_string(&self) -> String {
-        match self {
+impl Display for AuditStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
             AuditStatus::Pending => "pending".to_string(),
             AuditStatus::Approved => "approved".to_string(),
             AuditStatus::Rejected => "rejected".to_string(),
-        }
+        };
+        write!(f, "{}", str)
     }
 }
 

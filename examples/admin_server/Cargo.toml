@@ -1,0 +1,30 @@
+[package]
+name = "admin_server"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "admin_server"
+path = "src/main.rs"
+
+[dependencies]
+tx-di-core        = { path = "../../tx-di-core" }
+tx_di_log         = { path = "../../plugins/tx_di_log" }
+tx_di_axum        = { path = "../../plugins/tx_di_axum" }
+tx_di_file        = { path = "../../plugins/tx_di_file" }
+tx_di_toasty      = {path = "../../plugins/tx_di_toasty"}
+toasty            = { workspace = true, features = ["sqlite", "serde", "jiff"] }
+jiff = {workspace = true }
+tokio.workspace     = true
+axum.workspace      = true
+serde.workspace     = true
+serde_json.workspace = true
+anyhow.workspace    = true
+tracing.workspace   = true
+thiserror.workspace = true
+async-trait.workspace = true
+chrono              = { workspace = true }
+tokio-util          = { workspace = true }
+uuid                = { version = "1", features = ["v4"] }
+bcrypt              = "0.16"
+mime_guess          = "2"

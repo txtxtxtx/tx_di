@@ -24,3 +24,11 @@ chrono.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 #tracing-subscriber.workspace = true
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
+
+[[bench]]
+name = "di_bench"
+harness = false
