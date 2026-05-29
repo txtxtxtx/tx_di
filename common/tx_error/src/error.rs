@@ -11,7 +11,7 @@ pub enum AppError {
     /// 业务错误码（归一化值类型）
     ErrCode {
         domain: &'static str,
-        code: u16,
+        code: i32,
         message: &'static str,
     },
 }
@@ -39,7 +39,7 @@ impl AppError {
     }
 
     #[inline]
-    pub fn code(&self) -> u16 {
+    pub fn code(&self) -> i32 {
         match self {
             Self::ErrCode { code, .. } => *code,
         }
@@ -78,26 +78,24 @@ impl std::error::Error for AppError {}
 /// `Result<T, AppError>` 类型别名
 pub type AppResult<T> = Result<T, AppError>;
 
-// NOTE: `From<C: CodeMsg> for AppError` 不能用 blanket impl，
-// 因为会与宏生成的每个具体类型冲突。
-// 每个业务错误枚举通过 `gen_err!` 宏自动生成 `From<Enum> for AppError`。
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::CodeMsg; // derive 宏通过 tx_error re-export
+    use crate::CodeMsg;
 
+    // ── 语法1: 简洁形式（推荐） ──────────────────────────────
     #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
-    #[err(domain = "SYS")]
+    #[err("SYS")]
     pub enum SysErr {
-        #[err(code = 0, msg = "Success")]
+        #[err(0, "Success")]
         Success,
-        #[err(code = 1001, msg = "Config load failed")]
+        #[err(1001, "Config load failed")]
         ConfigLoadFailed,
-        #[err(code = 9999, msg = "Unknown error")]
+        #[err(9999, "Unknown error")]
         Unknown,
     }
 
+    // ── 语法2: 命名参数形式（兼容） ──────────────────────────
     #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
     #[err(domain = "USER")]
     pub enum UserErr {
@@ -105,6 +103,14 @@ mod tests {
         NotFound,
         #[err(code = 2002, msg = "Permission denied")]
         PermissionDenied,
+    }
+
+    // ── 语法3: 只传消息，code 默认 -1（通用错误） ──────────
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
+    #[err("BIZ")]
+    pub enum BizErr {
+        #[err("Something went wrong")]
+        GenericFailure,
     }
 
     #[test]
@@ -169,5 +175,26 @@ mod tests {
         }
         assert_eq!(ok_fn().unwrap(), 42);
         assert!(err_fn().is_err());
+    }
+
+    #[test]
+    fn test_default_error_code() {
+        // 只传消息时 code 默认 -1
+        let err: AppError = BizErr::GenericFailure.into();
+        assert_eq!(err.domain(), "BIZ");
+        assert_eq!(err.code(), -1);
+        assert_eq!(err.message(), "Something went wrong");
+        assert_eq!(err.to_string(), "[BIZ:-1] Something went wrong");
+    }
+
+    #[test]
+    fn test_short_syntax_works() {
+        // 简洁语法 #[err("SYS")] + #[err(0, "Success")]
+        let code = SysErr::err_code(SysErr::Success);
+        assert_eq!(code.code, 0);
+
+        // 命名语法 #[err(domain = "USER")] + #[err(code = 2001, msg = "...")]
+        let code = UserErr::err_code(UserErr::NotFound);
+        assert_eq!(code.code, 2001);
     }
 }

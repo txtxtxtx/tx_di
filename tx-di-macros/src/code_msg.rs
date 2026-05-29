@@ -4,17 +4,41 @@ use quote::quote;
 use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input,
-    Attribute, Data, DeriveInput, ExprLit, Ident, Lit, Result as SynResult, Token,
+    Attribute, Data, DeriveInput, Ident, Lit, LitInt, LitStr, Result as SynResult, Token,
 };
 
-/// 属性参数：`#[err(code = 1001, msg = "...")]`
+/// 通用错误码，当只传 `#[err("msg")]` 时作为默认值
+const DEFAULT_ERROR_CODE: i32 = -1;
+
+/// 解析 `#[err("...")]` 或 `#[err(N, "...")]` 或 `#[err(code = N, msg = "...")]`
+///
+/// 三种变体级语法：
+/// - `#[err("Config load failed")]`          → code = -1, msg = "Config load failed"
+/// - `#[err(0, "Success")]`                  → code = 0,  msg = "Success"
+/// - `#[err(code = 0, msg = "Success")]`     → code = 0,  msg = "Success"
 struct ErrVariantAttr {
-    code: u16,
+    code: i32,
     msg: String,
 }
 
 impl Parse for ErrVariantAttr {
     fn parse(input: ParseStream) -> SynResult<Self> {
+        // 情况1: 纯字符串 → `#[err("msg")]`
+        if input.peek(LitStr) {
+            let s: LitStr = input.parse()?;
+            return Ok(ErrVariantAttr { code: DEFAULT_ERROR_CODE, msg: s.value() });
+        }
+
+        // 情况2: 整数 → `#[err(N, "msg")]`
+        if input.peek(LitInt) {
+            let int_lit: LitInt = input.parse()?;
+            let code: i32 = int_lit.base10_parse()?;
+            let _comma: Token![,] = input.parse()?;
+            let s: LitStr = input.parse()?;
+            return Ok(ErrVariantAttr { code, msg: s.value() });
+        }
+
+        // 情况3: 命名参数 → `#[err(code = N, msg = "...")]`
         let mut code = None;
         let mut msg = None;
 
@@ -24,16 +48,16 @@ impl Parse for ErrVariantAttr {
 
             match key.to_string().as_str() {
                 "code" => {
-                    let lit: ExprLit = input.parse()?;
-                    if let Lit::Int(int_lit) = &lit.lit {
-                        code = Some(int_lit.base10_parse::<u16>()?);
+                    let lit: Lit = input.parse()?;
+                    if let Lit::Int(int_lit) = lit {
+                        code = Some(int_lit.base10_parse::<i32>()?);
                     } else {
                         return Err(syn::Error::new_spanned(&lit, "code 必须是整数"));
                     }
                 }
                 "msg" => {
-                    let lit: ExprLit = input.parse()?;
-                    if let Lit::Str(s) = &lit.lit {
+                    let lit: Lit = input.parse()?;
+                    if let Lit::Str(s) = lit {
                         msg = Some(s.value());
                     } else {
                         return Err(syn::Error::new_spanned(&lit, "msg 必须是字符串"));
@@ -42,7 +66,7 @@ impl Parse for ErrVariantAttr {
                 other => {
                     return Err(syn::Error::new_spanned(
                         &key,
-                        format!("未知属性 `{}`，仅支持 code, msg", other),
+                        format!("未知属性 `{}`，支持 code, msg", other),
                     ));
                 }
             }
@@ -59,42 +83,38 @@ impl Parse for ErrVariantAttr {
     }
 }
 
-/// 属性参数：`#[err(domain = "SYS")]`
+/// 解析 `#[err("SYS")]` 或 `#[err(domain = "SYS")]`
 struct ErrEnumAttr {
     domain: String,
 }
 
 impl Parse for ErrEnumAttr {
     fn parse(input: ParseStream) -> SynResult<Self> {
-        let mut domain = None;
-
-        while !input.is_empty() {
-            let key: Ident = input.parse()?;
-            let _eq: Token![=] = input.parse()?;
-
-            if key == "domain" {
-                let lit: ExprLit = input.parse()?;
-                if let Lit::Str(s) = &lit.lit {
-                    domain = Some(s.value());
-                } else {
-                    return Err(syn::Error::new_spanned(&lit, "domain 必须是字符串"));
-                }
-            } else {
-                return Err(syn::Error::new_spanned(&key, "仅支持 domain 属性"));
-            }
-
-            if input.peek(Token![,]) {
-                let _: Token![,] = input.parse()?;
-            }
+        // `#[err("SYS")]` — 纯字符串
+        if input.peek(LitStr) {
+            let s: LitStr = input.parse()?;
+            return Ok(ErrEnumAttr { domain: s.value() });
         }
 
-        let domain = domain.ok_or_else(|| syn::Error::new(input.span(), "缺少 domain 属性"))?;
-        Ok(ErrEnumAttr { domain })
+        // `#[err(domain = "SYS")]` — 命名参数
+        let key: Ident = input.parse()?;
+        let _eq: Token![=] = input.parse()?;
+
+        if key != "domain" {
+            return Err(syn::Error::new_spanned(&key, "仅支持 domain 属性"));
+        }
+
+        let lit: Lit = input.parse()?;
+        if let Lit::Str(s) = lit {
+            Ok(ErrEnumAttr { domain: s.value() })
+        } else {
+            Err(syn::Error::new_spanned(&lit, "domain 必须是字符串"))
+        }
     }
 }
 
 /// 从属性列表中找到 `#[err(...)]` 并直接解析为 T
-fn find_and_parse_err_attr<T: Parse>(attrs: &[Attribute], _what: &str) -> SynResult<Option<T>> {
+fn find_and_parse_err_attr<T: Parse>(attrs: &[Attribute]) -> SynResult<Option<T>> {
     for attr in attrs {
         if attr.path().is_ident("err") {
             let parsed: T = attr.parse_args()?;
@@ -118,13 +138,13 @@ fn expand_code_msg(input: &DeriveInput) -> SynResult<TokenStream2> {
     // crate 路径：生成的代码引用 tx_error
     let crate_path = quote! { tx_error };
 
-    // 解析 enum 级别的 #[err(domain = "...")]
-    let domain = match find_and_parse_err_attr::<ErrEnumAttr>(&input.attrs, "domain")? {
+    // 解析 enum 级别的 #[err("SYS")] 或 #[err(domain = "SYS")]
+    let domain = match find_and_parse_err_attr::<ErrEnumAttr>(&input.attrs)? {
         Some(attr) => attr.domain,
         None => {
             return Err(syn::Error::new_spanned(
                 &input.ident,
-                "需要在枚举上标注 #[err(domain = \"...\")]",
+                r#"需要在枚举上标注 #[err("SYS")] 或 #[err(domain = "SYS")]"#,
             ));
         }
     };
@@ -145,14 +165,13 @@ fn expand_code_msg(input: &DeriveInput) -> SynResult<TokenStream2> {
     for variant in variants {
         let variant_ident = &variant.ident;
 
-        // 解析变体级别的 #[err(code = N, msg = "...")]
-        let err_attr = match find_and_parse_err_attr::<ErrVariantAttr>(&variant.attrs, "variant")? {
+        let err_attr = match find_and_parse_err_attr::<ErrVariantAttr>(&variant.attrs)? {
             Some(attr) => attr,
             None => {
                 return Err(syn::Error::new_spanned(
                     variant_ident,
                     format!(
-                        "变体 `{}` 缺少 #[err(code = N, msg = \"...\")] 属性",
+                        r#"变体 `{}` 缺少 #[err(N, "msg")] 或 #[err("msg")] 属性"#,
                         variant_ident
                     ),
                 ));

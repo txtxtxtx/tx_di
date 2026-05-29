@@ -4,16 +4,18 @@ use std::fmt;
 ///
 /// 纯值类型，无堆分配，无虚表，可 `Copy`/`Clone`。
 /// 错误身份由 `domain + code` 唯一决定，`message` 仅用于展示。
+///
+/// `code` 使用 `i32` 以支持负数通用错误码（如 -1 表示通用错误）。
 #[derive(Debug, Copy, Clone)]
 pub struct AppErrCode {
     pub domain: &'static str,
-    pub code: u16,
+    pub code: i32,
     pub message: &'static str,
 }
 
 impl AppErrCode {
     #[inline]
-    pub const fn new(domain: &'static str, code: u16, message: &'static str) -> Self {
+    pub const fn new(domain: &'static str, code: i32, message: &'static str) -> Self {
         Self { domain, code, message }
     }
 }
@@ -25,7 +27,6 @@ impl PartialEq for AppErrCode {
     }
 }
 
-// 为 AppErrCode 类型实现 Eq trait
 impl Eq for AppErrCode {}
 
 impl fmt::Display for AppErrCode {
@@ -36,7 +37,7 @@ impl fmt::Display for AppErrCode {
 
 /// 错误码转换 trait — 连接业务错误枚举与统一 `AppError` 的桥梁。
 ///
-/// 通过宏自动生成实现，业务层无需手写。
+/// 通过 `#[derive(CodeMsg)]` 宏自动生成实现，业务层无需手写。
 pub trait CodeMsg: fmt::Debug + fmt::Display + Copy + Sync + Send + 'static {
     /// 将自身转换为归一化的 `AppErrCode` 值
     fn err_code(self) -> AppErrCode;
@@ -47,7 +48,7 @@ pub trait CodeMsg: fmt::Debug + fmt::Display + Copy + Sync + Send + 'static {
     }
 
     #[inline]
-    fn code(self) -> u16 {
+    fn code(self) -> i32 {
         self.err_code().code
     }
 
