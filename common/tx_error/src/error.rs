@@ -85,15 +85,26 @@ pub type AppResult<T> = Result<T, AppError>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gen_err;
+    use crate::{gen_err, impl_code_msg};
 
-    gen_err! {
+    // === 推荐方式：手写枚举 + impl_code_msg!（编辑器友好） ===
+
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+    pub enum SysErr {
+        Success,
+        ConfigLoadFailed,
+        Unknown,
+    }
+
+    impl_code_msg! {
         SysErr("SYS") {
             Success          = (0,    "Success"),
             ConfigLoadFailed = (1001, "Config load failed"),
             Unknown          = (9999, "Unknown error"),
         }
     }
+
+    // === 简洁方式：gen_err! 一步到位 ===
 
     gen_err! {
         UserErr("USER") {

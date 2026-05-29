@@ -8,37 +8,56 @@
 //! - **`CodeMsg`**: 错误码转换 trait，连接业务错误枚举与统一 `AppError`
 //! - **`AppError`**: 统一错误枚举，只存储归一化后的值字段
 //! - **`AppResult<T>`**: `Result<T, AppError>` 类型别名
-//! - **`gen_err!`**: 宏，自动生成业务错误枚举 + `CodeMsg` + `Display` + `From<AppError>`
+//! - **`impl_code_msg!`**: 宏，为已定义的枚举补全 `CodeMsg` + `Display` + `From` 实现
+//! - **`gen_err!`**: 宏，一步到位定义枚举 + 实现所有 trait
 //!
-//! ## 使用示例
+//! ## 推荐用法（编辑器友好）
+//!
+//! 手写枚举定义（编辑器可识别类型、支持跳转），再用 `impl_code_msg!` 补全 trait：
 //!
 //! ```rust
-//! use tx_error::{AppError, AppResult, CodeMsg, AppErrCode, gen_err};
+//! use tx_error::{AppError, AppResult, CodeMsg, AppErrCode, impl_code_msg};
 //!
-//! // 定义业务错误码
-//! gen_err! {
+//! // 1. 手写枚举 — 编辑器可识别
+//! #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+//! pub enum SysErr {
+//!     Success,
+//!     ConfigLoadFailed,
+//!     Unknown,
+//! }
+//!
+//! // 2. 宏补全 trait 实现
+//! impl_code_msg! {
 //!     SysErr("SYS") {
-//!         Success             = (0,   "Success"),
-//!         ConfigLoadFailed    = (1001, "Config load failed"),
-//!         Unknown             = (9999, "Unknown error"),
+//!         Success          = (0,    "Success"),
+//!         ConfigLoadFailed = (1001, "Config load failed"),
+//!         Unknown          = (9999, "Unknown error"),
 //!     }
 //! }
 //!
-//! gen_err! {
-//!     UserErr("USER") {
-//!         NotFound            = (2001, "User not found"),
-//!         PermissionDenied    = (2002, "Permission denied"),
-//!     }
-//! }
-//!
-//! // 在业务代码中使用
+//! // 使用
 //! fn load_config() -> AppResult<()> {
-//!     // 模拟错误
 //!     Err(SysErr::ConfigLoadFailed.into())
 //! }
 //!
 //! // 比较错误身份（domain + code）
 //! assert!(AppErrCode::new("SYS", 1001, "Config load failed") == AppErrCode::new("SYS", 1001, "其他消息"));
+//! ```
+//!
+//! ## 简洁用法（`gen_err!`）
+//!
+//! 如果不在意编辑器跳转，`gen_err!` 一步到位：
+//!
+//! ```rust
+//! use tx_error::gen_err;
+//!
+//! gen_err! {
+//!     SysErr("SYS") {
+//!         Success          = (0,    "Success"),
+//!         ConfigLoadFailed = (1001, "Config load failed"),
+//!         Unknown          = (9999, "Unknown error"),
+//!     }
+//! }
 //! ```
 
 mod code;
