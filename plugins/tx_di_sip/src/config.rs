@@ -120,7 +120,7 @@ impl SipConfig {
     pub fn socket_addr(&self) -> RIE<SocketAddr> {
         let raw = format!("{}:{}", self.host, self.port);
         raw.parse::<SocketAddr>()
-            .map_err(|e| tx_di_core::IE::Other(format!("无效的 SIP 地址 '{}': {}", raw, e)))
+            .map_err(|e| tx_di_core::IE::Internal(anyhow::anyhow!("无效的 SIP 地址 '{}': {}", raw, e)))
     }
 
     /// 获取对外可见的 IP（用于 Contact/Via 头）

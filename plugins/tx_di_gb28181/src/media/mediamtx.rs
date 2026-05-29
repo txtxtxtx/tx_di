@@ -253,7 +253,7 @@ impl MediaBackend for MediaMtxBackend {
         let port = if req.port != 0 {
             req.port
         } else {
-            self.allocate_port().map_err(|e| IE::Other(e.to_string()))?
+            self.allocate_port().map_err(|e| IE::Internal(anyhow::anyhow!(e)))?
         };
 
         self.rtp_ports
@@ -331,7 +331,7 @@ impl MediaBackend for MediaMtxBackend {
         let resp: MtxPathListResponse = self
             .api_get("/v3/paths/list")
             .await
-            .map_err(|e| IE::Other(e.to_string()))?;
+            .map_err(|e| IE::Internal(anyhow::anyhow!(e)))?;
 
         Ok(resp
             .items
@@ -366,6 +366,6 @@ impl MediaBackend for MediaMtxBackend {
             .send()
             .await
             .map(|_| ())
-            .map_err(|e| IE::Other(e.to_string()))
+            .map_err(|e| IE::Internal(anyhow::anyhow!(e)))
     }
 }

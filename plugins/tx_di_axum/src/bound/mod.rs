@@ -29,7 +29,7 @@ impl RequestPartsExt for Parts {
         self.app_status()
             .app
             .try_inject::<T>()
-            .ok_or_else(|| IE::Other(format!(
+            .ok_or_else(|| IE::Internal(anyhow::anyhow!(
                 "组件 {} 未在 DI 容器中找到，请确认已用 #[tx_comp] 注解并完成初始化",
                 std::any::type_name::<T>()
             )))

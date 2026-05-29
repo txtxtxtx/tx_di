@@ -496,10 +496,7 @@ impl MediaBackend for ZlmBackend {
             .await
             .map(|_| ())
             .map_err(|e| {
-                tx_di_core::IE::WithContext {
-                    context: "ZLM 健康检查失败".to_string(),
-                    source: e,
-                }
+                tx_di_core::IE::Internal(anyhow::anyhow!("ZLM 健康检查失败: {}", e))
             })
     }
 }
