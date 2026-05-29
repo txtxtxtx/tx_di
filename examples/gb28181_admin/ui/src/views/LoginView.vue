@@ -47,10 +47,10 @@ async function handleLogin() {
       // 跳转到 redirect 或首页
       router.replace(route.query.redirect || '/dashboard')
     } else {
-      error.value = res.data.message || '登录失败'
+      error.value = res.data.msg || '登录失败'
     }
   } catch (e) {
-    error.value = e.response?.data?.message || e.message || '网络错误'
+    error.value = e.response?.data?.msg || e.message || '网络错误'
   } finally {
     loading.value = false
   }

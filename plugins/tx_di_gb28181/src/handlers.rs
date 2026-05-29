@@ -168,6 +168,16 @@ async fn handle_register(
         "📡 收到 REGISTER"
     );
 
+    // ── ACL 白名单/黑名单检查 ─────────────────────────────────────────────────
+
+    if let Err(reason) = config.check_device_allowed(&device_id) {
+        warn!(device_id = %device_id, reason = %reason, "🚫 ACL 拒绝注册");
+        tx.reply_with(StatusCode::Forbidden, vec![], Some(reason.as_bytes().to_vec()))
+            .await
+            .map_err(|e| anyhow::anyhow!("发送 403 Forbidden 失败: {}", e))?;
+        return Ok(());
+    }
+
     // ── 摘要认证 ────────────────────────────────────────────────────────────
     if config.enable_auth && expires > 0 {
         // 检查是否有 Authorization 头

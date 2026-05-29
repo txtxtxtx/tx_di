@@ -80,6 +80,13 @@ pub struct ToastyConfig {
     /// 适用于不能容忍任何失败查询的部署。代价是每次检出增加一次往返。
     #[serde(default)]
     pub pool_pre_ping: bool,
+
+    /// 默认管理员密码
+    ///
+    /// 当数据库为空（无任何用户）时，自动创建用户 `admin` + 此密码。
+    /// 登录后应立即修改。默认值 `"admin123"`。
+    #[serde(default = "default_admin_password")]
+    pub default_admin_password: String,
 }
 
 impl Default for ToastyConfig {
@@ -95,6 +102,7 @@ impl Default for ToastyConfig {
             pool_max_connection_lifetime_secs: None,
             pool_max_connection_idle_time_secs: None,
             pool_pre_ping: false,
+            default_admin_password: default_admin_password(),
         }
     }
 }
@@ -121,4 +129,8 @@ fn default_database_url() -> String {
 
 fn default_auto_schema() -> bool {
     true
+}
+
+fn default_admin_password() -> String {
+    "admin123".to_string()
 }

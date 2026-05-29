@@ -47,6 +47,7 @@ prefix = "tx_gb28181"
 database_url = "sqlite:./gb28181.db"
 auto_schema = false
 max_pool_size = 3
+default_admin_password = "admin123"
 
 # 认证配置（sa-token）
 [sa_token_config]

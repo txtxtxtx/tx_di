@@ -102,6 +102,7 @@
 //! ```
 
 mod config;
+mod cascade;
 pub mod crypto;
 mod device_registry;
 mod event;

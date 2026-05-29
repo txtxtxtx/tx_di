@@ -38,14 +38,8 @@ use crate::xml::{
     build_time_sync_response_xml, build_zoom_in_xml, build_zoom_out_xml,
 };
 use dashmap::DashMap;
-use rsipstack::dialog::dialog::DialogState;
-use rsipstack::dialog::dialog_layer::DialogLayer;
-use rsipstack::dialog::invitation::InviteOption;
-use rsipstack::sip as rsip;
-use rsipstack::transaction::key::{TransactionKey, TransactionRole};
-use rsipstack::transaction::transaction::Transaction;
 use std::future::Future;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, OnceLock};
 use tokio::time::{Duration, interval};
 use tokio_util::sync::CancellationToken;
@@ -132,6 +126,23 @@ impl CompInit for Gb28181Server {
             // 存储 media backend
             let _ = srv.media.set(media_backend.clone());
 
+            // ── 级联：下级平台模式（向上级注册）────────────────────────────────
+            if config.cascade.enable_lower {
+                if let Some(cascade_lower) = crate::cascade::CascadeLower::new(
+                    &config.cascade,
+                    &config.platform_id,
+                    &config.sip_ip,
+                    sip_plugin.clone(),
+                    registry.clone(),
+                ) {
+                    let cancel_token = sip_plugin.get_cancel_token()?;
+                    cascade_lower.start(cancel_token);
+                    info!("下级平台级联任务已启动");
+                } else {
+                    warn!("enabled_lower=true 但缺少 upper_platform_sip 或 upper_platform_id 配置");
+                }
+            }
+
             info!(
                 platform_id = %config.platform_id,
                 realm = %config.realm,
@@ -171,6 +182,19 @@ impl Gb28181Server {
         Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
     {
         event::add_event_listener(handler);
+    }
+
+    /// 从数据库恢复设备注册状态（服务启动时调用）
+    ///
+    /// 恢复的设备默认标记为离线（`online = false`），
+    /// 等设备重新 REGISTER 或发送心跳时会自动上线。
+    ///
+    /// # 使用场景
+    /// Admin 示例在 `async_init` 中从 toasty DB 加载 `online=true` 的设备记录，
+    /// 调用此方法恢复到内存注册表。
+    pub fn restore_devices(app: &App, devices: Vec<GbDevice>) {
+        let srv = app.inject::<Gb28181Server>();
+        srv.device_registry.restore_batch(devices);
     }
 }
 
