@@ -37,7 +37,6 @@ extern crate self as tx_error;
 
 mod code;
 mod error;
-mod macros;
 
 pub use code::{AppErrCode, CodeMsg};
 pub use error::{AppError, AppResult};
