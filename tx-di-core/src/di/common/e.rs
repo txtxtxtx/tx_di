@@ -46,11 +46,9 @@ impl From<IE> for ApiRes {
     fn from(err: IE) -> Self {
         match &err {
             IE::AppError(app_err) => {
-                // 业务错误码：返回 domain:code 作为 msg，code 作为 code
                 ApiRes::error(app_err.code(), app_err.message().to_string())
             }
             _ => {
-                // 其他错误：code = -1，msg 为错误描述
                 ApiRes::fail(err.to_string())
             }
         }
@@ -85,9 +83,9 @@ impl From<&str> for IE {
 /// IE：统一错误
 pub type RIE<T> = Result<T, IE>;
 
-/// 统一错误码（基于 tx_error::AppErrCode）
-///
-/// 用于 DI 框架自身的业务错误。
+// ── 业务错误码定义 ──────────────────────────────────────────────────────────
+
+/// DI 框架自身的业务错误码。
 /// 外部业务模块应使用 `#[derive(CodeMsg)]` 自行定义。
 #[derive(Debug, Copy, Clone, PartialEq, Eq, tx_error::CodeMsg)]
 #[err("DI")]
@@ -101,4 +99,13 @@ pub enum DiErr {
     /// 任务 panic
     #[err(-3, "任务 panic")]
     TaskPanic,
+}
+
+/// `DiErr` → `IE`（经由 AppError）
+///
+/// 使 `DiErr::RegistryError?` 可直接使用。
+impl From<DiErr> for IE {
+    fn from(e: DiErr) -> Self {
+        IE::AppError(AppError::from_code(e))
+    }
 }
