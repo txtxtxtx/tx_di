@@ -230,6 +230,9 @@ fn expand_code_msg(input: &DeriveInput) -> SynResult<TokenStream2> {
                 #crate_path::AppError::from_code(e)
             }
         }
+
+        // Display + Debug 已由本宏 + derive 生成，Error 可直接实现
+        impl std::error::Error for #enum_name {}
     };
 
     // 如果指定了 #[ie(...)]，额外生成 From<EnumName> for IE

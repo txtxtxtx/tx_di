@@ -23,6 +23,7 @@ pub use toml::Value;
 pub use toml::map;
 
 pub use tx_di_macros::{tx_comp, tx_cst};
+pub use tx_error::{CodeMsg, AppErrCode, AppError};
 pub use di::{BuildContext,scopes::Scope,App,InnerContext,
              comp::{ComponentMeta,topo_sort,COMPONENT_REGISTRY,config::AppAllConfig},
              comp::comp_ref::{CompRef,ComponentDescriptor,CompInit,BoxFuture,inject_from_store},

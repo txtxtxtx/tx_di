@@ -29,7 +29,9 @@
 //! | `dynamodb`   | DynamoDB    |
 
 mod config;
+pub mod err;
 mod plugin;
 
 pub use config::ToastyConfig;
+pub use err::ToastyErr;
 pub use plugin::{ToastyPlugin, ToastyDb};

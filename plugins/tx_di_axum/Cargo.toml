@@ -8,6 +8,7 @@ readme.workspace = true
 repository.workspace = true
 
 [dependencies]
+tx_error = { workspace = true }
 tx-di-core.workspace = true
 linkme.workspace = true
 tx_di_log.workspace = true

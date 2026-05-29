@@ -105,6 +105,7 @@ mod config;
 mod cascade;
 pub mod crypto;
 mod device_registry;
+pub mod err;
 mod event;
 mod handlers;
 mod plugin;

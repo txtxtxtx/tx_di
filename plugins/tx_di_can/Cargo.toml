@@ -18,6 +18,7 @@ pcan = ["dep:windows"]
 simbus = []
 
 [dependencies]
+tx_error = { workspace = true }
 tx-di-core.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true

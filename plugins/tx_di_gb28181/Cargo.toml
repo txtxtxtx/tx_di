@@ -9,6 +9,7 @@ repository.workspace = true
 description = "GB28181 server plugin for tx-di framework (SIP registration center, catalog, playback control)"
 
 [dependencies]
+tx_error = { workspace = true }
 tx-di-core.workspace = true
 tx_di_sip       = { path = "../tx_di_sip" }
 tx_gb28181      = { path = "../../common/tx_gb28181" }

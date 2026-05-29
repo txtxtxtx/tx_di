@@ -2,12 +2,14 @@ mod config;
 mod comp;
 mod bound;
 mod e;
+pub mod err;
 mod r;
 mod layers;
 
 pub use config::*;
 pub use comp::*;
 pub use bound::DiComp;
+pub use err::WebErrCode;
 pub use r::R;
 pub use layers::{add_arc_layer, add_layer};
 #[cfg(test)]

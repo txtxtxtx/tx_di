@@ -57,11 +57,13 @@
 
 mod config;
 mod comp;
+pub mod err;
 mod handler;
 mod sender;
 
 pub use config::*;
 pub use comp::*;
+pub use err::SipErr;
 pub use handler::SipRouter;
 pub use sender::SipSender;
 

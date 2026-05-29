@@ -64,6 +64,7 @@
 
 mod adapter;
 mod config;
+pub mod err;
 mod event;
 mod frame;
 mod flash;
@@ -76,6 +77,7 @@ pub use adapter::{CanAdapter, AdapterKind};
 #[cfg(test)]
 mod tests;
 pub use config::CanConfig;
+pub use err::CanErr;
 pub use event::{CanEvent, on_event};
 pub use flash::{FlashConfig, FlashEngine, FlashProgress, FlashResult};
 pub use frame::{CanFdFrame, CanFrame, FrameId, FrameKind};
