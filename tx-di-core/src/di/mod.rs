@@ -9,8 +9,9 @@ pub mod scopes;
 use crate::di::comp::StoreFactoryFn;
 use crate::di::comp::config::AppAllConfig;
 use crate::{
-    COMPONENT_REGISTRY, CompRef, ComponentDescriptor, ComponentMeta, IE, RIE, Scope, topo_sort,
+    COMPONENT_REGISTRY, CompRef, ComponentDescriptor, ComponentMeta, DiErr, IE, RIE, Scope, topo_sort,
 };
+use tx_error::{AppError, CodeMsg};
 use dashmap::DashMap;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
@@ -156,7 +157,7 @@ impl crate::BuildContext {
         for meta in ans.iter() {
             let meta = metas[id_to_idx
                 .get(meta)
-                .ok_or_else(|| IE::Other("组件注册表错误".to_string()))?
+                .ok_or_else(|| IE::from(AppError::from(DiErr::RegistryError)))?
                 .0];
             let dep_names: Vec<&str> = meta
                 .deps
@@ -309,7 +310,7 @@ impl App {
         for x in metas {
             x.async_init_fn
                 .map(|init_fn| init_fn(app.clone(), token.clone()))
-                .ok_or_else(|| IE::Other("async_init_fn 错误".to_string()))?
+                .ok_or_else(|| IE::from(AppError::from(DiErr::AsyncInitError)))?
                 .await?;
         }
 
@@ -356,7 +357,7 @@ impl App {
             match handle.await {
                 Ok(Ok(_)) => {}
                 Ok(Err(e)) => errors.push(e),
-                Err(e) => errors.push(IE::Other(format!("Task panicked: {}", e))),
+                Err(e) => errors.push(IE::Other(format!("{}: {}", DiErr::TaskPanic.message(), e))),
             }
         }
 

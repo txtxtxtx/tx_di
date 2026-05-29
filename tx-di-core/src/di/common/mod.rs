@@ -3,7 +3,7 @@ pub use r::{ApiR,ApiRes,RCode};
 
 pub mod e;
 
-pub use e::{RIE,IE};
+pub use e::{RIE, IE, DiErr};
 
 mod date;
 
