@@ -7,3 +7,6 @@ plugins/tx_di_axum/static
 examples/gb_cams/ui/dist
 examples/gb_cams/ui/node_modules
 gb28181.db
+examples/gb_cams/public/qj.jpg
+examples/gb28181_admin/ui/dist
+examples/gb28181_admin/ui/node_modules
