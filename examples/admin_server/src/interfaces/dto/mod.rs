@@ -1,7 +1,6 @@
-//! 数据传输对象（DTO）
-//!
-//! 统一 API 请求和响应格式。
-
 pub mod common;
-
-pub use common::*;
+pub mod auth_dto;
+pub mod user_dto;
+pub mod role_dto;
+pub mod tenant_dto;
+pub mod menu_dto;

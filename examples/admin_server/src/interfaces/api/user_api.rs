@@ -1,115 +1,74 @@
 //! 用户管理 API
 
-use axum::{
-    Json, Router,
-    extract::{Path, Query, State},
-    routing::{delete, get, post, put},
-};
+use axum::{Json, Router, extract::{Path, Query, State}, routing::{delete, get, post, put}};
 use std::sync::Arc;
 use tx_di_core::App;
 
-use crate::application::user::{CreateUserRequest, UpdateUserRequest, UserService};
-use crate::domain::user::UserStatus;
-use crate::infrastructure::persistence::InMemoryUserRepository;
+use crate::domain::error::AdminError;
+use crate::domain::user::{UserRepository, UserStatus};
+use crate::domain::user::repo::ToastyUserRepository;
 use crate::interfaces::dto::common::{ApiResponse, PageQuery, PageResponse};
+use crate::interfaces::dto::user_dto::{UserDto, CreateUserRequest, UpdateUserRequest};
 
-/// 用户路由
 pub fn router(app: Arc<App>) -> Router {
     Router::new()
         .route("/", get(list_users).post(create_user))
         .route("/{id}", get(get_user).put(update_user).delete(delete_user))
-        .route("/{id}/reset-password", put(reset_password))
         .with_state(app)
 }
 
-/// 分页查询用户
 async fn list_users(
     State(app): State<Arc<App>>,
     Query(query): Query<PageQuery>,
-) -> Json<ApiResponse<PageResponse<crate::domain::user::User>>> {
-    let service = app.inject::<UserService>();
-
-    match service
-        .list_users(
-            "t-default-001",
-            query.keyword.as_deref(),
-            None,
-            query.page,
-            query.page_size,
-        )
-        .await
-    {
-        Ok((users, total)) => {
-            Json(ApiResponse::success(PageResponse::new(users, total, query.page, query.page_size)))
-        }
-        Err(e) => Json(ApiResponse::error(500, e.to_string())),
-    }
+) -> Result<Json<ApiResponse<PageResponse<UserDto>>>, AdminError> {
+    let repo = app.inject::<ToastyUserRepository>();
+    let (users, total) = repo.find_page(1, query.keyword.as_deref(), None, query.page, query.page_size).await?;
+    let dtos: Vec<UserDto> = users.iter().map(UserDto::from).collect();
+    Ok(Json(ApiResponse::success(PageResponse::new(dtos, total, query.page, query.page_size))))
 }
 
-/// 获取用户详情
 async fn get_user(
     State(app): State<Arc<App>>,
-    Path(id): Path<String>,
-) -> Json<ApiResponse<crate::domain::user::User>> {
-    let user_repo = app.inject::<InMemoryUserRepository>();
-    match user_repo.find_by_id(&id).await {
-        Ok(Some(user)) => Json(ApiResponse::success(user)),
-        Ok(None) => Json(ApiResponse::error(404, "用户不存在")),
-        Err(e) => Json(ApiResponse::error(500, e.to_string())),
-    }
+    Path(id): Path<u64>,
+) -> Result<Json<ApiResponse<UserDto>>, AdminError> {
+    let repo = app.inject::<ToastyUserRepository>();
+    let user = repo.find_by_id(id).await?.ok_or(AdminError::UserNotFound(id.to_string()))?;
+    Ok(Json(ApiResponse::success(UserDto::from(&user))))
 }
 
-/// 创建用户
 async fn create_user(
     State(app): State<Arc<App>>,
-    Json(body): Json<CreateUserRequest>,
-) -> Json<ApiResponse<crate::domain::user::User>> {
-    let service = app.inject::<UserService>();
-
-    match service.create_user("t-default-001", body).await {
-        Ok(user) => Json(ApiResponse::success(user)),
-        Err(e) => Json(ApiResponse::error(400, e.to_string())),
-    }
+    Json(req): Json<CreateUserRequest>,
+) -> Result<Json<ApiResponse<UserDto>>, AdminError> {
+    let repo = app.inject::<ToastyUserRepository>();
+    if repo.find_by_username(&req.username).await?.is_some() { return Err(AdminError::UsernameDuplicate(req.username)); }
+    let pw = bcrypt::hash(&req.password, bcrypt::DEFAULT_COST).map_err(|e| AdminError::Database(e.to_string()))?;
+    let mut user = crate::domain::user::User::new(1, req.username, pw, req.nickname);
+    user.email = req.email; user.mobile = req.mobile;
+    repo.save(&user).await?;
+    Ok(Json(ApiResponse::success(UserDto::from(&user))))
 }
 
-/// 更新用户
 async fn update_user(
     State(app): State<Arc<App>>,
-    Path(id): Path<String>,
-    Json(body): Json<UpdateUserRequest>,
-) -> Json<ApiResponse<crate::domain::user::User>> {
-    let service = app.inject::<UserService>();
-
-    match service.update_user(&id, body).await {
-        Ok(user) => Json(ApiResponse::success(user)),
-        Err(e) => Json(ApiResponse::error(400, e.to_string())),
-    }
+    Path(id): Path<u64>,
+    Json(req): Json<UpdateUserRequest>,
+) -> Result<Json<ApiResponse<UserDto>>, AdminError> {
+    let repo = app.inject::<ToastyUserRepository>();
+    let mut user = repo.find_by_id(id).await?.ok_or(AdminError::UserNotFound(id.to_string()))?;
+    if let Some(n) = req.nickname { user.nickname = n; }
+    if let Some(e) = req.email { user.email = Some(e); }
+    if let Some(m) = req.mobile { user.mobile = Some(m); }
+    repo.save(&user).await?;
+    Ok(Json(ApiResponse::success(UserDto::from(&user))))
 }
 
-/// 删除用户
 async fn delete_user(
     State(app): State<Arc<App>>,
-    Path(id): Path<String>,
-) -> Json<ApiResponse<()>> {
-    let service = app.inject::<UserService>();
-
-    match service.delete_user(&id).await {
-        Ok(()) => Json(ApiResponse::ok()),
-        Err(e) => Json(ApiResponse::error(400, e.to_string())),
-    }
-}
-
-/// 重置密码
-async fn reset_password(
-    State(app): State<Arc<App>>,
-    Path(id): Path<String>,
-    Json(body): Json<serde_json::Value>,
-) -> Json<ApiResponse<()>> {
-    let service = app.inject::<UserService>();
-    let password = body["password"].as_str().unwrap_or("123456");
-
-    match service.reset_password(&id, password).await {
-        Ok(()) => Json(ApiResponse::ok()),
-        Err(e) => Json(ApiResponse::error(400, e.to_string())),
-    }
+    Path(id): Path<u64>,
+) -> Result<Json<ApiResponse<()>>, AdminError> {
+    let repo = app.inject::<ToastyUserRepository>();
+    repo.find_by_id(id).await?.ok_or(AdminError::UserNotFound(id.to_string()))?;
+    repo.delete(id).await?;
+    Ok(Json(ApiResponse::<()>::ok()))
 }
