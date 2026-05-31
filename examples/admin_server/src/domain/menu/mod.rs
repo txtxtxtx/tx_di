@@ -3,16 +3,23 @@
 use std::fmt::Display;
 use async_trait::async_trait;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MenuType { Directory, Menu, Button }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, toasty::Embed)]
+pub enum MenuType {
+    #[column(variant = 0)] Directory,
+    #[column(variant = 1)] Menu,
+    #[column(variant = 2)] Button,
+}
 impl Display for MenuType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self { MenuType::Directory => write!(f, "directory"), MenuType::Menu => write!(f, "menu"), MenuType::Button => write!(f, "button") }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MenuStatus { Active, Disabled }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, toasty::Embed)]
+pub enum MenuStatus {
+    #[column(variant = 0)] Active,
+    #[column(variant = 1)] Disabled,
+}
 impl Display for MenuStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self { MenuStatus::Active => write!(f, "active"), MenuStatus::Disabled => write!(f, "disabled") }

@@ -3,8 +3,14 @@
 use std::collections::HashSet;
 use std::fmt::Display;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DataScope { All, Custom, Dept, DeptAndChild, Self_ }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, toasty::Embed)]
+pub enum DataScope {
+    #[column(variant = 0)] Self_,
+    #[column(variant = 1)] Custom,
+    #[column(variant = 2)] Dept,
+    #[column(variant = 3)] DeptAndChild,
+    #[column(variant = 4)] All,
+}
 impl Display for DataScope {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self { DataScope::All => write!(f, "all"), DataScope::Custom => write!(f, "custom"), DataScope::Dept => write!(f, "dept"), DataScope::DeptAndChild => write!(f, "dept_and_child"), DataScope::Self_ => write!(f, "self") }

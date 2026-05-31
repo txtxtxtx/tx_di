@@ -2,8 +2,12 @@
 
 use async_trait::async_trait;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MailSendStatus { Init, Success, Failed }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, toasty::Embed)]
+pub enum MailSendStatus {
+    #[column(variant = 0)] Init,
+    #[column(variant = 1)] Success,
+    #[column(variant = 2)] Failed,
+}
 impl std::fmt::Display for MailSendStatus { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { match self { MailSendStatus::Init => write!(f, "init"), MailSendStatus::Success => write!(f, "success"), MailSendStatus::Failed => write!(f, "failed") } } }
 
 #[derive(Debug, Clone)]

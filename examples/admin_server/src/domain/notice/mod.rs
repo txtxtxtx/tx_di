@@ -2,8 +2,11 @@
 
 use async_trait::async_trait;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NoticeType { Notice, Announcement }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, toasty::Embed)]
+pub enum NoticeType {
+    #[column(variant = 0)] Notice,
+    #[column(variant = 1)] Announcement,
+}
 impl std::fmt::Display for NoticeType { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { match self { NoticeType::Notice => write!(f, "notice"), NoticeType::Announcement => write!(f, "announcement") } } }
 
 #[derive(Debug, Clone)]

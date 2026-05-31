@@ -2,12 +2,23 @@
 
 use async_trait::async_trait;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LoginLogType { Login, Logout, ForceLogout }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, toasty::Embed)]
+pub enum LoginLogType {
+    #[column(variant = 0)] Login,
+    #[column(variant = 1)] Logout,
+    #[column(variant = 2)] ForceLogout,
+}
 impl std::fmt::Display for LoginLogType { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { match self { LoginLogType::Login => write!(f, "login"), LoginLogType::Logout => write!(f, "logout"), LoginLogType::ForceLogout => write!(f, "force_logout") } } }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LoginResult { Success, BadCredentials, UserDisabled, CaptchaMissing, CaptchaWrong, Unknown }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, toasty::Embed)]
+pub enum LoginResult {
+    #[column(variant = 0)] Success,
+    #[column(variant = 1)] BadCredentials,
+    #[column(variant = 2)] UserDisabled,
+    #[column(variant = 3)] CaptchaMissing,
+    #[column(variant = 4)] CaptchaWrong,
+    #[column(variant = 5)] Unknown,
+}
 impl std::fmt::Display for LoginResult { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { match self { LoginResult::Success => write!(f, "success"), LoginResult::BadCredentials => write!(f, "bad_credentials"), LoginResult::UserDisabled => write!(f, "user_disabled"), LoginResult::CaptchaMissing => write!(f, "captcha_missing"), LoginResult::CaptchaWrong => write!(f, "captcha_wrong"), LoginResult::Unknown => write!(f, "unknown") } } }
 
 #[derive(Debug, Clone)]

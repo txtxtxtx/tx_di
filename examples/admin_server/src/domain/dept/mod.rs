@@ -2,8 +2,11 @@
 
 use async_trait::async_trait;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CommonStatus { Enable, Disable }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, toasty::Embed)]
+pub enum CommonStatus {
+    #[column(variant = 0)] Enable,
+    #[column(variant = 1)] Disable,
+}
 impl CommonStatus { pub fn is_enable(&self) -> bool { matches!(self, CommonStatus::Enable) } }
 impl std::fmt::Display for CommonStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { match self { CommonStatus::Enable => write!(f, "enable"), CommonStatus::Disable => write!(f, "disable") } }

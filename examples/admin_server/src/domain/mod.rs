@@ -23,6 +23,8 @@ pub mod notify;
 pub mod mail;
 pub mod oauth2;
 
+use std::fmt::Display;
+
 // 重新导出常用类型
 pub use error::AdminError;
 pub use user::{User, UserStatus, Sex, UserRepository};
@@ -42,3 +44,20 @@ pub use notify::{NotifyMessage, NotifyTemplate, NotifyRepository};
 pub use mail::{MailAccount, MailTemplate, MailLog, MailSendStatus, MailRepository};
 pub use oauth2::{OAuth2Client, OAuth2AccessToken, OAuth2RefreshToken, OAuth2Repository};
 pub use data_permission::{DataScope, DataPermissionContext, DataPermissionService};
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, toasty::Embed)]
+pub enum DeletedStatus {
+    #[column(variant = 0_u8)]
+    Normal,
+    #[column(variant = 1_u8)]
+    Deleted,
+}
+impl Display for DeletedStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DeletedStatus::Normal => write!(f, "normal"),
+            DeletedStatus::Deleted => write!(f, "deleted"),
+        }
+    }
+}

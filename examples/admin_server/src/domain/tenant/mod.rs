@@ -3,8 +3,11 @@
 use std::fmt::Display;
 use async_trait::async_trait;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TenantStatus { Active, Disabled }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, toasty::Embed)]
+pub enum TenantStatus {
+    #[column(variant = 0)] Active,
+    #[column(variant = 1)] Disabled,
+}
 impl Display for TenantStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self { TenantStatus::Active => write!(f, "active"), TenantStatus::Disabled => write!(f, "disabled") }

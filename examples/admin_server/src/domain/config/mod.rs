@@ -2,8 +2,11 @@
 
 use async_trait::async_trait;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ConfigType { BuiltIn, Custom }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, toasty::Embed)]
+pub enum ConfigType {
+    #[column(variant = 0)] Custom,
+    #[column(variant = 1)] BuiltIn,
+}
 impl std::fmt::Display for ConfigType { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { match self { ConfigType::BuiltIn => write!(f, "built_in"), ConfigType::Custom => write!(f, "custom") } } }
 
 #[derive(Debug, Clone)]

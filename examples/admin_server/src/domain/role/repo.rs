@@ -13,24 +13,20 @@ use super::super::data_permission::DataScope;
 #[table = "system_role"]
 pub struct RoleModel {
     #[key] #[auto] pub id: u64, #[index] pub tenant_id: i64, pub name: String, #[unique] pub code: String,
-    #[default(0i32)] pub sort: i32, pub data_scope: String,
+    #[default(0i32)] pub sort: i32, pub data_scope: DataScope,
     #[serialize(json)] pub data_scope_dept_ids: Vec<String>,
-    pub status: String, pub role_type: String, #[default("".to_string())] pub remark: String,
+    pub status: RoleStatus, pub role_type: RoleType, #[default("".to_string())] pub remark: String,
     #[default("".to_string())] pub creator: String, #[default("".to_string())] pub updater: String,
     #[default(jiff::Timestamp::now())] pub created_at: jiff::Timestamp,
     #[update(jiff::Timestamp::now())] pub updated_at: jiff::Timestamp,
     #[default(0u8)] pub deleted: u8,
 }
 
-fn scope_to_str(s: &DataScope) -> String { match s { DataScope::All => "all".into(), DataScope::Custom => "custom".into(), DataScope::Dept => "dept".into(), DataScope::DeptAndChild => "dept_and_child".into(), DataScope::Self_ => "self".into() } }
-fn str_to_scope(s: &str) -> DataScope { match s { "all" => DataScope::All, "custom" => DataScope::Custom, "dept" => DataScope::Dept, "dept_and_child" => DataScope::DeptAndChild, _ => DataScope::Self_ } }
-
 impl From<RoleModel> for Role {
     fn from(m: RoleModel) -> Self {
         Self { id: m.id, tenant_id: m.tenant_id as u64, name: m.name, code: m.code, sort: m.sort,
-            data_scope: str_to_scope(&m.data_scope), data_scope_dept_ids: m.data_scope_dept_ids.iter().filter_map(|s| s.parse().ok()).collect(),
-            status: if m.status == "disabled" { RoleStatus::Disabled } else { RoleStatus::Active },
-            role_type: if m.role_type == "built_in" { RoleType::BuiltIn } else { RoleType::Custom },
+            data_scope: m.data_scope, data_scope_dept_ids: m.data_scope_dept_ids.iter().filter_map(|s| s.parse().ok()).collect(),
+            status: m.status, role_type: m.role_type,
             remark: if m.remark.is_empty() { None } else { Some(m.remark) }, creator: if m.creator.is_empty() { None } else { Some(m.creator) }, updater: if m.updater.is_empty() { None } else { Some(m.updater) },
             created_at: m.created_at, updated_at: m.updated_at, deleted: m.deleted }
     }
@@ -57,8 +53,8 @@ impl RoleRepository for ToastyRoleRepository {
     }
     async fn save(&self, role: &Role) -> Result<(), anyhow::Error> {
         let mut db = self.toasty.db().clone();
-        if role.id == 0 { toasty::create!(RoleModel { tenant_id: role.tenant_id as i64, name: role.name.clone(), code: role.code.clone(), sort: role.sort, data_scope: scope_to_str(&role.data_scope), data_scope_dept_ids: role.data_scope_dept_ids.iter().map(|v| v.to_string()).collect(), status: role.status.to_string(), role_type: role.role_type.to_string(), remark: role.remark.clone().unwrap_or_default(), creator: role.creator.clone().unwrap_or_default(), updater: role.updater.clone().unwrap_or_default() }).exec(&mut db).await?; }
-        else { let mut m = RoleModel::get_by_id(&mut db, role.id).await.map_err(|_| anyhow::anyhow!("not found"))?; m.tenant_id = role.tenant_id as i64; m.name = role.name.clone(); m.code = role.code.clone(); m.sort = role.sort; m.data_scope = scope_to_str(&role.data_scope); m.data_scope_dept_ids = role.data_scope_dept_ids.iter().map(|v| v.to_string()).collect(); m.status = role.status.to_string(); m.role_type = role.role_type.to_string(); m.remark = role.remark.clone().unwrap_or_default(); m.creator = role.creator.clone().unwrap_or_default(); m.updater = role.updater.clone().unwrap_or_default(); m.update().exec(&mut db).await?; } Ok(())
+        if role.id == 0 { toasty::create!(RoleModel { tenant_id: role.tenant_id as i64, name: role.name.clone(), code: role.code.clone(), sort: role.sort, data_scope: role.data_scope, data_scope_dept_ids: role.data_scope_dept_ids.iter().map(|v| v.to_string()).collect(), status: role.status, role_type: role.role_type, remark: role.remark.clone().unwrap_or_default(), creator: role.creator.clone().unwrap_or_default(), updater: role.updater.clone().unwrap_or_default() }).exec(&mut db).await?; }
+        else { let mut m = RoleModel::get_by_id(&mut db, role.id).await.map_err(|_| anyhow::anyhow!("not found"))?; m.tenant_id = role.tenant_id as i64; m.name = role.name.clone(); m.code = role.code.clone(); m.sort = role.sort; m.data_scope = role.data_scope; m.data_scope_dept_ids = role.data_scope_dept_ids.iter().map(|v| v.to_string()).collect(); m.status = role.status; m.role_type = role.role_type; m.remark = role.remark.clone().unwrap_or_default(); m.creator = role.creator.clone().unwrap_or_default(); m.updater = role.updater.clone().unwrap_or_default(); m.update().exec(&mut db).await?; } Ok(())
     }
     async fn delete(&self, id: u64) -> Result<(), anyhow::Error> { let mut db = self.toasty.db().clone(); match RoleModel::get_by_id(&mut db, id).await { Ok(mut m) => { m.deleted = 1; m.update().exec(&mut db).await?; } Err(_) => {} } Ok(()) }
     async fn find_by_ids(&self, ids: &[u64]) -> Result<Vec<Role>, anyhow::Error> { let mut db = self.toasty.db().clone(); let mut roles = Vec::new(); for &id in ids { match RoleModel::get_by_id(&mut db, id).await { Ok(m) => roles.push(Role::from(m)), Err(_) => {} } } Ok(roles) }

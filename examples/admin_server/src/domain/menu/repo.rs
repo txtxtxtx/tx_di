@@ -12,21 +12,19 @@ use super::{Menu, MenuType, MenuStatus, MenuRepository};
 #[table = "system_menu"]
 pub struct MenuModel {
     #[key] #[auto] pub id: u64, pub name: String, #[default("".to_string())] pub permission: String,
-    pub menu_type: String, #[default(0i32)] pub sort: i32, #[default(0u64)] pub parent_id: u64,
+    pub menu_type: MenuType, #[default(0i32)] pub sort: i32, #[default(0u64)] pub parent_id: u64,
     #[column("path")] #[default("".to_string())] pub route_path: String, #[default("".to_string())] pub icon: String,
     #[default("".to_string())] pub component: String, #[default("".to_string())] pub component_name: String,
-    pub status: String, #[default(true)] pub visible: bool, #[default(false)] pub keep_alive: bool,
+    pub status: MenuStatus, #[default(true)] pub visible: bool, #[default(false)] pub keep_alive: bool,
     #[default(false)] pub always_show: bool, #[default("".to_string())] pub creator: String, #[default("".to_string())] pub updater: String,
     #[default(jiff::Timestamp::now())] pub created_at: jiff::Timestamp,
     #[update(jiff::Timestamp::now())] pub updated_at: jiff::Timestamp,
     #[default(0u8)] pub deleted: u8,
 }
 
-fn str_to_menu_type(s: &str) -> MenuType { match s { "directory" => MenuType::Directory, "menu" => MenuType::Menu, "button" => MenuType::Button, _ => MenuType::Menu } }
-
 impl From<MenuModel> for Menu {
     fn from(m: MenuModel) -> Self {
-        Self { id: m.id, name: m.name, permission: if m.permission.is_empty() { None } else { Some(m.permission) }, menu_type: str_to_menu_type(&m.menu_type), sort: m.sort, parent_id: m.parent_id, route_path: if m.route_path.is_empty() { None } else { Some(m.route_path) }, icon: if m.icon.is_empty() { None } else { Some(m.icon) }, component: if m.component.is_empty() { None } else { Some(m.component) }, component_name: if m.component_name.is_empty() { None } else { Some(m.component_name) }, status: if m.status == "disabled" { MenuStatus::Disabled } else { MenuStatus::Active }, visible: m.visible, keep_alive: m.keep_alive, always_show: m.always_show, creator: if m.creator.is_empty() { None } else { Some(m.creator) }, updater: if m.updater.is_empty() { None } else { Some(m.updater) }, created_at: m.created_at, updated_at: m.updated_at, deleted: m.deleted }
+        Self { id: m.id, name: m.name, permission: if m.permission.is_empty() { None } else { Some(m.permission) }, menu_type: m.menu_type, sort: m.sort, parent_id: m.parent_id, route_path: if m.route_path.is_empty() { None } else { Some(m.route_path) }, icon: if m.icon.is_empty() { None } else { Some(m.icon) }, component: if m.component.is_empty() { None } else { Some(m.component) }, component_name: if m.component_name.is_empty() { None } else { Some(m.component_name) }, status: m.status, visible: m.visible, keep_alive: m.keep_alive, always_show: m.always_show, creator: if m.creator.is_empty() { None } else { Some(m.creator) }, updater: if m.updater.is_empty() { None } else { Some(m.updater) }, created_at: m.created_at, updated_at: m.updated_at, deleted: m.deleted }
     }
 }
 
@@ -56,8 +54,8 @@ impl MenuRepository for ToastyMenuRepository {
     async fn find_menu_tree(&self) -> Result<Vec<Menu>, anyhow::Error> { self.find_all().await }
     async fn save(&self, menu: &Menu) -> Result<(), anyhow::Error> {
         let mut db = self.toasty.db().clone();
-        if menu.id == 0 { toasty::create!(MenuModel { name: menu.name.clone(), permission: menu.permission.clone().unwrap_or_default(), menu_type: menu.menu_type.to_string(), sort: menu.sort, parent_id: menu.parent_id, route_path: menu.route_path.clone().unwrap_or_default(), icon: menu.icon.clone().unwrap_or_default(), component: menu.component.clone().unwrap_or_default(), component_name: menu.component_name.clone().unwrap_or_default(), status: menu.status.to_string(), visible: menu.visible, keep_alive: menu.keep_alive, always_show: menu.always_show, creator: menu.creator.clone().unwrap_or_default(), updater: menu.updater.clone().unwrap_or_default() }).exec(&mut db).await?; }
-        else { let mut m = MenuModel::get_by_id(&mut db, menu.id).await.map_err(|_| anyhow::anyhow!("not found"))?; m.name = menu.name.clone(); m.permission = menu.permission.clone().unwrap_or_default(); m.menu_type = menu.menu_type.to_string(); m.sort = menu.sort; m.parent_id = menu.parent_id; m.route_path = menu.route_path.clone().unwrap_or_default(); m.icon = menu.icon.clone().unwrap_or_default(); m.component = menu.component.clone().unwrap_or_default(); m.component_name = menu.component_name.clone().unwrap_or_default(); m.status = menu.status.to_string(); m.visible = menu.visible; m.keep_alive = menu.keep_alive; m.always_show = menu.always_show; m.creator = menu.creator.clone().unwrap_or_default(); m.updater = menu.updater.clone().unwrap_or_default(); m.update().exec(&mut db).await?; } Ok(())
+        if menu.id == 0 { toasty::create!(MenuModel { name: menu.name.clone(), permission: menu.permission.clone().unwrap_or_default(), menu_type: menu.menu_type, sort: menu.sort, parent_id: menu.parent_id, route_path: menu.route_path.clone().unwrap_or_default(), icon: menu.icon.clone().unwrap_or_default(), component: menu.component.clone().unwrap_or_default(), component_name: menu.component_name.clone().unwrap_or_default(), status: menu.status, visible: menu.visible, keep_alive: menu.keep_alive, always_show: menu.always_show, creator: menu.creator.clone().unwrap_or_default(), updater: menu.updater.clone().unwrap_or_default() }).exec(&mut db).await?; }
+        else { let mut m = MenuModel::get_by_id(&mut db, menu.id).await.map_err(|_| anyhow::anyhow!("not found"))?; m.name = menu.name.clone(); m.permission = menu.permission.clone().unwrap_or_default(); m.menu_type = menu.menu_type; m.sort = menu.sort; m.parent_id = menu.parent_id; m.route_path = menu.route_path.clone().unwrap_or_default(); m.icon = menu.icon.clone().unwrap_or_default(); m.component = menu.component.clone().unwrap_or_default(); m.component_name = menu.component_name.clone().unwrap_or_default(); m.status = menu.status; m.visible = menu.visible; m.keep_alive = menu.keep_alive; m.always_show = menu.always_show; m.creator = menu.creator.clone().unwrap_or_default(); m.updater = menu.updater.clone().unwrap_or_default(); m.update().exec(&mut db).await?; } Ok(())
     }
     async fn delete(&self, id: u64) -> Result<(), anyhow::Error> { let mut db = self.toasty.db().clone(); match MenuModel::get_by_id(&mut db, id).await { Ok(mut m) => { m.deleted = 1; m.update().exec(&mut db).await?; } Err(_) => {} } Ok(()) }
 }

@@ -4,16 +4,22 @@ use std::fmt::Display;
 use async_trait::async_trait;
 use crate::domain::data_permission::DataScope;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RoleStatus { Active, Disabled }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, toasty::Embed)]
+pub enum RoleStatus {
+    #[column(variant = 0)] Active,
+    #[column(variant = 1)] Disabled,
+}
 impl Display for RoleStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self { RoleStatus::Active => write!(f, "active"), RoleStatus::Disabled => write!(f, "disabled") }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RoleType { BuiltIn, Custom }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, toasty::Embed)]
+pub enum RoleType {
+    #[column(variant = 0)] Custom,
+    #[column(variant = 1)] BuiltIn,
+}
 impl Display for RoleType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self { RoleType::BuiltIn => write!(f, "built_in"), RoleType::Custom => write!(f, "custom") }
