@@ -6,29 +6,33 @@
 //!
 //! - **`AppErrCode`**: 归一化值类型错误码（domain + code + message），纯静态引用，可 `Copy`
 //! - **`CodeMsg`**: 错误码转换 trait，连接业务错误枚举与统一 `AppError`
-//! - **`AppError`**: 统一错误枚举，只存储归一化后的值字段
+//! - **`AppError`**: 统一错误枚举，支持带上下文（`with_context`）
 //! - **`AppResult<T>`**: `Result<T, AppError>` 类型别名
 //! - **`#[derive(CodeMsg)]`**: proc-macro，为枚举自动实现 `CodeMsg` + `Display` + `From<AppError>`
 //!
 //! ## 使用示例
 //!
 //! ```rust,ignore
-//! use tx_error::{AppErrCode, AppError, AppResult, CodeMsg};
-//! use tx_di_macros::CodeMsg;
+//! use tx_error::{AppError, AppResult, CodeMsg};
 //!
 //! #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
-//! #[err(domain = "SYS")]
-//! pub enum SysErr {
-//!     #[err(code = 0, msg = "Success")]
-//!     Success,
-//!     #[err(code = 1001, msg = "Config load failed")]
-//!     ConfigLoadFailed,
-//!     #[err(code = 9999, msg = "Unknown error")]
-//!     Unknown,
+//! #[err("USER")]
+//! pub enum UserErr {
+//!     #[err(2001, "User not found")]
+//!     NotFound,
+//!     #[err(2002, "Permission denied")]
+//!     PermissionDenied,
 //! }
 //!
-//! fn load_config() -> AppResult<()> {
-//!     Err(SysErr::ConfigLoadFailed.into())
+//! // 无上下文
+//! let err: AppError = UserErr::NotFound.into();
+//!
+//! // 带上下文
+//! let err = AppError::with_context(UserErr::NotFound, format!("id={}", user_id));
+//! // Display: [USER:2001] User not found: id=42
+//!
+//! fn get_user() -> AppResult<()> {
+//!     Err(AppError::with_context(UserErr::NotFound, "id=42"))
 //! }
 //! ```
 
@@ -43,3 +47,10 @@ pub use error::{AppError, AppResult};
 
 // re-export derive 宏，用户可以直接 use tx_error::CodeMsg 来作为 derive
 pub use tx_di_macros::CodeMsg;
+
+// ── 可选支持 ────────────────────────────────────────────
+#[cfg(feature = "axum")]
+mod axum_support;
+
+#[cfg(feature = "anyhow")]
+mod anyhow_support;

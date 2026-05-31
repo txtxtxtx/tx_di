@@ -6,7 +6,7 @@ use axum::{Json, Router, extract::State, routing::{get, post}};
 use std::sync::Arc;
 use tx_di_core::App;
 
-use crate::domain::error::AdminError;
+use crate::domain::AppError;
 use crate::domain::user::service::UserService;
 use crate::domain::user::repo::ToastyUserRepository;
 use crate::domain::role::repo::ToastyRoleRepository;
@@ -33,7 +33,7 @@ fn build_service(app: &Arc<App>) -> UserService {
 async fn login(
     State(app): State<Arc<App>>,
     Json(req): Json<LoginRequest>,
-) -> Result<Json<ApiResponse<LoginResponse>>, AdminError> {
+) -> Result<Json<ApiResponse<LoginResponse>>, AppError> {
     let service = build_service(&app);
 
     // 领域服务处理认证逻辑
@@ -64,7 +64,7 @@ async fn login(
 
 async fn user_info(
     State(app): State<Arc<App>>,
-) -> Result<Json<ApiResponse<UserInfo>>, AdminError> {
+) -> Result<Json<ApiResponse<UserInfo>>, AppError> {
     let service = build_service(&app);
 
     // TODO: 从 sa-token 获取当前用户 ID，硬编码 1 仅供调试

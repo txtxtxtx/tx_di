@@ -1,14 +1,13 @@
 //! 管理后台错误码定义
 //!
-//! 使用 tx_error 框架，零堆分配、无虚表。
+//! 直接使用 tx_error::AppError 作为统一错误类型。
 //! 错误码格式：[ADMIN:xxxx]
 
-use tx_error::CodeMsg;
+use tx_error::{AppResult, CodeMsg};
 
 /// 管理后台业务错误码
 #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
 #[err("ADMIN")]
-#[ie(tx_di_core::IE)] 
 pub enum AdminErr {
     // ── 通用 ─────────────────────────────────────────────
     #[err(1000, "记录不存在")]
@@ -89,68 +88,5 @@ pub enum AdminErr {
     Unknown,
 }
 
-/// 带上下文信息的错误包装
-///
-/// `AppError` 本身是零堆分配的，但业务场景经常需要携带
-/// 动态上下文（如 "用户 123 不存在"）。
-/// 用这个结构体包装，保持核心错误码的高效性。
-#[derive(Debug)]
-pub struct AdminError {
-    pub err: tx_error::AppError,
-    /// 动态上下文信息（如实体 ID、字段值等）
-    pub context: Option<String>,
-}
-
-impl AdminError {
-    /// 从错误码创建（无上下文）
-    pub fn from_code(err: AdminErr) -> Self {
-        Self {
-            err: tx_error::AppError::from_code(err),
-            context: None,
-        }
-    }
-
-    /// 从错误码 + 上下文创建
-    pub fn with_context(err: AdminErr, context: impl Into<String>) -> Self {
-        Self {
-            err: tx_error::AppError::from_code(err),
-            context: Some(context.into()),
-        }
-    }
-
-    /// 获取完整错误消息（含上下文）
-    pub fn message(&self) -> String {
-        match &self.context {
-            Some(ctx) => format!("{}: {}", self.err.message(), ctx),
-            None => self.err.message().to_string(),
-        }
-    }
-
-    /// 获取 HTTP 状态码
-    pub fn status_code(&self) -> u16 {
-        match self.err.code() {
-            // 404
-            1000 | 3000 | 4000 | 5000 | 6000 | 7000 | 7001 | 8001 | 9000 | 9001 | 10000 => 404,
-            // 409 冲突
-            1001 | 3001 | 4001 | 5001 => 409,
-            // 400 参数错误
-            1002 | 2000 | 3002 | 4002 | 6001 | 8000 => 400,
-            // 401 未授权
-            2001 | 2002 | 2003 => 401,
-            // 403 禁止
-            1003 => 403,
-            // 500 服务器错误
-            90000 | 90001 | 99999 => 500,
-            // 默认 500
-            _ => 500,
-        }
-    }
-}
-
-
-// ── 从 AdminErr 错误码转换（支持 `?` 操作符）──────────────
-impl From<AdminErr> for AdminError {
-    fn from(err: AdminErr) -> Self {
-        Self::from_code(err)
-    }
-}
+/// 类型别名
+pub type AdminResult<T> = AppResult<T>;
