@@ -7,6 +7,7 @@ use syn::{
 };
 
 /// 如果 `ty` 是 `Arc<T>`，返回 T；否则返回 ty 本身。
+#[allow(dead_code)]
 pub fn strip_arc(ty: &Type) -> TokenStream2 {
     let path = match ty {
         Type::Path(tp) => &tp.path,
@@ -39,6 +40,7 @@ pub fn strip_arc(ty: &Type) -> TokenStream2 {
 /// 转换后的蛇形命名法字符串
 ///
 /// case `DbPool` -> `db_pool`
+#[allow(dead_code)]
 pub fn camel_to_snake(s: &str) -> String {
     let mut result = String::new();
     for (i, ch) in s.chars().enumerate() {
@@ -63,12 +65,14 @@ pub fn camel_to_snake(s: &str) -> String {
 /// # 返回值
 ///
 /// 转换后的大写蛇形命名法字符串
+#[allow(dead_code)]
 pub fn camel_to_screaming_snake(s: &str) -> String {
     camel_to_snake(s).to_uppercase()
 }
 
 
 /// 提取 Option<T> 中的 T 类型
+#[allow(dead_code)]
 pub fn extract_option_inner(ty: &Type) -> Option<Type> {
     if let Type::Path(type_path) = ty {
         if let Some(segment) = type_path.path.segments.last() {
@@ -85,6 +89,7 @@ pub fn extract_option_inner(ty: &Type) -> Option<Type> {
 }
 
 /// 检查类型是否为 Option<T>
+#[allow(dead_code)]
 pub fn is_option_type(ty: &Type) -> bool {
     extract_option_inner(ty).is_some()
 }
