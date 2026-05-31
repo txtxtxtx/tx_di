@@ -5811,6 +5811,7 @@ dependencies = [
  "toml 1.1.2+spec-1.1.0",
  "tracing",
  "tx-di-macros",
+ "tx_common",
  "tx_error",
 ]
 
@@ -5821,6 +5822,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "tx_common"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "tx_error",
 ]
 
 [[package]]
@@ -5988,7 +5998,8 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
- "tx-di-macros",
+ "toml 1.1.2+spec-1.1.0",
+ "tx_macros",
 ]
 
 [[package]]
@@ -6007,6 +6018,15 @@ dependencies = [
  "tokio",
  "tracing",
  "tx-di-core",
+]
+
+[[package]]
+name = "tx_macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

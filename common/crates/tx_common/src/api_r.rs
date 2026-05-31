@@ -128,6 +128,20 @@ impl From<RCode> for ApiRes {
     }
 }
 
+/// IE → ApiRes 转换
+impl From<tx_error::IE> for ApiRes {
+    fn from(err: tx_error::IE) -> Self {
+        match &err {
+            tx_error::IE::Business(code) => {
+                ApiRes::error(code.code, code.message.to_string())
+            }
+            tx_error::IE::Internal(e) => {
+                ApiRes::fail(e.to_string())
+            }
+        }
+    }
+}
+
 
 // use axum::{http::StatusCode, response::{IntoResponse, Response}, Json};
 // 将ApiR类型的响应转换为HTTP响应

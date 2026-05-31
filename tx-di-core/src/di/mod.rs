@@ -2,16 +2,15 @@
 // 4. BuildContext
 // ─────────────────────────────────────────────────────────────────────────────
 
-pub mod common;
 pub mod comp;
 pub mod scopes;
 
 use crate::di::comp::StoreFactoryFn;
 use crate::di::comp::config::AppAllConfig;
 use crate::{
-    COMPONENT_REGISTRY, CompRef, ComponentDescriptor, ComponentMeta, DiErr, IE, RIE, Scope, topo_sort,
+    COMPONENT_REGISTRY, CompRef, ComponentDescriptor, ComponentMeta, Scope, topo_sort,
 };
-use tx_error::CodeMsg;
+use tx_error::{CodeMsg, DiErr, IE, RIE};
 use dashmap::DashMap;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;

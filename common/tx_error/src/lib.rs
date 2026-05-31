@@ -41,16 +41,17 @@ extern crate self as tx_error;
 
 mod code;
 mod error;
+mod di_err;
 
 pub use code::{AppErrCode, CodeMsg};
 pub use error::{AppError, AppResult};
+pub use di_err::{IE, RIE, DiErr};
 
 // re-export derive 宏，用户可以直接 use tx_error::CodeMsg 来作为 derive
-pub use tx_di_macros::CodeMsg;
+pub use tx_macros::CodeMsg;
 
 // ── 可选支持 ────────────────────────────────────────────
 #[cfg(feature = "axum")]
 mod axum_support;
 
-#[cfg(feature = "anyhow")]
 mod anyhow_support;
