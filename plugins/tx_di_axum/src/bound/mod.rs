@@ -50,7 +50,7 @@ where
     type Rejection = WebErr;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        let comp = parts.get_comp::<T>().map_err(WebErr::IE)?;
+        let comp = parts.get_comp::<T>().map_err(WebErr::AppError)?;
         Ok(DiComp(comp))
     }
 }

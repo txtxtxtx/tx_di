@@ -23,7 +23,11 @@ pub use toml::Value;
 pub use toml::map;
 
 pub use tx_di_macros::{tx_comp, tx_cst};
-pub use tx_error::{CodeMsg, AppErrCode, AppError, IE, RIE, DiErr};
+pub use tx_error::{CodeMsg, AppErrCode, AppError, AppResult, DiErr};
+/// 兼容旧代码：RIE<T> = AppResult<T>
+pub type RIE<T> = AppResult<T>;
+/// 兼容旧代码：IE = AppError
+pub type IE = AppError;
 pub use tx_common::{ApiR, ApiRes, RCode, FormattedDateTime};
 pub use di::{BuildContext, scopes::Scope, App, InnerContext,
              comp::{ComponentMeta, topo_sort, COMPONENT_REGISTRY, config::AppAllConfig},

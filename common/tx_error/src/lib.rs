@@ -1,16 +1,11 @@
 //! # tx_error — 统一错误设计
 //!
-//! 零堆分配、无虚表、单态化的高性能错误处理框架。
+//! 一个错误类型 `AppError` 贯穿全栈，三种形态：
+//! - `ErrCode` — 业务错误码（零堆分配）
+//! - `WithContext` — 带动态上下文
+//! - `Internal` — 框架/IO/第三方库错误
 //!
-//! ## 核心设计
-//!
-//! - **`AppErrCode`**: 归一化值类型错误码（domain + code + message），纯静态引用，可 `Copy`
-//! - **`CodeMsg`**: 错误码转换 trait，连接业务错误枚举与统一 `AppError`
-//! - **`AppError`**: 统一错误枚举，支持带上下文（`with_context`）
-//! - **`AppResult<T>`**: `Result<T, AppError>` 类型别名
-//! - **`#[derive(CodeMsg)]`**: proc-macro，为枚举自动实现 `CodeMsg` + `Display` + `From<AppError>`
-//!
-//! ## 使用示例
+//! ## 使用
 //!
 //! ```rust,ignore
 //! use tx_error::{AppError, AppResult, CodeMsg};
@@ -18,40 +13,28 @@
 //! #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
 //! #[err("USER")]
 //! pub enum UserErr {
-//!     #[err(2001, "User not found")]
-//!     NotFound,
-//!     #[err(2002, "Permission denied")]
-//!     PermissionDenied,
+//!     #[err(2001, "User not found")] NotFound,
 //! }
 //!
 //! // 无上下文
 //! let err: AppError = UserErr::NotFound.into();
 //!
 //! // 带上下文
-//! let err = AppError::with_context(UserErr::NotFound, format!("id={}", user_id));
-//! // Display: [USER:2001] User not found: id=42
+//! let err = AppError::with_context(UserErr::NotFound, format!("id={}", 42));
 //!
-//! fn get_user() -> AppResult<()> {
-//!     Err(AppError::with_context(UserErr::NotFound, "id=42"))
-//! }
+//! // 内部错误（anyhow 自动转换）
+//! let err: AppError = anyhow::anyhow!("db failed").into();
 //! ```
 
-// 允许 derive 宏生成的 `tx_error::AppErrCode` 等路径在 crate 内部也能解析
 extern crate self as tx_error;
 
 mod code;
 mod error;
-mod di_err;
 
 pub use code::{AppErrCode, CodeMsg};
-pub use error::{AppError, AppResult};
-pub use di_err::{IE, RIE, DiErr};
+pub use error::{AppError, AppResult, DiErr};
 
-// re-export derive 宏，用户可以直接 use tx_error::CodeMsg 来作为 derive
 pub use tx_macros::CodeMsg;
 
-// ── 可选支持 ────────────────────────────────────────────
 #[cfg(feature = "axum")]
 mod axum_support;
-
-mod anyhow_support;

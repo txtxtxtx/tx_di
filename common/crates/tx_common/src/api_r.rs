@@ -128,16 +128,12 @@ impl From<RCode> for ApiRes {
     }
 }
 
-/// IE → ApiRes 转换
-impl From<tx_error::IE> for ApiRes {
-    fn from(err: tx_error::IE) -> Self {
+/// AppError → ApiRes 转换
+impl From<tx_error::AppError> for ApiRes {
+    fn from(err: tx_error::AppError) -> Self {
         match &err {
-            tx_error::IE::Business(code) => {
-                ApiRes::error(code.code, code.message.to_string())
-            }
-            tx_error::IE::Internal(e) => {
-                ApiRes::fail(e.to_string())
-            }
+            tx_error::AppError::Internal(e) => ApiRes::fail(e.to_string()),
+            _ => ApiRes::error(err.code(), err.full_message()),
         }
     }
 }

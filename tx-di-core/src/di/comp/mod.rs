@@ -5,7 +5,7 @@ use dashmap::DashMap;
 use std::any::{Any, TypeId};
 use tracing::debug;
 use crate::{App, BoxFuture, CompRef, Scope};
-use tx_error::RIE;
+use crate::RIE;
 use std::collections::{BinaryHeap, HashMap};
 use std::cmp::Reverse;
 use std::sync::Arc;

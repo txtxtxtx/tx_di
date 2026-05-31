@@ -5,7 +5,7 @@ use tx_error::CodeMsg;
 /// GB28181 插件业务错误码。
 #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
 #[err("GB")]
-#[ie(tx_di_core::IE)]
+
 pub enum GbErr {
     /// 设备未注册或已离线
     #[err(-1, "设备未注册或已离线")]

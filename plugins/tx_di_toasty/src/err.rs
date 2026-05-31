@@ -5,7 +5,7 @@ use tx_error::CodeMsg;
 /// Toasty 插件业务错误码。
 #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
 #[err("TOASTY")]
-#[ie(tx_di_core::IE)]
+
 pub enum ToastyErr {
     /// 数据库连接失败
     #[err(-1, "数据库连接失败")]

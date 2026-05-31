@@ -5,7 +5,7 @@ use tx_error::CodeMsg;
 /// CAN 总线插件业务错误码。
 #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
 #[err("CAN")]
-#[ie(tx_di_core::IE)]
+
 pub enum CanErr {
     /// 配置加载失败
     #[err(-1, "配置加载失败")]

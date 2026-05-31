@@ -4,7 +4,7 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use tokio_util::sync::CancellationToken;
 use crate::{App, InnerContext, Scope};
-use tx_error::RIE;
+use crate::RIE;
 
 pub type BoxFuture = Pin<Box<dyn Future<Output = RIE<()>> + Send>>;
 

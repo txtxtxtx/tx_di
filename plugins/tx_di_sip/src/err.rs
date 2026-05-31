@@ -5,7 +5,7 @@ use tx_error::CodeMsg;
 /// SIP 插件业务错误码。
 #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
 #[err("SIP")]
-#[ie(tx_di_core::IE)]
+
 pub enum SipErr {
     /// 无效的 SIP 地址
     #[err(-1, "无效的 SIP 地址")]

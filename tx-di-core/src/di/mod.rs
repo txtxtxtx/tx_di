@@ -10,7 +10,8 @@ use crate::di::comp::config::AppAllConfig;
 use crate::{
     COMPONENT_REGISTRY, CompRef, ComponentDescriptor, ComponentMeta, Scope, topo_sort,
 };
-use tx_error::{CodeMsg, DiErr, IE, RIE};
+use tx_error::{CodeMsg, DiErr};
+use crate::{IE, RIE};
 use dashmap::DashMap;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
