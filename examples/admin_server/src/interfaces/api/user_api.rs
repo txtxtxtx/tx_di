@@ -44,7 +44,7 @@ async fn create_user(
     if repo.find_by_username(&req.username).await?.is_some() { return Err(AdminError::UsernameDuplicate(req.username)); }
     let pw = bcrypt::hash(&req.password, bcrypt::DEFAULT_COST).map_err(|e| AdminError::Database(e.to_string()))?;
     let mut user = crate::domain::user::User::new(1, req.username, pw, req.nickname);
-    user.email = req.email; user.mobile = req.mobile;
+    user.email = req.email.unwrap_or_default(); user.mobile = req.mobile.unwrap_or_default();
     repo.save(&user).await?;
     Ok(Json(ApiResponse::success(UserDto::from(&user))))
 }
@@ -57,8 +57,8 @@ async fn update_user(
     let repo = app.inject::<ToastyUserRepository>();
     let mut user = repo.find_by_id(id).await?.ok_or(AdminError::UserNotFound(id.to_string()))?;
     if let Some(n) = req.nickname { user.nickname = n; }
-    if let Some(e) = req.email { user.email = Some(e); }
-    if let Some(m) = req.mobile { user.mobile = Some(m); }
+    if let Some(e) = req.email { user.email = e; }
+    if let Some(m) = req.mobile { user.mobile = m; }
     repo.save(&user).await?;
     Ok(Json(ApiResponse::success(UserDto::from(&user))))
 }

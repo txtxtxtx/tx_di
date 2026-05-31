@@ -41,7 +41,7 @@ async fn login(
     let permissions: Vec<String> = role_codes.iter().flat_map(|r| if r == "admin" { vec!["*:*:*".to_string()] } else { vec![format!("{}:read", r)] }).collect();
 
     let token = format!("{}.{}.{}", user.id, user.username, chrono::Utc::now().timestamp());
-    Ok(Json(ApiResponse::success(LoginResponse { token, user: UserInfo { id: user.id, username: user.username, nickname: user.nickname, avatar: user.avatar, roles: role_codes, permissions, tenant_id: user.tenant_id } })))
+    Ok(Json(ApiResponse::success(LoginResponse { token, user: UserInfo { id: user.id, username: user.username, nickname: user.nickname, avatar: Some(user.avatar), roles: role_codes, permissions, tenant_id: user.tenant_id } })))
 }
 
 async fn user_info(
@@ -49,5 +49,5 @@ async fn user_info(
 ) -> Result<Json<ApiResponse<UserInfo>>, AdminError> {
     let user_repo = app.inject::<ToastyUserRepository>();
     let user = user_repo.find_by_id(1).await?.ok_or(AdminError::UserNotFound("1".to_string()))?;
-    Ok(Json(ApiResponse::success(UserInfo { id: user.id, username: user.username, nickname: user.nickname, avatar: user.avatar, roles: vec!["admin".to_string()], permissions: vec!["*:*:*".to_string()], tenant_id: user.tenant_id })))
+    Ok(Json(ApiResponse::success(UserInfo { id: user.id, username: user.username, nickname: user.nickname, avatar: Some(user.avatar), roles: vec!["admin".to_string()], permissions: vec!["*:*:*".to_string()], tenant_id: user.tenant_id })))
 }

@@ -2,7 +2,7 @@
 
 // use crate::domain::data_permission::DataScope;
 use async_trait::async_trait;
-use std::{fmt::Display, net::{IpAddr, Ipv4Addr, Ipv6Addr}};
+use std::{fmt::Display, net::{IpAddr, Ipv4Addr}};
 
 use crate::domain::DeletedStatus;
 
@@ -56,6 +56,7 @@ pub struct User {
     /// 用户唯一标识符
     pub id: u64,
     /// 所属租户的唯一标识符（用于多租户系统隔离）
+    #[index]
     pub tenant_id: u64,
     /// 用户名（通常用于登录，具有唯一性约束）
     #[unique]
@@ -123,15 +124,15 @@ impl User {
             username,
             password_hash,
             nickname,
-            remark: None,
-            dept_id: None,
+            remark: String::new(),
+            dept_id: vec![],
             post_ids: vec![],
-            email: None,
-            mobile: None,
+            email: String::new(),
+            mobile: String::new(),
             sex: Sex::Unknown,
-            avatar: None,
+            avatar: String::new(),
             status: UserStatus::Active,
-            login_ip: None,
+            login_ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
             login_date: None,
             creator: None,
             updater: None,
@@ -141,7 +142,7 @@ impl User {
         }
     }
     pub fn is_active(&self) -> bool {
-        self.status == UserStatus::Active && self.deleted == 0
+        self.status == UserStatus::Active && self.deleted == DeletedStatus::Normal
     }
     pub fn disable(&mut self) {
         self.status = UserStatus::Disabled;
@@ -152,8 +153,8 @@ impl User {
     pub fn change_password(&mut self, new_hash: String) {
         self.password_hash = new_hash;
     }
-    pub fn record_login(&mut self, ip: String) {
-        self.login_ip = Some(ip);
+    pub fn record_login(&mut self, ip: IpAddr) {
+        self.login_ip = ip;
         self.login_date = Some(jiff::Timestamp::now());
     }
     pub fn update_profile(
@@ -163,21 +164,13 @@ impl User {
         mobile: Option<String>,
         avatar: Option<String>,
     ) {
-        if let Some(n) = nickname {
-            self.nickname = n;
-        }
-        if let Some(e) = email {
-            self.email = Some(e);
-        }
-        if let Some(m) = mobile {
-            self.mobile = Some(m);
-        }
-        if let Some(a) = avatar {
-            self.avatar = Some(a);
-        }
+        if let Some(n) = nickname { self.nickname = n; }
+        if let Some(e) = email { self.email = e; }
+        if let Some(m) = mobile { self.mobile = m; }
+        if let Some(a) = avatar { self.avatar = a; }
     }
     pub fn mark_deleted(&mut self) {
-        self.deleted = 1;
+        self.deleted = DeletedStatus::Deleted;
     }
 }
 
