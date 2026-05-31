@@ -14,6 +14,7 @@ use proc_macro::TokenStream;
 ///
 /// #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
 /// #[err("SYS")]
+/// #[ie(tx_error::IE)]
 /// pub enum SysErr {
 ///     #[err(0, "Success")]
 ///     Success,

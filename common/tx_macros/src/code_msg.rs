@@ -149,7 +149,7 @@ fn expand_code_msg(input: &DeriveInput) -> SynResult<TokenStream2> {
         }
     };
 
-    // 解析可选的 #[ie(tx_di_core::IE)] 属性
+    // 解析可选的 #[ie(tx_error::IE)] 属性
     let ie_path: Option<syn::Path> = input.attrs.iter().find_map(|attr| {
         if attr.path().is_ident("ie") {
             attr.parse_args::<syn::Path>().ok()
