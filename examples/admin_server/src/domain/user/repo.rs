@@ -8,47 +8,6 @@ use tx_di_toasty::ToastyPlugin;
 
 use super::{Sex, User, UserRepository, UserStatus};
 
-#[derive(Debug, Clone, Model)]
-#[table = "system_users"]
-pub struct UserModel {
-    #[key]
-    #[auto]
-    pub id: u64,
-    #[index]
-    pub tenant_id: i64,
-    #[unique]
-    pub username: String,
-    pub password_hash: String,
-    pub nickname: String,
-    #[default("".to_string())]
-    pub remark: String,
-    #[default(0i64)]
-    pub dept_id: i64,
-    #[default(Vec::new())]
-    #[serialize(json)]
-    pub post_ids: Vec<String>,
-    #[default("".to_string())]
-    pub email: String,
-    #[default("".to_string())]
-    pub mobile: String,
-    pub sex: Sex,
-    #[default("".to_string())]
-    pub avatar: String,
-    pub status: UserStatus,
-    #[default("".to_string())]
-    pub login_ip: String,
-    #[default("".to_string())]
-    pub creator: String,
-    #[default("".to_string())]
-    pub updater: String,
-    #[default(jiff::Timestamp::now())]
-    pub created_at: jiff::Timestamp,
-    #[update(jiff::Timestamp::now())]
-    pub updated_at: jiff::Timestamp,
-    #[default(0u8)]
-    pub deleted: u8,
-}
-
 impl From<UserModel> for User {
     fn from(m: UserModel) -> Self {
         Self {

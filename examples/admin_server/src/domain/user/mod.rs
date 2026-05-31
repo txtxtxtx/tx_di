@@ -2,15 +2,15 @@
 
 // use crate::domain::data_permission::DataScope;
 use async_trait::async_trait;
-use std::fmt::Display;
+use std::{fmt::Display, net::{IpAddr, Ipv4Addr, Ipv6Addr}};
 
 use crate::domain::DeletedStatus;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, toasty::Embed)]
 pub enum UserStatus {
-    #[column(variant = 0)]
+    #[column(variant = 0_u8)]
     Active,
-    #[column(variant = 1)]
+    #[column(variant = 1_u8)]
     Disabled,
 }
 impl Display for UserStatus {
@@ -24,13 +24,14 @@ impl Display for UserStatus {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, toasty::Embed)]
 pub enum Sex {
-    #[column(variant = 0)]
+    #[column(variant = 0_u8)]
     Unknown,
-    #[column(variant = 1)]
+    #[column(variant = 1_u8)]
     Male,
-    #[column(variant = 2)]
+    #[column(variant = 2_u8)]
     Female,
 }
+
 impl Display for Sex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -48,7 +49,7 @@ impl Display for Sex {
  * 认证信息以及系统的审计字段。派生了 Debug 和 Clone trait 以便调试和复制。
  */
 #[derive(Debug, Clone, toasty::Model)]
-#[table = "system_users"]
+#[table = "tx_users"]
 pub struct User {
     #[key]
     #[auto]
@@ -56,43 +57,61 @@ pub struct User {
     pub id: u64,
     /// 所属租户的唯一标识符（用于多租户系统隔离）
     pub tenant_id: u64,
-    #[unique]
     /// 用户名（通常用于登录，具有唯一性约束）
+    #[unique]
+    #[column(type = varchar(50))]
     pub username: String,
     /// 用户密码的哈希值（切勿明文存储密码）
+    #[column(type = varchar(100))]
     pub password_hash: String,
-    #[default("".to_string())]
     /// 用户昵称（用于前端展示）
+    #[column(type = varchar(50))]
     pub nickname: String,
     /// 备注信息（可选）
-    pub remark: Option<String>,
+    #[default("".to_string())]
+    #[column(type = varchar(500))]
+    pub remark: String,
     /// 用户所属的部门ID列表（支持一人多部门）
+    #[default(Vec::new())]
     pub dept_id: Vec<u64>,
     /// 用户拥有的岗位ID列表（支持一人多岗位）
+    #[default(Vec::new())]
     pub post_ids: Vec<u64>,
     /// 邮箱地址（可选，可用于通知或找回密码）
-    pub email: Option<String>,
+    #[default("".to_string())]
+    pub email: String,
     /// 手机号码（可选，可用于登录或双因素认证）
-    pub mobile: Option<String>,
+    #[default("".to_string())]
+    pub mobile: String,
     /// 性别枚举
+    #[default(Sex::Unknown)]
     pub sex: Sex,
     /// 用户头像的URL地址或文件路径（可选）
-    pub avatar: Option<String>,
+    #[column(type = varchar(1000))]
+    #[default("".to_string())]
+    pub avatar: String,
     /// 用户状态枚举（如：正常、禁用等）
+    #[default(UserStatus::Active)]
     pub status: UserStatus,
     /// 最近一次登录的IP地址（可选）
-    pub login_ip: Option<String>,
+    #[serialize(json)]
+    pub login_ip: IpAddr,
     /// 最近一次登录的时间戳（可选）
     pub login_date: Option<jiff::Timestamp>,
     /// 创建人标识（可选，记录是谁创建了该用户）
+    #[column(type = varchar(64))]
     pub creator: Option<String>,
     /// 更新人标识（可选，记录最近一次修改该用户信息的人）
+    #[column(type = varchar(64))]
     pub updater: Option<String>,
     /// 记录创建时间的时间戳
+    #[default(jiff::Timestamp::now())]
     pub created_at: jiff::Timestamp,
     /// 记录最近一次更新时间的时间戳
+    #[update(jiff::Timestamp::now())]
     pub updated_at: jiff::Timestamp,
     /// 逻辑删除状态枚举（如：未删除、已删除）
+    #[default(DeletedStatus::Normal)]
     pub deleted: DeletedStatus,
 }
 
