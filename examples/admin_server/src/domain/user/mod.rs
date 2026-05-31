@@ -191,3 +191,4 @@ pub trait UserRepository: Send + Sync {
     async fn delete(&self, id: u64) -> Result<(), anyhow::Error>;
 }
 pub mod repo;
+pub mod service;

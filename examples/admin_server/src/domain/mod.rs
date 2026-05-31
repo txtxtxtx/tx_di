@@ -27,7 +27,7 @@ use std::fmt::Display;
 
 // 重新导出常用类型
 pub use error::AdminError;
-pub use user::{User, UserStatus, Sex, UserRepository};
+pub use user::{User, UserStatus, Sex, UserRepository, service::UserService};
 pub use role::{Role, RoleStatus, RoleType, RoleRepository};
 pub use menu::{Menu, MenuType, MenuStatus, MenuRepository};
 pub use tenant::{Tenant, TenantStatus, TenantPackage, TenantRepository};

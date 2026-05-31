@@ -1,13 +1,13 @@
 //! 认证 API
+//!
+//! Handler 只负责 HTTP 协议转换，业务逻辑交给领域服务。
 
 use axum::{Json, Router, extract::State, routing::{get, post}};
 use std::sync::Arc;
 use tx_di_core::App;
 
 use crate::domain::error::AdminError;
-use crate::domain::user::UserRepository;
-use crate::domain::role::RoleRepository;
-use crate::domain::tenant::TenantRepository;
+use crate::domain::user::service::UserService;
 use crate::domain::user::repo::ToastyUserRepository;
 use crate::domain::role::repo::ToastyRoleRepository;
 use crate::domain::tenant::repo::ToastyTenantRepository;
@@ -21,33 +21,67 @@ pub fn router(app: Arc<App>) -> Router {
         .with_state(app)
 }
 
+/// 组装 UserService（从 DI 容器提取仓储，注入领域服务）
+fn build_service(app: &Arc<App>) -> UserService {
+    UserService::new(
+        app.inject::<ToastyUserRepository>(),
+        app.inject::<ToastyRoleRepository>(),
+        app.inject::<ToastyTenantRepository>(),
+    )
+}
+
 async fn login(
     State(app): State<Arc<App>>,
     Json(req): Json<LoginRequest>,
 ) -> Result<Json<ApiResponse<LoginResponse>>, AdminError> {
-    let user_repo = app.inject::<ToastyUserRepository>();
-    let role_repo = app.inject::<ToastyRoleRepository>();
-    let tenant_repo = app.inject::<ToastyTenantRepository>();
+    let service = build_service(&app);
 
-    let user = user_repo.find_by_username(&req.username).await?.ok_or(AdminError::BadCredentials)?;
-    if !bcrypt::verify(&req.password, &user.password_hash).unwrap_or(false) { return Err(AdminError::BadCredentials); }
-    if !user.is_active() { return Err(AdminError::UserDisabled); }
+    // 领域服务处理认证逻辑
+    let auth = service.authenticate(&req.username, &req.password).await?;
 
-    let tenant = tenant_repo.find_by_id(user.tenant_id).await?.ok_or(AdminError::TenantDisabled)?;
-    if !tenant.is_active() { return Err(AdminError::TenantDisabled); }
+    // 构建响应（协议层的事情）
+    let role_codes: Vec<String> = auth.roles.iter().map(|r| r.code.clone()).collect();
+    let permissions: Vec<String> = role_codes.iter().flat_map(|r| {
+        if r == "admin" { vec!["*:*:*".to_string()] } else { vec![format!("{}:read", r)] }
+    }).collect();
 
-    let roles = role_repo.find_by_tenant(user.tenant_id).await.unwrap_or_default();
-    let role_codes: Vec<String> = roles.iter().map(|r| r.code.clone()).collect();
-    let permissions: Vec<String> = role_codes.iter().flat_map(|r| if r == "admin" { vec!["*:*:*".to_string()] } else { vec![format!("{}:read", r)] }).collect();
+    // TODO: 用 sa-token 生成真正的 token
+    let token = format!("{}.{}.{}", auth.user.id, auth.user.username, chrono::Utc::now().timestamp());
 
-    let token = format!("{}.{}.{}", user.id, user.username, chrono::Utc::now().timestamp());
-    Ok(Json(ApiResponse::success(LoginResponse { token, user: UserInfo { id: user.id, username: user.username, nickname: user.nickname, avatar: Some(user.avatar), roles: role_codes, permissions, tenant_id: user.tenant_id } })))
+    Ok(Json(ApiResponse::success(LoginResponse {
+        token,
+        user: UserInfo {
+            id: auth.user.id,
+            username: auth.user.username,
+            nickname: auth.user.nickname,
+            avatar: Some(auth.user.avatar),
+            roles: role_codes,
+            permissions,
+            tenant_id: auth.user.tenant_id,
+        },
+    })))
 }
 
 async fn user_info(
     State(app): State<Arc<App>>,
 ) -> Result<Json<ApiResponse<UserInfo>>, AdminError> {
-    let user_repo = app.inject::<ToastyUserRepository>();
-    let user = user_repo.find_by_id(1).await?.ok_or(AdminError::UserNotFound("1".to_string()))?;
-    Ok(Json(ApiResponse::success(UserInfo { id: user.id, username: user.username, nickname: user.nickname, avatar: Some(user.avatar), roles: vec!["admin".to_string()], permissions: vec!["*:*:*".to_string()], tenant_id: user.tenant_id })))
+    let service = build_service(&app);
+
+    // TODO: 从 sa-token 获取当前用户 ID，硬编码 1 仅供调试
+    let (user, roles) = service.get_user_with_roles(1).await?;
+
+    let role_codes: Vec<String> = roles.iter().map(|r| r.code.clone()).collect();
+    let permissions: Vec<String> = role_codes.iter().flat_map(|r| {
+        if r == "admin" { vec!["*:*:*".to_string()] } else { vec![format!("{}:read", r)] }
+    }).collect();
+
+    Ok(Json(ApiResponse::success(UserInfo {
+        id: user.id,
+        username: user.username,
+        nickname: user.nickname,
+        avatar: Some(user.avatar),
+        roles: role_codes,
+        permissions,
+        tenant_id: user.tenant_id,
+    })))
 }
