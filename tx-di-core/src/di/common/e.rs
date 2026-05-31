@@ -110,7 +110,7 @@ pub type RIE<T> = Result<T, IE>;
 
 /// DI 框架自身的业务错误码。
 /// 外部业务模块应使用 `#[derive(CodeMsg)]` 自行定义。
-#[derive(Debug, Copy, Clone, PartialEq, Eq, tx_error::CodeMsg)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
 #[err("DI")]
 #[ie(crate::IE)]
 pub enum DiErr {
