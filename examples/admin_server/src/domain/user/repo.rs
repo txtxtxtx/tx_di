@@ -8,65 +8,6 @@ use tx_di_toasty::ToastyPlugin;
 
 use super::{Sex, User, UserRepository, UserStatus};
 
-impl From<UserModel> for User {
-    fn from(m: UserModel) -> Self {
-        Self {
-            id: m.id,
-            tenant_id: m.tenant_id as u64,
-            username: m.username,
-            password_hash: m.password_hash,
-            nickname: m.nickname,
-            remark: if m.remark.is_empty() {
-                None
-            } else {
-                Some(m.remark)
-            },
-            dept_id: if m.dept_id == 0 {
-                None
-            } else {
-                Some(m.dept_id as u64)
-            },
-            post_ids: m.post_ids.iter().filter_map(|s| s.parse().ok()).collect(),
-            email: if m.email.is_empty() {
-                None
-            } else {
-                Some(m.email)
-            },
-            mobile: if m.mobile.is_empty() {
-                None
-            } else {
-                Some(m.mobile)
-            },
-            sex: m.sex,
-            avatar: if m.avatar.is_empty() {
-                None
-            } else {
-                Some(m.avatar)
-            },
-            status: m.status,
-            login_ip: if m.login_ip.is_empty() {
-                None
-            } else {
-                Some(m.login_ip)
-            },
-            login_date: None,
-            creator: if m.creator.is_empty() {
-                None
-            } else {
-                Some(m.creator)
-            },
-            updater: if m.updater.is_empty() {
-                None
-            } else {
-                Some(m.updater)
-            },
-            created_at: m.created_at,
-            updated_at: m.updated_at,
-            deleted: m.deleted,
-        }
-    }
-}
-
 #[derive(Debug)]
 #[tx_comp]
 pub struct ToastyUserRepository {
