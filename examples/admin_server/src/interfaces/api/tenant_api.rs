@@ -4,7 +4,7 @@ use axum::{Json, Router, extract::{Path, Query, State}, routing::{delete, get, p
 use std::sync::Arc;
 use tx_di_core::App;
 
-use crate::domain::error::AdminError;
+use crate::domain::error::{AdminError, AdminErr};
 use crate::domain::tenant::TenantRepository;
 use crate::domain::tenant::repo::ToastyTenantRepository;
 use crate::interfaces::dto::common::{ApiResponse, PageQuery, PageResponse};
@@ -32,7 +32,7 @@ async fn get_tenant(
     Path(id): Path<u64>,
 ) -> Result<Json<ApiResponse<TenantDto>>, AdminError> {
     let repo = app.inject::<ToastyTenantRepository>();
-    let tenant = repo.find_by_id(id).await?.ok_or(AdminError::TenantNotFound(id.to_string()))?;
+    let tenant = repo.find_by_id(id).await?.ok_or(AdminError::with_context(AdminErr::TenantNotFound, id.to_string()))?;
     Ok(Json(ApiResponse::success(TenantDto::from(&tenant))))
 }
 
@@ -53,7 +53,7 @@ async fn update_tenant(
     Json(req): Json<UpdateTenantRequest>,
 ) -> Result<Json<ApiResponse<TenantDto>>, AdminError> {
     let repo = app.inject::<ToastyTenantRepository>();
-    let mut tenant = repo.find_by_id(id).await?.ok_or(AdminError::TenantNotFound(id.to_string()))?;
+    let mut tenant = repo.find_by_id(id).await?.ok_or(AdminError::with_context(AdminErr::TenantNotFound, id.to_string()))?;
     if let Some(n) = req.name { tenant.name = n; }
     if let Some(cn) = req.contact_name { tenant.contact_name = Some(cn); }
     if let Some(cm) = req.contact_mobile { tenant.contact_mobile = Some(cm); }
@@ -67,7 +67,7 @@ async fn delete_tenant(
     Path(id): Path<u64>,
 ) -> Result<Json<ApiResponse<()>>, AdminError> {
     let repo = app.inject::<ToastyTenantRepository>();
-    repo.find_by_id(id).await?.ok_or(AdminError::TenantNotFound(id.to_string()))?;
+    repo.find_by_id(id).await?.ok_or(AdminError::with_context(AdminErr::TenantNotFound, id.to_string()))?;
     repo.delete(id).await?;
     Ok(Json(ApiResponse::<()>::ok()))
 }

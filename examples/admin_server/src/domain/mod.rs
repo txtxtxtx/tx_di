@@ -26,7 +26,7 @@ pub mod oauth2;
 use std::fmt::Display;
 
 // 重新导出常用类型
-pub use error::AdminError;
+pub use error::{AdminError, AdminErr};
 pub use user::{User, UserStatus, Sex, UserRepository, service::UserService};
 pub use role::{Role, RoleStatus, RoleType, RoleRepository};
 pub use menu::{Menu, MenuType, MenuStatus, MenuRepository};

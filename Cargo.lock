@@ -31,6 +31,7 @@ dependencies = [
  "tx_di_file",
  "tx_di_log",
  "tx_di_toasty",
+ "tx_error",
  "uuid",
 ]
 

@@ -4,7 +4,7 @@ use axum::{Json, Router, extract::{Path, Query, State}, routing::{delete, get, p
 use std::sync::Arc;
 use tx_di_core::App;
 
-use crate::domain::error::AdminError;
+use crate::domain::error::{AdminError, AdminErr};
 use crate::domain::role::RoleRepository;
 use crate::domain::role::repo::ToastyRoleRepository;
 use crate::interfaces::dto::common::{ApiResponse, PageQuery, PageResponse};
@@ -32,7 +32,7 @@ async fn get_role(
     Path(id): Path<u64>,
 ) -> Result<Json<ApiResponse<RoleDto>>, AdminError> {
     let repo = app.inject::<ToastyRoleRepository>();
-    let role = repo.find_by_id(id).await?.ok_or(AdminError::RoleNotFound(id.to_string()))?;
+    let role = repo.find_by_id(id).await?.ok_or(AdminError::with_context(AdminErr::RoleNotFound, id.to_string()))?;
     Ok(Json(ApiResponse::success(RoleDto::from(&role))))
 }
 
@@ -41,7 +41,7 @@ async fn create_role(
     Json(req): Json<CreateRoleRequest>,
 ) -> Result<Json<ApiResponse<RoleDto>>, AdminError> {
     let repo = app.inject::<ToastyRoleRepository>();
-    if repo.find_by_code(&req.code).await?.is_some() { return Err(AdminError::RoleCodeDuplicate(req.code)); }
+    if repo.find_by_code(&req.code).await?.is_some() { return Err(AdminError::with_context(AdminErr::RoleCodeDuplicate, req.code)); }
     let mut role = crate::domain::role::Role::new(1, req.name, req.code, req.sort.unwrap_or(0));
     role.remark = req.remark;
     repo.save(&role).await?;
@@ -54,7 +54,7 @@ async fn update_role(
     Json(req): Json<UpdateRoleRequest>,
 ) -> Result<Json<ApiResponse<RoleDto>>, AdminError> {
     let repo = app.inject::<ToastyRoleRepository>();
-    let mut role = repo.find_by_id(id).await?.ok_or(AdminError::RoleNotFound(id.to_string()))?;
+    let mut role = repo.find_by_id(id).await?.ok_or(AdminError::with_context(AdminErr::RoleNotFound, id.to_string()))?;
     if let Some(n) = req.name { role.name = n; }
     if let Some(r) = req.remark { role.remark = Some(r); }
     if let Some(s) = req.sort { role.sort = s; }
@@ -67,8 +67,8 @@ async fn delete_role(
     Path(id): Path<u64>,
 ) -> Result<Json<ApiResponse<()>>, AdminError> {
     let repo = app.inject::<ToastyRoleRepository>();
-    let role = repo.find_by_id(id).await?.ok_or(AdminError::RoleNotFound(id.to_string()))?;
-    if role.is_built_in() { return Err(AdminError::RoleBuiltIn); }
+    let role = repo.find_by_id(id).await?.ok_or(AdminError::with_context(AdminErr::RoleNotFound, id.to_string()))?;
+    if role.is_built_in() { return Err(AdminErr::RoleBuiltIn.into()); }
     repo.delete(id).await?;
     Ok(Json(ApiResponse::<()>::ok()))
 }

@@ -61,6 +61,7 @@ pub fn tx_cst(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
 /// #[err(domain = "SYS")]
+/// #[ie(tx_di_core::IE)]  // 可选，自动转换 IE
 /// pub enum SysErr {
 ///     #[err(code = 0, msg = "Success")]
 ///     Success,

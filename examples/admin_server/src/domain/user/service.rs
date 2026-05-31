@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use crate::domain::error::AdminError;
+use crate::domain::error::{AdminError, AdminErr};
 use crate::domain::user::{User, UserRepository, UserStatus};
 use crate::domain::role::{Role, RoleRepository};
 use crate::domain::tenant::{Tenant, TenantRepository};
@@ -38,24 +38,24 @@ impl UserService {
         // 1. 查找用户
         let user = self.user_repo
             .find_by_username(username).await?
-            .ok_or(AdminError::BadCredentials)?;
+            .ok_or(AdminErr::BadCredentials)?;
 
         // 2. 验证密码
         if !bcrypt::verify(password, &user.password_hash).unwrap_or(false) {
-            return Err(AdminError::BadCredentials);
+            return Err(AdminErr::BadCredentials.into());
         }
 
         // 3. 检查用户状态
         if user.status != UserStatus::Active {
-            return Err(AdminError::UserDisabled);
+            return Err(AdminErr::UserDisabled.into());
         }
 
         // 4. 检查租户状态
         let tenant = self.tenant_repo
             .find_by_id(user.tenant_id).await?
-            .ok_or(AdminError::TenantDisabled)?;
+            .ok_or(AdminErr::TenantDisabled)?;
         if !tenant.is_active() {
-            return Err(AdminError::TenantDisabled);
+            return Err(AdminErr::TenantDisabled.into());
         }
 
         // 5. 加载角色
@@ -70,7 +70,7 @@ impl UserService {
     pub async fn get_user_with_roles(&self, user_id: u64) -> Result<(User, Vec<Role>), AdminError> {
         let user = self.user_repo
             .find_by_id(user_id).await?
-            .ok_or(AdminError::UserNotFound(user_id.to_string()))?;
+            .ok_or(AdminError::with_context(AdminErr::UserNotFound, user_id.to_string()))?;
         let roles = self.role_repo
             .find_by_tenant(user.tenant_id).await
             .unwrap_or_default();
@@ -87,12 +87,12 @@ impl UserService {
     ) -> Result<User, AdminError> {
         // 检查用户名唯一性
         if self.user_repo.find_by_username(username).await?.is_some() {
-            return Err(AdminError::UsernameDuplicate(username.to_string()));
+            return Err(AdminError::with_context(AdminErr::UsernameDuplicate, username));
         }
 
         // 哈希密码
         let password_hash = bcrypt::hash(password, bcrypt::DEFAULT_COST)
-            .map_err(|e| AdminError::Database(e.to_string()))?;
+            .map_err(|e| AdminError::with_context(AdminErr::Database, e.to_string()))?;
 
         // 创建用户
         let user = User::new(tenant_id, username.to_string(), password_hash, nickname.to_string());
@@ -105,10 +105,10 @@ impl UserService {
     pub async fn reset_password(&self, user_id: u64, new_password: &str) -> Result<(), AdminError> {
         let mut user = self.user_repo
             .find_by_id(user_id).await?
-            .ok_or(AdminError::UserNotFound(user_id.to_string()))?;
+            .ok_or(AdminError::with_context(AdminErr::UserNotFound, user_id.to_string()))?;
 
         let hash = bcrypt::hash(new_password, bcrypt::DEFAULT_COST)
-            .map_err(|e| AdminError::Database(e.to_string()))?;
+            .map_err(|e| AdminError::with_context(AdminErr::Database, e.to_string()))?;
 
         user.change_password(hash);
         self.user_repo.save(&user).await?;

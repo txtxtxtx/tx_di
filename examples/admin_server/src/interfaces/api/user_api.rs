@@ -6,7 +6,7 @@ use axum::{Json, Router, extract::{Path, Query, State}, routing::{delete, get, p
 use std::sync::Arc;
 use tx_di_core::App;
 
-use crate::domain::error::AdminError;
+use crate::domain::error::{AdminError, AdminErr};
 use crate::domain::user::UserRepository;
 use crate::domain::user::service::UserService;
 use crate::domain::user::repo::ToastyUserRepository;
@@ -45,7 +45,7 @@ async fn get_user(
     Path(id): Path<u64>,
 ) -> Result<Json<ApiResponse<UserDto>>, AdminError> {
     let repo = app.inject::<ToastyUserRepository>();
-    let user = repo.find_by_id(id).await?.ok_or(AdminError::UserNotFound(id.to_string()))?;
+    let user = repo.find_by_id(id).await?.ok_or(AdminError::with_context(AdminErr::UserNotFound, id.to_string()))?;
     Ok(Json(ApiResponse::success(UserDto::from(&user))))
 }
 
@@ -69,7 +69,7 @@ async fn update_user(
     Json(req): Json<UpdateUserRequest>,
 ) -> Result<Json<ApiResponse<UserDto>>, AdminError> {
     let repo = app.inject::<ToastyUserRepository>();
-    let mut user = repo.find_by_id(id).await?.ok_or(AdminError::UserNotFound(id.to_string()))?;
+    let mut user = repo.find_by_id(id).await?.ok_or(AdminError::with_context(AdminErr::UserNotFound, id.to_string()))?;
     if let Some(n) = req.nickname { user.nickname = n; }
     if let Some(e) = req.email { user.email = e; }
     if let Some(m) = req.mobile { user.mobile = m; }
@@ -82,7 +82,7 @@ async fn delete_user(
     Path(id): Path<u64>,
 ) -> Result<Json<ApiResponse<()>>, AdminError> {
     let repo = app.inject::<ToastyUserRepository>();
-    repo.find_by_id(id).await?.ok_or(AdminError::UserNotFound(id.to_string()))?;
+    repo.find_by_id(id).await?.ok_or(AdminError::with_context(AdminErr::UserNotFound, id.to_string()))?;
     repo.delete(id).await?;
     Ok(Json(ApiResponse::<()>::ok()))
 }
