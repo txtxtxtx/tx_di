@@ -137,21 +137,27 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
                 store: &::tx_di_core::DashMap<::std::any::TypeId, ::tx_di_core::CompRef>,
             ) -> Self {
                 let app_config = ::tx_di_core::inject_from_store::<::tx_di_core::AppAllConfig>(store);
-                let config = if let Some(value) = app_config.get_value(#config_key) {
+                let config_key = #config_key;
+                if let Some(value) = app_config.get_value(config_key) {
                     <Self as ::serde::Deserialize>::deserialize(value.clone())
                         .unwrap_or_else(|e| {
-                            let empty_table = ::tx_di_core::Value::Table(::tx_di_core::map::Map::new());
-                            <Self as ::serde::Deserialize>::deserialize(empty_table)
-                                .expect("[di] 配置组件反序列化失败")
+                            panic!(
+                                "[di] 配置组件 '{}' 反序列化失败 (key='{}'): {}\n\
+                                 请检查配置文件中该字段的类型和格式是否正确。",
+                                stringify!(#struct_name), config_key, e
+                            )
                         })
                 } else {
                     let empty_table = ::tx_di_core::Value::Table(::tx_di_core::map::Map::new());
                     <Self as ::serde::Deserialize>::deserialize(empty_table)
-                        .expect("[di] 配置组件反序列化失败")
-                };
-                // 注意：inner_init 需要 &mut BuildContext，此处跳过
-                // 所有现有 inner_init 实现均不使用 ctx 参数
-                config
+                        .unwrap_or_else(|e| {
+                            panic!(
+                                "[di] 配置组件 '{}' 缺少配置 key='{}', 且默认值反序列化也失败: {}\n\
+                                 请在配置文件中添加该 section, 或为所有字段提供 #[serde(default)]。",
+                                stringify!(#struct_name), config_key, e
+                            )
+                        })
+                }
             }
         }
     } else {
