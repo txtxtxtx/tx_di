@@ -19,13 +19,19 @@ impl AppAllConfig {
         } else {
             // 默认使用可执行文件所在目录的 config/config.toml
             let exe_path = std::env::current_exe().unwrap_or_else(|e| {
-                eprintln!("[di] 警告：无法获取可执行文件路径: {}", e);
-                PathBuf::from(".")
+                panic!(
+                    "[di] 无法获取可执行文件路径: {}。\n\
+                     请检查程序运行环境，或手动传入配置路径。",
+                    e
+                )
             });
 
             let config_dir = exe_path.parent().unwrap_or_else(|| {
-                eprintln!("[di] 警告：无法获取可执行文件父目录");
-                Path::new(".")
+                panic!(
+                    "[di] 无法获取可执行文件父目录: {:?}。\n\
+                     请手动传入配置路径。",
+                    exe_path
+                )
             }).join("config");
 
             config_dir.join("config.toml")
@@ -36,30 +42,34 @@ impl AppAllConfig {
         }
     }
     /// 加载配置文件（如果存在）
+    ///
+    /// 配置文件不存在时返回空 Table（允许无配置运行）。
+    /// 配置文件存在但读取/解析失败时 panic，避免使用错误的默认值。
     fn load_config(path: &Path) -> toml::Value {
-        let config = Table(toml::map::Map::new());
         if !path.exists() {
             eprintln!("[di] 配置文件不存在: {:?}，将使用默认配置", path);
-            return config;
+            return Table(toml::map::Map::new());
         }
 
-        let content = match fs::read_to_string(path) {
-            Ok(c) => c,
-            Err(e) => {
-                eprintln!("[di] 警告：无法读取配置文件 '{:?}': {}", path, e);
-                return config;
-            }
-        };
+        let content = fs::read_to_string(path).unwrap_or_else(|e| {
+            panic!(
+                "[di] 配置文件读取失败: {:?}\n\
+                 错误: {}\n\
+                 请检查文件权限和路径是否正确。",
+                path, e
+            )
+        });
 
         // 解析 TOML
-        let config: toml::Value = match toml::from_str(&content) {
-            Ok(v) => v,
-            Err(e) => {
-                eprintln!("[di] 警告：配置文件 '{:?}' 解析失败: {}", path, e);
-                return config;
-            }
-        };
-        // 配置文件已加载，可以在这里将配置存储到上下文中
+        let config: toml::Value = toml::from_str(&content).unwrap_or_else(|e| {
+            panic!(
+                "[di] 配置文件解析失败: {:?}\n\
+                 错误: {}\n\
+                 请检查 TOML 语法是否正确。",
+                path, e
+            )
+        });
+        // 配置文件已加载
         eprintln!("[di] 配置文件加载成功: {:?}", path);
         config
     }
@@ -90,6 +100,8 @@ impl ComponentDescriptor for AppAllConfig {
     fn build(
         _store: &DashMap<TypeId, CompRef>,
     ) -> Self {
-        panic!("AppAllConfig should not be built via build_from_store. It is manually created in BuildContext::new().")
+        panic!(
+            "[di] AppAllConfig 只在app 内部构建。"
+        )
     }
 }
