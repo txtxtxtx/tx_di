@@ -67,8 +67,9 @@ pub struct ComponentMeta {
     /// - `auto_register_all` 阶段：Singleton 立即调用并缓存，Prototype 存为闭包
     /// - App 阶段：Prototype 调用闭包每次创建新实例
     pub factory_fn: Option<StoreFactoryFn>,
-
+    /// 初始化顺序
     pub init_sort_fn: fn() -> i32,
+    /// 内部初始化阶段的初始化方法
     pub init_fn: Option<InitFn>,
     /// 异步初始化函数，返回 BoxFuture 以支持动态分发
     pub async_init_fn: Option<AsyncInitFn>,
@@ -123,16 +124,20 @@ pub fn topo_sort(metas: &[&ComponentMeta]) -> Vec<TypeId> {
         for dep_fn in meta.deps {
             // 获取依赖的类型ID
             let one_type_id = dep_fn();
-            if let Some(&j) = id_to_idx.get(&one_type_id) {
-                adj[j.0].push(i);  // 建立边：j → i（j 被 i 依赖）
+            if let Some(&(j_idx, _j_name)) = id_to_idx.get(&one_type_id) {
+                adj[j_idx].push(i);  // 建立边：j → i（j 被 i 依赖）
                 in_degree[i] += 1;
             } else {
+                let registered: Vec<&str> = metas.iter().map(|m| m.name).collect();
                 panic!(
-                    "[di] 组件 '{}' 依赖的类型 {:?} {:?} 未在注册表中找到",
+                    "[di] 拓扑排序失败: 组件 '{}' 依赖的 TypeId {:?} 未注册。\n\
+                     请确认该依赖组件已标注 #[tx_comp] 且其 crate 已引入。\n\
+                     已注册组件 ({} 个): [{}]",
                     meta.name,
-                    id_to_idx.get(&one_type_id),
-                    &one_type_id
-                );  // 依赖未注册，报错
+                    one_type_id,
+                    registered.len(),
+                    registered.join(", ")
+                );
             }
         }
     }
@@ -157,13 +162,32 @@ pub fn topo_sort(metas: &[&ComponentMeta]) -> Vec<TypeId> {
     }
 
     if result.len() != n {
-        let cycles: Vec<&str> = metas
+        // 收集参与循环的组件及其依赖关系，帮助定位环路
+        let cycle_details: Vec<String> = metas
             .iter()
             .enumerate()
             .filter(|(i, _)| in_degree[*i] > 0)
-            .map(|(_, m)| m.name)
+            .map(|(_, m)| {
+                let dep_names: Vec<&str> = m.deps
+                    .iter()
+                    .filter_map(|dep_fn| {
+                        let dep_id = dep_fn();
+                        // 只显示未解析的依赖（即仍在循环中的）
+                        if id_to_idx.get(&dep_id).map(|(idx, _)| in_degree[*idx] > 0).unwrap_or(false) {
+                            id_to_idx.get(&dep_id).map(|(_, name)| *name)
+                        } else {
+                            id_to_idx.get(&dep_id).map(|(_, name)| *name)
+                        }
+                    })
+                    .collect();
+                format!("{} → [{}]", m.name, dep_names.join(", "))
+            })
             .collect();
-        panic!("[di] 循环依赖：{:?}", cycles);
+        panic!(
+            "[di] 检测到循环依赖！以下组件形成环路:\n{}\n\
+             请检查这些组件之间是否存在相互依赖，打破环中任意一条边即可。",
+            cycle_details.join("\n")
+        );
     }
 
     let sorted_names: Vec<&str> = result
