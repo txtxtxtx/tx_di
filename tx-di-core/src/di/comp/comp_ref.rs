@@ -169,10 +169,16 @@ pub trait ComponentDescriptor: CompInit {
 ///     }
 /// }
 /// ```
+///
+/// # Panics
+///
+/// - 组件未注册时 panic，附带已注册组件列表辅助排查
+/// - 组件 downcast 失败时 panic（通常为框架内部 bug）
 pub fn inject_from_store<T: Any + Send + Sync + 'static>(
     store: &DashMap<TypeId, CompRef>,
 ) -> Arc<T> {
     let tid = TypeId::of::<T>();
+    let type_name = std::any::type_name::<T>();
     store
         .get(&tid)
         .map(|entry| match &*entry {
@@ -180,16 +186,28 @@ pub fn inject_from_store<T: Any + Send + Sync + 'static>(
             CompRef::Factory(f) => f(store),
         })
         .unwrap_or_else(|| {
+            let registered: Vec<String> = store
+                .iter()
+                .map(|entry| format!("{:?}", entry.key()))
+                .collect();
             panic!(
-                "[di] inject_from_store::<{}> 未找到，请确认该组件已注册",
-                std::any::type_name::<T>()
+                "[di] 注入失败: 组件 `{}` 未注册。\n\
+                 请确认:\n\
+                 1. 该结构体已标注 #[tx_comp]\n\
+                 2. 所在 crate 已在 Cargo.toml 中引入\n\
+                 已注册组件 ({} 个): [{}]",
+                type_name,
+                registered.len(),
+                registered.join(", ")
             )
         })
         .downcast::<T>()
-        .unwrap_or_else(|_| {
+        .unwrap_or_else(|bad_arc| {
+            let actual_type = (&*bad_arc).type_id();
             panic!(
-                "[di] inject_from_store downcast 失败: {}",
-                std::any::type_name::<T>()
+                "[di] 注入 downcast 失败: 期望 `{}`, 实际 TypeId={:?}。",
+                type_name,
+                actual_type
             )
         })
 }

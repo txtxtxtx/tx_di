@@ -8,7 +8,7 @@ pub mod scopes;
 use crate::di::comp::StoreFactoryFn;
 use crate::di::comp::config::AppAllConfig;
 use crate::{
-    COMPONENT_REGISTRY, CompRef, ComponentDescriptor, ComponentMeta, Scope, topo_sort,
+    COMPONENT_REGISTRY, CompRef, ComponentDescriptor, ComponentMeta, Scope, topo_sort, inject_from_store,
 };
 use tx_error::{CodeMsg, DiErr};
 use crate::{IE, RIE};
@@ -127,8 +127,7 @@ impl crate::BuildContext {
     ///
     /// 注意：scope 来自被注入者（T 自己的 SCOPE），而非调用者的 scope。
     pub fn inject<T: Any + Send + Sync + 'static + ComponentDescriptor>(&self) -> Arc<T> {
-        let tid = TypeId::of::<T>();
-        inject_from_store(&self.store, tid)
+        inject_from_store(&self.store)
     }
 
     // ── 调试辅助 ────────────────────────────────────────────────────────────
@@ -249,8 +248,7 @@ impl App {
     /// 对于 Singleton：返回缓存的 Arc 引用
     /// 对于 Prototype：调用工厂闭包，每次从 store 解析依赖并创建新实例
     pub fn inject<T: Any + Send + Sync + 'static + ComponentDescriptor>(&self) -> Arc<T> {
-        let tid = TypeId::of::<T>();
-        inject_from_store(&self.store, tid)
+        inject_from_store(&self.store)
     }
 
     /// 尝试获取组件，失败时返回 None（不 panic）。
@@ -285,7 +283,7 @@ impl App {
     fn init(app: Arc<App>) -> RIE<()> {
         let mut metas: Vec<&ComponentMeta> = COMPONENT_REGISTRY
             .iter()
-            .filter(|m| m.async_init_fn.is_some())
+            .filter(|m| m.init_fn.is_some())
             .collect();
 
         metas.sort_by_key(|m| (m.init_sort_fn)());
@@ -363,8 +361,16 @@ impl App {
 
         if errors.is_empty() {
             Ok(())
+        } else if errors.len() == 1 {
+            Err(errors.into_iter().next().unwrap())
         } else {
-            Err(errors.remove(0)) // 返回第一个错误
+            // 聚合所有错误信息，避免丢失
+            let error_details: Vec<String> = errors.iter().map(|e| e.to_string()).collect();
+            Err(IE::Internal(anyhow::anyhow!(
+                "{} 个组件运行失败:\n{}",
+                error_details.len(),
+                error_details.join("\n")
+            )))
         }
     }
 
@@ -468,25 +474,4 @@ impl App {
             let _ = signal::ctrl_c().await;
         }
     }
-}
-
-/// 从 store 中注入组件的通用辅助函数
-pub fn inject_from_store<T: Any + Send + Sync + 'static>(
-    store: &DashMap<TypeId, CompRef>,
-    tid: TypeId,
-) -> Arc<T> {
-    store
-        .get(&tid)
-        .map(|entry| match &*entry {
-            CompRef::Cached(any_arc) => any_arc.clone(),
-            CompRef::Factory(f) => f(store),
-        })
-        .unwrap_or_else(|| {
-            panic!(
-                "[di] inject::<{}> 未找到，请确认该组件已注册（使用 #[tx_comp] 注解）",
-                std::any::type_name::<T>()
-            )
-        })
-        .downcast::<T>()
-        .unwrap_or_else(|_| panic!("[di] inject downcast 失败：{}", std::any::type_name::<T>()))
 }
