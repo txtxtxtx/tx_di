@@ -273,7 +273,7 @@ mod tests {
     fn test_is_same_kind() {
         let a: AppError = SysErr::ConfigLoadFailed.into();
         let b: AppError = UserErr::NotFound.into();
-        let c = AppError::internal(anyhow::anyhow!("test"));
+        let c: AppError = anyhow::anyhow!("test").into();
         assert!(a.is_same_kind(&a));
         assert!(!a.is_same_kind(&b));
         assert!(!a.is_same_kind(&c));
