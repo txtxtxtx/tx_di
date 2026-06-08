@@ -15,7 +15,6 @@ use crate::CodeMsg; // derive 宏
 /// 所有错误统一走这一种类型，`Result<T, AppError>` 贯穿全栈。
 /// 不实现 `Clone`（因为 `anyhow::Error` 不是 `Clone`）。
 #[derive(Debug)]
-
 pub enum AppError {
     /// 业务错误码（归一化值类型，零堆分配）
     ErrCode {
@@ -78,11 +77,17 @@ impl AppError {
         }
     }
 
+    /// 获取错误消息。
+    ///
+    /// - 对 `ErrCode` / `WithContext` 返回静态消息字符串
+    /// - 对 `Internal` 返回 `"Internal error"`（不泄漏内存）
+    ///
+    /// 如需包含 Internal 错误的完整信息，请使用 [`full_message()`](Self::full_message)。
     #[inline]
     pub fn message(&self) -> &str {
         match self {
             Self::ErrCode { message, .. } | Self::WithContext { message, .. } => message,
-            Self::Internal(e) => e.to_string().leak(), // leak for lifetime compatibility
+            Self::Internal(_) => "Internal error",
         }
     }
 
@@ -197,7 +202,6 @@ pub type AppResult<T> = Result<T, AppError>;
 /// DI 框架自身的业务错误码。
 #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
 #[err("DI")]
-
 pub enum DiErr {
     #[err(-1, "组件注册表错误")]
     RegistryError,
