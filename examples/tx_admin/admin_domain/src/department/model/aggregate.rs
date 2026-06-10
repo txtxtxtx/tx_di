@@ -1,8 +1,8 @@
-use admin_macros::AggregateRoot;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent};
+use crate::AggregateRoot;
 
 /// Department aggregate root
 #[derive(Debug, Clone, Serialize, Deserialize, AggregateRoot)]

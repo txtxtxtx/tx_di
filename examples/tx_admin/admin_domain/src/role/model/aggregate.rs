@@ -1,8 +1,8 @@
-use admin_macros::AggregateRoot;
 use chrono::Utc; // 引入时间处理库
 use serde::{Deserialize, Serialize}; // 引入序列化和反序列化库
 
 use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent}; // 引入共享模块中的模型定义
+use crate::AggregateRoot;
 
 /// Role aggregate root
 #[derive(Debug, Clone, Serialize, Deserialize, AggregateRoot)]
