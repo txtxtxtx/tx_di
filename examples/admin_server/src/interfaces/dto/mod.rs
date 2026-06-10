@@ -4,3 +4,7 @@ pub mod user_dto;
 pub mod role_dto;
 pub mod tenant_dto;
 pub mod menu_dto;
+pub mod config_dto;
+pub mod dict_dto;
+pub mod file_dto;
+pub mod log_dto;
