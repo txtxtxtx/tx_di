@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;  // 引入Arc智能指针，用于共享所有权
 use tx_error::AppResult;  // 引入自定义错误类型AppResult，用于处理可能的错误
 use crate::permission::model::value_object::PermissionCheck;  // 引入权限检查的值对象
@@ -35,7 +36,7 @@ impl PermissionService {
     pub async fn get_user_permissions(
         &self,  // 引用self，表示这是对结构体实例的方法
         user_id: u64,  // 用户ID参数，类型为u64
-    ) -> AppResult<Vec<String>> {  // 返回类型为AppResult，其中包含字符串向量
+    ) -> AppResult<HashSet<String>> {  // 返回类型为AppResult，其中包含字符串向量
         self.permission_repo.find_by_user_id(user_id).await  // 调用权限存储库的异步方法，根据用户ID查找权限
     }
 
@@ -53,14 +54,14 @@ impl PermissionService {
     pub async fn get_role_permissions(
         &self,
         role_ids: &[u64],
-    ) -> AppResult<Vec<String>> {
+    ) -> AppResult<HashSet<String>> {
         self.permission_repo.find_by_role_ids(role_ids).await
     }
 
     /// Get all available permissions
     pub async fn get_all_permissions(
         &self,
-    ) -> AppResult<Vec<PermissionCheck>> {
+    ) -> AppResult<HashSet<PermissionCheck>> {
         self.permission_repo.find_all().await
     }
 }
