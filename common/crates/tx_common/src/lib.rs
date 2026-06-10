@@ -6,6 +6,6 @@
 
 pub mod api_r;
 pub mod date;
-
+pub mod id;
 pub use api_r::{ApiR, ApiRes, RCode};
 pub use date::FormattedDateTime;
