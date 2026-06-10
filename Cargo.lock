@@ -9,6 +9,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
+name = "admin_domain"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "serde",
+ "serde_json",
+ "tx_common",
+ "tx_error",
+]
+
+[[package]]
 name = "admin_server"
 version = "0.1.0"
 dependencies = [
@@ -1579,23 +1591,6 @@ dependencies = [
  "wasm-bindgen",
  "web-sys",
  "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "di-example"
-version = "0.1.0"
-dependencies = [
- "linkme",
- "log",
- "serde",
- "tokio",
- "tokio-util",
- "toml 1.1.2+spec-1.1.0",
- "tracing",
- "tx-di-core",
- "tx_di_axum",
- "tx_di_log",
- "tx_di_sip",
 ]
 
 [[package]]

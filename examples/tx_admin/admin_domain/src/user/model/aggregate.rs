@@ -1,0 +1,186 @@
+use chrono::{DateTime, Utc}; // 引入chrono库中的DateTime和Utc类型，用于处理时间
+use serde::{Deserialize, Serialize}; // 引入serde库中的Deserialize和Serialize trait，用于序列化和反序列化
+
+use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent, Entity}; // 引入共享模块中的相关模型和trait
+
+/// User aggregate root
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// 用户实体结构体，用于存储用户的基本信息、状态、权限等相关数据
+pub struct User {
+    /// 用户唯一标识ID
+    pub id: u64,
+    /// 用户名，用于登录系统的账号
+    pub username: String,
+    /// 用户密码，经过加密处理的字符串
+    pub password: String,
+    /// 用户昵称，显示给其他用户看的名称
+    pub nickname: String,
+    /// 备注信息，可选字段
+    pub remark: Option<String>,
+    /// 用户电子邮箱，可选字段
+    pub email: Option<String>,
+    /// 用户手机号码，可选字段
+    pub mobile: Option<String>,
+    /// 用户性别，1-男，2-女，0-未知
+    pub sex: i32,
+    /// 用户头像URL，可选字段
+    pub avatar: Option<String>,
+    /// 用户状态，1-正常，0-禁用
+    pub status: i32,
+    /// 用户最近登录的IP地址，可选字段
+    pub login_ip: Option<String>,
+    /// 用户最近登录的时间，可选字段，使用UTC时间
+    pub login_date: Option<DateTime<Utc>>,
+    /// 租户ID，用于多租户系统中的租户隔离
+    pub tenant_id: i32,
+    /// 审计字段，包含创建、修改等信息
+    pub audit: AuditFields,
+    /// 用户拥有的角色ID列表
+    pub role_ids: Vec<u64>,
+    /// 用户所属的部门ID列表
+    pub dept_ids: Vec<u64>,
+    // 领域事件列表，不对外公开，用于领域事件处理
+    events: Vec<DomainEvent>,
+}
+
+// 为 User 实现Entity trait
+impl Entity for User {
+    // 定义关联类型Id为u64类型
+    type Id = u64;
+    // 实现id方法，返回用户的ID
+    fn id(&self) -> Self::Id {
+        // 返回User结构体中的id字段
+        self.id
+    }
+}
+
+impl AggregateRoot for User {
+    fn events(&self) -> &[DomainEvent] {
+        &self.events
+    }
+    fn clear_events(&mut self) {
+        self.events.clear();
+    }
+    fn add_event(&mut self, event: DomainEvent) {
+        self.events.push(event);
+    }
+}
+
+impl User {
+    /// Create a new user
+    pub fn create(
+        id: u64,
+        username: String,
+        password: String,
+        nickname: String,
+        creator: Option<String>,
+    ) -> Self {
+        let mut user = Self {
+            id,
+            username: username.clone(),
+            password,
+            nickname,
+            remark: None,
+            email: None,
+            mobile: None,
+            sex: 0,
+            avatar: None,
+            status: 0,
+            login_ip: None,
+            login_date: None,
+            tenant_id: 0,
+            audit: AuditFields {
+                creator: creator.clone(),
+                create_time: Utc::now(),
+                updater: creator,
+                update_time: Utc::now(),
+                deleted: 0,
+            },
+            role_ids: Vec::new(),
+            dept_ids: Vec::new(),
+            events: Vec::new(),
+        };
+        user.add_event(DomainEvent::UserCreated {
+            user_id: id,
+            username,
+        });
+        user
+    }
+
+    /// Set basic info
+    pub fn set_basic_info(
+        &mut self,
+        nickname: String,
+        email: Option<String>,
+        mobile: Option<String>,
+        sex: i32,
+        remark: Option<String>,
+        updater: Option<String>,
+    ) {
+        self.nickname = nickname;
+        self.email = email;
+        self.mobile = mobile;
+        self.sex = sex;
+        self.remark = remark;
+        self.audit.updater = updater;
+        self.audit.update_time = Utc::now();
+        self.add_event(DomainEvent::UserUpdated { user_id: self.id });
+    }
+
+    /// Change status
+    pub fn change_status(&mut self, status: i32, updater: Option<String>) {
+        self.status = status;
+        self.audit.updater = updater;
+        self.audit.update_time = Utc::now();
+        self.add_event(DomainEvent::UserStatusChanged {
+            user_id: self.id,
+            status,
+        });
+    }
+
+    /// Change password
+    pub fn change_password(&mut self, password: String, updater: Option<String>) {
+        self.password = password;
+        self.audit.updater = updater;
+        self.audit.update_time = Utc::now();
+        self.add_event(DomainEvent::UserPasswordChanged { user_id: self.id });
+    }
+
+    /// Record login
+    pub fn record_login(&mut self, ip: String) {
+        self.login_ip = Some(ip.clone());
+        self.login_date = Some(Utc::now());
+        self.add_event(DomainEvent::UserLoggedIn {
+            user_id: self.id,
+            ip,
+        });
+    }
+
+    /// Set roles
+    pub fn set_roles(&mut self, role_ids: Vec<u64>) {
+        self.role_ids = role_ids;
+    }
+
+    /// Set departments
+    pub fn set_departments(&mut self, dept_ids: Vec<u64>) {
+        self.dept_ids = dept_ids;
+    }
+
+    /// Soft delete
+    pub fn soft_delete(&mut self, updater: Option<String>) {
+        self.audit.deleted = 1;
+        self.audit.updater = updater;
+        self.audit.update_time = Utc::now();
+        self.add_event(DomainEvent::UserDeleted { user_id: self.id });
+    }
+
+    /// Check if user is active
+    pub fn is_active(&self) -> bool {
+        self.status == 0 && self.audit.deleted == 0
+    }
+
+    /// Check if user is locked
+    pub fn is_locked(&self) -> bool {
+        self.status == 2
+    }
+}

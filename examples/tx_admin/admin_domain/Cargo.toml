@@ -1,0 +1,18 @@
+[package]
+name = "admin_domain"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+
+[dependencies]
+tx_error = {path = "../../../common/tx_error"}
+tx_common = {path = "../../../common/crates/tx_common"}
+
+
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true

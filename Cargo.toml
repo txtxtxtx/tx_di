@@ -5,7 +5,7 @@ members = [
     # 宏
     "tx-di-macros",
     # 示例/测试
-    "di-example",
+#    "di-example",
     # 插件
     # web
     "plugins/tx_di_axum",
@@ -29,11 +29,13 @@ members = [
     # 数据库orm
     "plugins/tx_di_toasty",
     # 认证授权
-    "plugins/tx_di_sa_token", "examples/tx_di_meeting",
+    "plugins/tx_di_sa_token",
+    "examples/tx_di_meeting",
     # 文件存储
     "plugins/tx_di_file",
     # 后台管理系统
     "examples/admin_server",
+    "examples/tx_admin/admin_domain",
 ]
 resolver = "3"
 [workspace.package]
