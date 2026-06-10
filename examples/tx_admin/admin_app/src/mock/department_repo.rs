@@ -1,0 +1,122 @@
+use std::collections::HashMap;
+use std::sync::RwLock;
+use async_trait::async_trait;
+
+use admin_domain::department::model::aggregate::Department;
+use admin_domain::department::model::value_object::DeptQuery;
+use admin_domain::department::repository::DepartmentRepository;
+use admin_domain::shared::repository::RepositoryError;
+
+pub struct MockDepartmentRepository {
+    depts: RwLock<HashMap<u64, Department>>,
+    dept_users: RwLock<HashMap<u64, Vec<u64>>>,
+}
+
+impl MockDepartmentRepository {
+    pub fn new() -> Self {
+        Self {
+            depts: RwLock::new(HashMap::new()),
+            dept_users: RwLock::new(HashMap::new()),
+        }
+    }
+
+    pub fn with_dept(self, dept: Department) -> Self {
+        {
+            let mut depts = self.depts.write().unwrap();
+            depts.insert(dept.id, dept);
+        }
+        self
+    }
+}
+
+impl Default for MockDepartmentRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[async_trait]
+impl DepartmentRepository for MockDepartmentRepository {
+    async fn find_by_id(&self, id: u64) -> Result<Option<Department>, RepositoryError> {
+        let depts = self.depts.read().unwrap();
+        Ok(depts.get(&id).filter(|d| d.audit.deleted == 0).cloned())
+    }
+
+    async fn find_all(&self, query: &DeptQuery) -> Result<Vec<Department>, RepositoryError> {
+        let depts = self.depts.read().unwrap();
+        Ok(depts
+            .values()
+            .filter(|d| d.audit.deleted == 0)
+            .filter(|d| {
+                if let Some(ref name) = query.name {
+                    if !d.name.contains(name.as_str()) {
+                        return false;
+                    }
+                }
+                if let Some(status) = query.status {
+                    if d.status != status {
+                        return false;
+                    }
+                }
+                true
+            })
+            .cloned()
+            .collect())
+    }
+
+    async fn find_by_ids(&self, ids: &[u64]) -> Result<Vec<Department>, RepositoryError> {
+        let depts = self.depts.read().unwrap();
+        Ok(ids
+            .iter()
+            .filter_map(|id| depts.get(id))
+            .filter(|d| d.audit.deleted == 0)
+            .cloned()
+            .collect())
+    }
+
+    async fn find_by_parent_id(&self, parent_id: u64) -> Result<Vec<Department>, RepositoryError> {
+        let depts = self.depts.read().unwrap();
+        Ok(depts
+            .values()
+            .filter(|d| d.parent_id == parent_id && d.audit.deleted == 0)
+            .cloned()
+            .collect())
+    }
+
+    async fn insert(&self, dept: &Department) -> Result<(), RepositoryError> {
+        let mut depts = self.depts.write().unwrap();
+        depts.insert(dept.id, dept.clone());
+        Ok(())
+    }
+
+    async fn update(&self, dept: &Department) -> Result<(), RepositoryError> {
+        let mut depts = self.depts.write().unwrap();
+        depts.insert(dept.id, dept.clone());
+        Ok(())
+    }
+
+    async fn soft_delete(&self, id: u64) -> Result<(), RepositoryError> {
+        let mut depts = self.depts.write().unwrap();
+        if let Some(dept) = depts.get_mut(&id) {
+            dept.audit.deleted = 1;
+            Ok(())
+        } else {
+            Err(RepositoryError::NotFound(format!("Department {} not found", id)))
+        }
+    }
+
+    async fn has_children(&self, parent_id: u64) -> Result<bool, RepositoryError> {
+        let depts = self.depts.read().unwrap();
+        Ok(depts
+            .values()
+            .any(|d| d.parent_id == parent_id && d.audit.deleted == 0))
+    }
+
+    async fn has_users(&self, dept_id: u64) -> Result<bool, RepositoryError> {
+        let dept_users = self.dept_users.read().unwrap();
+        Ok(dept_users
+            .get(&dept_id)
+            .map(|users| !users.is_empty())
+            .unwrap_or(false))
+    }
+}
