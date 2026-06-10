@@ -2,7 +2,6 @@ use async_trait::async_trait;
 
 use crate::config::model::aggregate::Config;
 use crate::config::model::value_object::ConfigQuery;
-use crate::shared::repository::RepositoryError;
 use tx_common::page::Page;
 use tx_error::AppResult;
 

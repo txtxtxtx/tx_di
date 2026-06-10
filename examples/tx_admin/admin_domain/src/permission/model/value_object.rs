@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Permission type
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PermissionType {
     /// Menu permission
     Menu = 0,
@@ -23,7 +23,7 @@ impl From<i32> for PermissionType {
 }
 
 /// Permission check item
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PermissionCheck {
     pub code: String,
     pub name: String,

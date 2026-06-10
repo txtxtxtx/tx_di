@@ -63,13 +63,13 @@ impl ConfigAppService {
             config_key: request.config_key,
             config_type: request.config_type,
         };
-        let page = Page::<()>::request(request.page, request.page_size);
+        let page = Page::request(request.page, request.page_size);
         let result = self.config_service.get_config_page(&query, page).await?;
 
         Ok(Page::new(
             result.list.into_iter().map(ConfigResponse::from).collect(),
             result.page,
-            result.page_size,
+            result.size,
             result.total,
         ))
     }

@@ -33,7 +33,7 @@ use admin_domain::role::model::aggregate::Role;
 use admin_domain::menu::model::aggregate::Menu;
 use admin_domain::department::model::aggregate::Department;
 
-use admin_common::id;
+use tx_common::id;
 
 /// Helper to create user service with mock repos
 fn create_user_service() -> (Arc<UserService>, Arc<user_repo::MockUserRepository>) {

@@ -62,7 +62,7 @@ impl AuthAppService {
             nickname: login_user.nickname,
             tenant_id: login_user.tenant_id,
             role_ids: login_user.role_ids,
-            permissions: login_user.permissions,
+            permissions: login_user.permissions.into_iter().collect(),
             dept_ids: login_user.dept_ids,
         })
     }
@@ -85,7 +85,7 @@ impl AuthAppService {
             mobile: user.mobile,
             avatar: user.avatar,
             roles: role_names,
-            permissions,
+            permissions: permissions.into_iter().collect(),
         })
     }
 

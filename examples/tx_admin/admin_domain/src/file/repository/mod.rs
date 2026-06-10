@@ -2,7 +2,6 @@ use async_trait::async_trait;
 
 use crate::file::model::aggregate::{File, FileConfig};
 use crate::file::model::value_object::FileQuery;
-use crate::shared::repository::RepositoryError;
 use tx_common::page::Page;
 use tx_error::AppResult;
 

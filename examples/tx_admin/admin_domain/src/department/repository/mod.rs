@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use tx_error::AppResult;
-use crate::shared::repository::RepositoryError;
 use crate::department::model::aggregate::Department;
 use crate::department::model::value_object::DeptQuery;
 

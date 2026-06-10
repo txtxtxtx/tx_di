@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use admin_domain::department::model::value_object::DeptTreeNode;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateDeptCommand {

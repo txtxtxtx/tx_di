@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use tx_common::page::Page;
 use tx_error::AppResult;
-use crate::shared::repository::RepositoryError;
 use crate::user::model::aggregate::User;
 use crate::user::model::value_object::UserQuery;
 

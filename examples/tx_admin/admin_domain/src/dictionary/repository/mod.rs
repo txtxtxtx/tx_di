@@ -2,7 +2,6 @@ use async_trait::async_trait;
 
 use crate::dictionary::model::aggregate::{DictData, DictType};
 use crate::dictionary::model::value_object::{DictDataQuery, DictTypeQuery};
-use crate::shared::repository::RepositoryError;
 use tx_common::page::Page;
 use tx_error::AppResult;
 

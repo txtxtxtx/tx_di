@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::RwLock;
 use async_trait::async_trait;
 
@@ -8,12 +8,12 @@ use tx_error::AppResult;
 
 /// Mock permission repository for testing
 pub struct MockPermissionRepository {
-    /// role_id -> list of permission codes
-    role_permissions: RwLock<HashMap<u64, Vec<String>>>,
+    /// role_id -> set of permission codes
+    role_permissions: RwLock<HashMap<u64, HashSet<String>>>,
     /// user_id -> role_ids
     user_roles: RwLock<HashMap<u64, Vec<u64>>>,
     /// all available permissions
-    all_permissions: Vec<PermissionCheck>,
+    all_permissions: HashSet<PermissionCheck>,
 }
 
 impl MockPermissionRepository {
@@ -33,7 +33,7 @@ impl MockPermissionRepository {
         self
     }
 
-    pub fn with_role_permissions(self, role_id: u64, permissions: Vec<String>) -> Self {
+    pub fn with_role_permissions(self, role_id: u64, permissions: HashSet<String>) -> Self {
         {
             let mut role_permissions = self.role_permissions.write().unwrap();
             role_permissions.insert(role_id, permissions);
@@ -41,7 +41,7 @@ impl MockPermissionRepository {
         self
     }
 
-    fn default_permissions() -> Vec<PermissionCheck> {
+    fn default_permissions() -> HashSet<PermissionCheck> {
         vec![
             PermissionCheck { code: "system:user:list".into(), name: "用户查询".into(), permission_type: PermissionType::Menu },
             PermissionCheck { code: "system:user:create".into(), name: "用户新增".into(), permission_type: PermissionType::Button },
@@ -68,7 +68,7 @@ impl MockPermissionRepository {
             PermissionCheck { code: "system:dict:create".into(), name: "字典新增".into(), permission_type: PermissionType::Button },
             PermissionCheck { code: "system:dict:update".into(), name: "字典修改".into(), permission_type: PermissionType::Button },
             PermissionCheck { code: "system:dict:delete".into(), name: "字典删除".into(), permission_type: PermissionType::Button },
-        ]
+        ].into_iter().collect()
     }
 }
 
@@ -80,20 +80,18 @@ impl Default for MockPermissionRepository {
 
 #[async_trait]
 impl PermissionRepository for MockPermissionRepository {
-    async fn find_by_role_ids(&self, role_ids: &[u64]) -> AppResult<Vec<String>> {
+    async fn find_by_role_ids(&self, role_ids: &[u64]) -> AppResult<HashSet<String>> {
         let role_permissions = self.role_permissions.read().unwrap();
-        let mut permissions = Vec::new();
+        let mut permissions = HashSet::new();
         for role_id in role_ids {
             if let Some(perms) = role_permissions.get(role_id) {
                 permissions.extend(perms.clone());
             }
         }
-        permissions.sort();
-        permissions.dedup();
         Ok(permissions)
     }
 
-    async fn find_by_user_id(&self, user_id: u64) -> AppResult<Vec<String>> {
+    async fn find_by_user_id(&self, user_id: u64) -> AppResult<HashSet<String>> {
         let role_ids = {
             let user_roles = self.user_roles.read().unwrap();
             user_roles.get(&user_id).cloned().unwrap_or_default()
@@ -101,7 +99,7 @@ impl PermissionRepository for MockPermissionRepository {
         self.find_by_role_ids(&role_ids).await
     }
 
-    async fn find_all(&self) -> AppResult<Vec<PermissionCheck>> {
+    async fn find_all(&self) -> AppResult<HashSet<PermissionCheck>> {
         Ok(self.all_permissions.clone())
     }
 }

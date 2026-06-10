@@ -31,7 +31,7 @@ impl PermissionAppService {
         user_id: u64,
     ) -> AppResult<UserPermissionsResponse> {
         let permissions = self.permission_service.get_user_permissions(user_id).await?;
-        Ok(UserPermissionsResponse { user_id, permissions })
+        Ok(UserPermissionsResponse { user_id, permissions: permissions.into_iter().collect() })
     }
 
     /// Get all available permissions

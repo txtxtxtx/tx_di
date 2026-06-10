@@ -2,7 +2,6 @@ use async_trait::async_trait;
 
 use crate::log::model::aggregate::{LoginLog, OperateLog};
 use crate::log::model::value_object::{LoginLogQuery, OperateLogQuery};
-use crate::shared::repository::RepositoryError;
 use tx_common::page::Page;
 use tx_error::AppResult;
 

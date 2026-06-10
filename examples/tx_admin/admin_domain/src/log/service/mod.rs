@@ -3,7 +3,6 @@ use std::sync::Arc;
 use crate::log::model::aggregate::{LoginLog, OperateLog};
 use crate::log::model::value_object::{LoginLogQuery, OperateLogQuery};
 use crate::log::repository::{LoginLogRepository, OperateLogRepository};
-use crate::shared::repository::RepositoryError;
 use tx_common::page::Page;
 use tx_error::AppResult;
 use tx_common::id;
