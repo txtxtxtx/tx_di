@@ -1,10 +1,11 @@
+use admin_macros::AggregateRoot;
 use chrono::{DateTime, Utc}; // 引入chrono库中的DateTime和Utc类型，用于处理时间
 use serde::{Deserialize, Serialize}; // 引入serde库中的Deserialize和Serialize trait，用于序列化和反序列化
 
-use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent, Entity}; // 引入共享模块中的相关模型和trait
+use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent}; // 引入共享模块中的相关模型和trait
 
 /// User aggregate root
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, AggregateRoot)]
 /// 用户实体结构体，用于存储用户的基本信息、状态、权限等相关数据
 pub struct User {
     /// 用户唯一标识ID
@@ -41,29 +42,6 @@ pub struct User {
     pub dept_ids: Vec<u64>,
     // 领域事件列表，不对外公开，用于领域事件处理
     events: Vec<DomainEvent>,
-}
-
-// 为 User 实现Entity trait
-impl Entity for User {
-    // 定义关联类型Id为u64类型
-    type Id = u64;
-    // 实现id方法，返回用户的ID
-    fn id(&self) -> Self::Id {
-        // 返回User结构体中的id字段
-        self.id
-    }
-}
-
-impl AggregateRoot for User {
-    fn events(&self) -> &[DomainEvent] {
-        &self.events
-    }
-    fn clear_events(&mut self) {
-        self.events.clear();
-    }
-    fn add_event(&mut self, event: DomainEvent) {
-        self.events.push(event);
-    }
 }
 
 impl User {

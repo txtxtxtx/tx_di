@@ -36,6 +36,7 @@ members = [
     # 后台管理系统
     "examples/admin_server",
     "examples/tx_admin/admin_domain",
+    "examples/tx_admin/admin_macros",
 ]
 resolver = "3"
 [workspace.package]

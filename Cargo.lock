@@ -12,12 +12,22 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 name = "admin_domain"
 version = "0.1.0"
 dependencies = [
+ "admin_macros",
  "async-trait",
  "chrono",
  "serde",
  "serde_json",
  "tx_common",
  "tx_error",
+]
+
+[[package]]
+name = "admin_macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

@@ -1,10 +1,11 @@
+use admin_macros::AggregateRoot;
 use chrono::Utc; // 引入时间处理库
 use serde::{Deserialize, Serialize}; // 引入序列化和反序列化库
 
-use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent, Entity}; // 引入共享模块中的模型定义
+use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent}; // 引入共享模块中的模型定义
 
 /// Role aggregate root
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, AggregateRoot)]
 /// 角色实体结构体，用于存储角色相关的信息
 /// 包含角色的基本属性、权限范围、审计信息等
 pub struct Role {
@@ -32,25 +33,6 @@ pub struct Role {
     pub menu_ids: Vec<u64>,
     // 领域事件列表，使用Vec<DomainEvent>存储，用于领域事件处理，不对外暴露
     events: Vec<DomainEvent>,
-}
-
-impl Entity for Role {
-    type Id = u64;
-    fn id(&self) -> Self::Id {
-        self.id
-    }
-}
-
-impl AggregateRoot for Role {
-    fn events(&self) -> &[DomainEvent] {
-        &self.events
-    }
-    fn clear_events(&mut self) {
-        self.events.clear();
-    }
-    fn add_event(&mut self, event: DomainEvent) {
-        self.events.push(event);
-    }
 }
 
 impl Role {

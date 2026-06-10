@@ -1,10 +1,11 @@
+use admin_macros::AggregateRoot;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent, Entity};
+use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent};
 
 /// Menu aggregate root
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, AggregateRoot)]
 /// 菜单结构体，用于存储菜单相关的信息
 /// 包含菜单的基本信息、权限、样式配置以及子菜单等
 pub struct Menu {
@@ -42,25 +43,6 @@ pub struct Menu {
     pub children: Vec<Menu>,
     /// 领域事件列表，使用DomainEvent类型的向量存储，外部不可见
     events: Vec<DomainEvent>,
-}
-
-impl Entity for Menu {
-    type Id = u64;
-    fn id(&self) -> Self::Id {
-        self.id
-    }
-}
-
-impl AggregateRoot for Menu {
-    fn events(&self) -> &[DomainEvent] {
-        &self.events
-    }
-    fn clear_events(&mut self) {
-        self.events.clear();
-    }
-    fn add_event(&mut self, event: DomainEvent) {
-        self.events.push(event);
-    }
 }
 
 impl Menu {

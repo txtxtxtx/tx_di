@@ -1,10 +1,11 @@
+use admin_macros::AggregateRoot;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent, Entity};
+use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent};
 
 /// Department aggregate root
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, AggregateRoot)]
 pub struct Department {
     pub id: u64,
     pub name: String,
@@ -18,25 +19,6 @@ pub struct Department {
     pub audit: AuditFields,
     pub children: Vec<Department>,
     events: Vec<DomainEvent>,
-}
-
-impl Entity for Department {
-    type Id = u64;
-    fn id(&self) -> Self::Id {
-        self.id
-    }
-}
-
-impl AggregateRoot for Department {
-    fn events(&self) -> &[DomainEvent] {
-        &self.events
-    }
-    fn clear_events(&mut self) {
-        self.events.clear();
-    }
-    fn add_event(&mut self, event: DomainEvent) {
-        self.events.push(event);
-    }
 }
 
 impl Department {
