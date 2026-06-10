@@ -5,6 +5,7 @@ use admin_domain::user::service::UserService;
 use admin_domain::role::service::RoleService;
 use admin_domain::permission::service::PermissionService;
 use admin_domain::shared::repository::RepositoryError;
+use tx_error::AppResult;
 
 /// Authentication application service
 pub struct AuthAppService {
@@ -27,26 +28,26 @@ impl AuthAppService {
     }
 
     /// User login
-    pub async fn login(&self, cmd: LoginCommand) -> Result<LoginResponse, RepositoryError> {
+    pub async fn login(&self, cmd: LoginCommand) -> AppResult<LoginResponse> {
         // Find user by username
         let user = self
             .user_service
             .get_by_username(&cmd.username)
             .await?
-            .ok_or_else(|| RepositoryError::NotFound("Invalid username or password".to_string()))?;
+            .ok_or_else(|| RepositoryError::NotFound)?;
 
         // Check if user is active
         if !user.is_active() {
-            return Err(RepositoryError::Validation("User account is disabled".to_string()));
+            return Err(RepositoryError::Validation)?;
         }
 
         if user.is_locked() {
-            return Err(RepositoryError::Validation("User account is locked".to_string()));
+            return Err(RepositoryError::Validation)?;
         }
 
         // Verify password (in real app, compare hashed passwords)
         if user.password != cmd.password {
-            return Err(RepositoryError::Validation("Invalid username or password".to_string()));
+            return Err(RepositoryError::Validation)?;
         }
 
         // Build login user info
@@ -67,7 +68,7 @@ impl AuthAppService {
     }
 
     /// Get user info (for authenticated user)
-    pub async fn get_user_info(&self, user_id: u64) -> Result<UserInfoResponse, RepositoryError> {
+    pub async fn get_user_info(&self, user_id: u64) -> AppResult<UserInfoResponse> {
         let user = self.user_service.get_user(user_id).await?;
         let role_ids = self.user_service.get_user(user_id).await?.role_ids;
         let permissions = self.permission_service.get_user_permissions(user_id).await?;
@@ -89,7 +90,7 @@ impl AuthAppService {
     }
 
     /// User logout
-    pub async fn logout(&self, _cmd: LogoutCommand) -> Result<(), RepositoryError> {
+    pub async fn logout(&self, _cmd: LogoutCommand) -> AppResult<()> {
         // In a real app, invalidate token/session
         Ok(())
     }

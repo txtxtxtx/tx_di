@@ -6,6 +6,7 @@ use admin_domain::department::model::aggregate::Department;
 use admin_domain::department::model::value_object::DeptQuery;
 use admin_domain::department::repository::DepartmentRepository;
 use admin_domain::shared::repository::RepositoryError;
+use tx_error::AppResult;
 
 pub struct MockDepartmentRepository {
     depts: RwLock<HashMap<u64, Department>>,
@@ -37,12 +38,12 @@ impl Default for MockDepartmentRepository {
 
 #[async_trait]
 impl DepartmentRepository for MockDepartmentRepository {
-    async fn find_by_id(&self, id: u64) -> Result<Option<Department>, RepositoryError> {
+    async fn find_by_id(&self, id: u64) -> AppResult<Option<Department>> {
         let depts = self.depts.read().unwrap();
         Ok(depts.get(&id).filter(|d| d.audit.deleted == 0).cloned())
     }
 
-    async fn find_all(&self, query: &DeptQuery) -> Result<Vec<Department>, RepositoryError> {
+    async fn find_all(&self, query: &DeptQuery) -> AppResult<Vec<Department>> {
         let depts = self.depts.read().unwrap();
         Ok(depts
             .values()
@@ -64,7 +65,7 @@ impl DepartmentRepository for MockDepartmentRepository {
             .collect())
     }
 
-    async fn find_by_ids(&self, ids: &[u64]) -> Result<Vec<Department>, RepositoryError> {
+    async fn find_by_ids(&self, ids: &[u64]) -> AppResult<Vec<Department>> {
         let depts = self.depts.read().unwrap();
         Ok(ids
             .iter()
@@ -74,7 +75,7 @@ impl DepartmentRepository for MockDepartmentRepository {
             .collect())
     }
 
-    async fn find_by_parent_id(&self, parent_id: u64) -> Result<Vec<Department>, RepositoryError> {
+    async fn find_by_parent_id(&self, parent_id: u64) -> AppResult<Vec<Department>> {
         let depts = self.depts.read().unwrap();
         Ok(depts
             .values()
@@ -83,36 +84,36 @@ impl DepartmentRepository for MockDepartmentRepository {
             .collect())
     }
 
-    async fn insert(&self, dept: &Department) -> Result<(), RepositoryError> {
+    async fn insert(&self, dept: &Department) -> AppResult<()> {
         let mut depts = self.depts.write().unwrap();
         depts.insert(dept.id, dept.clone());
         Ok(())
     }
 
-    async fn update(&self, dept: &Department) -> Result<(), RepositoryError> {
+    async fn update(&self, dept: &Department) -> AppResult<()> {
         let mut depts = self.depts.write().unwrap();
         depts.insert(dept.id, dept.clone());
         Ok(())
     }
 
-    async fn soft_delete(&self, id: u64) -> Result<(), RepositoryError> {
+    async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut depts = self.depts.write().unwrap();
         if let Some(dept) = depts.get_mut(&id) {
             dept.audit.deleted = 1;
             Ok(())
         } else {
-            Err(RepositoryError::NotFound(format!("Department {} not found", id)))
+            Err(RepositoryError::NotFound)?
         }
     }
 
-    async fn has_children(&self, parent_id: u64) -> Result<bool, RepositoryError> {
+    async fn has_children(&self, parent_id: u64) -> AppResult<bool> {
         let depts = self.depts.read().unwrap();
         Ok(depts
             .values()
             .any(|d| d.parent_id == parent_id && d.audit.deleted == 0))
     }
 
-    async fn has_users(&self, dept_id: u64) -> Result<bool, RepositoryError> {
+    async fn has_users(&self, dept_id: u64) -> AppResult<bool> {
         let dept_users = self.dept_users.read().unwrap();
         Ok(dept_users
             .get(&dept_id)

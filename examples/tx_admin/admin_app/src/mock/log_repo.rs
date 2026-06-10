@@ -5,8 +5,8 @@ use async_trait::async_trait;
 use admin_domain::log::model::aggregate::{LoginLog, OperateLog};
 use admin_domain::log::model::value_object::{LoginLogQuery, OperateLogQuery};
 use admin_domain::log::repository::{LoginLogRepository, OperateLogRepository};
-use admin_domain::shared::repository::RepositoryError;
-use admin_common::types::{PageRequest, PageResponse};
+use tx_common::page::Page;
+use tx_error::AppResult;
 
 pub struct MockOperateLogRepository {
     logs: RwLock<HashMap<u64, OperateLog>>,
@@ -28,7 +28,7 @@ impl Default for MockOperateLogRepository {
 
 #[async_trait]
 impl OperateLogRepository for MockOperateLogRepository {
-    async fn find_by_id(&self, id: u64) -> Result<Option<OperateLog>, RepositoryError> {
+    async fn find_by_id(&self, id: u64) -> AppResult<Option<OperateLog>> {
         let logs = self.logs.read().unwrap();
         Ok(logs.get(&id).cloned())
     }
@@ -36,8 +36,8 @@ impl OperateLogRepository for MockOperateLogRepository {
     async fn find_page(
         &self,
         _query: &OperateLogQuery,
-        page: &PageRequest,
-    ) -> Result<PageResponse<OperateLog>, RepositoryError> {
+        page: Page<OperateLog>,
+    ) -> AppResult<Page<OperateLog>> {
         let logs = self.logs.read().unwrap();
         let filtered: Vec<OperateLog> = logs.values().cloned().collect();
         let total = filtered.len() as i64;
@@ -45,18 +45,18 @@ impl OperateLogRepository for MockOperateLogRepository {
         let list = filtered
             .into_iter()
             .skip(offset)
-            .take(page.page_size as usize)
+            .take(page.size as usize)
             .collect();
-        Ok(PageResponse::new(list, total, page.page, page.page_size))
+        Ok(Page::new(list, page.page, page.size, total))
     }
 
-    async fn insert(&self, log: &OperateLog) -> Result<(), RepositoryError> {
+    async fn insert(&self, log: &OperateLog) -> AppResult<()> {
         let mut logs = self.logs.write().unwrap();
         logs.insert(log.id, log.clone());
         Ok(())
     }
 
-    async fn delete_by_ids(&self, ids: &[u64]) -> Result<(), RepositoryError> {
+    async fn delete_by_ids(&self, ids: &[u64]) -> AppResult<()> {
         let mut logs = self.logs.write().unwrap();
         for id in ids {
             logs.remove(id);
@@ -64,7 +64,7 @@ impl OperateLogRepository for MockOperateLogRepository {
         Ok(())
     }
 
-    async fn clean_all(&self) -> Result<(), RepositoryError> {
+    async fn clean_all(&self) -> AppResult<()> {
         let mut logs = self.logs.write().unwrap();
         logs.clear();
         Ok(())
@@ -91,7 +91,7 @@ impl Default for MockLoginLogRepository {
 
 #[async_trait]
 impl LoginLogRepository for MockLoginLogRepository {
-    async fn find_by_id(&self, id: u64) -> Result<Option<LoginLog>, RepositoryError> {
+    async fn find_by_id(&self, id: u64) -> AppResult<Option<LoginLog>> {
         let logs = self.logs.read().unwrap();
         Ok(logs.get(&id).cloned())
     }
@@ -99,8 +99,8 @@ impl LoginLogRepository for MockLoginLogRepository {
     async fn find_page(
         &self,
         _query: &LoginLogQuery,
-        page: &PageRequest,
-    ) -> Result<PageResponse<LoginLog>, RepositoryError> {
+        page: Page<LoginLog>,
+    ) -> AppResult<Page<LoginLog>> {
         let logs = self.logs.read().unwrap();
         let filtered: Vec<LoginLog> = logs.values().cloned().collect();
         let total = filtered.len() as i64;
@@ -108,18 +108,18 @@ impl LoginLogRepository for MockLoginLogRepository {
         let list = filtered
             .into_iter()
             .skip(offset)
-            .take(page.page_size as usize)
+            .take(page.size as usize)
             .collect();
-        Ok(PageResponse::new(list, total, page.page, page.page_size))
+        Ok(Page::new(list, page.page, page.size, total))
     }
 
-    async fn insert(&self, log: &LoginLog) -> Result<(), RepositoryError> {
+    async fn insert(&self, log: &LoginLog) -> AppResult<()> {
         let mut logs = self.logs.write().unwrap();
         logs.insert(log.id, log.clone());
         Ok(())
     }
 
-    async fn delete_by_ids(&self, ids: &[u64]) -> Result<(), RepositoryError> {
+    async fn delete_by_ids(&self, ids: &[u64]) -> AppResult<()> {
         let mut logs = self.logs.write().unwrap();
         for id in ids {
             logs.remove(id);
@@ -127,7 +127,7 @@ impl LoginLogRepository for MockLoginLogRepository {
         Ok(())
     }
 
-    async fn clean_all(&self) -> Result<(), RepositoryError> {
+    async fn clean_all(&self) -> AppResult<()> {
         let mut logs = self.logs.write().unwrap();
         logs.clear();
         Ok(())

@@ -6,6 +6,7 @@ use admin_domain::menu::model::aggregate::Menu;
 use admin_domain::menu::model::value_object::MenuQuery;
 use admin_domain::menu::repository::MenuRepository;
 use admin_domain::shared::repository::RepositoryError;
+use tx_error::AppResult;
 
 pub struct MockMenuRepository {
     menus: RwLock<HashMap<u64, Menu>>,
@@ -35,12 +36,12 @@ impl Default for MockMenuRepository {
 
 #[async_trait]
 impl MenuRepository for MockMenuRepository {
-    async fn find_by_id(&self, id: u64) -> Result<Option<Menu>, RepositoryError> {
+    async fn find_by_id(&self, id: u64) -> AppResult<Option<Menu>> {
         let menus = self.menus.read().unwrap();
         Ok(menus.get(&id).filter(|m| m.audit.deleted == 0).cloned())
     }
 
-    async fn find_all(&self, query: &MenuQuery) -> Result<Vec<Menu>, RepositoryError> {
+    async fn find_all(&self, query: &MenuQuery) -> AppResult<Vec<Menu>> {
         let menus = self.menus.read().unwrap();
         Ok(menus
             .values()
@@ -67,7 +68,7 @@ impl MenuRepository for MockMenuRepository {
             .collect())
     }
 
-    async fn find_by_ids(&self, ids: &[u64]) -> Result<Vec<Menu>, RepositoryError> {
+    async fn find_by_ids(&self, ids: &[u64]) -> AppResult<Vec<Menu>> {
         let menus = self.menus.read().unwrap();
         Ok(ids
             .iter()
@@ -77,7 +78,7 @@ impl MenuRepository for MockMenuRepository {
             .collect())
     }
 
-    async fn find_by_parent_id(&self, parent_id: u64) -> Result<Vec<Menu>, RepositoryError> {
+    async fn find_by_parent_id(&self, parent_id: u64) -> AppResult<Vec<Menu>> {
         let menus = self.menus.read().unwrap();
         Ok(menus
             .values()
@@ -86,29 +87,29 @@ impl MenuRepository for MockMenuRepository {
             .collect())
     }
 
-    async fn insert(&self, menu: &Menu) -> Result<(), RepositoryError> {
+    async fn insert(&self, menu: &Menu) -> AppResult<()> {
         let mut menus = self.menus.write().unwrap();
         menus.insert(menu.id, menu.clone());
         Ok(())
     }
 
-    async fn update(&self, menu: &Menu) -> Result<(), RepositoryError> {
+    async fn update(&self, menu: &Menu) -> AppResult<()> {
         let mut menus = self.menus.write().unwrap();
         menus.insert(menu.id, menu.clone());
         Ok(())
     }
 
-    async fn soft_delete(&self, id: u64) -> Result<(), RepositoryError> {
+    async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut menus = self.menus.write().unwrap();
         if let Some(menu) = menus.get_mut(&id) {
             menu.audit.deleted = 1;
             Ok(())
         } else {
-            Err(RepositoryError::NotFound(format!("Menu {} not found", id)))
+            Err(RepositoryError::NotFound)?
         }
     }
 
-    async fn has_children(&self, parent_id: u64) -> Result<bool, RepositoryError> {
+    async fn has_children(&self, parent_id: u64) -> AppResult<bool> {
         let menus = self.menus.read().unwrap();
         Ok(menus
             .values()

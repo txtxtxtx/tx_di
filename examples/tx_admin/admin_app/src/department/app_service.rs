@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::department::dto::*;
 use admin_domain::department::model::value_object::{DeptQuery, DeptTreeNode};
 use admin_domain::department::service::DepartmentService;
-use admin_domain::shared::repository::RepositoryError;
+use tx_error::AppResult;
 
 pub struct DepartmentAppService {
     dept_service: Arc<DepartmentService>,
@@ -18,7 +18,7 @@ impl DepartmentAppService {
         &self,
         cmd: CreateDeptCommand,
         creator: Option<String>,
-    ) -> Result<DeptResponse, RepositoryError> {
+    ) -> AppResult<DeptResponse> {
         let dept = self
             .dept_service
             .create_dept(cmd.name, cmd.parent_id, cmd.sort, creator)
@@ -30,7 +30,7 @@ impl DepartmentAppService {
         &self,
         cmd: UpdateDeptCommand,
         updater: Option<String>,
-    ) -> Result<DeptResponse, RepositoryError> {
+    ) -> AppResult<DeptResponse> {
         let dept = self
             .dept_service
             .update_dept(
@@ -47,14 +47,14 @@ impl DepartmentAppService {
         Ok(DeptResponse::from(dept))
     }
 
-    pub async fn delete_dept(&self, dept_id: u64, updater: Option<String>) -> Result<(), RepositoryError> {
+    pub async fn delete_dept(&self, dept_id: u64, updater: Option<String>) -> AppResult<()> {
         self.dept_service.delete_dept(dept_id, updater).await
     }
 
     pub async fn get_dept_list(
         &self,
         request: DeptQueryRequest,
-    ) -> Result<Vec<DeptResponse>, RepositoryError> {
+    ) -> AppResult<Vec<DeptResponse>> {
         let query = DeptQuery {
             name: request.name,
             status: request.status,
@@ -66,7 +66,7 @@ impl DepartmentAppService {
     pub async fn get_dept_tree(
         &self,
         request: DeptQueryRequest,
-    ) -> Result<Vec<DeptTreeNode>, RepositoryError> {
+    ) -> AppResult<Vec<DeptTreeNode>> {
         let query = DeptQuery {
             name: request.name,
             status: request.status,
@@ -74,7 +74,7 @@ impl DepartmentAppService {
         self.dept_service.get_dept_tree(&query).await
     }
 
-    pub async fn get_dept(&self, dept_id: u64) -> Result<DeptResponse, RepositoryError> {
+    pub async fn get_dept(&self, dept_id: u64) -> AppResult<DeptResponse> {
         let dept = self.dept_service.get_dept(dept_id).await?;
         Ok(DeptResponse::from(dept))
     }

@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use admin_domain::permission::model::value_object::{PermissionCheck, PermissionType};
 use admin_domain::permission::repository::PermissionRepository;
-use admin_domain::shared::repository::RepositoryError;
+use tx_error::AppResult;
 
 /// Mock permission repository for testing
 pub struct MockPermissionRepository {
@@ -80,7 +80,7 @@ impl Default for MockPermissionRepository {
 
 #[async_trait]
 impl PermissionRepository for MockPermissionRepository {
-    async fn find_by_role_ids(&self, role_ids: &[u64]) -> Result<Vec<String>, RepositoryError> {
+    async fn find_by_role_ids(&self, role_ids: &[u64]) -> AppResult<Vec<String>> {
         let role_permissions = self.role_permissions.read().unwrap();
         let mut permissions = Vec::new();
         for role_id in role_ids {
@@ -93,7 +93,7 @@ impl PermissionRepository for MockPermissionRepository {
         Ok(permissions)
     }
 
-    async fn find_by_user_id(&self, user_id: u64) -> Result<Vec<String>, RepositoryError> {
+    async fn find_by_user_id(&self, user_id: u64) -> AppResult<Vec<String>> {
         let role_ids = {
             let user_roles = self.user_roles.read().unwrap();
             user_roles.get(&user_id).cloned().unwrap_or_default()
@@ -101,7 +101,7 @@ impl PermissionRepository for MockPermissionRepository {
         self.find_by_role_ids(&role_ids).await
     }
 
-    async fn find_all(&self) -> Result<Vec<PermissionCheck>, RepositoryError> {
+    async fn find_all(&self) -> AppResult<Vec<PermissionCheck>> {
         Ok(self.all_permissions.clone())
     }
 }

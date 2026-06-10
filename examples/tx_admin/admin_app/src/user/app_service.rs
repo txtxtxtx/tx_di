@@ -3,8 +3,8 @@ use std::sync::Arc;
 use crate::user::dto::*;
 use admin_domain::user::model::value_object::UserQuery;
 use admin_domain::user::service::UserService;
-use admin_domain::shared::repository::RepositoryError;
-use admin_common::types::{PageRequest, PageResponse};
+use tx_error::AppResult;
+use tx_common::page::Page;
 
 /// User application service - orchestrates domain operations
 pub struct UserAppService {
@@ -21,7 +21,7 @@ impl UserAppService {
         &self,
         cmd: CreateUserCommand,
         creator: Option<String>,
-    ) -> Result<UserResponse, RepositoryError> {
+    ) -> AppResult<UserResponse> {
         let mut user = self
             .user_service
             .create_user(cmd.username, cmd.password, cmd.nickname, creator)
@@ -61,7 +61,7 @@ impl UserAppService {
         &self,
         cmd: UpdateUserCommand,
         updater: Option<String>,
-    ) -> Result<UserResponse, RepositoryError> {
+    ) -> AppResult<UserResponse> {
         let user = self
             .user_service
             .update_user(
@@ -82,7 +82,7 @@ impl UserAppService {
         &self,
         user_id: u64,
         updater: Option<String>,
-    ) -> Result<(), RepositoryError> {
+    ) -> AppResult<()> {
         self.user_service.delete_user(user_id, updater).await
     }
 
@@ -92,7 +92,7 @@ impl UserAppService {
         user_id: u64,
         status: i32,
         updater: Option<String>,
-    ) -> Result<UserResponse, RepositoryError> {
+    ) -> AppResult<UserResponse> {
         let user = self.user_service.change_status(user_id, status, updater).await?;
         Ok(UserResponse::from(user))
     }
@@ -102,7 +102,7 @@ impl UserAppService {
         &self,
         cmd: ChangePasswordCommand,
         updater: Option<String>,
-    ) -> Result<(), RepositoryError> {
+    ) -> AppResult<()> {
         self.user_service
             .change_password(cmd.user_id, cmd.new_password, updater)
             .await?;
@@ -110,17 +110,17 @@ impl UserAppService {
     }
 
     /// Assign roles to user
-    pub async fn assign_roles(&self, cmd: AssignRolesCommand) -> Result<(), RepositoryError> {
+    pub async fn assign_roles(&self, cmd: AssignRolesCommand) -> AppResult<()> {
         self.user_service.assign_roles(cmd.user_id, cmd.role_ids).await
     }
 
     /// Assign departments to user
-    pub async fn assign_departments(&self, cmd: AssignDeptsCommand) -> Result<(), RepositoryError> {
+    pub async fn assign_departments(&self, cmd: AssignDeptsCommand) -> AppResult<()> {
         self.user_service.assign_departments(cmd.user_id, cmd.dept_ids).await
     }
 
     /// Get user by ID
-    pub async fn get_user(&self, user_id: u64) -> Result<UserResponse, RepositoryError> {
+    pub async fn get_user(&self, user_id: u64) -> AppResult<UserResponse> {
         let user = self.user_service.get_user(user_id).await?;
         Ok(UserResponse::from(user))
     }
@@ -129,7 +129,7 @@ impl UserAppService {
     pub async fn get_user_page(
         &self,
         request: UserQueryRequest,
-    ) -> Result<PageResponse<UserResponse>, RepositoryError> {
+    ) -> AppResult<Page<UserResponse>> {
         let query = UserQuery {
             username: request.username,
             nickname: request.nickname,
@@ -139,14 +139,14 @@ impl UserAppService {
             begin_time: None,
             end_time: None,
         };
-        let page = PageRequest::new(request.page, request.page_size);
-        let result = self.user_service.get_user_page(&query, &page).await?;
+        let page = Page::<()>::request(request.page, request.page_size);
+        let result = self.user_service.get_user_page(&query, page).await?;
 
-        Ok(PageResponse::new(
+        Ok(Page::new(
             result.list.into_iter().map(UserResponse::from).collect(),
-            result.total,
             result.page,
             result.page_size,
+            result.total,
         ))
     }
 }

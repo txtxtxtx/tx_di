@@ -3,26 +3,27 @@ use async_trait::async_trait;
 use crate::file::model::aggregate::{File, FileConfig};
 use crate::file::model::value_object::FileQuery;
 use crate::shared::repository::RepositoryError;
-use admin_common::types::{PageRequest, PageResponse};
+use tx_common::page::Page;
+use tx_error::AppResult;
 
 #[async_trait]
 pub trait FileRepository: Send + Sync {
-    async fn find_by_id(&self, id: u64) -> Result<Option<File>, RepositoryError>;
+    async fn find_by_id(&self, id: u64) -> AppResult<Option<File>>;
     async fn find_page(
         &self,
         query: &FileQuery,
-        page: &PageRequest,
-    ) -> Result<PageResponse<File>, RepositoryError>;
-    async fn insert(&self, file: &File) -> Result<(), RepositoryError>;
-    async fn soft_delete(&self, id: u64) -> Result<(), RepositoryError>;
+        page: Page<File>,
+    ) -> AppResult<Page<File>>;
+    async fn insert(&self, file: &File) -> AppResult<()>;
+    async fn soft_delete(&self, id: u64) -> AppResult<()>;
 }
 
 #[async_trait]
 pub trait FileConfigRepository: Send + Sync {
-    async fn find_by_id(&self, id: i32) -> Result<Option<FileConfig>, RepositoryError>;
-    async fn find_master(&self) -> Result<Option<FileConfig>, RepositoryError>;
-    async fn find_all(&self) -> Result<Vec<FileConfig>, RepositoryError>;
-    async fn insert(&self, config: &FileConfig) -> Result<(), RepositoryError>;
-    async fn update(&self, config: &FileConfig) -> Result<(), RepositoryError>;
-    async fn soft_delete(&self, id: i32) -> Result<(), RepositoryError>;
+    async fn find_by_id(&self, id: i32) -> AppResult<Option<FileConfig>>;
+    async fn find_master(&self) -> AppResult<Option<FileConfig>>;
+    async fn find_all(&self) -> AppResult<Vec<FileConfig>>;
+    async fn insert(&self, config: &FileConfig) -> AppResult<()>;
+    async fn update(&self, config: &FileConfig) -> AppResult<()>;
+    async fn soft_delete(&self, id: i32) -> AppResult<()>;
 }

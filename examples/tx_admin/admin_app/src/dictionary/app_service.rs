@@ -3,8 +3,8 @@ use std::sync::Arc;
 use crate::dictionary::dto::*;
 use admin_domain::dictionary::model::value_object::{DictDataQuery, DictTypeQuery};
 use admin_domain::dictionary::service::{DictDataService, DictTypeService};
-use admin_domain::shared::repository::RepositoryError;
-use admin_common::types::{PageRequest, PageResponse};
+use tx_error::AppResult;
+use tx_common::page::Page;
 
 pub struct DictTypeAppService {
     dict_type_service: Arc<DictTypeService>,
@@ -19,7 +19,7 @@ impl DictTypeAppService {
         &self,
         cmd: CreateDictTypeCommand,
         creator: Option<String>,
-    ) -> Result<DictTypeResponse, RepositoryError> {
+    ) -> AppResult<DictTypeResponse> {
         let dt = self
             .dict_type_service
             .create_dict_type(cmd.name, cmd.dict_type, creator)
@@ -31,7 +31,7 @@ impl DictTypeAppService {
         &self,
         cmd: UpdateDictTypeCommand,
         updater: Option<String>,
-    ) -> Result<DictTypeResponse, RepositoryError> {
+    ) -> AppResult<DictTypeResponse> {
         let dt = self
             .dict_type_service
             .update_dict_type(cmd.id, cmd.name, cmd.dict_type, cmd.remark, updater)
@@ -39,31 +39,31 @@ impl DictTypeAppService {
         Ok(DictTypeResponse::from(dt))
     }
 
-    pub async fn delete_dict_type(&self, id: u64, updater: Option<String>) -> Result<(), RepositoryError> {
+    pub async fn delete_dict_type(&self, id: u64, updater: Option<String>) -> AppResult<()> {
         self.dict_type_service.delete_dict_type(id, updater).await
     }
 
     pub async fn get_dict_type_page(
         &self,
         request: DictTypeQueryRequest,
-    ) -> Result<PageResponse<DictTypeResponse>, RepositoryError> {
+    ) -> AppResult<Page<DictTypeResponse>> {
         let query = DictTypeQuery {
             name: request.name,
             dict_type: request.dict_type,
             status: request.status,
         };
-        let page = PageRequest::new(request.page, request.page_size);
-        let result = self.dict_type_service.get_dict_type_page(&query, &page).await?;
+        let page = Page::<()>::request(request.page, request.page_size);
+        let result = self.dict_type_service.get_dict_type_page(&query, page).await?;
 
-        Ok(PageResponse::new(
+        Ok(Page::new(
             result.list.into_iter().map(DictTypeResponse::from).collect(),
-            result.total,
             result.page,
             result.page_size,
+            result.total,
         ))
     }
 
-    pub async fn get_all_dict_types(&self) -> Result<Vec<DictTypeResponse>, RepositoryError> {
+    pub async fn get_all_dict_types(&self) -> AppResult<Vec<DictTypeResponse>> {
         let dts = self.dict_type_service.get_all_dict_types(&DictTypeQuery::default()).await?;
         Ok(dts.into_iter().map(DictTypeResponse::from).collect())
     }
@@ -82,7 +82,7 @@ impl DictDataAppService {
         &self,
         cmd: CreateDictDataCommand,
         creator: Option<String>,
-    ) -> Result<DictDataResponse, RepositoryError> {
+    ) -> AppResult<DictDataResponse> {
         let dd = self
             .dict_data_service
             .create_dict_data(cmd.sort, cmd.label, cmd.value, cmd.dict_type, creator)
@@ -94,7 +94,7 @@ impl DictDataAppService {
         &self,
         cmd: UpdateDictDataCommand,
         updater: Option<String>,
-    ) -> Result<DictDataResponse, RepositoryError> {
+    ) -> AppResult<DictDataResponse> {
         let dd = self
             .dict_data_service
             .update_dict_data(
@@ -112,31 +112,31 @@ impl DictDataAppService {
         Ok(DictDataResponse::from(dd))
     }
 
-    pub async fn delete_dict_data(&self, id: u64, updater: Option<String>) -> Result<(), RepositoryError> {
+    pub async fn delete_dict_data(&self, id: u64, updater: Option<String>) -> AppResult<()> {
         self.dict_data_service.delete_dict_data(id, updater).await
     }
 
     pub async fn get_dict_data_page(
         &self,
         request: DictDataQueryRequest,
-    ) -> Result<PageResponse<DictDataResponse>, RepositoryError> {
+    ) -> AppResult<Page<DictDataResponse>> {
         let query = DictDataQuery {
             dict_type: request.dict_type,
             label: request.label,
             status: request.status,
         };
-        let page = PageRequest::new(request.page, request.page_size);
-        let result = self.dict_data_service.get_dict_data_page(&query, &page).await?;
+        let page = Page::<()>::request(request.page, request.page_size);
+        let result = self.dict_data_service.get_dict_data_page(&query, page).await?;
 
-        Ok(PageResponse::new(
+        Ok(Page::new(
             result.list.into_iter().map(DictDataResponse::from).collect(),
-            result.total,
             result.page,
             result.page_size,
+            result.total,
         ))
     }
 
-    pub async fn get_by_dict_type(&self, dict_type: &str) -> Result<Vec<DictDataResponse>, RepositoryError> {
+    pub async fn get_by_dict_type(&self, dict_type: &str) -> AppResult<Vec<DictDataResponse>> {
         let data = self.dict_data_service.get_by_dict_type(dict_type).await?;
         Ok(data.into_iter().map(DictDataResponse::from).collect())
     }

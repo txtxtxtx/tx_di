@@ -4,8 +4,10 @@ use crate::config::model::aggregate::Config;
 use crate::config::model::value_object::ConfigQuery;
 use crate::config::repository::ConfigRepository;
 use crate::shared::repository::RepositoryError;
-use admin_common::types::{PageRequest, PageResponse};
-use admin_common::id;
+use crate::shared::repository::RepositoryError::NotFound;
+use tx_common::page::Page;
+use tx_error::AppResult;
+use tx_common::id;
 
 pub struct ConfigService {
     config_repo: Arc<dyn ConfigRepository>,
@@ -24,12 +26,9 @@ impl ConfigService {
         config_key: String,
         value: String,
         creator: Option<String>,
-    ) -> Result<Config, RepositoryError> {
+    ) -> AppResult<Config> {
         if self.config_repo.exists_by_key(&config_key).await? {
-            return Err(RepositoryError::Duplicate(format!(
-                "Config key '{}' already exists",
-                config_key
-            )));
+            return Err(RepositoryError::Duplicate)?;
         }
 
         let config_id = id::next_id();
@@ -49,24 +48,24 @@ impl ConfigService {
         visible: i32,
         remark: Option<String>,
         updater: Option<String>,
-    ) -> Result<Config, RepositoryError> {
+    ) -> AppResult<Config> {
         let mut config = self
             .config_repo
             .find_by_id(config_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFound(format!("Config {} not found", config_id)))?;
+            .ok_or_else(|| NotFound)?;
 
         config.update_info(category, config_type, name, config_key, value, visible, remark, updater);
         self.config_repo.update(&config).await?;
         Ok(config)
     }
 
-    pub async fn delete_config(&self, config_id: u64, updater: Option<String>) -> Result<(), RepositoryError> {
+    pub async fn delete_config(&self, config_id: u64, updater: Option<String>) -> AppResult<()> {
         let mut config = self
             .config_repo
             .find_by_id(config_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFound(format!("Config {} not found", config_id)))?;
+            .ok_or_else(|| NotFound)?;
 
         config.soft_delete(updater);
         self.config_repo.update(&config).await?;
@@ -76,22 +75,22 @@ impl ConfigService {
     pub async fn get_config_page(
         &self,
         query: &ConfigQuery,
-        page: &PageRequest,
-    ) -> Result<PageResponse<Config>, RepositoryError> {
+        page: Page<Config>,
+    ) -> AppResult<Page<Config>> {
         self.config_repo.find_page(query, page).await
     }
 
-    pub async fn get_config(&self, config_id: u64) -> Result<Config, RepositoryError> {
-        self.config_repo
+    pub async fn get_config(&self, config_id: u64) -> AppResult<Config> {
+        Ok(self.config_repo
             .find_by_id(config_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFound(format!("Config {} not found", config_id)))
+            .ok_or_else(|| NotFound)?)
     }
 
-    pub async fn get_by_key(&self, key: &str) -> Result<Config, RepositoryError> {
-        self.config_repo
+    pub async fn get_by_key(&self, key: &str) -> AppResult<Config> {
+        Ok(self.config_repo
             .find_by_key(key)
             .await?
-            .ok_or_else(|| RepositoryError::NotFound(format!("Config key '{}' not found", key)))
+            .ok_or_else(|| NotFound)?)
     }
 }

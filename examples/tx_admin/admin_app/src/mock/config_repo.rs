@@ -6,7 +6,8 @@ use admin_domain::config::model::aggregate::Config;
 use admin_domain::config::model::value_object::ConfigQuery;
 use admin_domain::config::repository::ConfigRepository;
 use admin_domain::shared::repository::RepositoryError;
-use admin_common::types::{PageRequest, PageResponse};
+use tx_common::page::Page;
+use tx_error::AppResult;
 
 pub struct MockConfigRepository {
     configs: RwLock<HashMap<u64, Config>>,
@@ -28,12 +29,12 @@ impl Default for MockConfigRepository {
 
 #[async_trait]
 impl ConfigRepository for MockConfigRepository {
-    async fn find_by_id(&self, id: u64) -> Result<Option<Config>, RepositoryError> {
+    async fn find_by_id(&self, id: u64) -> AppResult<Option<Config>> {
         let configs = self.configs.read().unwrap();
         Ok(configs.get(&id).filter(|c| c.audit.deleted == 0).cloned())
     }
 
-    async fn find_by_key(&self, key: &str) -> Result<Option<Config>, RepositoryError> {
+    async fn find_by_key(&self, key: &str) -> AppResult<Option<Config>> {
         let configs = self.configs.read().unwrap();
         Ok(configs
             .values()
@@ -44,8 +45,8 @@ impl ConfigRepository for MockConfigRepository {
     async fn find_page(
         &self,
         query: &ConfigQuery,
-        page: &PageRequest,
-    ) -> Result<PageResponse<Config>, RepositoryError> {
+        page: Page<Config>,
+    ) -> AppResult<Page<Config>> {
         let configs = self.configs.read().unwrap();
         let filtered: Vec<Config> = configs
             .values()
@@ -71,13 +72,13 @@ impl ConfigRepository for MockConfigRepository {
         let list = filtered
             .into_iter()
             .skip(offset)
-            .take(page.page_size as usize)
+            .take(page.size as usize)
             .collect();
 
-        Ok(PageResponse::new(list, total, page.page, page.page_size))
+        Ok(Page::new(list, page.page, page.size, total))
     }
 
-    async fn find_all(&self, query: &ConfigQuery) -> Result<Vec<Config>, RepositoryError> {
+    async fn find_all(&self, query: &ConfigQuery) -> AppResult<Vec<Config>> {
         let configs = self.configs.read().unwrap();
         Ok(configs
             .values()
@@ -94,29 +95,29 @@ impl ConfigRepository for MockConfigRepository {
             .collect())
     }
 
-    async fn insert(&self, config: &Config) -> Result<(), RepositoryError> {
+    async fn insert(&self, config: &Config) -> AppResult<()> {
         let mut configs = self.configs.write().unwrap();
         configs.insert(config.id, config.clone());
         Ok(())
     }
 
-    async fn update(&self, config: &Config) -> Result<(), RepositoryError> {
+    async fn update(&self, config: &Config) -> AppResult<()> {
         let mut configs = self.configs.write().unwrap();
         configs.insert(config.id, config.clone());
         Ok(())
     }
 
-    async fn soft_delete(&self, id: u64) -> Result<(), RepositoryError> {
+    async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut configs = self.configs.write().unwrap();
         if let Some(config) = configs.get_mut(&id) {
             config.audit.deleted = 1;
             Ok(())
         } else {
-            Err(RepositoryError::NotFound(format!("Config {} not found", id)))
+            Err(RepositoryError::NotFound)?
         }
     }
 
-    async fn exists_by_key(&self, key: &str) -> Result<bool, RepositoryError> {
+    async fn exists_by_key(&self, key: &str) -> AppResult<bool> {
         let configs = self.configs.read().unwrap();
         Ok(configs
             .values()

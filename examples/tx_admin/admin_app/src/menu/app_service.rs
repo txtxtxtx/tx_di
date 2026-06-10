@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::menu::dto::*;
 use admin_domain::menu::model::value_object::{MenuQuery, MenuTreeNode};
 use admin_domain::menu::service::MenuService;
-use admin_domain::shared::repository::RepositoryError;
+use tx_error::AppResult;
 
 pub struct MenuAppService {
     menu_service: Arc<MenuService>,
@@ -18,7 +18,7 @@ impl MenuAppService {
         &self,
         cmd: CreateMenuCommand,
         creator: Option<String>,
-    ) -> Result<MenuResponse, RepositoryError> {
+    ) -> AppResult<MenuResponse> {
         let menu = self
             .menu_service
             .create_menu(
@@ -41,7 +41,7 @@ impl MenuAppService {
         &self,
         cmd: UpdateMenuCommand,
         updater: Option<String>,
-    ) -> Result<MenuResponse, RepositoryError> {
+    ) -> AppResult<MenuResponse> {
         let menu = self
             .menu_service
             .update_menu(
@@ -63,14 +63,14 @@ impl MenuAppService {
         Ok(MenuResponse::from(menu))
     }
 
-    pub async fn delete_menu(&self, menu_id: u64, updater: Option<String>) -> Result<(), RepositoryError> {
+    pub async fn delete_menu(&self, menu_id: u64, updater: Option<String>) -> AppResult<()> {
         self.menu_service.delete_menu(menu_id, updater).await
     }
 
     pub async fn get_menu_list(
         &self,
         request: MenuQueryRequest,
-    ) -> Result<Vec<MenuResponse>, RepositoryError> {
+    ) -> AppResult<Vec<MenuResponse>> {
         let query = MenuQuery {
             name: request.name,
             status: request.status,
@@ -83,7 +83,7 @@ impl MenuAppService {
     pub async fn get_menu_tree(
         &self,
         request: MenuQueryRequest,
-    ) -> Result<Vec<MenuTreeNode>, RepositoryError> {
+    ) -> AppResult<Vec<MenuTreeNode>> {
         let query = MenuQuery {
             name: request.name,
             status: request.status,

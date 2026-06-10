@@ -35,6 +35,7 @@ members = [
     "plugins/tx_di_file",
     # 后台管理系统
     "examples/admin_server",
+    "examples/tx_admin/admin_app",
     "examples/tx_admin/admin_domain",
     "examples/tx_admin/admin_macros",
 ]

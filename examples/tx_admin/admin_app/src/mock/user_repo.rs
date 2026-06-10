@@ -6,7 +6,8 @@ use admin_domain::user::model::aggregate::User;
 use admin_domain::user::model::value_object::UserQuery;
 use admin_domain::user::repository::UserRepository;
 use admin_domain::shared::repository::RepositoryError;
-use admin_common::types::{PageRequest, PageResponse};
+use tx_common::page::Page;
+use tx_error::AppResult;
 
 /// Mock user repository for testing
 pub struct MockUserRepository {
@@ -41,12 +42,12 @@ impl Default for MockUserRepository {
 
 #[async_trait]
 impl UserRepository for MockUserRepository {
-    async fn find_by_id(&self, id: u64) -> Result<Option<User>, RepositoryError> {
+    async fn find_by_id(&self, id: u64) -> AppResult<Option<User>> {
         let users = self.users.read().unwrap();
         Ok(users.get(&id).filter(|u| u.audit.deleted == 0).cloned())
     }
 
-    async fn find_by_username(&self, username: &str) -> Result<Option<User>, RepositoryError> {
+    async fn find_by_username(&self, username: &str) -> AppResult<Option<User>> {
         let users = self.users.read().unwrap();
         Ok(users
             .values()
@@ -57,8 +58,8 @@ impl UserRepository for MockUserRepository {
     async fn find_page(
         &self,
         query: &UserQuery,
-        page: &PageRequest,
-    ) -> Result<PageResponse<User>, RepositoryError> {
+        page: Page<User>,
+    ) -> AppResult<Page<User>> {
         let users = self.users.read().unwrap();
         let filtered: Vec<User> = users
             .values()
@@ -89,13 +90,13 @@ impl UserRepository for MockUserRepository {
         let list = filtered
             .into_iter()
             .skip(offset)
-            .take(page.page_size as usize)
+            .take(page.size as usize)
             .collect();
 
-        Ok(PageResponse::new(list, total, page.page, page.page_size))
+        Ok(Page::new(list, page.page, page.size, total))
     }
 
-    async fn find_all(&self, query: &UserQuery) -> Result<Vec<User>, RepositoryError> {
+    async fn find_all(&self, query: &UserQuery) -> AppResult<Vec<User>> {
         let users = self.users.read().unwrap();
         Ok(users
             .values()
@@ -112,47 +113,47 @@ impl UserRepository for MockUserRepository {
             .collect())
     }
 
-    async fn insert(&self, user: &User) -> Result<(), RepositoryError> {
+    async fn insert(&self, user: &User) -> AppResult<()> {
         let mut users = self.users.write().unwrap();
         if users.contains_key(&user.id) {
-            return Err(RepositoryError::Duplicate(format!("User {} already exists", user.id)));
+            return Err(RepositoryError::Duplicate)?;
         }
         users.insert(user.id, user.clone());
         Ok(())
     }
 
-    async fn update(&self, user: &User) -> Result<(), RepositoryError> {
+    async fn update(&self, user: &User) -> AppResult<()> {
         let mut users = self.users.write().unwrap();
         if !users.contains_key(&user.id) {
-            return Err(RepositoryError::NotFound(format!("User {} not found", user.id)));
+            return Err(RepositoryError::NotFound)?;
         }
         users.insert(user.id, user.clone());
         Ok(())
     }
 
-    async fn soft_delete(&self, id: u64) -> Result<(), RepositoryError> {
+    async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut users = self.users.write().unwrap();
         if let Some(user) = users.get_mut(&id) {
             user.audit.deleted = 1;
             Ok(())
         } else {
-            Err(RepositoryError::NotFound(format!("User {} not found", id)))
+            Err(RepositoryError::NotFound)?
         }
     }
 
-    async fn exists_by_username(&self, username: &str) -> Result<bool, RepositoryError> {
+    async fn exists_by_username(&self, username: &str) -> AppResult<bool> {
         let users = self.users.read().unwrap();
         Ok(users
             .values()
             .any(|u| u.username == username && u.audit.deleted == 0))
     }
 
-    async fn count(&self, _query: &UserQuery) -> Result<i64, RepositoryError> {
+    async fn count(&self, _query: &UserQuery) -> AppResult<i64> {
         let users = self.users.read().unwrap();
         Ok(users.values().filter(|u| u.audit.deleted == 0).count() as i64)
     }
 
-    async fn find_by_role_id(&self, role_id: u64) -> Result<Vec<User>, RepositoryError> {
+    async fn find_by_role_id(&self, role_id: u64) -> AppResult<Vec<User>> {
         let user_roles = self.user_roles.read().unwrap();
         let users = self.users.read().unwrap();
         let user_ids: Vec<u64> = user_roles
@@ -169,7 +170,7 @@ impl UserRepository for MockUserRepository {
             .collect())
     }
 
-    async fn find_by_dept_id(&self, dept_id: u64) -> Result<Vec<User>, RepositoryError> {
+    async fn find_by_dept_id(&self, dept_id: u64) -> AppResult<Vec<User>> {
         let user_depts = self.user_depts.read().unwrap();
         let users = self.users.read().unwrap();
         let user_ids: Vec<u64> = user_depts
@@ -186,24 +187,24 @@ impl UserRepository for MockUserRepository {
             .collect())
     }
 
-    async fn bind_roles(&self, user_id: u64, role_ids: &[u64]) -> Result<(), RepositoryError> {
+    async fn bind_roles(&self, user_id: u64, role_ids: &[u64]) -> AppResult<()> {
         let mut user_roles = self.user_roles.write().unwrap();
         user_roles.insert(user_id, role_ids.to_vec());
         Ok(())
     }
 
-    async fn bind_departments(&self, user_id: u64, dept_ids: &[u64]) -> Result<(), RepositoryError> {
+    async fn bind_departments(&self, user_id: u64, dept_ids: &[u64]) -> AppResult<()> {
         let mut user_depts = self.user_depts.write().unwrap();
         user_depts.insert(user_id, dept_ids.to_vec());
         Ok(())
     }
 
-    async fn get_role_ids(&self, user_id: u64) -> Result<Vec<u64>, RepositoryError> {
+    async fn get_role_ids(&self, user_id: u64) -> AppResult<Vec<u64>> {
         let user_roles = self.user_roles.read().unwrap();
         Ok(user_roles.get(&user_id).cloned().unwrap_or_default())
     }
 
-    async fn get_dept_ids(&self, user_id: u64) -> Result<Vec<u64>, RepositoryError> {
+    async fn get_dept_ids(&self, user_id: u64) -> AppResult<Vec<u64>> {
         let user_depts = self.user_depts.read().unwrap();
         Ok(user_depts.get(&user_id).cloned().unwrap_or_default())
     }

@@ -4,8 +4,9 @@ use crate::log::model::aggregate::{LoginLog, OperateLog};
 use crate::log::model::value_object::{LoginLogQuery, OperateLogQuery};
 use crate::log::repository::{LoginLogRepository, OperateLogRepository};
 use crate::shared::repository::RepositoryError;
-use admin_common::types::{PageRequest, PageResponse};
-use admin_common::id;
+use tx_common::page::Page;
+use tx_error::AppResult;
+use tx_common::id;
 
 pub struct OperateLogService {
     log_repo: Arc<dyn OperateLogRepository>,
@@ -27,7 +28,7 @@ impl OperateLogService {
         action: String,
         success: i32,
         extra: String,
-    ) -> Result<OperateLog, RepositoryError> {
+    ) -> AppResult<OperateLog> {
         let log_id = id::next_id();
         let log = OperateLog::create(
             log_id, trace_id, user_id, user_type, log_type, sub_type, biz_id, action, success, extra,
@@ -39,16 +40,16 @@ impl OperateLogService {
     pub async fn get_log_page(
         &self,
         query: &OperateLogQuery,
-        page: &PageRequest,
-    ) -> Result<PageResponse<OperateLog>, RepositoryError> {
+        page: Page<OperateLog>,
+    ) -> AppResult<Page<OperateLog>> {
         self.log_repo.find_page(query, page).await
     }
 
-    pub async fn delete_logs(&self, ids: &[u64]) -> Result<(), RepositoryError> {
+    pub async fn delete_logs(&self, ids: &[u64]) -> AppResult<()> {
         self.log_repo.delete_by_ids(ids).await
     }
 
-    pub async fn clean_logs(&self) -> Result<(), RepositoryError> {
+    pub async fn clean_logs(&self) -> AppResult<()> {
         self.log_repo.clean_all().await
     }
 }
@@ -70,7 +71,7 @@ impl LoginLogService {
         login_ip: String,
         login_type: String,
         result: i32,
-    ) -> Result<LoginLog, RepositoryError> {
+    ) -> AppResult<LoginLog> {
         let log_id = id::next_id();
         let log = LoginLog::create(log_id, user_id, user_type, username, login_ip, login_type, result);
         self.log_repo.insert(&log).await?;
@@ -80,16 +81,16 @@ impl LoginLogService {
     pub async fn get_log_page(
         &self,
         query: &LoginLogQuery,
-        page: &PageRequest,
-    ) -> Result<PageResponse<LoginLog>, RepositoryError> {
+        page: Page<LoginLog>,
+    ) -> AppResult<Page<LoginLog>> {
         self.log_repo.find_page(query, page).await
     }
 
-    pub async fn delete_logs(&self, ids: &[u64]) -> Result<(), RepositoryError> {
+    pub async fn delete_logs(&self, ids: &[u64]) -> AppResult<()> {
         self.log_repo.delete_by_ids(ids).await
     }
 
-    pub async fn clean_logs(&self) -> Result<(), RepositoryError> {
+    pub async fn clean_logs(&self) -> AppResult<()> {
         self.log_repo.clean_all().await
     }
 }

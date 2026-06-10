@@ -3,8 +3,8 @@ use std::sync::Arc;
 use crate::log::dto::*;
 use admin_domain::log::model::value_object::{LoginLogQuery, OperateLogQuery};
 use admin_domain::log::service::{LoginLogService, OperateLogService};
-use admin_domain::shared::repository::RepositoryError;
-use admin_common::types::{PageRequest, PageResponse};
+use tx_error::AppResult;
+use tx_common::page::Page;
 
 pub struct OperateLogAppService {
     log_service: Arc<OperateLogService>,
@@ -18,7 +18,7 @@ impl OperateLogAppService {
     pub async fn create_log(
         &self,
         cmd: CreateOperateLogCommand,
-    ) -> Result<OperateLogResponse, RepositoryError> {
+    ) -> AppResult<OperateLogResponse> {
         let log = self
             .log_service
             .create_log(
@@ -39,7 +39,7 @@ impl OperateLogAppService {
     pub async fn get_log_page(
         &self,
         request: OperateLogQueryRequest,
-    ) -> Result<PageResponse<OperateLogResponse>, RepositoryError> {
+    ) -> AppResult<Page<OperateLogResponse>> {
         let query = OperateLogQuery {
             user_id: request.user_id,
             log_type: request.log_type,
@@ -48,22 +48,22 @@ impl OperateLogAppService {
             begin_time: request.begin_time,
             end_time: request.end_time,
         };
-        let page = PageRequest::new(request.page, request.page_size);
-        let result = self.log_service.get_log_page(&query, &page).await?;
+        let page = Page::<()>::request(request.page, request.page_size);
+        let result = self.log_service.get_log_page(&query, page).await?;
 
-        Ok(PageResponse::new(
+        Ok(Page::new(
             result.list.into_iter().map(OperateLogResponse::from).collect(),
-            result.total,
             result.page,
             result.page_size,
+            result.total,
         ))
     }
 
-    pub async fn delete_logs(&self, ids: &[u64]) -> Result<(), RepositoryError> {
+    pub async fn delete_logs(&self, ids: &[u64]) -> AppResult<()> {
         self.log_service.delete_logs(ids).await
     }
 
-    pub async fn clean_logs(&self) -> Result<(), RepositoryError> {
+    pub async fn clean_logs(&self) -> AppResult<()> {
         self.log_service.clean_logs().await
     }
 }
@@ -80,7 +80,7 @@ impl LoginLogAppService {
     pub async fn create_log(
         &self,
         cmd: CreateLoginLogCommand,
-    ) -> Result<LoginLogResponse, RepositoryError> {
+    ) -> AppResult<LoginLogResponse> {
         let log = self
             .log_service
             .create_log(
@@ -98,7 +98,7 @@ impl LoginLogAppService {
     pub async fn get_log_page(
         &self,
         request: LoginLogQueryRequest,
-    ) -> Result<PageResponse<LoginLogResponse>, RepositoryError> {
+    ) -> AppResult<Page<LoginLogResponse>> {
         let query = LoginLogQuery {
             user_id: request.user_id,
             username: request.username,
@@ -108,22 +108,22 @@ impl LoginLogAppService {
             begin_time: request.begin_time,
             end_time: request.end_time,
         };
-        let page = PageRequest::new(request.page, request.page_size);
-        let result = self.log_service.get_log_page(&query, &page).await?;
+        let page = Page::<()>::request(request.page, request.page_size);
+        let result = self.log_service.get_log_page(&query, page).await?;
 
-        Ok(PageResponse::new(
+        Ok(Page::new(
             result.list.into_iter().map(LoginLogResponse::from).collect(),
-            result.total,
             result.page,
             result.page_size,
+            result.total,
         ))
     }
 
-    pub async fn delete_logs(&self, ids: &[u64]) -> Result<(), RepositoryError> {
+    pub async fn delete_logs(&self, ids: &[u64]) -> AppResult<()> {
         self.log_service.delete_logs(ids).await
     }
 
-    pub async fn clean_logs(&self) -> Result<(), RepositoryError> {
+    pub async fn clean_logs(&self) -> AppResult<()> {
         self.log_service.clean_logs().await
     }
 }

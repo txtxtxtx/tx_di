@@ -6,7 +6,8 @@ use admin_domain::dictionary::model::aggregate::{DictData, DictType};
 use admin_domain::dictionary::model::value_object::{DictDataQuery, DictTypeQuery};
 use admin_domain::dictionary::repository::{DictDataRepository, DictTypeRepository};
 use admin_domain::shared::repository::RepositoryError;
-use admin_common::types::{PageRequest, PageResponse};
+use tx_common::page::Page;
+use tx_error::AppResult;
 
 pub struct MockDictTypeRepository {
     dict_types: RwLock<HashMap<u64, DictType>>,
@@ -28,12 +29,12 @@ impl Default for MockDictTypeRepository {
 
 #[async_trait]
 impl DictTypeRepository for MockDictTypeRepository {
-    async fn find_by_id(&self, id: u64) -> Result<Option<DictType>, RepositoryError> {
+    async fn find_by_id(&self, id: u64) -> AppResult<Option<DictType>> {
         let dict_types = self.dict_types.read().unwrap();
         Ok(dict_types.get(&id).filter(|d| d.audit.deleted == 0).cloned())
     }
 
-    async fn find_by_type(&self, dict_type: &str) -> Result<Option<DictType>, RepositoryError> {
+    async fn find_by_type(&self, dict_type: &str) -> AppResult<Option<DictType>> {
         let dict_types = self.dict_types.read().unwrap();
         Ok(dict_types
             .values()
@@ -44,8 +45,8 @@ impl DictTypeRepository for MockDictTypeRepository {
     async fn find_page(
         &self,
         query: &DictTypeQuery,
-        page: &PageRequest,
-    ) -> Result<PageResponse<DictType>, RepositoryError> {
+        page: Page<DictType>,
+    ) -> AppResult<Page<DictType>> {
         let dict_types = self.dict_types.read().unwrap();
         let filtered: Vec<DictType> = dict_types
             .values()
@@ -71,13 +72,13 @@ impl DictTypeRepository for MockDictTypeRepository {
         let list = filtered
             .into_iter()
             .skip(offset)
-            .take(page.page_size as usize)
+            .take(page.size as usize)
             .collect();
 
-        Ok(PageResponse::new(list, total, page.page, page.page_size))
+        Ok(Page::new(list, page.page, page.size, total))
     }
 
-    async fn find_all(&self, query: &DictTypeQuery) -> Result<Vec<DictType>, RepositoryError> {
+    async fn find_all(&self, query: &DictTypeQuery) -> AppResult<Vec<DictType>> {
         let dict_types = self.dict_types.read().unwrap();
         Ok(dict_types
             .values()
@@ -94,29 +95,29 @@ impl DictTypeRepository for MockDictTypeRepository {
             .collect())
     }
 
-    async fn insert(&self, dict_type: &DictType) -> Result<(), RepositoryError> {
+    async fn insert(&self, dict_type: &DictType) -> AppResult<()> {
         let mut dict_types = self.dict_types.write().unwrap();
         dict_types.insert(dict_type.id, dict_type.clone());
         Ok(())
     }
 
-    async fn update(&self, dict_type: &DictType) -> Result<(), RepositoryError> {
+    async fn update(&self, dict_type: &DictType) -> AppResult<()> {
         let mut dict_types = self.dict_types.write().unwrap();
         dict_types.insert(dict_type.id, dict_type.clone());
         Ok(())
     }
 
-    async fn soft_delete(&self, id: u64) -> Result<(), RepositoryError> {
+    async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut dict_types = self.dict_types.write().unwrap();
         if let Some(dt) = dict_types.get_mut(&id) {
             dt.audit.deleted = 1;
             Ok(())
         } else {
-            Err(RepositoryError::NotFound(format!("DictType {} not found", id)))
+            Err(RepositoryError::NotFound)?
         }
     }
 
-    async fn exists_by_type(&self, dict_type: &str) -> Result<bool, RepositoryError> {
+    async fn exists_by_type(&self, dict_type: &str) -> AppResult<bool> {
         let dict_types = self.dict_types.read().unwrap();
         Ok(dict_types
             .values()
@@ -144,12 +145,12 @@ impl Default for MockDictDataRepository {
 
 #[async_trait]
 impl DictDataRepository for MockDictDataRepository {
-    async fn find_by_id(&self, id: u64) -> Result<Option<DictData>, RepositoryError> {
+    async fn find_by_id(&self, id: u64) -> AppResult<Option<DictData>> {
         let dict_data = self.dict_data.read().unwrap();
         Ok(dict_data.get(&id).filter(|d| d.audit.deleted == 0).cloned())
     }
 
-    async fn find_by_type(&self, dict_type: &str) -> Result<Vec<DictData>, RepositoryError> {
+    async fn find_by_type(&self, dict_type: &str) -> AppResult<Vec<DictData>> {
         let dict_data = self.dict_data.read().unwrap();
         Ok(dict_data
             .values()
@@ -161,8 +162,8 @@ impl DictDataRepository for MockDictDataRepository {
     async fn find_page(
         &self,
         query: &DictDataQuery,
-        page: &PageRequest,
-    ) -> Result<PageResponse<DictData>, RepositoryError> {
+        page: Page<DictData>,
+    ) -> AppResult<Page<DictData>> {
         let dict_data = self.dict_data.read().unwrap();
         let filtered: Vec<DictData> = dict_data
             .values()
@@ -193,31 +194,31 @@ impl DictDataRepository for MockDictDataRepository {
         let list = filtered
             .into_iter()
             .skip(offset)
-            .take(page.page_size as usize)
+            .take(page.size as usize)
             .collect();
 
-        Ok(PageResponse::new(list, total, page.page, page.page_size))
+        Ok(Page::new(list, page.page, page.size, total))
     }
 
-    async fn insert(&self, data: &DictData) -> Result<(), RepositoryError> {
+    async fn insert(&self, data: &DictData) -> AppResult<()> {
         let mut dict_data = self.dict_data.write().unwrap();
         dict_data.insert(data.id, data.clone());
         Ok(())
     }
 
-    async fn update(&self, data: &DictData) -> Result<(), RepositoryError> {
+    async fn update(&self, data: &DictData) -> AppResult<()> {
         let mut dict_data = self.dict_data.write().unwrap();
         dict_data.insert(data.id, data.clone());
         Ok(())
     }
 
-    async fn soft_delete(&self, id: u64) -> Result<(), RepositoryError> {
+    async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut dict_data = self.dict_data.write().unwrap();
         if let Some(dd) = dict_data.get_mut(&id) {
             dd.audit.deleted = 1;
             Ok(())
         } else {
-            Err(RepositoryError::NotFound(format!("DictData {} not found", id)))
+            Err(RepositoryError::NotFound)?
         }
     }
 }

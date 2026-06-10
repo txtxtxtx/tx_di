@@ -6,7 +6,8 @@ use admin_domain::role::model::aggregate::Role;
 use admin_domain::role::model::value_object::RoleQuery;
 use admin_domain::role::repository::RoleRepository;
 use admin_domain::shared::repository::RepositoryError;
-use admin_common::types::{PageRequest, PageResponse};
+use tx_common::page::Page;
+use tx_error::AppResult;
 
 pub struct MockRoleRepository {
     roles: RwLock<HashMap<u64, Role>>,
@@ -38,12 +39,12 @@ impl Default for MockRoleRepository {
 
 #[async_trait]
 impl RoleRepository for MockRoleRepository {
-    async fn find_by_id(&self, id: u64) -> Result<Option<Role>, RepositoryError> {
+    async fn find_by_id(&self, id: u64) -> AppResult<Option<Role>> {
         let roles = self.roles.read().unwrap();
         Ok(roles.get(&id).filter(|r| r.audit.deleted == 0).cloned())
     }
 
-    async fn find_by_code(&self, code: &str) -> Result<Option<Role>, RepositoryError> {
+    async fn find_by_code(&self, code: &str) -> AppResult<Option<Role>> {
         let roles = self.roles.read().unwrap();
         Ok(roles
             .values()
@@ -51,7 +52,7 @@ impl RoleRepository for MockRoleRepository {
             .cloned())
     }
 
-    async fn find_by_ids(&self, ids: &[u64]) -> Result<Vec<Role>, RepositoryError> {
+    async fn find_by_ids(&self, ids: &[u64]) -> AppResult<Vec<Role>> {
         let roles = self.roles.read().unwrap();
         Ok(ids
             .iter()
@@ -64,8 +65,8 @@ impl RoleRepository for MockRoleRepository {
     async fn find_page(
         &self,
         query: &RoleQuery,
-        page: &PageRequest,
-    ) -> Result<PageResponse<Role>, RepositoryError> {
+        page: Page<Role>,
+    ) -> AppResult<Page<Role>> {
         let roles = self.roles.read().unwrap();
         let filtered: Vec<Role> = roles
             .values()
@@ -91,13 +92,13 @@ impl RoleRepository for MockRoleRepository {
         let list = filtered
             .into_iter()
             .skip(offset)
-            .take(page.page_size as usize)
+            .take(page.size as usize)
             .collect();
 
-        Ok(PageResponse::new(list, total, page.page, page.page_size))
+        Ok(Page::new(list, page.page, page.size, total))
     }
 
-    async fn find_all(&self, query: &RoleQuery) -> Result<Vec<Role>, RepositoryError> {
+    async fn find_all(&self, query: &RoleQuery) -> AppResult<Vec<Role>> {
         let roles = self.roles.read().unwrap();
         Ok(roles
             .values()
@@ -114,42 +115,42 @@ impl RoleRepository for MockRoleRepository {
             .collect())
     }
 
-    async fn insert(&self, role: &Role) -> Result<(), RepositoryError> {
+    async fn insert(&self, role: &Role) -> AppResult<()> {
         let mut roles = self.roles.write().unwrap();
         roles.insert(role.id, role.clone());
         Ok(())
     }
 
-    async fn update(&self, role: &Role) -> Result<(), RepositoryError> {
+    async fn update(&self, role: &Role) -> AppResult<()> {
         let mut roles = self.roles.write().unwrap();
         roles.insert(role.id, role.clone());
         Ok(())
     }
 
-    async fn soft_delete(&self, id: u64) -> Result<(), RepositoryError> {
+    async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut roles = self.roles.write().unwrap();
         if let Some(role) = roles.get_mut(&id) {
             role.audit.deleted = 1;
             Ok(())
         } else {
-            Err(RepositoryError::NotFound(format!("Role {} not found", id)))
+            Err(RepositoryError::NotFound)?
         }
     }
 
-    async fn exists_by_code(&self, code: &str) -> Result<bool, RepositoryError> {
+    async fn exists_by_code(&self, code: &str) -> AppResult<bool> {
         let roles = self.roles.read().unwrap();
         Ok(roles
             .values()
             .any(|r| r.code == code && r.audit.deleted == 0))
     }
 
-    async fn bind_menus(&self, role_id: u64, menu_ids: &[u64]) -> Result<(), RepositoryError> {
+    async fn bind_menus(&self, role_id: u64, menu_ids: &[u64]) -> AppResult<()> {
         let mut role_menus = self.role_menus.write().unwrap();
         role_menus.insert(role_id, menu_ids.to_vec());
         Ok(())
     }
 
-    async fn get_menu_ids(&self, role_id: u64) -> Result<Vec<u64>, RepositoryError> {
+    async fn get_menu_ids(&self, role_id: u64) -> AppResult<Vec<u64>> {
         let role_menus = self.role_menus.read().unwrap();
         Ok(role_menus.get(&role_id).cloned().unwrap_or_default())
     }
