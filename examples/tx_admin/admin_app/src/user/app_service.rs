@@ -160,7 +160,7 @@ impl UserAppService {
             begin_time: None,
             end_time: None,
         };
-        let page = Page::request(request.page, request.page_size);
+        let page = Page::request(request.page, request.size);
         let result = self.user_service.get_user_page(&query, page).await?;
 
         Ok(Page::new(

@@ -52,7 +52,7 @@ impl DictTypeAppService {
             dict_type: request.dict_type,
             status: request.status,
         };
-        let page = Page::request(request.page, request.page_size);
+        let page = Page::request(request.page, request.size);
         let result = self.dict_type_service.get_dict_type_page(&query, page).await?;
 
         Ok(Page::new(
@@ -125,7 +125,7 @@ impl DictDataAppService {
             label: request.label,
             status: request.status,
         };
-        let page = Page::request(request.page, request.page_size);
+        let page = Page::request(request.page, request.size);
         let result = self.dict_data_service.get_dict_data_page(&query, page).await?;
 
         Ok(Page::new(

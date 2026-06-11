@@ -9,7 +9,8 @@ use tx_di_core::App;
 use crate::domain::{AppError, AdminErr};
 use crate::domain::config::{ConfigRepository, ConfigType};
 use crate::domain::config::repo::ToastyConfigRepository;
-use crate::interfaces::dto::common::{ApiResponse, PageQuery, PageResponse};
+use tx_common::{ApiR, ApiRes, Page};
+use crate::interfaces::dto::common::PageQuery;
 use crate::interfaces::dto::config_dto::{ConfigDto, CreateConfigRequest, UpdateConfigRequest};
 
 pub fn router(app: Arc<App>) -> Router {
@@ -22,26 +23,26 @@ pub fn router(app: Arc<App>) -> Router {
 async fn list_configs(
     State(app): State<Arc<App>>,
     Query(query): Query<PageQuery>,
-) -> Result<Json<ApiResponse<PageResponse<ConfigDto>>>, AppError> {
+) -> Result<Json<ApiR<Page<ConfigDto>>>, AppError> {
     let repo = app.inject::<ToastyConfigRepository>();
-    let (configs, total) = repo.find_page(query.keyword.as_deref(), query.page, query.page_size).await?;
+    let (configs, total) = repo.find_page(query.keyword.as_deref(), query.page as u64, query.size as u64).await?;
     let dtos: Vec<ConfigDto> = configs.iter().map(ConfigDto::from).collect();
-    Ok(Json(ApiResponse::success(PageResponse::new(dtos, total, query.page, query.page_size))))
+    Ok(Json(ApiR::success(Page::new(dtos, query.page, query.size, total as i64))))
 }
 
 async fn get_config(
     State(app): State<Arc<App>>,
     Path(id): Path<u64>,
-) -> Result<Json<ApiResponse<ConfigDto>>, AppError> {
+) -> Result<Json<ApiR<ConfigDto>>, AppError> {
     let repo = app.inject::<ToastyConfigRepository>();
     let config = repo.find_by_id(id).await?.ok_or(AppError::with_context(AdminErr::NotFound, id.to_string()))?;
-    Ok(Json(ApiResponse::success(ConfigDto::from(&config))))
+    Ok(Json(ApiR::success(ConfigDto::from(&config))))
 }
 
 async fn create_config(
     State(app): State<Arc<App>>,
     Json(req): Json<CreateConfigRequest>,
-) -> Result<Json<ApiResponse<ConfigDto>>, AppError> {
+) -> Result<Json<ApiR<ConfigDto>>, AppError> {
     let repo = app.inject::<ToastyConfigRepository>();
     // 检查 key 唯一性
     if repo.find_by_key(&req.config_key).await?.is_some() {
@@ -63,14 +64,14 @@ async fn create_config(
         deleted: 0,
     };
     repo.save(&config).await?;
-    Ok(Json(ApiResponse::success(ConfigDto::from(&config))))
+    Ok(Json(ApiR::success(ConfigDto::from(&config))))
 }
 
 async fn update_config(
     State(app): State<Arc<App>>,
     Path(id): Path<u64>,
     Json(req): Json<UpdateConfigRequest>,
-) -> Result<Json<ApiResponse<ConfigDto>>, AppError> {
+) -> Result<Json<ApiR<ConfigDto>>, AppError> {
     let repo = app.inject::<ToastyConfigRepository>();
     let mut config = repo.find_by_id(id).await?.ok_or(AppError::with_context(AdminErr::NotFound, id.to_string()))?;
     if let Some(v) = req.category { config.category = Some(v); }
@@ -80,15 +81,15 @@ async fn update_config(
     if let Some(v) = req.visible { config.visible = v; }
     if let Some(v) = req.remark { config.remark = Some(v); }
     repo.save(&config).await?;
-    Ok(Json(ApiResponse::success(ConfigDto::from(&config))))
+    Ok(Json(ApiR::success(ConfigDto::from(&config))))
 }
 
 async fn delete_config(
     State(app): State<Arc<App>>,
     Path(id): Path<u64>,
-) -> Result<Json<ApiResponse<()>>, AppError> {
+) -> Result<Json<ApiRes>, AppError> {
     let repo = app.inject::<ToastyConfigRepository>();
     repo.find_by_id(id).await?.ok_or(AppError::with_context(AdminErr::NotFound, id.to_string()))?;
     repo.delete(id).await?;
-    Ok(Json(ApiResponse::<()>::ok()))
+    Ok(Json(ApiRes::ok()))
 }

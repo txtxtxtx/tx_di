@@ -5,7 +5,7 @@ package admin.common;
 /// 通用分页请求
 message PageRequest {
   int64 page = 1;
-  int64 page_size = 2;
+  int64 size = 2;
 }
 
 /// 空响应
@@ -14,14 +14,14 @@ message Empty {}
 /// 通用 API 响应包装
 message ApiResponse {
   int32 code = 1;
-  string message = 2;
+  string msg = 2;
   bytes data = 3; // JSON 编码的具体数据
 }
 
-/// 分页信息
-message PageInfo {
+/// 分页响应
+message PageResponse {
   int64 total = 1;
   int64 page = 2;
-  int64 page_size = 3;
+  int64 size = 3;
   int64 total_pages = 4;
 }

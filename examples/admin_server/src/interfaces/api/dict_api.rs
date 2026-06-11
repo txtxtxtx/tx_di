@@ -10,7 +10,8 @@ use crate::domain::{AppError, AdminErr};
 use crate::domain::dict::DictRepository;
 use crate::domain::dict::repo::ToastyDictRepository;
 use crate::domain::dept::CommonStatus;
-use crate::interfaces::dto::common::{ApiResponse, PageQuery, PageResponse};
+use tx_common::{ApiR, ApiRes, Page};
+use crate::interfaces::dto::common::PageQuery;
 use crate::interfaces::dto::dict_dto::{
     DictTypeDto, CreateDictTypeRequest, UpdateDictTypeRequest,
     DictDataDto, CreateDictDataRequest, UpdateDictDataRequest,
@@ -34,26 +35,26 @@ pub fn router(app: Arc<App>) -> Router {
 async fn list_dict_types(
     State(app): State<Arc<App>>,
     Query(query): Query<PageQuery>,
-) -> Result<Json<ApiResponse<PageResponse<DictTypeDto>>>, AppError> {
+) -> Result<Json<ApiR<Page<DictTypeDto>>>, AppError> {
     let repo = app.inject::<ToastyDictRepository>();
-    let (types, total) = repo.find_type_page(query.keyword.as_deref(), query.page, query.page_size).await?;
+    let (types, total) = repo.find_type_page(query.keyword.as_deref(), query.page as u64, query.size as u64).await?;
     let dtos: Vec<DictTypeDto> = types.iter().map(DictTypeDto::from).collect();
-    Ok(Json(ApiResponse::success(PageResponse::new(dtos, total, query.page, query.page_size))))
+    Ok(Json(ApiR::success(Page::new(dtos, query.page, query.size, total as i64))))
 }
 
 async fn get_dict_type(
     State(app): State<Arc<App>>,
     Path(id): Path<u64>,
-) -> Result<Json<ApiResponse<DictTypeDto>>, AppError> {
+) -> Result<Json<ApiR<DictTypeDto>>, AppError> {
     let repo = app.inject::<ToastyDictRepository>();
     let dt = repo.find_type_by_id(id).await?.ok_or(AppError::with_context(AdminErr::DictTypeNotFound, id.to_string()))?;
-    Ok(Json(ApiResponse::success(DictTypeDto::from(&dt))))
+    Ok(Json(ApiR::success(DictTypeDto::from(&dt))))
 }
 
 async fn create_dict_type(
     State(app): State<Arc<App>>,
     Json(req): Json<CreateDictTypeRequest>,
-) -> Result<Json<ApiResponse<DictTypeDto>>, AppError> {
+) -> Result<Json<ApiR<DictTypeDto>>, AppError> {
     let repo = app.inject::<ToastyDictRepository>();
     let mut dt = crate::domain::dict::DictType::new(req.name, req.dict_type);
     if let Some(s) = req.status {
@@ -61,14 +62,14 @@ async fn create_dict_type(
     }
     dt.remark = req.remark;
     repo.save_type(&dt).await?;
-    Ok(Json(ApiResponse::success(DictTypeDto::from(&dt))))
+    Ok(Json(ApiR::success(DictTypeDto::from(&dt))))
 }
 
 async fn update_dict_type(
     State(app): State<Arc<App>>,
     Path(id): Path<u64>,
     Json(req): Json<UpdateDictTypeRequest>,
-) -> Result<Json<ApiResponse<DictTypeDto>>, AppError> {
+) -> Result<Json<ApiR<DictTypeDto>>, AppError> {
     let repo = app.inject::<ToastyDictRepository>();
     let mut dt = repo.find_type_by_id(id).await?.ok_or(AppError::with_context(AdminErr::DictTypeNotFound, id.to_string()))?;
     if let Some(v) = req.name { dt.name = v; }
@@ -78,17 +79,17 @@ async fn update_dict_type(
     }
     if let Some(v) = req.remark { dt.remark = Some(v); }
     repo.save_type(&dt).await?;
-    Ok(Json(ApiResponse::success(DictTypeDto::from(&dt))))
+    Ok(Json(ApiR::success(DictTypeDto::from(&dt))))
 }
 
 async fn delete_dict_type(
     State(app): State<Arc<App>>,
     Path(id): Path<u64>,
-) -> Result<Json<ApiResponse<()>>, AppError> {
+) -> Result<Json<ApiRes>, AppError> {
     let repo = app.inject::<ToastyDictRepository>();
     repo.find_type_by_id(id).await?.ok_or(AppError::with_context(AdminErr::DictTypeNotFound, id.to_string()))?;
     repo.delete_type(id).await?;
-    Ok(Json(ApiResponse::<()>::ok()))
+    Ok(Json(ApiRes::ok()))
 }
 
 // ── 字典数据 ─────────────────────────────────────────────
@@ -96,47 +97,47 @@ async fn delete_dict_type(
 async fn list_dict_data(
     State(app): State<Arc<App>>,
     Query(query): Query<PageQuery>,
-) -> Result<Json<ApiResponse<PageResponse<DictDataDto>>>, AppError> {
+) -> Result<Json<ApiR<Page<DictDataDto>>>, AppError> {
     let repo = app.inject::<ToastyDictRepository>();
     // 字典数据按类型分页：keyword 作为 dict_type 过滤条件
     let (data, total) = if let Some(ref dict_type) = query.keyword {
         // 简化实现：先获取全部再手动分页
         let all = repo.find_data_by_type(dict_type).await?;
-        let total = all.len() as u64;
-        let start = ((query.page - 1) * query.page_size) as usize;
-        let page_data: Vec<_> = all.into_iter().skip(start).take(query.page_size as usize).collect();
+        let total = all.len() as i64;
+        let start = ((query.page - 1) * query.size) as usize;
+        let page_data: Vec<_> = all.into_iter().skip(start).take(query.size as usize).collect();
         (page_data, total)
     } else {
         // 没有 keyword 时返回空（字典数据通常需要按类型查询）
         (vec![], 0)
     };
     let dtos: Vec<DictDataDto> = data.iter().map(DictDataDto::from).collect();
-    Ok(Json(ApiResponse::success(PageResponse::new(dtos, total, query.page, query.page_size))))
+    Ok(Json(ApiR::success(Page::new(dtos, query.page, query.size, total as i64))))
 }
 
 async fn list_dict_data_by_type(
     State(app): State<Arc<App>>,
     Path(dict_type): Path<String>,
-) -> Result<Json<ApiResponse<Vec<DictDataDto>>>, AppError> {
+) -> Result<Json<ApiR<Vec<DictDataDto>>>, AppError> {
     let repo = app.inject::<ToastyDictRepository>();
     let data = repo.find_data_by_type(&dict_type).await?;
     let dtos: Vec<DictDataDto> = data.iter().map(DictDataDto::from).collect();
-    Ok(Json(ApiResponse::success(dtos)))
+    Ok(Json(ApiR::success(dtos)))
 }
 
 async fn get_dict_data(
     State(app): State<Arc<App>>,
     Path(id): Path<u64>,
-) -> Result<Json<ApiResponse<DictDataDto>>, AppError> {
+) -> Result<Json<ApiR<DictDataDto>>, AppError> {
     let repo = app.inject::<ToastyDictRepository>();
     let data = repo.find_data_by_id(id).await?.ok_or(AppError::with_context(AdminErr::DictDataNotFound, id.to_string()))?;
-    Ok(Json(ApiResponse::success(DictDataDto::from(&data))))
+    Ok(Json(ApiR::success(DictDataDto::from(&data))))
 }
 
 async fn create_dict_data(
     State(app): State<Arc<App>>,
     Json(req): Json<CreateDictDataRequest>,
-) -> Result<Json<ApiResponse<DictDataDto>>, AppError> {
+) -> Result<Json<ApiR<DictDataDto>>, AppError> {
     let repo = app.inject::<ToastyDictRepository>();
     let mut data = crate::domain::dict::DictData::new(req.dict_type, req.label, req.value, req.sort.unwrap_or(0));
     if let Some(s) = req.status {
@@ -146,14 +147,14 @@ async fn create_dict_data(
     data.css_class = req.css_class;
     data.remark = req.remark;
     repo.save_data(&data).await?;
-    Ok(Json(ApiResponse::success(DictDataDto::from(&data))))
+    Ok(Json(ApiR::success(DictDataDto::from(&data))))
 }
 
 async fn update_dict_data(
     State(app): State<Arc<App>>,
     Path(id): Path<u64>,
     Json(req): Json<UpdateDictDataRequest>,
-) -> Result<Json<ApiResponse<DictDataDto>>, AppError> {
+) -> Result<Json<ApiR<DictDataDto>>, AppError> {
     let repo = app.inject::<ToastyDictRepository>();
     let mut data = repo.find_data_by_id(id).await?.ok_or(AppError::with_context(AdminErr::DictDataNotFound, id.to_string()))?;
     if let Some(v) = req.sort { data.sort = v; }
@@ -167,15 +168,15 @@ async fn update_dict_data(
     if let Some(v) = req.css_class { data.css_class = Some(v); }
     if let Some(v) = req.remark { data.remark = Some(v); }
     repo.save_data(&data).await?;
-    Ok(Json(ApiResponse::success(DictDataDto::from(&data))))
+    Ok(Json(ApiR::success(DictDataDto::from(&data))))
 }
 
 async fn delete_dict_data(
     State(app): State<Arc<App>>,
     Path(id): Path<u64>,
-) -> Result<Json<ApiResponse<()>>, AppError> {
+) -> Result<Json<ApiRes>, AppError> {
     let repo = app.inject::<ToastyDictRepository>();
     repo.find_data_by_id(id).await?.ok_or(AppError::with_context(AdminErr::DictDataNotFound, id.to_string()))?;
     repo.delete_data(id).await?;
-    Ok(Json(ApiResponse::<()>::ok()))
+    Ok(Json(ApiRes::ok()))
 }

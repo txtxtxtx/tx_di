@@ -14,6 +14,7 @@ tx_di_axum        = { path = "../../plugins/tx_di_axum" }
 tx_di_file        = { path = "../../plugins/tx_di_file" }
 tx_di_toasty      = {path = "../../plugins/tx_di_toasty"}
 tx_error          = {path = "../../common/tx_error", features = ["axum"]}
+tx_common         = { workspace = true, features = ["axum"] }
 toasty            = { workspace = true, features = ["sqlite", "serde", "jiff"] }
 jiff = {workspace = true }
 tokio.workspace     = true

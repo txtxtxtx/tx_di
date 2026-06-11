@@ -12,7 +12,8 @@ use crate::domain::user::service::UserService;
 use crate::domain::user::repo::ToastyUserRepository;
 use crate::domain::role::repo::ToastyRoleRepository;
 use crate::domain::tenant::repo::ToastyTenantRepository;
-use crate::interfaces::dto::common::{ApiResponse, PageQuery, PageResponse};
+use tx_common::{ApiR, ApiRes, Page};
+use crate::interfaces::dto::common::PageQuery;
 use crate::interfaces::dto::user_dto::{UserDto, CreateUserRequest, UpdateUserRequest};
 
 pub fn router(app: Arc<App>) -> Router {
@@ -33,26 +34,26 @@ fn build_service(app: &Arc<App>) -> UserService {
 async fn list_users(
     State(app): State<Arc<App>>,
     Query(query): Query<PageQuery>,
-) -> Result<Json<ApiResponse<PageResponse<UserDto>>>, AppError> {
+) -> Result<Json<ApiR<Page<UserDto>>>, AppError> {
     let repo = app.inject::<ToastyUserRepository>();
-    let (users, total) = repo.find_page(1, query.keyword.as_deref(), None, query.page, query.page_size).await?;
+    let (users, total) = repo.find_page(1, query.keyword.as_deref(), None, query.page as u64, query.size as u64).await?;
     let dtos: Vec<UserDto> = users.iter().map(UserDto::from).collect();
-    Ok(Json(ApiResponse::success(PageResponse::new(dtos, total, query.page, query.page_size))))
+    Ok(Json(ApiR::success(Page::new(dtos, query.page, query.size, total as i64))))
 }
 
 async fn get_user(
     State(app): State<Arc<App>>,
     Path(id): Path<u64>,
-) -> Result<Json<ApiResponse<UserDto>>, AppError> {
+) -> Result<Json<ApiR<UserDto>>, AppError> {
     let repo = app.inject::<ToastyUserRepository>();
     let user = repo.find_by_id(id).await?.ok_or(AppError::with_context(AdminErr::UserNotFound, id.to_string()))?;
-    Ok(Json(ApiResponse::success(UserDto::from(&user))))
+    Ok(Json(ApiR::success(UserDto::from(&user))))
 }
 
 async fn create_user(
     State(app): State<Arc<App>>,
     Json(req): Json<CreateUserRequest>,
-) -> Result<Json<ApiResponse<UserDto>>, AppError> {
+) -> Result<Json<ApiR<UserDto>>, AppError> {
     let service = build_service(&app);
     // TODO: tenant_id 应从 sa-token 获取
     let mut user = service.register(1, &req.username, &req.password, &req.nickname).await?;
@@ -60,29 +61,29 @@ async fn create_user(
     user.mobile = req.mobile.unwrap_or_default();
     // 注册后再更新补充字段
     service.user_repo.save(&user).await?;
-    Ok(Json(ApiResponse::success(UserDto::from(&user))))
+    Ok(Json(ApiR::success(UserDto::from(&user))))
 }
 
 async fn update_user(
     State(app): State<Arc<App>>,
     Path(id): Path<u64>,
     Json(req): Json<UpdateUserRequest>,
-) -> Result<Json<ApiResponse<UserDto>>, AppError> {
+) -> Result<Json<ApiR<UserDto>>, AppError> {
     let repo = app.inject::<ToastyUserRepository>();
     let mut user = repo.find_by_id(id).await?.ok_or(AppError::with_context(AdminErr::UserNotFound, id.to_string()))?;
     if let Some(n) = req.nickname { user.nickname = n; }
     if let Some(e) = req.email { user.email = e; }
     if let Some(m) = req.mobile { user.mobile = m; }
     repo.save(&user).await?;
-    Ok(Json(ApiResponse::success(UserDto::from(&user))))
+    Ok(Json(ApiR::success(UserDto::from(&user))))
 }
 
 async fn delete_user(
     State(app): State<Arc<App>>,
     Path(id): Path<u64>,
-) -> Result<Json<ApiResponse<()>>, AppError> {
+) -> Result<Json<ApiRes>, AppError> {
     let repo = app.inject::<ToastyUserRepository>();
     repo.find_by_id(id).await?.ok_or(AppError::with_context(AdminErr::UserNotFound, id.to_string()))?;
     repo.delete(id).await?;
-    Ok(Json(ApiResponse::<()>::ok()))
+    Ok(Json(ApiRes::ok()))
 }

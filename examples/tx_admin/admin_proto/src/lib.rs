@@ -7,7 +7,7 @@
 //! `admin::auth` 中 `super::common` 指向 `admin::common`
 
 pub mod admin {
-    /// 通用类型（PageRequest, Empty, PageInfo 等）
+    /// 通用类型（PageRequest, Empty, PageResponse 等）
     pub mod common {
         tonic::include_proto!("admin.common");
     }
@@ -68,7 +68,7 @@ pub mod admin {
 // ============================================================
 
 // --- Common ---
-pub use admin::common::{Empty, PageRequest, PageInfo};
+pub use admin::common::{Empty, PageRequest, PageResponse};
 
 // --- Auth ---
 pub use admin::auth::{

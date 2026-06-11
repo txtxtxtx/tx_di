@@ -29,7 +29,7 @@ pub struct ConfigQueryRequest {
     pub config_key: Option<String>,
     pub config_type: Option<i32>,
     pub page: i64,
-    pub page_size: i64,
+    pub size: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -65,7 +65,7 @@ message DictTypeResponse {
 
 message ListDictTypesResponse {
   repeated DictTypeResponse items = 1;
-  admin.common.PageInfo page_info = 2;
+  admin.common.PageResponse page_info = 2;
 }
 
 // ---- 字典数据 ----
@@ -121,5 +121,5 @@ message DictDataResponse {
 
 message ListDictDataResponse {
   repeated DictDataResponse items = 1;
-  admin.common.PageInfo page_info = 2;
+  admin.common.PageResponse page_info = 2;
 }

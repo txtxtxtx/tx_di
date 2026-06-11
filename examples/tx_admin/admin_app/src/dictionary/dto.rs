@@ -21,7 +21,7 @@ pub struct DictTypeQueryRequest {
     pub dict_type: Option<String>,
     pub status: Option<i32>,
     pub page: i64,
-    pub page_size: i64,
+    pub size: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,7 +74,7 @@ pub struct DictDataQueryRequest {
     pub label: Option<String>,
     pub status: Option<i32>,
     pub page: i64,
-    pub page_size: i64,
+    pub size: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

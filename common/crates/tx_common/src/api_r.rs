@@ -138,9 +138,10 @@ impl From<tx_error::AppError> for ApiRes {
     }
 }
 
+#[cfg(feature = "axum")]
+use axum::{http::StatusCode, response::{IntoResponse, Response}, Json};
 
-// use axum::{http::StatusCode, response::{IntoResponse, Response}, Json};
-// 将ApiR类型的响应转换为HTTP响应
+/// 将 ApiR 类型的响应转换为 HTTP 响应（axum feature 启用时可用）
 //
 // 该实现将序列化的ApiR对象转换为JSON格式的HTTP响应，
 // 并设置状态码为200 OK
@@ -153,9 +154,11 @@ impl From<tx_error::AppError> for ApiRes {
 //
 // # 返回值
 // * `Response` - HTTP响应对象，包含JSON格式的响应体和200状态码
-// impl <T: Serialize> IntoResponse for ApiR<T> {
-//     fn into_response(self) -> Response {
-//         // 序列化ApiR对象为JSON格式的响应体
-//         (StatusCode::OK, Json(self)).into_response()
-//     }
-// }
+#[cfg(feature = "axum")]
+impl<T: Serialize + Send> IntoResponse for ApiR<T> {
+    fn into_response(self) -> Response {
+        // 根据业务状态码设置 HTTP 状态码，序列化ApiR对象为JSON格式的响应体
+        // let status = StatusCode::from_u16(self.code as u16).unwrap_or();
+        (StatusCode::OK, Json(self)).into_response()
+    }
+}

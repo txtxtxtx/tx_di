@@ -9,3 +9,8 @@ description = "通用工具类型（ApiR, ApiRes, FormattedDateTime）"
 serde.workspace = true
 chrono.workspace = true
 tx_error = { path = "../../tx_error" }
+axum = { workspace = true, optional = true }
+
+[features]
+default = []
+axum = ["dep:axum"]

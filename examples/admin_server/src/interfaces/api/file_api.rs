@@ -9,7 +9,8 @@ use tx_di_core::App;
 use crate::domain::{AppError, AdminErr};
 use crate::domain::file::{FileRepository};
 use crate::domain::file::repo::ToastyFileRepository;
-use crate::interfaces::dto::common::{ApiResponse, PageQuery, PageResponse};
+use tx_common::{ApiR, ApiRes, Page};
+use crate::interfaces::dto::common::PageQuery;
 use crate::interfaces::dto::file_dto::{FileDto, CreateFileRequest, UpdateFileRequest};
 
 pub fn router(app: Arc<App>) -> Router {
@@ -22,26 +23,26 @@ pub fn router(app: Arc<App>) -> Router {
 async fn list_files(
     State(app): State<Arc<App>>,
     Query(query): Query<PageQuery>,
-) -> Result<Json<ApiResponse<PageResponse<FileDto>>>, AppError> {
+) -> Result<Json<ApiR<Page<FileDto>>>, AppError> {
     let repo = app.inject::<ToastyFileRepository>();
-    let (files, total) = repo.find_page(query.page, query.page_size).await?;
+    let (files, total) = repo.find_page(query.page as u64, query.size as u64).await?;
     let dtos: Vec<FileDto> = files.iter().map(FileDto::from).collect();
-    Ok(Json(ApiResponse::success(PageResponse::new(dtos, total, query.page, query.page_size))))
+    Ok(Json(ApiR::success(Page::new(dtos, query.page, query.size, total as i64))))
 }
 
 async fn get_file(
     State(app): State<Arc<App>>,
     Path(id): Path<u64>,
-) -> Result<Json<ApiResponse<FileDto>>, AppError> {
+) -> Result<Json<ApiR<FileDto>>, AppError> {
     let repo = app.inject::<ToastyFileRepository>();
     let file = repo.find_by_id(id).await?.ok_or(AppError::with_context(AdminErr::FileNotFound, id.to_string()))?;
-    Ok(Json(ApiResponse::success(FileDto::from(&file))))
+    Ok(Json(ApiR::success(FileDto::from(&file))))
 }
 
 async fn create_file(
     State(app): State<Arc<App>>,
     Json(req): Json<CreateFileRequest>,
-) -> Result<Json<ApiResponse<FileDto>>, AppError> {
+) -> Result<Json<ApiR<FileDto>>, AppError> {
     let repo = app.inject::<ToastyFileRepository>();
     let file = crate::domain::file::File {
         id: 0,
@@ -58,14 +59,14 @@ async fn create_file(
         deleted: 0,
     };
     repo.save(&file).await?;
-    Ok(Json(ApiResponse::success(FileDto::from(&file))))
+    Ok(Json(ApiR::success(FileDto::from(&file))))
 }
 
 async fn update_file(
     State(app): State<Arc<App>>,
     Path(id): Path<u64>,
     Json(req): Json<UpdateFileRequest>,
-) -> Result<Json<ApiResponse<FileDto>>, AppError> {
+) -> Result<Json<ApiR<FileDto>>, AppError> {
     let repo = app.inject::<ToastyFileRepository>();
     let mut file = repo.find_by_id(id).await?.ok_or(AppError::with_context(AdminErr::FileNotFound, id.to_string()))?;
     if let Some(v) = req.config_id { file.config_id = Some(v); }
@@ -75,15 +76,15 @@ async fn update_file(
     if let Some(v) = req.file_type { file.file_type = Some(v); }
     if let Some(v) = req.size { file.size = v; }
     repo.save(&file).await?;
-    Ok(Json(ApiResponse::success(FileDto::from(&file))))
+    Ok(Json(ApiR::success(FileDto::from(&file))))
 }
 
 async fn delete_file(
     State(app): State<Arc<App>>,
     Path(id): Path<u64>,
-) -> Result<Json<ApiResponse<()>>, AppError> {
+) -> Result<Json<ApiRes>, AppError> {
     let repo = app.inject::<ToastyFileRepository>();
     repo.find_by_id(id).await?.ok_or(AppError::with_context(AdminErr::FileNotFound, id.to_string()))?;
     repo.delete(id).await?;
-    Ok(Json(ApiResponse::<()>::ok()))
+    Ok(Json(ApiRes::ok()))
 }

@@ -52,5 +52,5 @@ message FileResponse {
 
 message ListFilesResponse {
   repeated FileResponse items = 1;
-  admin.common.PageInfo page_info = 2;
+  admin.common.PageResponse page_info = 2;
 }

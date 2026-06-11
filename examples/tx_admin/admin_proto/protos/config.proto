@@ -66,5 +66,5 @@ message ConfigResponse {
 
 message ListConfigsResponse {
   repeated ConfigResponse items = 1;
-  admin.common.PageInfo page_info = 2;
+  admin.common.PageResponse page_info = 2;
 }

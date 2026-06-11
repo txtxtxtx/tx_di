@@ -45,7 +45,7 @@ impl FileAppService {
             file_type: request.file_type,
             config_id: request.config_id,
         };
-        let page = Page::request(request.page, request.page_size);
+        let page = Page::request(request.page, request.size);
         let result = self.file_service.get_file_page(&query, page).await?;
 
         Ok(Page::new(

@@ -61,7 +61,7 @@ message OperateLogResponse {
 
 message ListOperateLogsResponse {
   repeated OperateLogResponse items = 1;
-  admin.common.PageInfo page_info = 2;
+  admin.common.PageResponse page_info = 2;
 }
 
 // ---- 登录日志 ----
@@ -100,5 +100,5 @@ message LoginLogResponse {
 
 message ListLoginLogsResponse {
   repeated LoginLogResponse items = 1;
-  admin.common.PageInfo page_info = 2;
+  admin.common.PageResponse page_info = 2;
 }

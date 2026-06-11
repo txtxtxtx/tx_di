@@ -48,7 +48,7 @@ impl OperateLogAppService {
             begin_time: request.begin_time,
             end_time: request.end_time,
         };
-        let page = Page::request(request.page, request.page_size);
+        let page = Page::request(request.page, request.size);
         let result = self.log_service.get_log_page(&query, page).await?;
 
         Ok(Page::new(
@@ -108,7 +108,7 @@ impl LoginLogAppService {
             begin_time: request.begin_time,
             end_time: request.end_time,
         };
-        let page = Page::request(request.page, request.page_size);
+        let page = Page::request(request.page, request.size);
         let result = self.log_service.get_log_page(&query, page).await?;
 
         Ok(Page::new(

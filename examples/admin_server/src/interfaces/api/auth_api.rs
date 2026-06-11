@@ -11,7 +11,7 @@ use crate::domain::user::service::UserService;
 use crate::domain::user::repo::ToastyUserRepository;
 use crate::domain::role::repo::ToastyRoleRepository;
 use crate::domain::tenant::repo::ToastyTenantRepository;
-use crate::interfaces::dto::common::ApiResponse;
+use tx_common::ApiR;
 use crate::interfaces::dto::auth_dto::{LoginRequest, LoginResponse, UserInfo};
 
 pub fn router(app: Arc<App>) -> Router {
@@ -33,7 +33,7 @@ fn build_service(app: &Arc<App>) -> UserService {
 async fn login(
     State(app): State<Arc<App>>,
     Json(req): Json<LoginRequest>,
-) -> Result<Json<ApiResponse<LoginResponse>>, AppError> {
+) -> Result<Json<ApiR<LoginResponse>>, AppError> {
     let service = build_service(&app);
 
     // 领域服务处理认证逻辑
@@ -48,7 +48,7 @@ async fn login(
     // TODO: 用 sa-token 生成真正的 token
     let token = format!("{}.{}.{}", auth.user.id, auth.user.username, chrono::Utc::now().timestamp());
 
-    Ok(Json(ApiResponse::success(LoginResponse {
+    Ok(Json(ApiR::success(LoginResponse {
         token,
         user: UserInfo {
             id: auth.user.id,
@@ -64,7 +64,7 @@ async fn login(
 
 async fn user_info(
     State(app): State<Arc<App>>,
-) -> Result<Json<ApiResponse<UserInfo>>, AppError> {
+) -> Result<Json<ApiR<UserInfo>>, AppError> {
     let service = build_service(&app);
 
     // TODO: 从 sa-token 获取当前用户 ID，硬编码 1 仅供调试
@@ -75,7 +75,7 @@ async fn user_info(
         if r == "admin" { vec!["*:*:*".to_string()] } else { vec![format!("{}:read", r)] }
     }).collect();
 
-    Ok(Json(ApiResponse::success(UserInfo {
+    Ok(Json(ApiR::success(UserInfo {
         id: user.id,
         username: user.username,
         nickname: user.nickname,

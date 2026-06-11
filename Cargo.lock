@@ -106,6 +106,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tx-di-core",
+ "tx_common",
  "tx_di_axum",
  "tx_di_file",
  "tx_di_log",
@@ -6194,6 +6195,7 @@ dependencies = [
 name = "tx_common"
 version = "0.1.0"
 dependencies = [
+ "axum 0.8.9",
  "chrono",
  "serde",
  "tx_error",

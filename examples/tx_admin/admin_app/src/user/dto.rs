@@ -51,7 +51,7 @@ pub struct UserQueryRequest {
     pub status: Option<UserStatus>,
     pub dept_id: Option<u64>,
     pub page: i64,
-    pub page_size: i64,
+    pub size: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -22,7 +22,7 @@ pub struct OperateLogQueryRequest {
     pub begin_time: Option<String>,
     pub end_time: Option<String>,
     pub page: i64,
-    pub page_size: i64,
+    pub size: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,7 +82,7 @@ pub struct LoginLogQueryRequest {
     pub begin_time: Option<String>,
     pub end_time: Option<String>,
     pub page: i64,
-    pub page_size: i64,
+    pub size: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
