@@ -99,7 +99,7 @@ impl IdGenerator {
     /// 当检测到闰秒事件时，会使用特殊的序列号(LEAP_SECOND_SEQUENCE)标记ID
     pub fn next_id(&self) -> u64 {
         loop {
-            let current_state = self.state.load(Ordering::SeqCst);
+            let current_state = self.state.load(Ordering::Acquire);
             let (last_ts, last_seq) = unpack_state(current_state);
             let mut timestamp = Self::current_timestamp();
 
@@ -137,7 +137,7 @@ impl IdGenerator {
             // CAS：如果状态自读取后未改变，则原子更新
             if self
                 .state
-                .compare_exchange(current_state, new_state, Ordering::SeqCst, Ordering::SeqCst)
+                .compare_exchange(current_state, new_state, Ordering::AcqRel, Ordering::Acquire)
                 .is_ok()
             {
                 return ((timestamp - EPOCH) << TIMESTAMP_SHIFT)
@@ -168,7 +168,7 @@ impl IdGenerator {
         let mut remaining = count;
 
         while remaining > 0 {
-            let current_state = self.state.load(Ordering::SeqCst);
+            let current_state = self.state.load(Ordering::Acquire);
             let (last_ts, last_seq) = unpack_state(current_state);
             let mut timestamp = Self::current_timestamp();
 
@@ -193,7 +193,14 @@ impl IdGenerator {
             };
 
             // 当前毫秒剩余可用序列号数量
-            let available_in_ms = (MAX_SEQUENCE - base_seq + 1) as usize;
+            // 如果 base_seq > MAX_SEQUENCE，说明当前毫秒序列号已耗尽，需要等待下一毫秒
+            let available_in_ms = if base_seq > MAX_SEQUENCE {
+                // 等待下一毫秒后重试
+                timestamp = Self::wait_next_millis(timestamp);
+                continue;
+            } else {
+                (MAX_SEQUENCE - base_seq + 1) as usize
+            };
             // 本次批量分配的数量：取剩余需求和可用序列号的较小值
             let batch_size = available_in_ms.min(remaining);
 
@@ -203,7 +210,7 @@ impl IdGenerator {
 
             if self
                 .state
-                .compare_exchange(current_state, new_state, Ordering::SeqCst, Ordering::SeqCst)
+                .compare_exchange(current_state, new_state, Ordering::AcqRel, Ordering::Acquire)
                 .is_err()
             {
                 // CAS失败 — 另一个线程先更新了状态，重试
@@ -559,5 +566,250 @@ mod tests {
         for i in 1..single_ids.len() {
             assert!(single_ids[i] > single_ids[i-1], "单个生成的ID应该单调递增");
         }
+    }
+}
+
+#[cfg(test)]
+mod bench {
+    use super::*;
+    use std::sync::Arc;
+    use std::thread;
+    use std::time::Instant;
+
+    /// 辅助函数：格式化吞吐量输出
+    fn format_throughput(count: u64, elapsed: std::time::Duration) -> String {
+        let secs = elapsed.as_secs_f64();
+        let throughput = count as f64 / secs;
+        if throughput >= 1_000_000.0 {
+            format!("{:.2} ops/s ({:.2} M/s)", throughput, throughput / 1_000_000.0)
+        } else if throughput >= 1_000.0 {
+            format!("{:.2} ops/s ({:.2} K/s)", throughput, throughput / 1_000.0)
+        } else {
+            format!("{:.2} ops/s", throughput)
+        }
+    }
+
+    #[test]
+    fn bench_single_thread_next_id() {
+        let generator = IdGenerator::new(1, 1);
+        let count = 100_000;
+
+        let start = Instant::now();
+        for _ in 0..count {
+            let _ = generator.next_id();
+        }
+        let elapsed = start.elapsed();
+
+        println!(
+            "单线程 next_id: 生成 {} 个ID, 耗时 {:?}, 吞吐量 {}",
+            count,
+            elapsed,
+            format_throughput(count, elapsed)
+        );
+    }
+
+    #[test]
+    fn bench_single_thread_next_ids_batch_100() {
+        let generator = IdGenerator::new(1, 1);
+        let batch_size = 100;
+        let rounds = 1_000;
+        let total = batch_size * rounds;
+
+        let start = Instant::now();
+        for _ in 0..rounds {
+            let _ = generator.next_ids(batch_size);
+        }
+        let elapsed = start.elapsed();
+
+        println!(
+            "单线程 next_ids(100): 生成 {} 个ID, 耗时 {:?}, 吞吐量 {}",
+            total,
+            elapsed,
+            format_throughput(total as u64, elapsed)
+        );
+    }
+
+    #[test]
+    fn bench_single_thread_next_ids_batch_1000() {
+        let generator = IdGenerator::new(1, 1);
+        let batch_size = 1_000;
+        let rounds = 100;
+        let total = batch_size * rounds;
+
+        let start = Instant::now();
+        for _ in 0..rounds {
+            let _ = generator.next_ids(batch_size);
+        }
+        let elapsed = start.elapsed();
+
+        println!(
+            "单线程 next_ids(1000): 生成 {} 个ID, 耗时 {:?}, 吞吐量 {}",
+            total,
+            elapsed,
+            format_throughput(total as u64, elapsed)
+        );
+    }
+
+    #[test]
+    fn bench_multi_thread_next_id_4_threads() {
+        let generator = Arc::new(IdGenerator::new(1, 1));
+        let ids_per_thread = 50_000;
+        let num_threads = 4;
+        let total = ids_per_thread * num_threads;
+
+        let start = Instant::now();
+        let mut handles = vec![];
+        for _ in 0..num_threads {
+            let arc_gen = generator.clone();
+            handles.push(thread::spawn(move || {
+                for _ in 0..ids_per_thread {
+                    let _ = arc_gen.next_id();
+                }
+            }));
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+        let elapsed = start.elapsed();
+
+        println!(
+            "4线程 next_id: 生成 {} 个ID, 耗时 {:?}, 吞吐量 {}",
+            total,
+            elapsed,
+            format_throughput(total, elapsed)
+        );
+    }
+
+    #[test]
+    fn bench_multi_thread_next_id_8_threads() {
+        let generator = Arc::new(IdGenerator::new(1, 1));
+        let ids_per_thread = 50_000;
+        let num_threads = 8;
+        let total = ids_per_thread * num_threads;
+
+        let start = Instant::now();
+        let mut handles = vec![];
+        for _ in 0..num_threads {
+            let arc_gen = generator.clone();
+            handles.push(thread::spawn(move || {
+                for _ in 0..ids_per_thread {
+                    let _ = arc_gen.next_id();
+                }
+            }));
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+        let elapsed = start.elapsed();
+
+        println!(
+            "8线程 next_id: 生成 {} 个ID, 耗时 {:?}, 吞吐量 {}",
+            total,
+            elapsed,
+            format_throughput(total, elapsed)
+        );
+    }
+
+    #[test]
+    fn bench_multi_thread_next_ids_4_threads() {
+        let generator = Arc::new(IdGenerator::new(1, 1));
+        let batch_size = 100;
+        let batches_per_thread = 500;
+        let num_threads = 4;
+        let total = batch_size * batches_per_thread * num_threads;
+
+        let start = Instant::now();
+        let mut handles = vec![];
+        for _ in 0..num_threads {
+            let arc_gen = generator.clone();
+            handles.push(thread::spawn(move || {
+                for _ in 0..batches_per_thread {
+                    let _ = arc_gen.next_ids(batch_size);
+                }
+            }));
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+        let elapsed = start.elapsed();
+
+        println!(
+            "4线程 next_ids(100): 生成 {} 个ID, 耗时 {:?}, 吞吐量 {}",
+            total,
+            elapsed,
+            format_throughput(total as u64, elapsed)
+        );
+    }
+
+    #[test]
+    fn bench_multi_thread_next_ids_8_threads() {
+        let generator = Arc::new(IdGenerator::new(1, 1));
+        let batch_size = 100;
+        let batches_per_thread = 500;
+        let num_threads = 8;
+        let total = batch_size * batches_per_thread * num_threads;
+
+        let start = Instant::now();
+        let mut handles = vec![];
+        for _ in 0..num_threads {
+            let arc_gen = generator.clone();
+            handles.push(thread::spawn(move || {
+                for _ in 0..batches_per_thread {
+                    let _ = arc_gen.next_ids(batch_size);
+                }
+            }));
+        }
+        for h in handles {
+            h.join().unwrap();
+        }
+        let elapsed = start.elapsed();
+
+        println!(
+            "8线程 next_ids(100): 生成 {} 个ID, 耗时 {:?}, 吞吐量 {}",
+            total,
+            elapsed,
+            format_throughput(total as u64, elapsed)
+        );
+    }
+
+    #[test]
+    fn bench_multi_thread_mixed_next_id_and_next_ids() {
+        let generator = Arc::new(IdGenerator::new(1, 1));
+        let num_threads = 8;
+        let ops_per_thread = 10_000;
+
+        let start = Instant::now();
+        let mut handles = vec![];
+        for thread_id in 0..num_threads {
+            let arc_gen = generator.clone();
+            handles.push(thread::spawn(move || {
+                // 偶数线程使用 next_id，奇数线程使用 next_ids(10)
+                if thread_id % 2 == 0 {
+                    for _ in 0..ops_per_thread {
+                        let _ = arc_gen.next_id();
+                    }
+                    ops_per_thread as u64
+                } else {
+                    let batch_size = 10;
+                    let rounds = ops_per_thread / batch_size;
+                    for _ in 0..rounds {
+                        let _ = arc_gen.next_ids(batch_size);
+                    }
+                    (rounds * batch_size) as u64
+                }
+            }));
+        }
+        let mut total: u64 = 0;
+        for h in handles {
+            total += h.join().unwrap();
+        }
+        let elapsed = start.elapsed();
+
+        println!(
+            "8线程混合(next_id + next_ids): 生成 {} 个ID, 耗时 {:?}, 吞吐量 {}",
+            total,
+            elapsed,
+            format_throughput(total, elapsed)
+        );
     }
 }
