@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package admin.user;
+
+import "common.proto";
+
+// ============================================================
+// 用户服务
+// ============================================================
+
+service UserService {
+  rpc CreateUser(CreateUserRequest) returns (UserResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (UserResponse);
+  rpc DeleteUser(DeleteUserRequest) returns (admin.common.Empty);
+  rpc GetUser(GetUserRequest) returns (UserResponse);
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  rpc ChangePassword(ChangePasswordRequest) returns (admin.common.Empty);
+  rpc AssignRoles(AssignRolesRequest) returns (admin.common.Empty);
+  rpc AssignDepts(AssignDeptsRequest) returns (admin.common.Empty);
+}
+
+message CreateUserRequest {
+  string username = 1;
+  string password = 2;
+  string nickname = 3;
+  optional string email = 4;
+  optional string mobile = 5;
+  optional int32 sex = 6;
+  optional string remark = 7;
+  repeated uint64 role_ids = 8;
+  repeated uint64 dept_ids = 9;
+}
+
+message UpdateUserRequest {
+  uint64 user_id = 1;
+  string nickname = 2;
+  optional string email = 3;
+  optional string mobile = 4;
+  int32 sex = 5;
+  optional string remark = 6;
+}
+
+message DeleteUserRequest {
+  uint64 user_id = 1;
+}
+
+message GetUserRequest {
+  uint64 user_id = 1;
+}
+
+message ListUsersRequest {
+  optional string username = 1;
+  optional string nickname = 2;
+  optional string mobile = 3;
+  optional int32 status = 4;
+  optional uint64 dept_id = 5;
+  int64 page = 6;
+  int64 page_size = 7;
+}
+
+message ChangePasswordRequest {
+  uint64 user_id = 1;
+  string new_password = 2;
+}
+
+message AssignRolesRequest {
+  uint64 user_id = 1;
+  repeated uint64 role_ids = 2;
+}
+
+message AssignDeptsRequest {
+  uint64 user_id = 1;
+  repeated uint64 dept_ids = 2;
+}
+
+message UserResponse {
+  uint64 id = 1;
+  string username = 2;
+  string nickname = 3;
+  optional string email = 4;
+  optional string mobile = 5;
+  int32 sex = 6;
+  int32 status = 7;
+  optional string remark = 8;
+  repeated uint64 role_ids = 9;
+  repeated uint64 dept_ids = 10;
+}
+
+message ListUsersResponse {
+  repeated UserResponse items = 1;
+  admin.common.PageInfo page_info = 2;
+}

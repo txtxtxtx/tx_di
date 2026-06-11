@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package admin.menu;
+
+import "common.proto";
+
+// ============================================================
+// 菜单服务
+// ============================================================
+
+service MenuService {
+  rpc CreateMenu(CreateMenuRequest) returns (MenuResponse);
+  rpc UpdateMenu(UpdateMenuRequest) returns (MenuResponse);
+  rpc DeleteMenu(DeleteMenuRequest) returns (admin.common.Empty);
+  rpc GetMenu(GetMenuRequest) returns (MenuResponse);
+  rpc ListMenus(ListMenusRequest) returns (ListMenusResponse);
+}
+
+message CreateMenuRequest {
+  string name = 1;
+  string permission = 2;
+  int32 types = 3;
+  int32 sort = 4;
+  uint64 parent_id = 5;
+  optional string path = 6;
+  optional string icon = 7;
+  optional string component = 8;
+  optional string component_name = 9;
+}
+
+message UpdateMenuRequest {
+  uint64 menu_id = 1;
+  string name = 2;
+  string permission = 3;
+  int32 types = 4;
+  int32 sort = 5;
+  uint64 parent_id = 6;
+  optional string path = 7;
+  optional string icon = 8;
+  optional string component = 9;
+  optional string component_name = 10;
+  int32 visible = 11;
+  int32 keep_alive = 12;
+}
+
+message DeleteMenuRequest {
+  uint64 menu_id = 1;
+}
+
+message GetMenuRequest {
+  uint64 menu_id = 1;
+}
+
+message ListMenusRequest {
+  optional string name = 1;
+  optional int32 status = 2;
+  optional int32 types = 3;
+}
+
+message MenuResponse {
+  uint64 id = 1;
+  string name = 2;
+  string permission = 3;
+  int32 types = 4;
+  int32 sort = 5;
+  uint64 parent_id = 6;
+  optional string path = 7;
+  optional string icon = 8;
+  optional string component = 9;
+  optional string component_name = 10;
+  int32 status = 11;
+  int32 visible = 12;
+  int32 keep_alive = 13;
+}
+
+message ListMenusResponse {
+  repeated MenuResponse items = 1;
+}

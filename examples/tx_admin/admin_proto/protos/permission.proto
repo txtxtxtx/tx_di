@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package admin.permission;
+
+import "common.proto";
+
+// ============================================================
+// 权限服务
+// ============================================================
+
+service PermissionService {
+  rpc CheckPermission(PermissionCheckRequest) returns (PermissionCheckResponse);
+  rpc GetUserPermissions(GetUserPermissionsRequest) returns (UserPermissionsResponse);
+}
+
+message PermissionCheckRequest {
+  uint64 user_id = 1;
+  string permission = 2;
+}
+
+message PermissionCheckResponse {
+  bool has_permission = 1;
+}
+
+message GetUserPermissionsRequest {
+  uint64 user_id = 1;
+}
+
+message UserPermissionsResponse {
+  uint64 user_id = 1;
+  repeated string permissions = 2;
+  repeated PermissionItem items = 3;
+}
+
+message PermissionItem {
+  string code = 1;
+  string name = 2;
+  string permission_type = 3;
+}

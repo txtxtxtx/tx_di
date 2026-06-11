@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package admin.file;
+
+import "common.proto";
+
+// ============================================================
+// 文件服务
+// ============================================================
+
+service FileService {
+  rpc UploadFile(UploadFileRequest) returns (FileResponse);
+  rpc DeleteFile(DeleteFileRequest) returns (admin.common.Empty);
+  rpc GetFile(GetFileRequest) returns (FileResponse);
+  rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
+}
+
+message UploadFileRequest {
+  string name = 1;
+  string path = 2;
+  string url = 3;
+  optional string file_type = 4;
+  int32 size = 5;
+  optional int32 config_id = 6;
+}
+
+message DeleteFileRequest {
+  uint64 file_id = 1;
+}
+
+message GetFileRequest {
+  uint64 file_id = 1;
+}
+
+message ListFilesRequest {
+  optional string name = 1;
+  optional string file_type = 2;
+  optional int32 config_id = 3;
+  int64 page = 4;
+  int64 page_size = 5;
+}
+
+message FileResponse {
+  uint64 id = 1;
+  optional int32 config_id = 2;
+  string name = 3;
+  string path = 4;
+  string url = 5;
+  optional string file_type = 6;
+  int32 size = 7;
+}
+
+message ListFilesResponse {
+  repeated FileResponse items = 1;
+  admin.common.PageInfo page_info = 2;
+}

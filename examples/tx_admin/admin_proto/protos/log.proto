@@ -1,0 +1,104 @@
+syntax = "proto3";
+
+package admin.log;
+
+import "common.proto";
+
+// ============================================================
+// 日志服务
+// ============================================================
+
+service LogService {
+  // 操作日志
+  rpc CreateOperateLog(CreateOperateLogRequest) returns (admin.common.Empty);
+  rpc ListOperateLogs(ListOperateLogsRequest) returns (ListOperateLogsResponse);
+
+  // 登录日志
+  rpc CreateLoginLog(CreateLoginLogRequest) returns (admin.common.Empty);
+  rpc ListLoginLogs(ListLoginLogsRequest) returns (ListLoginLogsResponse);
+}
+
+// ---- 操作日志 ----
+
+message CreateOperateLogRequest {
+  string trace_id = 1;
+  uint64 user_id = 2;
+  int32 user_type = 3;
+  string log_type = 4;
+  string sub_type = 5;
+  uint64 biz_id = 6;
+  string action = 7;
+  int32 success = 8;
+  string extra = 9;
+}
+
+message ListOperateLogsRequest {
+  optional uint64 user_id = 1;
+  optional string log_type = 2;
+  optional string sub_type = 3;
+  optional int32 success = 4;
+  optional string begin_time = 5;
+  optional string end_time = 6;
+  int64 page = 7;
+  int64 page_size = 8;
+}
+
+message OperateLogResponse {
+  uint64 id = 1;
+  string trace_id = 2;
+  uint64 user_id = 3;
+  int32 user_type = 4;
+  string log_type = 5;
+  string sub_type = 6;
+  uint64 biz_id = 7;
+  string action = 8;
+  int32 success = 9;
+  string extra = 10;
+  optional string request_method = 11;
+  optional string request_url = 12;
+  optional string user_ip = 13;
+}
+
+message ListOperateLogsResponse {
+  repeated OperateLogResponse items = 1;
+  admin.common.PageInfo page_info = 2;
+}
+
+// ---- 登录日志 ----
+
+message CreateLoginLogRequest {
+  uint64 user_id = 1;
+  int32 user_type = 2;
+  string username = 3;
+  string login_ip = 4;
+  string login_type = 5;
+  int32 result = 6;
+}
+
+message ListLoginLogsRequest {
+  optional uint64 user_id = 1;
+  optional string username = 2;
+  optional string login_ip = 3;
+  optional string login_type = 4;
+  optional int32 result = 5;
+  optional string begin_time = 6;
+  optional string end_time = 7;
+  int64 page = 8;
+  int64 page_size = 9;
+}
+
+message LoginLogResponse {
+  uint64 id = 1;
+  uint64 user_id = 2;
+  int32 user_type = 3;
+  string username = 4;
+  string login_ip = 5;
+  string login_type = 6;
+  int32 result = 7;
+  optional string msg = 8;
+}
+
+message ListLoginLogsResponse {
+  repeated LoginLogResponse items = 1;
+  admin.common.PageInfo page_info = 2;
+}

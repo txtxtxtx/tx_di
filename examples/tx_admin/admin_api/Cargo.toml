@@ -8,18 +8,31 @@ readme.workspace = true
 repository.workspace = true
 
 [dependencies]
-tx_error          = {path = "../../../common/tx_error", features = ["axum"]}
-tx-di-core        = { path = "../../../tx-di-core" }
-tx_di_log         = { path = "../../../plugins/tx_di_log" }
-tx_di_axum        = { path = "../../../plugins/tx_di_axum" }
+# 项目内依赖
+admin_proto = { path = "../admin_proto" }
+admin_app   = { path = "../admin_app" }
+tx_error    = { path = "../../../common/tx_error", features = ["axum"] }
+tx-di-core  = { path = "../../../tx-di-core" }
+tx_di_log   = { path = "../../../plugins/tx_di_log" }
+tx_di_axum  = { path = "../../../plugins/tx_di_axum" }
 
-toasty            = { workspace = true, features = ["sqlite", "serde", "jiff"] }
-jiff = {workspace = true }
-tokio.workspace     = true
-axum                = { workspace = true, features = ["macros", "multipart"] }
-serde.workspace     = true
-serde_json.workspace = true
-anyhow.workspace    = true
-tracing.workspace   = true
-async-trait.workspace = true
-tokio-util          = { workspace = true }
+# gRPC
+tonic  = { workspace = true }
+prost  = { workspace = true }
+
+# HTTP
+axum   = { workspace = true, features = ["macros", "multipart"] }
+tower  = { workspace = true, features = ["full"] }
+
+# 序列化
+serde       = { workspace = true }
+serde_json  = { workspace = true }
+
+# 异步运行时
+tokio       = { workspace = true }
+tokio-util  = { workspace = true }
+async-trait = { workspace = true }
+
+# 工具
+anyhow  = { workspace = true }
+tracing = { workspace = true }

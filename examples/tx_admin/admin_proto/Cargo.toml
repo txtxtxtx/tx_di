@@ -8,3 +8,13 @@ readme.workspace = true
 repository.workspace = true
 
 [dependencies]
+prost = "0.13"
+prost-types = "0.13"
+tonic = "0.12"
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+
+[build-dependencies]
+tonic-build = "0.12"
+# 内嵌 protoc 编译器，无需系统安装
+protoc-bin-vendored = "3"

@@ -119,6 +119,12 @@ image = {version = "0.25.9", default-features = false}
 
 deku = {version = "0.20"}
 
+# gRPC
+tonic = "0.12"
+prost = "0.13"
+prost-types = "0.13"
+tonic-build = "0.12"
+
 sa-token-plugin-axum = {version = "0.1" , default-features = false}
 
 livekit-api = {version = "0.4",default-features = false}

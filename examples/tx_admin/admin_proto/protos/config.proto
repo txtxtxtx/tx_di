@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package admin.config;
+
+import "common.proto";
+
+// ============================================================
+// 配置服务
+// ============================================================
+
+service ConfigService {
+  rpc CreateConfig(CreateConfigRequest) returns (ConfigResponse);
+  rpc UpdateConfig(UpdateConfigRequest) returns (ConfigResponse);
+  rpc DeleteConfig(DeleteConfigRequest) returns (admin.common.Empty);
+  rpc GetConfig(GetConfigRequest) returns (ConfigResponse);
+  rpc ListConfigs(ListConfigsRequest) returns (ListConfigsResponse);
+}
+
+message CreateConfigRequest {
+  string category = 1;
+  int32 config_type = 2;
+  string name = 3;
+  string config_key = 4;
+  string value = 5;
+  optional string remark = 6;
+}
+
+message UpdateConfigRequest {
+  uint64 config_id = 1;
+  string category = 2;
+  int32 config_type = 3;
+  string name = 4;
+  string config_key = 5;
+  string value = 6;
+  int32 visible = 7;
+  optional string remark = 8;
+}
+
+message DeleteConfigRequest {
+  uint64 config_id = 1;
+}
+
+message GetConfigRequest {
+  uint64 config_id = 1;
+}
+
+message ListConfigsRequest {
+  optional string name = 1;
+  optional string category = 2;
+  optional string config_key = 3;
+  optional int32 config_type = 4;
+  int64 page = 5;
+  int64 page_size = 6;
+}
+
+message ConfigResponse {
+  uint64 id = 1;
+  string category = 2;
+  int32 config_type = 3;
+  string name = 4;
+  string config_key = 5;
+  string value = 6;
+  int32 visible = 7;
+  optional string remark = 8;
+}
+
+message ListConfigsResponse {
+  repeated ConfigResponse items = 1;
+  admin.common.PageInfo page_info = 2;
+}

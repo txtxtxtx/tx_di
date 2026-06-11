@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package admin.role;
+
+import "common.proto";
+
+// ============================================================
+// 角色服务
+// ============================================================
+
+service RoleService {
+  rpc CreateRole(CreateRoleRequest) returns (RoleResponse);
+  rpc UpdateRole(UpdateRoleRequest) returns (RoleResponse);
+  rpc DeleteRole(DeleteRoleRequest) returns (admin.common.Empty);
+  rpc GetRole(GetRoleRequest) returns (RoleResponse);
+  rpc ListRoles(ListRolesRequest) returns (ListRolesResponse);
+  rpc AssignMenus(AssignMenusRequest) returns (admin.common.Empty);
+}
+
+message CreateRoleRequest {
+  string name = 1;
+  string code = 2;
+  int32 sort = 3;
+  optional string remark = 4;
+  repeated uint64 menu_ids = 5;
+}
+
+message UpdateRoleRequest {
+  uint64 role_id = 1;
+  string name = 2;
+  string code = 3;
+  int32 sort = 4;
+  int32 data_scope = 5;
+  optional string remark = 6;
+}
+
+message DeleteRoleRequest {
+  uint64 role_id = 1;
+}
+
+message GetRoleRequest {
+  uint64 role_id = 1;
+}
+
+message ListRolesRequest {
+  optional string name = 1;
+  optional string code = 2;
+  optional int32 status = 3;
+  int64 page = 4;
+  int64 page_size = 5;
+}
+
+message AssignMenusRequest {
+  uint64 role_id = 1;
+  repeated uint64 menu_ids = 2;
+}
+
+message RoleResponse {
+  uint64 id = 1;
+  string name = 2;
+  string code = 3;
+  int32 sort = 4;
+  int32 data_scope = 5;
+  int32 status = 6;
+  optional string remark = 7;
+  repeated uint64 menu_ids = 8;
+}
+
+message ListRolesResponse {
+  repeated RoleResponse items = 1;
+  admin.common.PageInfo page_info = 2;
+}
