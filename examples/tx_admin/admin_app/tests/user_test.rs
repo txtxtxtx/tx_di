@@ -9,13 +9,28 @@
 
 mod common;
 use admin_app::user::dto::*;
+use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::user::model::value_object::{Sex, UserStatus};
+use admin_domain::user::repository::UserRepository;
 
 // ── 1.1 用户 CRUD ──────────────────────────────────────────────────────────
 
+/// 创建用户测试规范（六大维度）
+///
+/// ## 验证维度
+/// | # | 维度           | 验证方式                  | 覆盖内容                              |
+/// |---|---------------|--------------------------|--------------------------------------|
+/// | 1 | 返回值正确性    | 对返回值逐字段 assert      | 所有显式赋值字段 + 默认值字段           |
+/// | 2 | 持久化正确性    | API 回查 get_user        | 与返回值一致的字段再次验证              |
+/// | 3 | 默认值         | 断言默认/自动生成值        | ID>0、status=Active、空列表、None 字段  |
+/// | 4 | 审计追踪       | 仓库直接查询 raw User     | creator/updater/create_time/deleted   |
+/// | 5 | 业务规则       | 独立错误用例              | 用户名/邮箱/手机重复 → 略（另有用例）    |
+/// | 6 | 副作用         | 独立用例                  | 角色绑定/部门绑定 → 略（另有用例）       |
 #[tokio::test]
 async fn create_user_success() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, repo) = common::create_user_app();
+
+    // ── Act ──────────────────────────────────────────────────────────────
     let user = app
         .create_user(
             CreateUserCommand {
@@ -33,16 +48,75 @@ async fn create_user_success() {
         )
         .await
         .unwrap();
-    assert_eq!(user.username, "testuser");
 
-    // 回查验证持久化
+    // ══════════════════════════════════════════════════════════════════════
+    // 维度 1：返回值正确性 — 逐字段验证
+    // ══════════════════════════════════════════════════════════════════════
+    assert!(user.id > 0, "用户 ID 应由 ID 生成器分配，大于 0");
+    assert_eq!(user.username, "testuser");
+    assert_eq!(user.nickname, "测试用户");
+    assert_eq!(user.email, Some("test@example.com".into()));
+    assert_eq!(user.mobile, Some("13800138000".into()));
+    assert_eq!(user.sex, Sex::Male);
+    assert_eq!(user.status, UserStatus::Active, "新用户默认状态应为 Active");
+    assert_eq!(user.remark, None, "未提供备注时应为 None");
+    assert!(user.role_ids.is_empty(), "未分配角色时 role_ids 应为空 Vec");
+    assert!(user.dept_ids.is_empty(), "未分配部门时 dept_ids 应为空 Vec");
+
+    // ══════════════════════════════════════════════════════════════════════
+    // 维度 2：持久化正确性 — 通过 API 回查验证数据已落库
+    // ══════════════════════════════════════════════════════════════════════
     let found = app.get_user(user.id).await.unwrap();
+    assert_eq!(found.id, user.id, "回查 ID 应与创建时一致");
     assert_eq!(found.username, "testuser");
     assert_eq!(found.nickname, "测试用户");
     assert_eq!(found.email, Some("test@example.com".into()));
     assert_eq!(found.mobile, Some("13800138000".into()));
     assert_eq!(found.sex, Sex::Male);
     assert_eq!(found.status, UserStatus::Active);
+    assert_eq!(found.remark, None);
+    assert!(found.role_ids.is_empty());
+    assert!(found.dept_ids.is_empty());
+
+    // ══════════════════════════════════════════════════════════════════════
+    // 维度 4：审计追踪 — 通过仓库直接查询，验证 API 不暴露的内部字段
+    // ══════════════════════════════════════════════════════════════════════
+    let raw = repo
+        .find_by_id(user.id)
+        .await
+        .unwrap()
+        .expect("用户必须在仓库中存在");
+
+    // 审计：创建者和更新者
+    assert_eq!(
+        raw.audit.creator,
+        Some("admin".into()),
+        "创建者应记录为传入的 creator"
+    );
+    assert_eq!(
+        raw.audit.updater,
+        Some("admin".into()),
+        "更新者应与创建者一致（创建即是首次更新）"
+    );
+
+    // 审计：时间戳已设置（不超过当前时间，且两个时间相近）
+    let now = chrono::Utc::now();
+    assert!(raw.audit.create_time <= now, "创建时间不应超过当前时间");
+    assert!(raw.audit.update_time <= now, "更新时间不应超过当前时间");
+    assert!(
+        raw.audit.update_time >= raw.audit.create_time,
+        "更新时间不应早于创建时间"
+    );
+
+    // 审计：未软删除
+    assert_eq!(
+        raw.audit.deleted,
+        DeletedStatus::Normal,
+        "新用户不应处于软删除状态"
+    );
+
+    // 密码：确认密码已持久化
+    assert_eq!(raw.password, "password123", "密码应正确存储");
 }
 
 #[tokio::test]
