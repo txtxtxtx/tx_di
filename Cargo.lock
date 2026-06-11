@@ -88,34 +88,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "admin_server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "axum 0.8.9",
- "bcrypt",
- "chrono",
- "jiff",
- "mime_guess",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "toasty",
- "tokio",
- "tokio-util",
- "tracing",
- "tx-di-core",
- "tx_common",
- "tx_di_axum",
- "tx_di_file",
- "tx_di_log",
- "tx_di_toasty",
- "tx_error",
- "uuid",
-]
-
-[[package]]
 name = "aho-corasick"
 version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"

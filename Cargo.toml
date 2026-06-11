@@ -5,7 +5,7 @@ members = [
     # 宏
     "tx-di-macros",
     # 示例/测试
-#    "di-example",
+    #    "di-example",
     # 插件
     # web
     "plugins/tx_di_axum",
@@ -19,7 +19,7 @@ members = [
     "plugins/tx_di_can",
     # app
     # 国标设备模拟
-#    "examples/gb_cams",
+    #    "examples/gb_cams",
     # 国标服务
     "examples/gb28181_admin",
     # 国标公共模块
@@ -36,10 +36,13 @@ members = [
     # 文件存储
     "plugins/tx_di_file",
     # 后台管理系统
-    "examples/admin_server",
+    # "examples/admin_server",
     "examples/tx_admin/admin_app",
     "examples/tx_admin/admin_domain",
-    "examples/tx_admin/admin_macros", "examples/tx_admin/admin_infra", "examples/tx_admin/admin_api", "examples/tx_admin/admin_proto",
+    "examples/tx_admin/admin_macros",
+    "examples/tx_admin/admin_infra",
+    "examples/tx_admin/admin_api",
+    "examples/tx_admin/admin_proto",
 ]
 resolver = "3"
 [workspace.package]
@@ -55,14 +58,14 @@ repository = "https://gitee.com/tian_xiong/tx_di"
 
 [workspace.dependencies]
 tx-di-core = { path = "tx-di-core" }
-tx_di_log = { path = "plugins/tx_di_log"}
+tx_di_log = { path = "plugins/tx_di_log" }
 tx_gb28181 = { path = "common/tx_gb28181" }
 tx_error = { path = "common/tx_error" }
 tx_common = { path = "common/crates/tx_common" }
 # linkme 用于跨 crate 在链接期收集静态数组切片
 # 基于 ELF/Mach-O/PE 的自定义 link section，完全零运行时开销
 linkme = "0.3"
-tx_di_file = { path = "plugins/tx_di_file"}
+tx_di_file = { path = "plugins/tx_di_file" }
 
 # DashMap：无锁并发 HashMap，支持跨线程共享的组件注册表
 dashmap = "6"
@@ -71,7 +74,7 @@ toml = "1.1"
 rand = "0.9.2"
 bytes = "1.11"
 # 时间
-chrono = { version = "0.4", features = ["serde"]}
+chrono = { version = "0.4", features = ["serde"] }
 
 # syn：解析 Rust AST
 syn = { version = "2", features = ["full", "extra-traits"] }
@@ -79,26 +82,29 @@ syn = { version = "2", features = ["full", "extra-traits"] }
 quote = "1"
 # proc-macro2：提供 Span 等工具
 proc-macro2 = "1"
-tokio = {version = "1.49",features = ["full"]}
-socket2 = {version = "0.6"}
+tokio = { version = "1.49", features = ["full"] }
+socket2 = { version = "0.6" }
 env_logger = "0.11"
 
 # 序列化
-serde = { version = "1.0", features = ["derive","serde_derive"]}
+serde = { version = "1.0", features = ["derive", "serde_derive"] }
 serde_json = "1.0"
 serde_repr = "0.1"
-rsipstack = { version = "0.5",features = ["default"]}
+rsipstack = { version = "0.5", features = ["default"] }
 tokio-util = { version = "0.7", features = ["rt"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 futures-core = "0.3"
 futures = "0.3"
 # 日志
-time = {version = "0.3"}
-log = {version = "0.4",features = ["serde"]}
-tracing = {version = "0.1"}
-tracing-subscriber = {version = "0.3",features = ["env-filter","local-time"]}
+time = { version = "0.3" }
+log = { version = "0.4", features = ["serde"] }
+tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+    "local-time",
+] }
 # 用于文件输出
-tracing-appender = {version = "0.2"}
+tracing-appender = { version = "0.2" }
 
 # 错误处理
 thiserror = "2.0"
@@ -111,16 +117,16 @@ async-trait = "0.1"
 reqwest = { version = "0.12", features = ["json"] }
 
 # Web 框架
-axum = {version = "0.8", features = ["macros"]}
-tower = {version = "0.5", features = ["full"]}
-hyper = {version =  "1.9.0",features = ["full"]}
-tower-http = {version = "0.6", features = ["full"]}
-http = { version = "1.4.0"}
+axum = { version = "0.8", features = ["macros"] }
+tower = { version = "0.5", features = ["full"] }
+hyper = { version = "1.9.0", features = ["full"] }
+tower-http = { version = "0.6", features = ["full"] }
+http = { version = "1.4.0" }
 encoding_rs = "0.8"
 
-image = {version = "0.25.9", default-features = false}
+image = { version = "0.25.9", default-features = false }
 
-deku = {version = "0.20"}
+deku = { version = "0.20" }
 
 # gRPC
 tonic = "0.12"
@@ -128,9 +134,9 @@ prost = "0.13"
 prost-types = "0.13"
 tonic-build = "0.12"
 
-sa-token-plugin-axum = {version = "0.1" , default-features = false}
+sa-token-plugin-axum = { version = "0.1", default-features = false }
 
-livekit-api = {version = "0.4",default-features = false}
-livekit = {version = "0.7.42" , default-features = false}
-toasty = {version = "0.6",default-features = false, features = ["serde"]}
-jiff  = {version = "0.2", default-features = false, features = ["std"]}
+livekit-api = { version = "0.4", default-features = false }
+livekit = { version = "0.7.42", default-features = false }
+toasty = { version = "0.6", default-features = false, features = ["serde"] }
+jiff = { version = "0.2", default-features = false, features = ["std"] }
