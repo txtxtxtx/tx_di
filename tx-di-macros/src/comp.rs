@@ -138,7 +138,7 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
             ) -> Self {
                 let app_config = ::tx_di_core::inject_from_store::<::tx_di_core::AppAllConfig>(store);
                 let config_key = #config_key;
-                if let Some(value) = app_config.get_value(config_key) {
+                let mut config = if let Some(value) = app_config.get_value(config_key) {
                     <Self as ::serde::Deserialize>::deserialize(value.clone())
                         .unwrap_or_else(|e| {
                             panic!(
@@ -157,7 +157,12 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
                                 stringify!(#struct_name), config_key, e
                             )
                         })
+                };
+                if let Err(e) = <Self as ::tx_di_core::CompInit>::inner_init(&mut config, store) {
+                    panic!("[di] 组件 '{}' 初始化失败: {}", stringify!(#struct_name), e);
                 }
+                ::tracing::debug!("{} build 成功",stringify!(#struct_name));
+                config
             }
         }
     } else {
