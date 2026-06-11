@@ -149,6 +149,20 @@ impl UserRepository for MockUserRepository {
             .any(|u| u.username == username && u.audit.deleted == DeletedStatus::Normal))
     }
 
+    async fn exists_by_email(&self, email: &str) -> AppResult<bool> {
+        let users = self.users.read().unwrap();
+        Ok(users
+            .values()
+            .any(|u| u.email.as_deref() == Some(email) && u.audit.deleted == DeletedStatus::Normal))
+    }
+
+    async fn exists_by_mobile(&self, mobile: &str) -> AppResult<bool> {
+        let users = self.users.read().unwrap();
+        Ok(users
+            .values()
+            .any(|u| u.mobile.as_deref() == Some(mobile) && u.audit.deleted == DeletedStatus::Normal))
+    }
+
     async fn count(&self, _query: &UserQuery) -> AppResult<i64> {
         let users = self.users.read().unwrap();
         Ok(users.values().filter(|u| u.audit.deleted == DeletedStatus::Normal).count() as i64)

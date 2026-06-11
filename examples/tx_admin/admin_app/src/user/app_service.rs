@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use crate::user::dto::*;
-use admin_domain::user::model::value_object::{UserQuery, UserStatus};
+use admin_domain::user::model::value_object::{Sex, UserQuery, UserStatus};
 use admin_domain::user::service::UserService;
+use admin_domain::shared::repository::RepositoryError;
 use tx_error::AppResult;
 use tx_common::page::Page;
 
@@ -22,23 +23,43 @@ impl UserAppService {
         cmd: CreateUserCommand,
         creator: Option<String>,
     ) -> AppResult<UserResponse> {
+        // Check email uniqueness
+        if let Some(ref email) = cmd.email {
+            if self.user_service.exists_by_email(email).await? {
+                return Err(RepositoryError::Duplicate)?;
+            }
+        }
+
+        // Check mobile uniqueness
+        if let Some(ref mobile) = cmd.mobile {
+            if self.user_service.exists_by_mobile(mobile).await? {
+                return Err(RepositoryError::Duplicate)?;
+            }
+        }
+
         let mut user = self
             .user_service
-            .create_user(cmd.username, cmd.password, cmd.nickname, creator)
+            .create_user(cmd.username, cmd.password, cmd.nickname, creator.clone())
             .await?;
 
-        // Set optional fields
-        if let Some(email) = cmd.email {
-            user.email = Some(email);
-        }
-        if let Some(mobile) = cmd.mobile {
-            user.mobile = Some(mobile);
-        }
-        if let Some(sex) = cmd.sex {
-            user.sex = sex;
-        }
-        if let Some(remark) = cmd.remark {
-            user.remark = Some(remark);
+        // Set optional fields and persist to repository
+        if cmd.email.is_some() || cmd.mobile.is_some() || cmd.sex.is_some() || cmd.remark.is_some() {
+            user.email = cmd.email;
+            user.mobile = cmd.mobile;
+            user.sex = cmd.sex.unwrap_or(Sex::Unknown);
+            user.remark = cmd.remark;
+            user = self
+                .user_service
+                .update_user(
+                    user.id,
+                    user.nickname.clone(),
+                    user.email.clone(),
+                    user.mobile.clone(),
+                    user.sex,
+                    user.remark.clone(),
+                    creator.clone(),
+                )
+                .await?;
         }
 
         // Assign roles if provided

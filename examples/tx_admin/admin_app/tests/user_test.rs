@@ -34,10 +34,15 @@ async fn create_user_success() {
         .await
         .unwrap();
     assert_eq!(user.username, "testuser");
-    assert_eq!(user.nickname, "测试用户");
-    assert_eq!(user.email, Some("test@example.com".into()));
-    assert_eq!(user.sex, Sex::Male);
-    assert_eq!(user.status, UserStatus::Active);
+
+    // 回查验证持久化
+    let found = app.get_user(user.id).await.unwrap();
+    assert_eq!(found.username, "testuser");
+    assert_eq!(found.nickname, "测试用户");
+    assert_eq!(found.email, Some("test@example.com".into()));
+    assert_eq!(found.mobile, Some("13800138000".into()));
+    assert_eq!(found.sex, Sex::Male);
+    assert_eq!(found.status, UserStatus::Active);
 }
 
 #[tokio::test]
@@ -61,8 +66,14 @@ async fn create_user_with_roles_and_depts() {
         .await
         .unwrap();
     assert_eq!(user.username, "staff");
-    assert!(!user.role_ids.is_empty());
-    assert!(!user.dept_ids.is_empty());
+
+    // 回查验证角色和部门已持久化
+    let found = app.get_user(user.id).await.unwrap();
+    assert_eq!(found.role_ids.len(), 2);
+    assert!(found.role_ids.contains(&1));
+    assert!(found.role_ids.contains(&2));
+    assert_eq!(found.dept_ids.len(), 1);
+    assert!(found.dept_ids.contains(&100));
 }
 
 #[tokio::test]
@@ -158,24 +169,27 @@ async fn update_user_success() {
         .await
         .unwrap();
 
-    let updated = app
-        .update_user(
-            UpdateUserCommand {
-                user_id: user.id,
-                nickname: "NewName".into(),
-                email: Some("new@example.com".into()),
-                mobile: Some("13800000000".into()),
-                sex: Sex::Female,
-                remark: Some("已更新".into()),
-            },
-            Some("admin".into()),
-        )
-        .await
-        .unwrap();
+    app.update_user(
+        UpdateUserCommand {
+            user_id: user.id,
+            nickname: "NewName".into(),
+            email: Some("new@example.com".into()),
+            mobile: Some("13800000000".into()),
+            sex: Sex::Female,
+            remark: Some("已更新".into()),
+        },
+        Some("admin".into()),
+    )
+    .await
+    .unwrap();
 
-    assert_eq!(updated.nickname, "NewName");
-    assert_eq!(updated.email, Some("new@example.com".into()));
-    assert_eq!(updated.sex, Sex::Female);
+    // 回查验证更新持久化
+    let found = app.get_user(user.id).await.unwrap();
+    assert_eq!(found.nickname, "NewName");
+    assert_eq!(found.email, Some("new@example.com".into()));
+    assert_eq!(found.mobile, Some("13800000000".into()));
+    assert_eq!(found.sex, Sex::Female);
+    assert_eq!(found.remark, Some("已更新".into()));
 }
 
 #[tokio::test]
@@ -255,13 +269,14 @@ async fn change_status_to_disabled() {
         )
         .await
         .unwrap();
-    assert_eq!(user.status, UserStatus::Active);
 
-    let u = app
-        .change_status(user.id, UserStatus::Disabled, Some("admin".into()))
+    app.change_status(user.id, UserStatus::Disabled, Some("admin".into()))
         .await
         .unwrap();
-    assert_eq!(u.status, UserStatus::Disabled);
+
+    // 回查验证状态已持久化
+    let found = app.get_user(user.id).await.unwrap();
+    assert_eq!(found.status, UserStatus::Disabled);
 }
 
 #[tokio::test]
@@ -287,11 +302,13 @@ async fn change_status_to_active_reenable() {
     app.change_status(user.id, UserStatus::Disabled, Some("admin".into()))
         .await
         .unwrap();
-    let u = app
-        .change_status(user.id, UserStatus::Active, Some("admin".into()))
+    app.change_status(user.id, UserStatus::Active, Some("admin".into()))
         .await
         .unwrap();
-    assert_eq!(u.status, UserStatus::Active);
+
+    // 回查验证重新启用已持久化
+    let found = app.get_user(user.id).await.unwrap();
+    assert_eq!(found.status, UserStatus::Active);
 }
 
 #[tokio::test]
@@ -314,11 +331,13 @@ async fn change_status_to_locked() {
         )
         .await
         .unwrap();
-    let u = app
-        .change_status(user.id, UserStatus::Locked, Some("admin".into()))
+    app.change_status(user.id, UserStatus::Locked, Some("admin".into()))
         .await
         .unwrap();
-    assert_eq!(u.status, UserStatus::Locked);
+
+    // 回查验证锁定已持久化
+    let found = app.get_user(user.id).await.unwrap();
+    assert_eq!(found.status, UserStatus::Locked);
 }
 
 // ── 1.4 角色分配 ───────────────────────────────────────────────────────────
@@ -350,6 +369,13 @@ async fn assign_roles_to_user() {
     })
     .await
     .unwrap();
+
+    // 回查验证角色已持久化
+    let found = app.get_user(user.id).await.unwrap();
+    assert_eq!(found.role_ids.len(), 3);
+    assert!(found.role_ids.contains(&1));
+    assert!(found.role_ids.contains(&2));
+    assert!(found.role_ids.contains(&3));
 }
 
 #[tokio::test]
@@ -379,6 +405,10 @@ async fn assign_roles_empty_should_clear() {
     })
     .await
     .unwrap();
+
+    // 回查验证角色已清空
+    let found = app.get_user(user.id).await.unwrap();
+    assert!(found.role_ids.is_empty());
 }
 
 // ── 1.5 部门分配 ───────────────────────────────────────────────────────────
@@ -410,6 +440,12 @@ async fn assign_departments_to_user() {
     })
     .await
     .unwrap();
+
+    // 回查验证部门已持久化
+    let found = app.get_user(user.id).await.unwrap();
+    assert_eq!(found.dept_ids.len(), 2);
+    assert!(found.dept_ids.contains(&100));
+    assert!(found.dept_ids.contains(&200));
 }
 
 #[tokio::test]
@@ -439,6 +475,10 @@ async fn assign_departments_empty_should_clear() {
     })
     .await
     .unwrap();
+
+    // 回查验证部门已清空
+    let found = app.get_user(user.id).await.unwrap();
+    assert!(found.dept_ids.is_empty());
 }
 
 // ── 1.7 用户查询（分页 & 筛选）────────────────────────────────────────────

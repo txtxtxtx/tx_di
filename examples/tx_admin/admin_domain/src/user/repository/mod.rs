@@ -35,6 +35,12 @@ pub trait UserRepository: Send + Sync {
     /// Check if username exists
     async fn exists_by_username(&self, username: &str) -> AppResult<bool>;
 
+    /// Check if email exists
+    async fn exists_by_email(&self, email: &str) -> AppResult<bool>;
+
+    /// Check if mobile exists
+    async fn exists_by_mobile(&self, mobile: &str) -> AppResult<bool>;
+
     /// Count users
     async fn count(&self, query: &UserQuery) -> AppResult<i64>;
 

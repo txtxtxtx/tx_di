@@ -31,6 +31,16 @@ impl UserService {
         }
     }
 
+    /// Check if email already exists
+    pub async fn exists_by_email(&self, email: &str) -> AppResult<bool> {
+        self.user_repo.exists_by_email(email).await
+    }
+
+    /// Check if mobile already exists
+    pub async fn exists_by_mobile(&self, mobile: &str) -> AppResult<bool> {
+        self.user_repo.exists_by_mobile(mobile).await
+    }
+
     /// Create a new user
     pub async fn create_user(
         &self,
@@ -167,12 +177,16 @@ impl UserService {
         self.user_repo.find_page(query, page).await
     }
 
-    /// Get user by ID
+    /// Get user by ID (includes role and department associations)
     pub async fn get_user(&self, user_id: u64) -> AppResult<User> {
-        Ok(self.user_repo
+        let mut user = self
+            .user_repo
             .find_by_id(user_id)
             .await?
-            .ok_or_else(|| NotFound)?)
+            .ok_or_else(|| NotFound)?;
+        user.role_ids = self.user_repo.get_role_ids(user.id).await?;
+        user.dept_ids = self.user_repo.get_dept_ids(user.id).await?;
+        Ok(user)
     }
 
     /// Build login user info (for auth)
