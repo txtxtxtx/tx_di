@@ -1,5 +1,9 @@
+pub mod value_object;
+
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use crate::shared::model::value_object::DeletedStatus;
+use crate::user::model::value_object::UserStatus;
 
 /// Base trait for all entities
 pub trait Entity {
@@ -24,7 +28,7 @@ pub enum DomainEvent {
     UserCreated { user_id: u64, username: String },
     UserUpdated { user_id: u64 },
     UserDeleted { user_id: u64 },
-    UserStatusChanged { user_id: u64, status: i32 },
+    UserStatusChanged { user_id: u64, status: UserStatus },
     UserPasswordChanged { user_id: u64 },
     UserLoggedIn { user_id: u64, ip: String },
 
@@ -73,9 +77,21 @@ pub struct AuditFields {
     pub create_time: DateTime<Utc>,
     pub updater: Option<String>,
     pub update_time: DateTime<Utc>,
-    pub deleted: i32,
+    pub deleted: DeletedStatus,
 }
 
+impl AuditFields {
+    pub fn is_deleted(&self) -> bool {
+        self.deleted == DeletedStatus::Deleted
+    }
+
+    pub fn delete(&mut self,updater: Option<String>) {
+    // 将deleted字段设置为DeletedStatus::Deleted，表示对象已被删除
+        self.deleted = DeletedStatus::Deleted;
+        self.updater = updater;
+        self.update_time = Utc::now();
+    }
+}
 impl Default for AuditFields {
     fn default() -> Self {
         let now = Utc::now();
@@ -84,7 +100,7 @@ impl Default for AuditFields {
             create_time: now,
             updater: None,
             update_time: now,
-            deleted: 0,
+            deleted: DeletedStatus::default(),
         }
     }
 }

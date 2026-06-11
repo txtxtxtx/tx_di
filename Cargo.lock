@@ -33,6 +33,7 @@ dependencies = [
  "chrono",
  "serde",
  "serde_json",
+ "serde_repr",
  "tx_common",
  "tx_error",
 ]

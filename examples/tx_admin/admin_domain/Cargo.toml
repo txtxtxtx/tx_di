@@ -15,5 +15,6 @@ admin_macros = {path = "../admin_macros"}
 
 async-trait.workspace = true
 serde.workspace = true
+serde_repr.workspace = true
 serde_json.workspace = true
 chrono.workspace = true

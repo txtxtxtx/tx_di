@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 /// User query filters
 /// 用户查询结构体，用于封装用户查询相关的参数
@@ -68,4 +69,29 @@ pub struct LoginUser {
     pub permissions: HashSet<String>,
     /// 部门ID列表，使用Vec<u64>类型存储
     pub dept_ids: Vec<u64>,
+}
+
+/// 用户状态
+#[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(i32)]
+pub enum UserStatus {
+    /// 用户状态：激活
+    #[default]
+    Active = 0,
+    /// 用户状态：禁用
+    Disabled = 1,
+    /// 用户状态：锁定
+    Locked = 2,
+}
+
+#[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(i32)]
+pub enum Sex {
+    /// 性别：未知
+    #[default]
+    Unknown = 0,
+    /// 性别：男
+    Male = 1,
+    /// 性别：女
+    Female = 2,
 }
