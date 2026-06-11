@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use admin_domain::user::model::value_object::{Sex, UserStatus};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateUserCommand {
@@ -7,7 +8,7 @@ pub struct CreateUserCommand {
     pub nickname: String,
     pub email: Option<String>,
     pub mobile: Option<String>,
-    pub sex: Option<i32>,
+    pub sex: Option<Sex>,
     pub remark: Option<String>,
     pub role_ids: Option<Vec<u64>>,
     pub dept_ids: Option<Vec<u64>>,
@@ -19,7 +20,7 @@ pub struct UpdateUserCommand {
     pub nickname: String,
     pub email: Option<String>,
     pub mobile: Option<String>,
-    pub sex: i32,
+    pub sex: Sex,
     pub remark: Option<String>,
 }
 
@@ -46,7 +47,7 @@ pub struct UserQueryRequest {
     pub username: Option<String>,
     pub nickname: Option<String>,
     pub mobile: Option<String>,
-    pub status: Option<i32>,
+    pub status: Option<UserStatus>,
     pub dept_id: Option<u64>,
     pub page: i64,
     pub page_size: i64,
@@ -59,8 +60,8 @@ pub struct UserResponse {
     pub nickname: String,
     pub email: Option<String>,
     pub mobile: Option<String>,
-    pub sex: i32,
-    pub status: i32,
+    pub sex: Sex,
+    pub status: UserStatus,
     pub remark: Option<String>,
     pub role_ids: Vec<u64>,
     pub dept_ids: Vec<u64>,

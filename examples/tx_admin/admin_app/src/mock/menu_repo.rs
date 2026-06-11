@@ -6,6 +6,7 @@ use admin_domain::menu::model::aggregate::Menu;
 use admin_domain::menu::model::value_object::MenuQuery;
 use admin_domain::menu::repository::MenuRepository;
 use admin_domain::shared::repository::RepositoryError;
+use admin_domain::shared::model::value_object::DeletedStatus;
 use tx_error::AppResult;
 
 pub struct MockMenuRepository {
@@ -38,14 +39,14 @@ impl Default for MockMenuRepository {
 impl MenuRepository for MockMenuRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Menu>> {
         let menus = self.menus.read().unwrap();
-        Ok(menus.get(&id).filter(|m| m.audit.deleted == 0).cloned())
+        Ok(menus.get(&id).filter(|m| m.audit.deleted == DeletedStatus::Normal).cloned())
     }
 
     async fn find_all(&self, query: &MenuQuery) -> AppResult<Vec<Menu>> {
         let menus = self.menus.read().unwrap();
         Ok(menus
             .values()
-            .filter(|m| m.audit.deleted == 0)
+            .filter(|m| m.audit.deleted == DeletedStatus::Normal)
             .filter(|m| {
                 if let Some(ref name) = query.name {
                     if !m.name.contains(name.as_str()) {
@@ -73,7 +74,7 @@ impl MenuRepository for MockMenuRepository {
         Ok(ids
             .iter()
             .filter_map(|id| menus.get(id))
-            .filter(|m| m.audit.deleted == 0)
+            .filter(|m| m.audit.deleted == DeletedStatus::Normal)
             .cloned()
             .collect())
     }
@@ -82,7 +83,7 @@ impl MenuRepository for MockMenuRepository {
         let menus = self.menus.read().unwrap();
         Ok(menus
             .values()
-            .filter(|m| m.parent_id == parent_id && m.audit.deleted == 0)
+            .filter(|m| m.parent_id == parent_id && m.audit.deleted == DeletedStatus::Normal)
             .cloned()
             .collect())
     }
@@ -102,7 +103,7 @@ impl MenuRepository for MockMenuRepository {
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut menus = self.menus.write().unwrap();
         if let Some(menu) = menus.get_mut(&id) {
-            menu.audit.deleted = 1;
+            menu.audit.deleted = DeletedStatus::Deleted;
             Ok(())
         } else {
             Err(RepositoryError::NotFound)?
@@ -113,6 +114,6 @@ impl MenuRepository for MockMenuRepository {
         let menus = self.menus.read().unwrap();
         Ok(menus
             .values()
-            .any(|m| m.parent_id == parent_id && m.audit.deleted == 0))
+            .any(|m| m.parent_id == parent_id && m.audit.deleted == DeletedStatus::Normal))
     }
 }

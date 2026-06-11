@@ -3,6 +3,7 @@ use tx_common::id;
 use tx_error::AppResult;
 use crate::shared::repository::RepositoryError;
 use crate::department::model::aggregate::Department;
+use crate::shared::model::value_object::DeletedStatus;
 use crate::department::model::value_object::{DeptQuery, DeptTreeNode};
 use crate::department::repository::DepartmentRepository;
 use crate::shared::repository::RepositoryError::NotFound;
@@ -97,7 +98,7 @@ impl DepartmentService {
     fn build_tree(depts: &[Department], parent_id: u64) -> Vec<DeptTreeNode> {
         depts
             .iter()
-            .filter(|d| d.parent_id == parent_id && d.audit.deleted == 0)
+            .filter(|d| d.parent_id == parent_id && d.audit.deleted == DeletedStatus::Normal)
             .map(|d| DeptTreeNode {
                 id: d.id,
                 name: d.name.clone(),

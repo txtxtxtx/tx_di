@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::user::dto::*;
-use admin_domain::user::model::value_object::UserQuery;
+use admin_domain::user::model::value_object::{UserQuery, UserStatus};
 use admin_domain::user::service::UserService;
 use tx_error::AppResult;
 use tx_common::page::Page;
@@ -90,7 +90,7 @@ impl UserAppService {
     pub async fn change_status(
         &self,
         user_id: u64,
-        status: i32,
+        status: UserStatus,
         updater: Option<String>,
     ) -> AppResult<UserResponse> {
         let user = self.user_service.change_status(user_id, status, updater).await?;

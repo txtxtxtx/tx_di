@@ -2,6 +2,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent, Entity};
+use crate::shared::model::value_object::DeletedStatus;
 
 /// Dictionary type aggregate root
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,7 +53,7 @@ impl DictType {
                 create_time: Utc::now(),
                 updater: creator,
                 update_time: Utc::now(),
-                deleted: 0,
+                deleted: DeletedStatus::Normal,
             },
             events: Vec::new(),
         };
@@ -76,7 +77,7 @@ impl DictType {
     }
 
     pub fn soft_delete(&mut self, updater: Option<String>) {
-        self.audit.deleted = 1;
+        self.audit.deleted = DeletedStatus::Deleted;
         self.audit.updater = updater;
         self.audit.update_time = Utc::now();
         self.add_event(DomainEvent::DictTypeDeleted { dict_type_id: self.id });
@@ -142,7 +143,7 @@ impl DictData {
                 create_time: Utc::now(),
                 updater: creator,
                 update_time: Utc::now(),
-                deleted: 0,
+                deleted: DeletedStatus::Normal,
             },
             events: Vec::new(),
         };
@@ -180,7 +181,7 @@ impl DictData {
     }
 
     pub fn soft_delete(&mut self, updater: Option<String>) {
-        self.audit.deleted = 1;
+        self.audit.deleted = DeletedStatus::Deleted;
         self.audit.updater = updater;
         self.audit.update_time = Utc::now();
         self.add_event(DomainEvent::DictDataDeleted { dict_data_id: self.id });

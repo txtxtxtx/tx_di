@@ -6,6 +6,7 @@ use admin_domain::role::model::aggregate::Role;
 use admin_domain::role::model::value_object::RoleQuery;
 use admin_domain::role::repository::RoleRepository;
 use admin_domain::shared::repository::RepositoryError;
+use admin_domain::shared::model::value_object::DeletedStatus;
 use tx_common::page::Page;
 use tx_error::AppResult;
 
@@ -41,14 +42,14 @@ impl Default for MockRoleRepository {
 impl RoleRepository for MockRoleRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Role>> {
         let roles = self.roles.read().unwrap();
-        Ok(roles.get(&id).filter(|r| r.audit.deleted == 0).cloned())
+        Ok(roles.get(&id).filter(|r| r.audit.deleted == DeletedStatus::Normal).cloned())
     }
 
     async fn find_by_code(&self, code: &str) -> AppResult<Option<Role>> {
         let roles = self.roles.read().unwrap();
         Ok(roles
             .values()
-            .find(|r| r.code == code && r.audit.deleted == 0)
+            .find(|r| r.code == code && r.audit.deleted == DeletedStatus::Normal)
             .cloned())
     }
 
@@ -57,7 +58,7 @@ impl RoleRepository for MockRoleRepository {
         Ok(ids
             .iter()
             .filter_map(|id| roles.get(id))
-            .filter(|r| r.audit.deleted == 0)
+            .filter(|r| r.audit.deleted == DeletedStatus::Normal)
             .cloned()
             .collect())
     }
@@ -70,7 +71,7 @@ impl RoleRepository for MockRoleRepository {
         let roles = self.roles.read().unwrap();
         let filtered: Vec<Role> = roles
             .values()
-            .filter(|r| r.audit.deleted == 0)
+            .filter(|r| r.audit.deleted == DeletedStatus::Normal)
             .filter(|r| {
                 if let Some(ref name) = query.name {
                     if !r.name.contains(name.as_str()) {
@@ -102,7 +103,7 @@ impl RoleRepository for MockRoleRepository {
         let roles = self.roles.read().unwrap();
         Ok(roles
             .values()
-            .filter(|r| r.audit.deleted == 0)
+            .filter(|r| r.audit.deleted == DeletedStatus::Normal)
             .filter(|r| {
                 if let Some(status) = query.status {
                     if r.status != status {
@@ -130,7 +131,7 @@ impl RoleRepository for MockRoleRepository {
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut roles = self.roles.write().unwrap();
         if let Some(role) = roles.get_mut(&id) {
-            role.audit.deleted = 1;
+            role.audit.deleted = DeletedStatus::Deleted;
             Ok(())
         } else {
             Err(RepositoryError::NotFound)?
@@ -141,7 +142,7 @@ impl RoleRepository for MockRoleRepository {
         let roles = self.roles.read().unwrap();
         Ok(roles
             .values()
-            .any(|r| r.code == code && r.audit.deleted == 0))
+            .any(|r| r.code == code && r.audit.deleted == DeletedStatus::Normal))
     }
 
     async fn bind_menus(&self, role_id: u64, menu_ids: &[u64]) -> AppResult<()> {

@@ -6,6 +6,7 @@ use admin_domain::dictionary::model::aggregate::{DictData, DictType};
 use admin_domain::dictionary::model::value_object::{DictDataQuery, DictTypeQuery};
 use admin_domain::dictionary::repository::{DictDataRepository, DictTypeRepository};
 use admin_domain::shared::repository::RepositoryError;
+use admin_domain::shared::model::value_object::DeletedStatus;
 use tx_common::page::Page;
 use tx_error::AppResult;
 
@@ -31,14 +32,14 @@ impl Default for MockDictTypeRepository {
 impl DictTypeRepository for MockDictTypeRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<DictType>> {
         let dict_types = self.dict_types.read().unwrap();
-        Ok(dict_types.get(&id).filter(|d| d.audit.deleted == 0).cloned())
+        Ok(dict_types.get(&id).filter(|d| d.audit.deleted == DeletedStatus::Normal).cloned())
     }
 
     async fn find_by_type(&self, dict_type: &str) -> AppResult<Option<DictType>> {
         let dict_types = self.dict_types.read().unwrap();
         Ok(dict_types
             .values()
-            .find(|d| d.dict_type == dict_type && d.audit.deleted == 0)
+            .find(|d| d.dict_type == dict_type && d.audit.deleted == DeletedStatus::Normal)
             .cloned())
     }
 
@@ -50,7 +51,7 @@ impl DictTypeRepository for MockDictTypeRepository {
         let dict_types = self.dict_types.read().unwrap();
         let filtered: Vec<DictType> = dict_types
             .values()
-            .filter(|d| d.audit.deleted == 0)
+            .filter(|d| d.audit.deleted == DeletedStatus::Normal)
             .filter(|d| {
                 if let Some(ref name) = query.name {
                     if !d.name.contains(name.as_str()) {
@@ -82,7 +83,7 @@ impl DictTypeRepository for MockDictTypeRepository {
         let dict_types = self.dict_types.read().unwrap();
         Ok(dict_types
             .values()
-            .filter(|d| d.audit.deleted == 0)
+            .filter(|d| d.audit.deleted == DeletedStatus::Normal)
             .filter(|d| {
                 if let Some(status) = query.status {
                     if d.status != status {
@@ -110,7 +111,7 @@ impl DictTypeRepository for MockDictTypeRepository {
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut dict_types = self.dict_types.write().unwrap();
         if let Some(dt) = dict_types.get_mut(&id) {
-            dt.audit.deleted = 1;
+            dt.audit.deleted = DeletedStatus::Deleted;
             Ok(())
         } else {
             Err(RepositoryError::NotFound)?
@@ -121,7 +122,7 @@ impl DictTypeRepository for MockDictTypeRepository {
         let dict_types = self.dict_types.read().unwrap();
         Ok(dict_types
             .values()
-            .any(|d| d.dict_type == dict_type && d.audit.deleted == 0))
+            .any(|d| d.dict_type == dict_type && d.audit.deleted == DeletedStatus::Normal))
     }
 }
 
@@ -147,14 +148,14 @@ impl Default for MockDictDataRepository {
 impl DictDataRepository for MockDictDataRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<DictData>> {
         let dict_data = self.dict_data.read().unwrap();
-        Ok(dict_data.get(&id).filter(|d| d.audit.deleted == 0).cloned())
+        Ok(dict_data.get(&id).filter(|d| d.audit.deleted == DeletedStatus::Normal).cloned())
     }
 
     async fn find_by_type(&self, dict_type: &str) -> AppResult<Vec<DictData>> {
         let dict_data = self.dict_data.read().unwrap();
         Ok(dict_data
             .values()
-            .filter(|d| d.dict_type == dict_type && d.audit.deleted == 0)
+            .filter(|d| d.dict_type == dict_type && d.audit.deleted == DeletedStatus::Normal)
             .cloned()
             .collect())
     }
@@ -167,7 +168,7 @@ impl DictDataRepository for MockDictDataRepository {
         let dict_data = self.dict_data.read().unwrap();
         let filtered: Vec<DictData> = dict_data
             .values()
-            .filter(|d| d.audit.deleted == 0)
+            .filter(|d| d.audit.deleted == DeletedStatus::Normal)
             .filter(|d| {
                 if let Some(ref dict_type) = query.dict_type {
                     if d.dict_type != *dict_type {
@@ -215,7 +216,7 @@ impl DictDataRepository for MockDictDataRepository {
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut dict_data = self.dict_data.write().unwrap();
         if let Some(dd) = dict_data.get_mut(&id) {
-            dd.audit.deleted = 1;
+            dd.audit.deleted = DeletedStatus::Deleted;
             Ok(())
         } else {
             Err(RepositoryError::NotFound)?

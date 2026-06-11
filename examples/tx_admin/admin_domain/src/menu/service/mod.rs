@@ -3,6 +3,7 @@ use tx_common::id;
 use tx_error::AppResult;
 use crate::shared::repository::RepositoryError;
 use crate::menu::model::aggregate::Menu;
+use crate::shared::model::value_object::DeletedStatus;
 use crate::menu::model::value_object::{MenuQuery, MenuTreeNode};
 use crate::menu::repository::MenuRepository;
 use crate::shared::repository::RepositoryError::NotFound;
@@ -118,7 +119,7 @@ impl MenuService {
     fn build_tree(menus: &[Menu], parent_id: u64) -> Vec<MenuTreeNode> {
         menus
             .iter()
-            .filter(|m| m.parent_id == parent_id && m.audit.deleted == 0)
+            .filter(|m| m.parent_id == parent_id && m.audit.deleted == DeletedStatus::Normal)
             .map(|m| MenuTreeNode {
                 id: m.id,
                 name: m.name.clone(),

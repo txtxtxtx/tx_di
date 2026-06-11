@@ -4,7 +4,7 @@ use tx_common::page::Page;
 use tx_error::AppResult;
 use crate::shared::repository::RepositoryError;
 use crate::user::model::aggregate::User;
-use crate::user::model::value_object::{LoginUser, UserQuery};
+use crate::user::model::value_object::{LoginUser, Sex, UserQuery, UserStatus};
 use crate::user::repository::UserRepository;
 use crate::permission::repository::PermissionRepository;
 use crate::shared::repository::RepositoryError::NotFound;
@@ -57,7 +57,7 @@ impl UserService {
         nickname: String,
         email: Option<String>,
         mobile: Option<String>,
-        sex: i32,
+        sex: Sex,
         remark: Option<String>,
         updater: Option<String>,
     ) -> AppResult<User> {
@@ -93,7 +93,7 @@ impl UserService {
     pub async fn change_status(
         &self,
         user_id: u64,
-        status: i32,
+        status: UserStatus,
         updater: Option<String>,
     ) -> AppResult<User> {
         let mut user = self

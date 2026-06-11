@@ -29,6 +29,7 @@ use admin_domain::config::service::ConfigService;
 use admin_domain::dictionary::service::{DictDataService, DictTypeService};
 use admin_domain::permission::service::PermissionService;
 use admin_domain::user::model::aggregate::User;
+use admin_domain::user::model::value_object::{Sex, UserStatus};
 use admin_domain::role::model::aggregate::Role;
 use admin_domain::menu::model::aggregate::Menu;
 use admin_domain::department::model::aggregate::Department;
@@ -100,7 +101,7 @@ async fn test_create_user() {
         nickname: "Test User".to_string(),
         email: Some("test@example.com".to_string()),
         mobile: Some("13800138000".to_string()),
-        sex: Some(1),
+        sex: Some(Sex::Male),
         remark: None,
         role_ids: None,
         dept_ids: None,
@@ -114,7 +115,7 @@ async fn test_create_user() {
     assert_eq!(user.nickname, "Test User");
     assert_eq!(user.email, Some("test@example.com".to_string()));
     assert_eq!(user.mobile, Some("13800138000".to_string()));
-    assert_eq!(user.sex, 1);
+    assert_eq!(user.sex, Sex::Male);
 }
 
 #[tokio::test]
@@ -181,7 +182,7 @@ async fn test_update_user() {
         nickname: "Updated User".to_string(),
         email: Some("updated@example.com".to_string()),
         mobile: Some("13900139000".to_string()),
-        sex: 2,
+        sex: Sex::Female,
         remark: Some("Updated remark".to_string()),
     };
 
@@ -191,7 +192,7 @@ async fn test_update_user() {
     let updated = result.unwrap();
     assert_eq!(updated.nickname, "Updated User");
     assert_eq!(updated.email, Some("updated@example.com".to_string()));
-    assert_eq!(updated.sex, 2);
+    assert_eq!(updated.sex, Sex::Female);
 }
 
 #[tokio::test]
@@ -242,12 +243,12 @@ async fn test_change_user_status() {
     };
 
     let user = app_service.create_user(create_cmd, Some("admin".to_string())).await.unwrap();
-    assert_eq!(user.status, 0); // Active
+    assert_eq!(user.status, UserStatus::Active); // Active
 
     // Change to disabled
-    let result = app_service.change_status(user.id, 1, Some("admin".to_string())).await;
+    let result = app_service.change_status(user.id, UserStatus::Disabled, Some("admin".to_string())).await;
     assert!(result.is_ok());
-    assert_eq!(result.unwrap().status, 1);
+    assert_eq!(result.unwrap().status, UserStatus::Disabled);
 }
 
 #[tokio::test]
@@ -1028,7 +1029,7 @@ async fn test_login_nonexistent_user() {
 #[tokio::test]
 async fn test_login_disabled_user() {
     let mut user = User::create(1, "admin".to_string(), "password123".to_string(), "管理员".to_string(), None);
-    user.change_status(1, None); // Disable user
+    user.change_status(UserStatus::Disabled, None); // Disable user
 
     let user_repo = Arc::new(
         user_repo::MockUserRepository::new()
@@ -1113,7 +1114,7 @@ async fn test_full_workflow() {
             nickname: "张三".to_string(),
             email: Some("zhangsan@example.com".to_string()),
             mobile: Some("13800138001".to_string()),
-            sex: Some(1),
+            sex: Some(Sex::Male),
             remark: None,
             role_ids: Some(vec![admin_role.id]),
             dept_ids: Some(vec![tech_dept.id]),

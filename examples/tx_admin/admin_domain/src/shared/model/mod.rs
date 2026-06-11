@@ -100,7 +100,7 @@ impl Default for AuditFields {
             create_time: now,
             updater: None,
             update_time: now,
-            deleted: DeletedStatus::default(),
+            deleted: DeletedStatus::Normal,
         }
     }
 }

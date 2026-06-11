@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use admin_domain::shared::model::value_object::TenantId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoginCommand {
@@ -12,7 +13,7 @@ pub struct LoginResponse {
     pub user_id: u64,
     pub username: String,
     pub nickname: String,
-    pub tenant_id: i32,
+    pub tenant_id: TenantId,
     pub role_ids: Vec<u64>,
     pub permissions: Vec<String>,
     pub dept_ids: Vec<u64>,

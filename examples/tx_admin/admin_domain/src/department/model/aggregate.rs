@@ -2,6 +2,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent};
+use crate::shared::model::value_object::DeletedStatus;
 use crate::AggregateRoot;
 
 /// Department aggregate root
@@ -44,7 +45,7 @@ impl Department {
                 create_time: Utc::now(),
                 updater: creator,
                 update_time: Utc::now(),
-                deleted: 0,
+                deleted: DeletedStatus::Normal,
             },
             children: Vec::new(),
             events: Vec::new(),
@@ -81,7 +82,7 @@ impl Department {
     }
 
     pub fn soft_delete(&mut self, updater: Option<String>) {
-        self.audit.deleted = 1;
+        self.audit.deleted = DeletedStatus::Deleted;
         self.audit.updater = updater;
         self.audit.update_time = Utc::now();
         self.add_event(DomainEvent::DepartmentDeleted { dept_id: self.id });

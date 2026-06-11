@@ -2,6 +2,7 @@ use chrono::Utc; // 引入时间处理库
 use serde::{Deserialize, Serialize}; // 引入序列化和反序列化库
 
 use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent}; // 引入共享模块中的模型定义
+use crate::shared::model::value_object::DeletedStatus;
 use crate::AggregateRoot;
 
 /// Role aggregate root
@@ -59,7 +60,7 @@ impl Role {
                 create_time: Utc::now(),
                 updater: creator,
                 update_time: Utc::now(),
-                deleted: 0,
+                deleted: DeletedStatus::Normal,
             },
             menu_ids: Vec::new(),
             events: Vec::new(),
@@ -104,7 +105,7 @@ impl Role {
 
     /// Soft delete
     pub fn soft_delete(&mut self, updater: Option<String>) {
-        self.audit.deleted = 1;
+        self.audit.deleted = DeletedStatus::Deleted;
         self.audit.updater = updater;
         self.audit.update_time = Utc::now();
         self.add_event(DomainEvent::RoleDeleted { role_id: self.id });
@@ -112,6 +113,6 @@ impl Role {
 
     /// Check if role is active
     pub fn is_active(&self) -> bool {
-        self.status == 0 && self.audit.deleted == 0
+        self.status == 0 && self.audit.deleted == DeletedStatus::Normal
     }
 }

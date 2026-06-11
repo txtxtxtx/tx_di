@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use admin_domain::user::model::aggregate::User;
 use admin_domain::user::model::value_object::UserQuery;
 use admin_domain::user::repository::UserRepository;
+use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::repository::RepositoryError;
 use tx_common::page::Page;
 use tx_error::AppResult;
@@ -44,14 +45,14 @@ impl Default for MockUserRepository {
 impl UserRepository for MockUserRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<User>> {
         let users = self.users.read().unwrap();
-        Ok(users.get(&id).filter(|u| u.audit.deleted == 0).cloned())
+        Ok(users.get(&id).filter(|u| u.audit.deleted == DeletedStatus::Normal).cloned())
     }
 
     async fn find_by_username(&self, username: &str) -> AppResult<Option<User>> {
         let users = self.users.read().unwrap();
         Ok(users
             .values()
-            .find(|u| u.username == username && u.audit.deleted == 0)
+            .find(|u| u.username == username && u.audit.deleted == DeletedStatus::Normal)
             .cloned())
     }
 
@@ -63,7 +64,7 @@ impl UserRepository for MockUserRepository {
         let users = self.users.read().unwrap();
         let filtered: Vec<User> = users
             .values()
-            .filter(|u| u.audit.deleted == 0)
+            .filter(|u| u.audit.deleted == DeletedStatus::Normal)
             .filter(|u| {
                 if let Some(ref username) = query.username {
                     if !u.username.contains(username.as_str()) {
@@ -100,7 +101,7 @@ impl UserRepository for MockUserRepository {
         let users = self.users.read().unwrap();
         Ok(users
             .values()
-            .filter(|u| u.audit.deleted == 0)
+            .filter(|u| u.audit.deleted == DeletedStatus::Normal)
             .filter(|u| {
                 if let Some(status) = query.status {
                     if u.status != status {
@@ -134,7 +135,7 @@ impl UserRepository for MockUserRepository {
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut users = self.users.write().unwrap();
         if let Some(user) = users.get_mut(&id) {
-            user.audit.deleted = 1;
+            user.audit.deleted = DeletedStatus::Deleted;
             Ok(())
         } else {
             Err(RepositoryError::NotFound)?
@@ -145,12 +146,12 @@ impl UserRepository for MockUserRepository {
         let users = self.users.read().unwrap();
         Ok(users
             .values()
-            .any(|u| u.username == username && u.audit.deleted == 0))
+            .any(|u| u.username == username && u.audit.deleted == DeletedStatus::Normal))
     }
 
     async fn count(&self, _query: &UserQuery) -> AppResult<i64> {
         let users = self.users.read().unwrap();
-        Ok(users.values().filter(|u| u.audit.deleted == 0).count() as i64)
+        Ok(users.values().filter(|u| u.audit.deleted == DeletedStatus::Normal).count() as i64)
     }
 
     async fn find_by_role_id(&self, role_id: u64) -> AppResult<Vec<User>> {
@@ -165,7 +166,7 @@ impl UserRepository for MockUserRepository {
         Ok(user_ids
             .iter()
             .filter_map(|id| users.get(id))
-            .filter(|u| u.audit.deleted == 0)
+            .filter(|u| u.audit.deleted == DeletedStatus::Normal)
             .cloned()
             .collect())
     }
@@ -182,7 +183,7 @@ impl UserRepository for MockUserRepository {
         Ok(user_ids
             .iter()
             .filter_map(|id| users.get(id))
-            .filter(|u| u.audit.deleted == 0)
+            .filter(|u| u.audit.deleted == DeletedStatus::Normal)
             .cloned()
             .collect())
     }

@@ -6,6 +6,7 @@ use admin_domain::config::model::aggregate::Config;
 use admin_domain::config::model::value_object::ConfigQuery;
 use admin_domain::config::repository::ConfigRepository;
 use admin_domain::shared::repository::RepositoryError;
+use admin_domain::shared::model::value_object::DeletedStatus;
 use tx_common::page::Page;
 use tx_error::AppResult;
 
@@ -31,14 +32,14 @@ impl Default for MockConfigRepository {
 impl ConfigRepository for MockConfigRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Config>> {
         let configs = self.configs.read().unwrap();
-        Ok(configs.get(&id).filter(|c| c.audit.deleted == 0).cloned())
+        Ok(configs.get(&id).filter(|c| c.audit.deleted == DeletedStatus::Normal).cloned())
     }
 
     async fn find_by_key(&self, key: &str) -> AppResult<Option<Config>> {
         let configs = self.configs.read().unwrap();
         Ok(configs
             .values()
-            .find(|c| c.config_key == key && c.audit.deleted == 0)
+            .find(|c| c.config_key == key && c.audit.deleted == DeletedStatus::Normal)
             .cloned())
     }
 
@@ -50,7 +51,7 @@ impl ConfigRepository for MockConfigRepository {
         let configs = self.configs.read().unwrap();
         let filtered: Vec<Config> = configs
             .values()
-            .filter(|c| c.audit.deleted == 0)
+            .filter(|c| c.audit.deleted == DeletedStatus::Normal)
             .filter(|c| {
                 if let Some(ref name) = query.name {
                     if !c.name.contains(name.as_str()) {
@@ -82,7 +83,7 @@ impl ConfigRepository for MockConfigRepository {
         let configs = self.configs.read().unwrap();
         Ok(configs
             .values()
-            .filter(|c| c.audit.deleted == 0)
+            .filter(|c| c.audit.deleted == DeletedStatus::Normal)
             .filter(|c| {
                 if let Some(ref category) = query.category {
                     if c.category != *category {
@@ -110,7 +111,7 @@ impl ConfigRepository for MockConfigRepository {
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut configs = self.configs.write().unwrap();
         if let Some(config) = configs.get_mut(&id) {
-            config.audit.deleted = 1;
+            config.audit.deleted = DeletedStatus::Deleted;
             Ok(())
         } else {
             Err(RepositoryError::NotFound)?
@@ -121,6 +122,6 @@ impl ConfigRepository for MockConfigRepository {
         let configs = self.configs.read().unwrap();
         Ok(configs
             .values()
-            .any(|c| c.config_key == key && c.audit.deleted == 0))
+            .any(|c| c.config_key == key && c.audit.deleted == DeletedStatus::Normal))
     }
 }

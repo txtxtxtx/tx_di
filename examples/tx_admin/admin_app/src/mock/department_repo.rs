@@ -6,6 +6,7 @@ use admin_domain::department::model::aggregate::Department;
 use admin_domain::department::model::value_object::DeptQuery;
 use admin_domain::department::repository::DepartmentRepository;
 use admin_domain::shared::repository::RepositoryError;
+use admin_domain::shared::model::value_object::DeletedStatus;
 use tx_error::AppResult;
 
 pub struct MockDepartmentRepository {
@@ -40,14 +41,14 @@ impl Default for MockDepartmentRepository {
 impl DepartmentRepository for MockDepartmentRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Department>> {
         let depts = self.depts.read().unwrap();
-        Ok(depts.get(&id).filter(|d| d.audit.deleted == 0).cloned())
+        Ok(depts.get(&id).filter(|d| d.audit.deleted == DeletedStatus::Normal).cloned())
     }
 
     async fn find_all(&self, query: &DeptQuery) -> AppResult<Vec<Department>> {
         let depts = self.depts.read().unwrap();
         Ok(depts
             .values()
-            .filter(|d| d.audit.deleted == 0)
+            .filter(|d| d.audit.deleted == DeletedStatus::Normal)
             .filter(|d| {
                 if let Some(ref name) = query.name {
                     if !d.name.contains(name.as_str()) {
@@ -70,7 +71,7 @@ impl DepartmentRepository for MockDepartmentRepository {
         Ok(ids
             .iter()
             .filter_map(|id| depts.get(id))
-            .filter(|d| d.audit.deleted == 0)
+            .filter(|d| d.audit.deleted == DeletedStatus::Normal)
             .cloned()
             .collect())
     }
@@ -79,7 +80,7 @@ impl DepartmentRepository for MockDepartmentRepository {
         let depts = self.depts.read().unwrap();
         Ok(depts
             .values()
-            .filter(|d| d.parent_id == parent_id && d.audit.deleted == 0)
+            .filter(|d| d.parent_id == parent_id && d.audit.deleted == DeletedStatus::Normal)
             .cloned()
             .collect())
     }
@@ -99,7 +100,7 @@ impl DepartmentRepository for MockDepartmentRepository {
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut depts = self.depts.write().unwrap();
         if let Some(dept) = depts.get_mut(&id) {
-            dept.audit.deleted = 1;
+            dept.audit.deleted = DeletedStatus::Deleted;
             Ok(())
         } else {
             Err(RepositoryError::NotFound)?
@@ -110,7 +111,7 @@ impl DepartmentRepository for MockDepartmentRepository {
         let depts = self.depts.read().unwrap();
         Ok(depts
             .values()
-            .any(|d| d.parent_id == parent_id && d.audit.deleted == 0))
+            .any(|d| d.parent_id == parent_id && d.audit.deleted == DeletedStatus::Normal))
     }
 
     async fn has_users(&self, dept_id: u64) -> AppResult<bool> {

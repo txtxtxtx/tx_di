@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use crate::shared::model::value_object::TenantId;
 
 /// User query filters
 /// 用户查询结构体，用于封装用户查询相关的参数
@@ -13,8 +14,8 @@ pub struct UserQuery {
     pub nickname: Option<String>,
     /// 手机号码，可选参数
     pub mobile: Option<String>,
-    /// 用户状态，可选参数，使用i32类型存储
-    pub status: Option<i32>,
+    /// 用户状态，可选参数
+    pub status: Option<UserStatus>,
     /// 部门ID，可选参数，使用u64类型存储
     pub dept_id: Option<u64>,
     /// 开始时间，可选参数，用于时间范围查询
@@ -38,12 +39,12 @@ pub struct UserDisplayInfo {
     pub email: Option<String>,
     /// 用户手机号码，可选字段
     pub mobile: Option<String>,
-    /// 用户性别，使用整数表示（如0:未知，1:男，2:女）
-    pub sex: i32,
+    /// 用户性别
+    pub sex: Sex,
     /// 用户头像URL，可选字段
     pub avatar: Option<String>,
-    /// 用户状态，使用整数表示（如0:禁用，1:正常）
-    pub status: i32,
+    /// 用户状态
+    pub status: UserStatus,
     /// 用户所属部门名称列表
     pub dept_names: Vec<String>,
     /// 用户角色名称列表
@@ -61,8 +62,8 @@ pub struct LoginUser {
     pub username: String,
     /// 用户昵称，使用String类型存储
     pub nickname: String,
-    /// 租户ID，使用i32类型存储
-    pub tenant_id: i32,
+    /// 租户ID
+    pub tenant_id: TenantId,
     /// 角色ID列表，使用Vec<u64>类型存储
     pub role_ids: Vec<u64>,
     /// 权限列表，使用Vec<String>类型存储
@@ -94,4 +95,43 @@ pub enum Sex {
     Male = 1,
     /// 性别：女
     Female = 2,
+}
+
+impl From<i32> for Sex {
+    fn from(value: i32) -> Self {
+        match value {
+            0 => Self::Unknown,
+            1 => Self::Male,
+            2 => Self::Female,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+/// UserStatus 转换错误
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InvalidUserStatusError(pub i32);
+
+impl std::fmt::Display for InvalidUserStatusError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "invalid user status value: {}", self.0)
+    }
+}
+
+impl UserStatus {
+    /// 从 i32 安全转换，未知值返回错误
+    pub fn try_from_i32(value: i32) -> Result<Self, InvalidUserStatusError> {
+        match value {
+            0 => Ok(Self::Active),
+            1 => Ok(Self::Disabled),
+            2 => Ok(Self::Locked),
+            _ => Err(InvalidUserStatusError(value)),
+        }
+    }
+}
+
+impl From<i32> for UserStatus {
+    fn from(value: i32) -> Self {
+        Self::try_from_i32(value).unwrap_or(Self::Active)
+    }
 }

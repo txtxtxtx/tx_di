@@ -25,11 +25,11 @@ pub struct User {
     pub email: Option<String>,
     /// 用户手机号码，可选字段
     pub mobile: Option<String>,
-    /// 用户性别，1-男，2-女，0-未知
+    /// 用户性别
     pub sex: Sex,
     /// 用户头像URL，可选字段
     pub avatar: Option<String>,
-    /// 用户状态，1-正常，0-禁用
+    /// 用户状态：Active(正常) / Disabled(禁用) / Locked(锁定)
     pub status: UserStatus,
     /// 用户最近登录的IP地址，可选字段
     pub login_ip: Option<String>,

@@ -6,6 +6,7 @@ use admin_domain::file::model::aggregate::{File, FileConfig};
 use admin_domain::file::model::value_object::FileQuery;
 use admin_domain::file::repository::{FileConfigRepository, FileRepository};
 use admin_domain::shared::repository::RepositoryError;
+use admin_domain::shared::model::value_object::DeletedStatus;
 use tx_common::page::Page;
 use tx_error::AppResult;
 
@@ -31,7 +32,7 @@ impl Default for MockFileRepository {
 impl FileRepository for MockFileRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<File>> {
         let files = self.files.read().unwrap();
-        Ok(files.get(&id).filter(|f| f.audit.deleted == 0).cloned())
+        Ok(files.get(&id).filter(|f| f.audit.deleted == DeletedStatus::Normal).cloned())
     }
 
     async fn find_page(
@@ -42,7 +43,7 @@ impl FileRepository for MockFileRepository {
         let files = self.files.read().unwrap();
         let filtered: Vec<File> = files
             .values()
-            .filter(|f| f.audit.deleted == 0)
+            .filter(|f| f.audit.deleted == DeletedStatus::Normal)
             .filter(|f| {
                 if let Some(ref name) = query.name {
                     if !f.name.contains(name.as_str()) {
@@ -74,7 +75,7 @@ impl FileRepository for MockFileRepository {
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut files = self.files.write().unwrap();
         if let Some(file) = files.get_mut(&id) {
-            file.audit.deleted = 1;
+            file.audit.deleted = DeletedStatus::Deleted;
             Ok(())
         } else {
             Err(RepositoryError::NotFound)?
@@ -104,14 +105,14 @@ impl Default for MockFileConfigRepository {
 impl FileConfigRepository for MockFileConfigRepository {
     async fn find_by_id(&self, id: i32) -> AppResult<Option<FileConfig>> {
         let configs = self.configs.read().unwrap();
-        Ok(configs.get(&id).filter(|c| c.audit.deleted == 0).cloned())
+        Ok(configs.get(&id).filter(|c| c.audit.deleted == DeletedStatus::Normal).cloned())
     }
 
     async fn find_master(&self) -> AppResult<Option<FileConfig>> {
         let configs = self.configs.read().unwrap();
         Ok(configs
             .values()
-            .find(|c| c.master == 1 && c.audit.deleted == 0)
+            .find(|c| c.master == 1 && c.audit.deleted == DeletedStatus::Normal)
             .cloned())
     }
 
@@ -119,7 +120,7 @@ impl FileConfigRepository for MockFileConfigRepository {
         let configs = self.configs.read().unwrap();
         Ok(configs
             .values()
-            .filter(|c| c.audit.deleted == 0)
+            .filter(|c| c.audit.deleted == DeletedStatus::Normal)
             .cloned()
             .collect())
     }
@@ -139,7 +140,7 @@ impl FileConfigRepository for MockFileConfigRepository {
     async fn soft_delete(&self, id: i32) -> AppResult<()> {
         let mut configs = self.configs.write().unwrap();
         if let Some(config) = configs.get_mut(&id) {
-            config.audit.deleted = 1;
+            config.audit.deleted = DeletedStatus::Deleted;
             Ok(())
         } else {
             Err(RepositoryError::NotFound)?
