@@ -1,14 +1,13 @@
 //! 配置管理 HTTP API
 
 use axum::{Json, Router, extract::State, routing::{get, post, put, delete}};
+use axum::response::IntoResponse;
 use std::sync::Arc;
 use tx_di_core::App;
 
-use admin_proto::{
-    CreateConfigRequest, UpdateConfigRequest, DeleteConfigRequest, GetConfigRequest,
-    ListConfigsRequest, ConfigResponse, Empty,
-};
-use crate::interfaces::dto::{ApiResponse, PageResponse};
+use admin_proto::{CreateConfigRequest, UpdateConfigRequest, ListConfigsRequest, ConfigResponse, Empty};
+use crate::services;
+use tx_common::{ApiR, ApiRes, Page};
 
 pub fn router(app: Arc<App>) -> Router {
     Router::new()
@@ -20,86 +19,74 @@ pub fn router(app: Arc<App>) -> Router {
         .with_state(app)
 }
 
-/// POST /api/config/
+fn map_config(c: admin_app::config::dto::ConfigResponse) -> ConfigResponse {
+    ConfigResponse {
+        id: c.id, category: c.category, config_type: c.config_type,
+        name: c.name, config_key: c.config_key, value: c.value,
+        visible: c.visible, remark: c.remark,
+    }
+}
+
 async fn create_config(
-    State(_app): State<Arc<App>>,
     Json(req): Json<CreateConfigRequest>,
-) -> Result<Json<ApiResponse<ConfigResponse>>, tx_error::AppError> {
-    // TODO: 调用 ConfigAppService::create
-    let resp = ConfigResponse {
-        id: 1,
-        category: req.category.clone(),
-        config_type: req.config_type,
-        name: req.name.clone(),
-        config_key: req.config_key.clone(),
-        value: req.value.clone(),
-        visible: 0,
-        remark: req.remark.clone(),
+) -> impl IntoResponse {
+    let cmd = admin_app::config::dto::CreateConfigCommand {
+        category: req.category, config_type: req.config_type,
+        name: req.name, config_key: req.config_key,
+        value: req.value, remark: req.remark,
     };
-    Ok(Json(ApiResponse::success(resp)))
+    match services::get().config.create_config(cmd, None).await {
+        Ok(r) => ApiR::success(map_config(r)),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
-/// GET /api/config/{config_id}
 async fn get_config(
-    State(_app): State<Arc<App>>,
     axum::extract::Path(config_id): axum::extract::Path<u64>,
-) -> Result<Json<ApiResponse<ConfigResponse>>, tx_error::AppError> {
-    // TODO: 调用 ConfigAppService::get_by_id
-    let resp = ConfigResponse {
-        id: config_id,
-        category: String::new(),
-        config_type: 0,
-        name: "placeholder".into(),
-        config_key: String::new(),
-        value: String::new(),
-        visible: 0,
-        remark: None,
-    };
-    Ok(Json(ApiResponse::success(resp)))
+) -> impl IntoResponse {
+    match services::get().config.get_config(config_id).await {
+        Ok(r) => ApiR::success(map_config(r)),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
-/// PUT /api/config/{config_id}
 async fn update_config(
-    State(_app): State<Arc<App>>,
     axum::extract::Path(config_id): axum::extract::Path<u64>,
-    Json(mut req): Json<UpdateConfigRequest>,
-) -> Result<Json<ApiResponse<ConfigResponse>>, tx_error::AppError> {
-    // TODO: 调用 ConfigAppService::update
-    req.config_id = config_id;
-    let resp = ConfigResponse {
-        id: config_id,
-        category: req.category.clone(),
-        config_type: req.config_type,
-        name: req.name.clone(),
-        config_key: req.config_key.clone(),
-        value: req.value.clone(),
-        visible: req.visible,
-        remark: req.remark.clone(),
+    Json(req): Json<UpdateConfigRequest>,
+) -> impl IntoResponse {
+    let cmd = admin_app::config::dto::UpdateConfigCommand {
+        config_id, category: req.category, config_type: req.config_type,
+        name: req.name, config_key: req.config_key, value: req.value,
+        visible: req.visible, remark: req.remark,
     };
-    Ok(Json(ApiResponse::success(resp)))
+    match services::get().config.update_config(cmd, None).await {
+        Ok(r) => ApiR::success(map_config(r)),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
-/// DELETE /api/config/{config_id}
 async fn delete_config(
-    State(_app): State<Arc<App>>,
     axum::extract::Path(config_id): axum::extract::Path<u64>,
-) -> Result<Json<ApiResponse<Empty>>, tx_error::AppError> {
-    // TODO: 调用 ConfigAppService::delete
-    let _ = config_id;
-    Ok(Json(ApiResponse::success(Empty {})))
+) -> impl IntoResponse {
+    match services::get().config.delete_config(config_id, None).await {
+        Ok(()) => ApiRes::ok(),
+        Err(e) => ApiRes::from(e),
+    }
 }
 
-/// POST /api/config/list
 async fn list_configs(
-    State(_app): State<Arc<App>>,
     Json(req): Json<ListConfigsRequest>,
-) -> Result<Json<ApiResponse<PageResponse<ConfigResponse>>>, tx_error::AppError> {
-    // TODO: 调用 ConfigAppService::list
-    let page = PageResponse {
-        list: vec![],
-        total: 0,
-        page: req.page,
-        size: req.page_size,
+) -> impl IntoResponse {
+    let query = admin_app::config::dto::ConfigQueryRequest {
+        name: req.name, category: req.category,
+        config_key: req.config_key, config_type: req.config_type,
+        page: req.page, size: req.page_size,
     };
-    Ok(Json(ApiResponse::success(page)))
+    match services::get().config.get_config_page(query).await {
+        Ok(page) => ApiR::success(Page::new(
+            page.list.into_iter().map(map_config).collect(),
+            page.page, page.size, page.total,
+        )),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }

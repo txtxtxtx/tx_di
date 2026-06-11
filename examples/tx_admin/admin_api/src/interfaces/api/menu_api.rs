@@ -1,14 +1,13 @@
 //! 菜单管理 HTTP API
 
 use axum::{Json, Router, extract::State, routing::{get, post, put, delete}};
+use axum::response::IntoResponse;
 use std::sync::Arc;
 use tx_di_core::App;
 
-use admin_proto::{
-    CreateMenuRequest, UpdateMenuRequest, DeleteMenuRequest, GetMenuRequest,
-    ListMenusRequest, MenuResponse, Empty,
-};
-use crate::interfaces::dto::ApiResponse;
+use admin_proto::{CreateMenuRequest, UpdateMenuRequest, ListMenusRequest, MenuResponse, Empty};
+use crate::services;
+use tx_common::{ApiR, ApiRes};
 
 pub fn router(app: Arc<App>) -> Router {
     Router::new()
@@ -20,95 +19,78 @@ pub fn router(app: Arc<App>) -> Router {
         .with_state(app)
 }
 
-/// POST /api/menu/
+fn map_menu(m: admin_app::menu::dto::MenuResponse) -> MenuResponse {
+    MenuResponse {
+        id: m.id, name: m.name, permission: m.permission,
+        types: m.types, sort: m.sort, parent_id: m.parent_id,
+        path: m.path, icon: m.icon, component: m.component,
+        component_name: m.component_name, status: m.status,
+        visible: m.visible, keep_alive: m.keep_alive,
+    }
+}
+
 async fn create_menu(
-    State(_app): State<Arc<App>>,
     Json(req): Json<CreateMenuRequest>,
-) -> Result<Json<ApiResponse<MenuResponse>>, tx_error::AppError> {
-    // TODO: 调用 MenuAppService::create
-    let resp = MenuResponse {
-        id: 1,
-        name: req.name.clone(),
-        permission: req.permission.clone(),
-        types: req.types,
-        sort: req.sort,
-        parent_id: req.parent_id,
-        path: req.path.clone(),
-        icon: req.icon.clone(),
-        component: req.component.clone(),
-        component_name: req.component_name.clone(),
-        status: 1,
-        visible: 1,
-        keep_alive: 0,
+) -> impl IntoResponse {
+    let cmd = admin_app::menu::dto::CreateMenuCommand {
+        name: req.name, permission: req.permission, types: req.types,
+        sort: req.sort, parent_id: req.parent_id, path: req.path,
+        icon: req.icon, component: req.component, component_name: req.component_name,
     };
-    Ok(Json(ApiResponse::success(resp)))
+    match services::get().menu.create_menu(cmd, None).await {
+        Ok(r) => ApiR::success(map_menu(r)),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
-/// GET /api/menu/{menu_id}
 async fn get_menu(
-    State(_app): State<Arc<App>>,
     axum::extract::Path(menu_id): axum::extract::Path<u64>,
-) -> Result<Json<ApiResponse<MenuResponse>>, tx_error::AppError> {
-    // TODO: 调用 MenuAppService::get_by_id
-    let resp = MenuResponse {
-        id: menu_id,
-        name: "placeholder".into(),
-        permission: String::new(),
-        types: 0,
-        sort: 0,
-        parent_id: 0,
-        path: None,
-        icon: None,
-        component: None,
-        component_name: None,
-        status: 1,
-        visible: 1,
-        keep_alive: 0,
-    };
-    Ok(Json(ApiResponse::success(resp)))
+) -> impl IntoResponse {
+    let query = admin_app::menu::dto::MenuQueryRequest { name: None, status: None, types: None };
+    match services::get().menu.get_menu_list(query).await {
+        Ok(list) => {
+            match list.into_iter().find(|m| m.id == menu_id) {
+                Some(m) => ApiR::success(map_menu(m)),
+                None => ApiRes::error(404, "菜单不存在".into()).into_typed(),
+            }
+        }
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
-/// PUT /api/menu/{menu_id}
 async fn update_menu(
-    State(_app): State<Arc<App>>,
     axum::extract::Path(menu_id): axum::extract::Path<u64>,
-    Json(mut req): Json<UpdateMenuRequest>,
-) -> Result<Json<ApiResponse<MenuResponse>>, tx_error::AppError> {
-    // TODO: 调用 MenuAppService::update
-    req.menu_id = menu_id;
-    let resp = MenuResponse {
-        id: menu_id,
-        name: req.name.clone(),
-        permission: req.permission.clone(),
-        types: req.types,
-        sort: req.sort,
-        parent_id: req.parent_id,
-        path: req.path.clone(),
-        icon: req.icon.clone(),
-        component: req.component.clone(),
-        component_name: req.component_name.clone(),
-        status: 1,
-        visible: req.visible,
-        keep_alive: req.keep_alive,
+    Json(req): Json<UpdateMenuRequest>,
+) -> impl IntoResponse {
+    let cmd = admin_app::menu::dto::UpdateMenuCommand {
+        menu_id, name: req.name, permission: req.permission, types: req.types,
+        sort: req.sort, parent_id: req.parent_id, path: req.path,
+        icon: req.icon, component: req.component, component_name: req.component_name,
+        visible: req.visible, keep_alive: req.keep_alive,
     };
-    Ok(Json(ApiResponse::success(resp)))
+    match services::get().menu.update_menu(cmd, None).await {
+        Ok(r) => ApiR::success(map_menu(r)),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
-/// DELETE /api/menu/{menu_id}
 async fn delete_menu(
-    State(_app): State<Arc<App>>,
     axum::extract::Path(menu_id): axum::extract::Path<u64>,
-) -> Result<Json<ApiResponse<Empty>>, tx_error::AppError> {
-    // TODO: 调用 MenuAppService::delete
-    let _ = menu_id;
-    Ok(Json(ApiResponse::success(Empty {})))
+) -> impl IntoResponse {
+    match services::get().menu.delete_menu(menu_id, None).await {
+        Ok(()) => ApiRes::ok(),
+        Err(e) => ApiRes::from(e),
+    }
 }
 
-/// POST /api/menu/list
 async fn list_menus(
-    State(_app): State<Arc<App>>,
-    Json(_req): Json<ListMenusRequest>,
-) -> Result<Json<ApiResponse<Vec<MenuResponse>>>, tx_error::AppError> {
-    // TODO: 调用 MenuAppService::list (菜单为树形，不分页)
-    Ok(Json(ApiResponse::success(vec![])))
+    Json(req): Json<ListMenusRequest>,
+) -> impl IntoResponse {
+    let query = admin_app::menu::dto::MenuQueryRequest {
+        name: req.name, status: req.status, types: req.types,
+    };
+    match services::get().menu.get_menu_list(query).await {
+        Ok(list) => ApiR::success(list.into_iter().map(map_menu).collect::<Vec<_>>()),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }

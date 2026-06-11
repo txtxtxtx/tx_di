@@ -1,14 +1,13 @@
 //! 文件管理 HTTP API
 
 use axum::{Json, Router, extract::State, routing::{get, post, delete}};
+use axum::response::IntoResponse;
 use std::sync::Arc;
 use tx_di_core::App;
 
-use admin_proto::{
-    UploadFileRequest, ListFilesRequest,
-    FileResponse, Empty,
-};
-use crate::interfaces::dto::{ApiResponse, PageResponse};
+use admin_proto::{UploadFileRequest, ListFilesRequest, FileResponse, Empty};
+use crate::services;
+use tx_common::{ApiR, ApiRes, Page};
 
 pub fn router(app: Arc<App>) -> Router {
     Router::new()
@@ -19,63 +18,56 @@ pub fn router(app: Arc<App>) -> Router {
         .with_state(app)
 }
 
-/// POST /api/file/upload
+fn map_file(f: admin_app::file::dto::FileResponse) -> FileResponse {
+    FileResponse {
+        id: f.id, config_id: f.config_id, name: f.name,
+        path: f.path, url: f.url, file_type: f.file_type, size: f.size,
+    }
+}
+
 async fn upload_file(
-    State(_app): State<Arc<App>>,
     Json(req): Json<UploadFileRequest>,
-) -> Result<Json<ApiResponse<FileResponse>>, tx_error::AppError> {
-    // TODO: 调用 FileAppService::upload
-    let resp = FileResponse {
-        id: 1,
-        config_id: req.config_id,
-        name: req.name.clone(),
-        path: req.path.clone(),
-        url: req.url.clone(),
-        file_type: req.file_type.clone(),
-        size: req.size,
+) -> impl IntoResponse {
+    let cmd = admin_app::file::dto::UploadFileCommand {
+        name: req.name, path: req.path, url: req.url,
+        file_type: req.file_type, size: req.size, config_id: req.config_id,
     };
-    Ok(Json(ApiResponse::success(resp)))
+    match services::get().file.upload_file(cmd, None).await {
+        Ok(r) => ApiR::success(map_file(r)),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
-/// GET /api/file/{file_id}
 async fn get_file(
-    State(_app): State<Arc<App>>,
     axum::extract::Path(file_id): axum::extract::Path<u64>,
-) -> Result<Json<ApiResponse<FileResponse>>, tx_error::AppError> {
-    // TODO: 调用 FileAppService::get_by_id
-    let resp = FileResponse {
-        id: file_id,
-        config_id: None,
-        name: "placeholder".into(),
-        path: String::new(),
-        url: String::new(),
-        file_type: None,
-        size: 0,
-    };
-    Ok(Json(ApiResponse::success(resp)))
+) -> impl IntoResponse {
+    match services::get().file.get_file(file_id).await {
+        Ok(r) => ApiR::success(map_file(r)),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
-/// DELETE /api/file/{file_id}
 async fn delete_file(
-    State(_app): State<Arc<App>>,
     axum::extract::Path(file_id): axum::extract::Path<u64>,
-) -> Result<Json<ApiResponse<Empty>>, tx_error::AppError> {
-    // TODO: 调用 FileAppService::delete
-    let _ = file_id;
-    Ok(Json(ApiResponse::success(Empty {})))
+) -> impl IntoResponse {
+    match services::get().file.delete_file(file_id, None).await {
+        Ok(()) => ApiRes::ok(),
+        Err(e) => ApiRes::from(e),
+    }
 }
 
-/// POST /api/file/list
 async fn list_files(
-    State(_app): State<Arc<App>>,
     Json(req): Json<ListFilesRequest>,
-) -> Result<Json<ApiResponse<PageResponse<FileResponse>>>, tx_error::AppError> {
-    // TODO: 调用 FileAppService::list
-    let page = PageResponse {
-        list: vec![],
-        total: 0,
-        page: req.page,
-        size: req.page_size,
+) -> impl IntoResponse {
+    let query = admin_app::file::dto::FileQueryRequest {
+        name: req.name, file_type: req.file_type,
+        config_id: req.config_id, page: req.page, size: req.page_size,
     };
-    Ok(Json(ApiResponse::success(page)))
+    match services::get().file.get_file_page(query).await {
+        Ok(page) => ApiR::success(Page::new(
+            page.list.into_iter().map(map_file).collect(),
+            page.page, page.size, page.total,
+        )),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }

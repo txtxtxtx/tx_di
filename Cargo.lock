@@ -13,6 +13,7 @@ name = "admin_api"
 version = "0.1.0"
 dependencies = [
  "admin_app",
+ "admin_domain",
  "admin_proto",
  "anyhow",
  "async-trait",

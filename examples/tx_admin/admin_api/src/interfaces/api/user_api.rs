@@ -1,18 +1,18 @@
 //! 用户管理 HTTP API
-//!
-//! 使用 admin_proto 生成的用户 DTO，
-//! HTTP 协议层仅负责 JSON ↔ Proto DTO 转换，业务逻辑委托给 admin_app。
 
 use axum::{Json, Router, extract::State, routing::{get, post, put, delete}};
+use axum::response::IntoResponse;
 use std::sync::Arc;
 use tx_di_core::App;
 
 use admin_proto::{
-    CreateUserRequest, UpdateUserRequest, DeleteUserRequest, GetUserRequest,
-    ListUsersRequest, ChangePasswordRequest, AssignRolesRequest, AssignDeptsRequest,
-    UserResponse, ListUsersResponse, Empty,
+    CreateUserRequest, UpdateUserRequest, ChangePasswordRequest,
+    AssignRolesRequest, AssignDeptsRequest, ListUsersRequest,
+    UserResponse, Empty,
 };
-use crate::interfaces::dto::{ApiResponse, PageResponse};
+use admin_domain::user::model::value_object::{Sex, UserStatus};
+use crate::services;
+use tx_common::{ApiR, ApiRes, Page};
 
 pub fn router(app: Arc<App>) -> Router {
     Router::new()
@@ -21,125 +21,154 @@ pub fn router(app: Arc<App>) -> Router {
         .route("/{user_id}", put(update_user))
         .route("/{user_id}", delete(delete_user))
         .route("/list", post(list_users))
-        .route("/change-password", post(change_password))
-        .route("/assign-roles", post(assign_roles))
-        .route("/assign-depts", post(assign_depts))
+        .route("/change_password", post(change_password))
+        .route("/assign_roles", post(assign_roles))
+        .route("/assign_depts", post(assign_depts))
         .with_state(app)
+}
+
+fn map_user(r: admin_app::user::dto::UserResponse) -> UserResponse {
+    UserResponse {
+        id: r.id,
+        username: r.username,
+        nickname: r.nickname,
+        email: r.email,
+        mobile: r.mobile,
+        sex: r.sex as i32,
+        status: r.status as i32,
+        remark: r.remark,
+        role_ids: r.role_ids,
+        dept_ids: r.dept_ids,
+    }
 }
 
 /// POST /api/user/
 async fn create_user(
     State(_app): State<Arc<App>>,
     Json(req): Json<CreateUserRequest>,
-) -> Result<Json<ApiResponse<UserResponse>>, tx_error::AppError> {
-    // TODO: 调用 UserAppService::create
-    let resp = UserResponse {
-        id: 1,
-        username: req.username.clone(),
-        nickname: req.nickname.clone(),
-        email: req.email.clone(),
-        mobile: req.mobile.clone(),
-        sex: req.sex.unwrap_or(0),
-        status: 1,
-        remark: req.remark.clone(),
-        role_ids: req.role_ids.clone(),
-        dept_ids: req.dept_ids.clone(),
+) -> impl IntoResponse {
+    let cmd = admin_app::user::dto::CreateUserCommand {
+        username: req.username,
+        password: req.password,
+        nickname: req.nickname,
+        email: req.email,
+        mobile: req.mobile,
+        sex: req.sex.map(Sex::from),
+        remark: req.remark,
+        role_ids: if req.role_ids.is_empty() { None } else { Some(req.role_ids) },
+        dept_ids: if req.dept_ids.is_empty() { None } else { Some(req.dept_ids) },
     };
-    Ok(Json(ApiResponse::success(resp)))
+    match services::get().user.create_user(cmd, None).await {
+        Ok(r) => ApiR::success(map_user(r)),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
 /// GET /api/user/{user_id}
 async fn get_user(
-    State(_app): State<Arc<App>>,
     axum::extract::Path(user_id): axum::extract::Path<u64>,
-) -> Result<Json<ApiResponse<UserResponse>>, tx_error::AppError> {
-    // TODO: 调用 UserAppService::get_by_id
-    let resp = UserResponse {
-        id: user_id,
-        username: "placeholder".into(),
-        nickname: "Placeholder".into(),
-        email: None,
-        mobile: None,
-        sex: 0,
-        status: 1,
-        remark: None,
-        role_ids: vec![],
-        dept_ids: vec![],
-    };
-    Ok(Json(ApiResponse::success(resp)))
+) -> impl IntoResponse {
+    match services::get().user.get_user(user_id).await {
+        Ok(r) => ApiR::success(map_user(r)),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
 /// PUT /api/user/{user_id}
 async fn update_user(
-    State(_app): State<Arc<App>>,
     axum::extract::Path(user_id): axum::extract::Path<u64>,
-    Json(mut req): Json<UpdateUserRequest>,
-) -> Result<Json<ApiResponse<UserResponse>>, tx_error::AppError> {
-    // TODO: 调用 UserAppService::update
-    req.user_id = user_id;
-    let resp = UserResponse {
-        id: user_id,
-        username: String::new(),
-        nickname: req.nickname.clone(),
-        email: req.email.clone(),
-        mobile: req.mobile.clone(),
-        sex: req.sex,
-        status: 1,
-        remark: req.remark.clone(),
-        role_ids: vec![],
-        dept_ids: vec![],
+    Json(req): Json<UpdateUserRequest>,
+) -> impl IntoResponse {
+    let cmd = admin_app::user::dto::UpdateUserCommand {
+        user_id,
+        nickname: req.nickname,
+        email: req.email,
+        mobile: req.mobile,
+        sex: Sex::from(req.sex),
+        remark: req.remark,
     };
-    Ok(Json(ApiResponse::success(resp)))
+    match services::get().user.update_user(cmd, None).await {
+        Ok(r) => ApiR::success(map_user(r)),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
 /// DELETE /api/user/{user_id}
 async fn delete_user(
-    State(_app): State<Arc<App>>,
     axum::extract::Path(user_id): axum::extract::Path<u64>,
-) -> Result<Json<ApiResponse<Empty>>, tx_error::AppError> {
-    // TODO: 调用 UserAppService::delete
-    let _ = user_id;
-    Ok(Json(ApiResponse::success(Empty {})))
+) -> impl IntoResponse {
+    match services::get().user.delete_user(user_id, None).await {
+        Ok(()) => ApiRes::ok(),
+        Err(e) => ApiRes::from(e),
+    }
 }
 
 /// POST /api/user/list
 async fn list_users(
-    State(_app): State<Arc<App>>,
     Json(req): Json<ListUsersRequest>,
-) -> Result<Json<ApiResponse<PageResponse<UserResponse>>>, tx_error::AppError> {
-    // TODO: 调用 UserAppService::list
-    let page = crate::interfaces::dto::PageResponse {
-        list: vec![],
-        total: 0,
+) -> impl IntoResponse {
+    let status = match req.status {
+        Some(s) => UserStatus::try_from_i32(s).ok(),
+        None => None,
+    };
+    let query = admin_app::user::dto::UserQueryRequest {
+        username: req.username,
+        nickname: req.nickname,
+        mobile: req.mobile,
+        status,
+        dept_id: req.dept_id,
         page: req.page,
         size: req.page_size,
     };
-    Ok(Json(ApiResponse::success(page)))
+    match services::get().user.get_user_page(query).await {
+        Ok(page) => ApiR::success(Page::new(
+            page.list.into_iter().map(map_user).collect(),
+            page.page,
+            page.size,
+            page.total,
+        )),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
 /// POST /api/user/change-password
 async fn change_password(
-    State(_app): State<Arc<App>>,
-    Json(_req): Json<ChangePasswordRequest>,
-) -> Result<Json<ApiResponse<Empty>>, tx_error::AppError> {
-    // TODO: 调用 UserAppService::change_password
-    Ok(Json(ApiResponse::success(Empty {})))
+    Json(req): Json<ChangePasswordRequest>,
+) -> impl IntoResponse {
+    let cmd = admin_app::user::dto::ChangePasswordCommand {
+        user_id: req.user_id,
+        new_password: req.new_password,
+    };
+    match services::get().user.change_password(cmd, None).await {
+        Ok(()) => ApiRes::ok(),
+        Err(e) => ApiRes::from(e),
+    }
 }
 
 /// POST /api/user/assign-roles
 async fn assign_roles(
-    State(_app): State<Arc<App>>,
-    Json(_req): Json<AssignRolesRequest>,
-) -> Result<Json<ApiResponse<Empty>>, tx_error::AppError> {
-    // TODO: 调用 UserAppService::assign_roles
-    Ok(Json(ApiResponse::success(Empty {})))
+    Json(req): Json<AssignRolesRequest>,
+) -> impl IntoResponse {
+    let cmd = admin_app::user::dto::AssignRolesCommand {
+        user_id: req.user_id,
+        role_ids: req.role_ids,
+    };
+    match services::get().user.assign_roles(cmd).await {
+        Ok(()) => ApiRes::ok(),
+        Err(e) => ApiRes::from(e),
+    }
 }
 
 /// POST /api/user/assign-depts
 async fn assign_depts(
-    State(_app): State<Arc<App>>,
-    Json(_req): Json<AssignDeptsRequest>,
-) -> Result<Json<ApiResponse<Empty>>, tx_error::AppError> {
-    // TODO: 调用 UserAppService::assign_depts
-    Ok(Json(ApiResponse::success(Empty {})))
+    Json(req): Json<AssignDeptsRequest>,
+) -> impl IntoResponse {
+    let cmd = admin_app::user::dto::AssignDeptsCommand {
+        user_id: req.user_id,
+        dept_ids: req.dept_ids,
+    };
+    match services::get().user.assign_departments(cmd).await {
+        Ok(()) => ApiRes::ok(),
+        Err(e) => ApiRes::from(e),
+    }
 }

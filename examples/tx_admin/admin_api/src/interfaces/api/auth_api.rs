@@ -1,68 +1,76 @@
 //! 认证 HTTP API
-//!
-//! 使用 admin_proto 生成的 LoginRequest/LoginResponse 等 DTO，
-//! HTTP 协议层仅负责 JSON ↔ Proto DTO 转换，业务逻辑委托给 admin_app。
 
 use axum::{Json, Router, extract::State, routing::{get, post}};
+use axum::response::IntoResponse;
 use std::sync::Arc;
 use tx_di_core::App;
 
-use admin_proto::{LoginRequest, LoginResponse, UserInfoResponse, LogoutRequest, Empty};
-use crate::interfaces::dto::ApiResponse;
+use admin_proto::{LoginRequest, LoginResponse, GetUserInfoRequest, UserInfoResponse, LogoutRequest, Empty};
+use crate::services;
+use tx_common::{ApiR, ApiRes};
 
 pub fn router(app: Arc<App>) -> Router {
     Router::new()
         .route("/login", post(login))
-        .route("/user-info", get(user_info))
+        .route("/user-info", post(user_info))
         .route("/logout", post(logout))
         .with_state(app)
 }
 
 /// POST /api/auth/login
-///
-/// 接收 JSON 格式的 LoginRequest（proto 生成），返回 LoginResponse
 async fn login(
     State(_app): State<Arc<App>>,
     Json(req): Json<LoginRequest>,
-) -> Result<Json<ApiResponse<LoginResponse>>, tx_error::AppError> {
-    // TODO: 调用 AuthAppService::login，目前为占位实现
-    let resp = LoginResponse {
-        user_id: 1,
-        username: req.username.clone(),
-        nickname: "Admin".into(),
-        tenant_id: 0,
-        role_ids: vec![],
-        permissions: vec![],
-        dept_ids: vec![],
-        token: "placeholder-token".into(),
+) -> impl IntoResponse {
+    let cmd = admin_app::auth::dto::LoginCommand {
+        username: req.username,
+        password: req.password,
+        login_ip: req.login_ip,
     };
-    Ok(Json(ApiResponse::success(resp)))
+    match services::get().auth.login(cmd).await {
+        Ok(r) => ApiR::success(LoginResponse {
+            user_id: r.user_id,
+            username: r.username,
+            nickname: r.nickname,
+            tenant_id: r.tenant_id.into_inner() as i64,
+            role_ids: r.role_ids,
+            permissions: r.permissions,
+            dept_ids: r.dept_ids,
+            token: String::new(), // token 由中间件生成
+        }),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
-/// GET /api/auth/user-info?user_id=1
+/// POST /api/auth/user-info
 async fn user_info(
     State(_app): State<Arc<App>>,
-) -> Result<Json<ApiResponse<UserInfoResponse>>, tx_error::AppError> {
-    // TODO: 调用 AuthAppService::get_user_info
-    let resp = UserInfoResponse {
-        user_id: 1,
-        username: "admin".into(),
-        nickname: "Admin".into(),
-        email: Some("admin@example.com".into()),
-        mobile: None,
-        avatar: None,
-        roles: vec!["admin".into()],
-        permissions: vec!["*:*:*".into()],
-        tenant_id: 0,
-    };
-    Ok(Json(ApiResponse::success(resp)))
+    Json(req): Json<GetUserInfoRequest>,
+) -> impl IntoResponse {
+    match services::get().auth.get_user_info(req.user_id).await {
+        Ok(r) => ApiR::success(UserInfoResponse {
+            user_id: r.user_id,
+            username: r.username,
+            nickname: r.nickname,
+            email: r.email,
+            mobile: r.mobile,
+            avatar: r.avatar,
+            roles: r.roles,
+            permissions: r.permissions,
+            tenant_id: 0, // auth UserInfoResponse 暂无 tenant_id
+        }),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
 /// POST /api/auth/logout
 async fn logout(
     State(_app): State<Arc<App>>,
-    Json(_req): Json<LogoutRequest>,
-) -> Result<Json<ApiResponse<Empty>>, tx_error::AppError> {
-    // TODO: 调用 AuthAppService::logout
-    Ok(Json(ApiResponse::success(Empty {})))
+    Json(req): Json<LogoutRequest>,
+) -> impl IntoResponse {
+    let cmd = admin_app::auth::dto::LogoutCommand { user_id: req.user_id };
+    match services::get().auth.logout(cmd).await {
+        Ok(()) => ApiR::success(Empty {}),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }

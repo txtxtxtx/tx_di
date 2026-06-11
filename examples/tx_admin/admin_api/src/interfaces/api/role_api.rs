@@ -1,14 +1,13 @@
 //! 角色管理 HTTP API
 
 use axum::{Json, Router, extract::State, routing::{get, post, put, delete}};
+use axum::response::IntoResponse;
 use std::sync::Arc;
 use tx_di_core::App;
 
-use admin_proto::{
-    CreateRoleRequest, UpdateRoleRequest, DeleteRoleRequest, GetRoleRequest,
-    ListRolesRequest, AssignMenusRequest, RoleResponse, Empty,
-};
-use crate::interfaces::dto::{ApiResponse, PageResponse};
+use admin_proto::{CreateRoleRequest, UpdateRoleRequest, AssignMenusRequest, ListRolesRequest, RoleResponse, Empty};
+use crate::services;
+use tx_common::{ApiR, ApiRes, Page};
 
 pub fn router(app: Arc<App>) -> Router {
     Router::new()
@@ -21,95 +20,105 @@ pub fn router(app: Arc<App>) -> Router {
         .with_state(app)
 }
 
+fn map_role(r: admin_app::role::dto::RoleResponse) -> RoleResponse {
+    RoleResponse {
+        id: r.id,
+        name: r.name,
+        code: r.code,
+        sort: r.sort,
+        data_scope: r.data_scope,
+        status: r.status,
+        remark: r.remark,
+        menu_ids: r.menu_ids,
+    }
+}
+
 /// POST /api/role/
 async fn create_role(
-    State(_app): State<Arc<App>>,
     Json(req): Json<CreateRoleRequest>,
-) -> Result<Json<ApiResponse<RoleResponse>>, tx_error::AppError> {
-    // TODO: 调用 RoleAppService::create
-    let resp = RoleResponse {
-        id: 1,
-        name: req.name.clone(),
-        code: req.code.clone(),
+) -> impl IntoResponse {
+    let cmd = admin_app::role::dto::CreateRoleCommand {
+        name: req.name,
+        code: req.code,
         sort: req.sort,
-        data_scope: 0,
-        status: 1,
-        remark: req.remark.clone(),
-        menu_ids: req.menu_ids.clone(),
+        remark: req.remark,
+        menu_ids: if req.menu_ids.is_empty() { None } else { Some(req.menu_ids) },
     };
-    Ok(Json(ApiResponse::success(resp)))
+    match services::get().role.create_role(cmd, None).await {
+        Ok(r) => ApiR::success(map_role(r)),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
 /// GET /api/role/{role_id}
 async fn get_role(
-    State(_app): State<Arc<App>>,
     axum::extract::Path(role_id): axum::extract::Path<u64>,
-) -> Result<Json<ApiResponse<RoleResponse>>, tx_error::AppError> {
-    // TODO: 调用 RoleAppService::get_by_id
-    let resp = RoleResponse {
-        id: role_id,
-        name: "placeholder".into(),
-        code: "placeholder".into(),
-        sort: 0,
-        data_scope: 0,
-        status: 1,
-        remark: None,
-        menu_ids: vec![],
-    };
-    Ok(Json(ApiResponse::success(resp)))
+) -> impl IntoResponse {
+    match services::get().role.get_role(role_id).await {
+        Ok(r) => ApiR::success(map_role(r)),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
 /// PUT /api/role/{role_id}
 async fn update_role(
-    State(_app): State<Arc<App>>,
     axum::extract::Path(role_id): axum::extract::Path<u64>,
-    Json(mut req): Json<UpdateRoleRequest>,
-) -> Result<Json<ApiResponse<RoleResponse>>, tx_error::AppError> {
-    // TODO: 调用 RoleAppService::update
-    req.role_id = role_id;
-    let resp = RoleResponse {
-        id: role_id,
-        name: req.name.clone(),
-        code: req.code.clone(),
+    Json(req): Json<UpdateRoleRequest>,
+) -> impl IntoResponse {
+    let cmd = admin_app::role::dto::UpdateRoleCommand {
+        role_id,
+        name: req.name,
+        code: req.code,
         sort: req.sort,
         data_scope: req.data_scope,
-        status: 1,
-        remark: req.remark.clone(),
-        menu_ids: vec![],
+        remark: req.remark,
     };
-    Ok(Json(ApiResponse::success(resp)))
+    match services::get().role.update_role(cmd, None).await {
+        Ok(r) => ApiR::success(map_role(r)),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
 /// DELETE /api/role/{role_id}
 async fn delete_role(
-    State(_app): State<Arc<App>>,
     axum::extract::Path(role_id): axum::extract::Path<u64>,
-) -> Result<Json<ApiResponse<Empty>>, tx_error::AppError> {
-    // TODO: 调用 RoleAppService::delete
-    let _ = role_id;
-    Ok(Json(ApiResponse::success(Empty {})))
+) -> impl IntoResponse {
+    match services::get().role.delete_role(role_id, None).await {
+        Ok(()) => ApiRes::ok(),
+        Err(e) => ApiRes::from(e),
+    }
 }
 
 /// POST /api/role/list
 async fn list_roles(
-    State(_app): State<Arc<App>>,
     Json(req): Json<ListRolesRequest>,
-) -> Result<Json<ApiResponse<PageResponse<RoleResponse>>>, tx_error::AppError> {
-    // TODO: 调用 RoleAppService::list
-    let page = PageResponse {
-        list: vec![],
-        total: 0,
+) -> impl IntoResponse {
+    let query = admin_app::role::dto::RoleQueryRequest {
+        name: req.name,
+        code: req.code,
+        status: req.status,
         page: req.page,
         size: req.page_size,
     };
-    Ok(Json(ApiResponse::success(page)))
+    match services::get().role.get_role_page(query).await {
+        Ok(page) => ApiR::success(Page::new(
+            page.list.into_iter().map(map_role).collect(),
+            page.page, page.size, page.total,
+        )),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
 /// POST /api/role/assign-menus
 async fn assign_menus(
-    State(_app): State<Arc<App>>,
-    Json(_req): Json<AssignMenusRequest>,
-) -> Result<Json<ApiResponse<Empty>>, tx_error::AppError> {
-    // TODO: 调用 RoleAppService::assign_menus
-    Ok(Json(ApiResponse::success(Empty {})))
+    Json(req): Json<AssignMenusRequest>,
+) -> impl IntoResponse {
+    let cmd = admin_app::role::dto::AssignMenusCommand {
+        role_id: req.role_id,
+        menu_ids: req.menu_ids,
+    };
+    match services::get().role.assign_menus(cmd).await {
+        Ok(_) => ApiRes::ok(),
+        Err(e) => ApiRes::from(e),
+    }
 }

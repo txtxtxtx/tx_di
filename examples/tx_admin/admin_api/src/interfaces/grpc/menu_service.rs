@@ -8,101 +8,76 @@ use admin_proto::admin::menu::{
     GetMenuRequest, ListMenusRequest, ListMenusResponse,
 };
 use admin_proto::Empty;
+use crate::services;
 
-/// 菜单 gRPC 服务
 #[derive(Debug, Default)]
 pub struct MenuGrpcService;
 
+fn map_menu(m: admin_app::menu::dto::MenuResponse) -> MenuResponse {
+    MenuResponse {
+        id: m.id, name: m.name, permission: m.permission,
+        types: m.types, sort: m.sort, parent_id: m.parent_id,
+        path: m.path, icon: m.icon, component: m.component,
+        component_name: m.component_name, status: m.status,
+        visible: m.visible, keep_alive: m.keep_alive,
+    }
+}
+
 #[tonic::async_trait]
 impl MenuService for MenuGrpcService {
-    async fn create_menu(
-        &self,
-        request: Request<CreateMenuRequest>,
-    ) -> Result<Response<MenuResponse>, Status> {
+    async fn create_menu(&self, request: Request<CreateMenuRequest>) -> Result<Response<MenuResponse>, Status> {
         let req = request.into_inner();
-        // TODO: 调用 MenuAppService::create
-        let resp = MenuResponse {
-            id: 1,
-            name: req.name.clone(),
-            permission: req.permission.clone(),
-            types: req.types,
-            sort: req.sort,
-            parent_id: req.parent_id,
-            path: req.path.clone(),
-            icon: req.icon.clone(),
-            component: req.component.clone(),
-            component_name: req.component_name.clone(),
-            status: 1,
-            visible: 1,
-            keep_alive: 0,
+        let cmd = admin_app::menu::dto::CreateMenuCommand {
+            name: req.name, permission: req.permission, types: req.types,
+            sort: req.sort, parent_id: req.parent_id, path: req.path,
+            icon: req.icon, component: req.component, component_name: req.component_name,
         };
-        Ok(Response::new(resp))
+        services::get().menu.create_menu(cmd, None).await
+            .map(|r| Response::new(map_menu(r)))
+            .map_err(|e| Status::internal(e.to_string()))
     }
 
-    async fn update_menu(
-        &self,
-        request: Request<UpdateMenuRequest>,
-    ) -> Result<Response<MenuResponse>, Status> {
+    async fn update_menu(&self, request: Request<UpdateMenuRequest>) -> Result<Response<MenuResponse>, Status> {
         let req = request.into_inner();
-        // TODO: 调用 MenuAppService::update
-        let resp = MenuResponse {
-            id: req.menu_id,
-            name: req.name.clone(),
-            permission: req.permission.clone(),
-            types: req.types,
-            sort: req.sort,
-            parent_id: req.parent_id,
-            path: req.path.clone(),
-            icon: req.icon.clone(),
-            component: req.component.clone(),
-            component_name: req.component_name.clone(),
-            status: 1,
-            visible: req.visible,
-            keep_alive: req.keep_alive,
+        let cmd = admin_app::menu::dto::UpdateMenuCommand {
+            menu_id: req.menu_id, name: req.name, permission: req.permission,
+            types: req.types, sort: req.sort, parent_id: req.parent_id,
+            path: req.path, icon: req.icon, component: req.component,
+            component_name: req.component_name, visible: req.visible, keep_alive: req.keep_alive,
         };
-        Ok(Response::new(resp))
+        services::get().menu.update_menu(cmd, None).await
+            .map(|r| Response::new(map_menu(r)))
+            .map_err(|e| Status::internal(e.to_string()))
     }
 
-    async fn delete_menu(
-        &self,
-        request: Request<DeleteMenuRequest>,
-    ) -> Result<Response<Empty>, Status> {
+    async fn delete_menu(&self, request: Request<DeleteMenuRequest>) -> Result<Response<Empty>, Status> {
         let req = request.into_inner();
-        // TODO: 调用 MenuAppService::delete
-        let _ = req.menu_id;
-        Ok(Response::new(Empty {}))
+        services::get().menu.delete_menu(req.menu_id, None).await
+            .map(|_| Response::new(Empty {}))
+            .map_err(|e| Status::internal(e.to_string()))
     }
 
-    async fn get_menu(
-        &self,
-        request: Request<GetMenuRequest>,
-    ) -> Result<Response<MenuResponse>, Status> {
+    async fn get_menu(&self, request: Request<GetMenuRequest>) -> Result<Response<MenuResponse>, Status> {
         let req = request.into_inner();
-        // TODO: 调用 MenuAppService::get_by_id
-        let resp = MenuResponse {
-            id: req.menu_id,
-            name: "placeholder".into(),
-            permission: String::new(),
-            types: 0,
-            sort: 0,
-            parent_id: 0,
-            path: None,
-            icon: None,
-            component: None,
-            component_name: None,
-            status: 1,
-            visible: 1,
-            keep_alive: 0,
+        let query = admin_app::menu::dto::MenuQueryRequest { name: None, status: None, types: None };
+        services::get().menu.get_menu_list(query).await
+            .map(|list| {
+                let found = list.into_iter().find(|m| m.id == req.menu_id)
+                    .expect("menu not found");
+                Response::new(map_menu(found))
+            })
+            .map_err(|e| Status::internal(e.to_string()))
+    }
+
+    async fn list_menus(&self, request: Request<ListMenusRequest>) -> Result<Response<ListMenusResponse>, Status> {
+        let req = request.into_inner();
+        let query = admin_app::menu::dto::MenuQueryRequest {
+            name: req.name, status: req.status, types: req.types,
         };
-        Ok(Response::new(resp))
-    }
-
-    async fn list_menus(
-        &self,
-        _request: Request<ListMenusRequest>,
-    ) -> Result<Response<ListMenusResponse>, Status> {
-        // TODO: 调用 MenuAppService::list
-        let resp = ListMenusResponse { items: vec![] };
-        Ok(Response::new(resp))
+        services::get().menu.get_menu_list(query).await
+            .map(|list| Response::new(ListMenusResponse {
+                items: list.into_iter().map(map_menu).collect(),
+            }))
+            .map_err(|e| Status::internal(e.to_string()))
     }
 }

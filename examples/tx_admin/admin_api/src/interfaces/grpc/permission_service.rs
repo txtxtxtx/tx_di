@@ -7,32 +7,29 @@ use admin_proto::admin::permission::{
     PermissionCheckRequest, PermissionCheckResponse,
     GetUserPermissionsRequest, UserPermissionsResponse,
 };
+use crate::services;
 
-/// 权限 gRPC 服务
 #[derive(Debug, Default)]
 pub struct PermissionGrpcService;
 
 #[tonic::async_trait]
 impl PermissionService for PermissionGrpcService {
-    async fn check_permission(
-        &self,
-        _request: Request<PermissionCheckRequest>,
-    ) -> Result<Response<PermissionCheckResponse>, Status> {
-        // TODO: 调用 PermissionAppService::check
-        let resp = PermissionCheckResponse { has_permission: true };
-        Ok(Response::new(resp))
+    async fn check_permission(&self, request: Request<PermissionCheckRequest>) -> Result<Response<PermissionCheckResponse>, Status> {
+        let req = request.into_inner();
+        let cmd = admin_app::permission::dto::PermissionCheckRequest {
+            user_id: req.user_id, permission: req.permission,
+        };
+        services::get().perm.check_permission(cmd).await
+            .map(|r| Response::new(PermissionCheckResponse { has_permission: r.has_permission }))
+            .map_err(|e| Status::internal(e.to_string()))
     }
 
-    async fn get_user_permissions(
-        &self,
-        _request: Request<GetUserPermissionsRequest>,
-    ) -> Result<Response<UserPermissionsResponse>, Status> {
-        // TODO: 调用 PermissionAppService::get_user_permissions
-        let resp = UserPermissionsResponse {
-            user_id: 0,
-            permissions: vec![],
-            items: vec![],
-        };
-        Ok(Response::new(resp))
+    async fn get_user_permissions(&self, request: Request<GetUserPermissionsRequest>) -> Result<Response<UserPermissionsResponse>, Status> {
+        let req = request.into_inner();
+        services::get().perm.get_user_permissions(req.user_id).await
+            .map(|r| Response::new(UserPermissionsResponse {
+                user_id: r.user_id, permissions: r.permissions, items: vec![],
+            }))
+            .map_err(|e| Status::internal(e.to_string()))
     }
 }

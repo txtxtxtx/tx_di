@@ -1,7 +1,4 @@
 //! 用户管理 gRPC 服务实现
-//!
-//! 实现 tonic 生成的 UserService trait，
-//! 使用与 HTTP 相同的 proto DTO。
 
 use tonic::{Request, Response, Status};
 
@@ -12,120 +9,100 @@ use admin_proto::admin::user::{
     ChangePasswordRequest, AssignRolesRequest, AssignDeptsRequest,
 };
 use admin_proto::Empty;
+use admin_proto::admin::common::PageResponse;
+use admin_domain::user::model::value_object::{Sex, UserStatus};
+use crate::services;
 
-/// 用户 gRPC 服务
 #[derive(Debug, Default)]
 pub struct UserGrpcService;
 
+fn map_user(r: admin_app::user::dto::UserResponse) -> UserResponse {
+    UserResponse {
+        id: r.id, username: r.username, nickname: r.nickname,
+        email: r.email, mobile: r.mobile, sex: r.sex as i32,
+        status: r.status as i32, remark: r.remark,
+        role_ids: r.role_ids, dept_ids: r.dept_ids,
+    }
+}
+
 #[tonic::async_trait]
 impl UserService for UserGrpcService {
-    async fn create_user(
-        &self,
-        request: Request<CreateUserRequest>,
-    ) -> Result<Response<UserResponse>, Status> {
+    async fn create_user(&self, request: Request<CreateUserRequest>) -> Result<Response<UserResponse>, Status> {
         let req = request.into_inner();
-        // TODO: 调用 UserAppService::create
-        let resp = UserResponse {
-            id: 1,
-            username: req.username.clone(),
-            nickname: req.nickname.clone(),
-            email: req.email.clone(),
-            mobile: req.mobile.clone(),
-            sex: req.sex.unwrap_or(0),
-            status: 1,
-            remark: req.remark.clone(),
-            role_ids: req.role_ids.clone(),
-            dept_ids: req.dept_ids.clone(),
+        let cmd = admin_app::user::dto::CreateUserCommand {
+            username: req.username, password: req.password, nickname: req.nickname,
+            email: req.email, mobile: req.mobile, sex: req.sex.map(Sex::from),
+            remark: req.remark,
+            role_ids: if req.role_ids.is_empty() { None } else { Some(req.role_ids) },
+            dept_ids: if req.dept_ids.is_empty() { None } else { Some(req.dept_ids) },
         };
-        Ok(Response::new(resp))
+        services::get().user.create_user(cmd, None).await
+            .map(|r| Response::new(map_user(r)))
+            .map_err(|e| Status::internal(e.to_string()))
     }
 
-    async fn update_user(
-        &self,
-        request: Request<UpdateUserRequest>,
-    ) -> Result<Response<UserResponse>, Status> {
+    async fn update_user(&self, request: Request<UpdateUserRequest>) -> Result<Response<UserResponse>, Status> {
         let req = request.into_inner();
-        // TODO: 调用 UserAppService::update
-        let resp = UserResponse {
-            id: req.user_id,
-            username: String::new(),
-            nickname: req.nickname.clone(),
-            email: req.email.clone(),
-            mobile: req.mobile.clone(),
-            sex: req.sex,
-            status: 1,
-            remark: req.remark.clone(),
-            role_ids: vec![],
-            dept_ids: vec![],
+        let cmd = admin_app::user::dto::UpdateUserCommand {
+            user_id: req.user_id, nickname: req.nickname, email: req.email,
+            mobile: req.mobile, sex: Sex::from(req.sex), remark: req.remark,
         };
-        Ok(Response::new(resp))
+        services::get().user.update_user(cmd, None).await
+            .map(|r| Response::new(map_user(r)))
+            .map_err(|e| Status::internal(e.to_string()))
     }
 
-    async fn delete_user(
-        &self,
-        request: Request<DeleteUserRequest>,
-    ) -> Result<Response<Empty>, Status> {
+    async fn delete_user(&self, request: Request<DeleteUserRequest>) -> Result<Response<Empty>, Status> {
         let req = request.into_inner();
-        // TODO: 调用 UserAppService::delete
-        let _ = req.user_id;
-        Ok(Response::new(Empty {}))
+        services::get().user.delete_user(req.user_id, None).await
+            .map(|_| Response::new(Empty {}))
+            .map_err(|e| Status::internal(e.to_string()))
     }
 
-    async fn get_user(
-        &self,
-        request: Request<GetUserRequest>,
-    ) -> Result<Response<UserResponse>, Status> {
+    async fn get_user(&self, request: Request<GetUserRequest>) -> Result<Response<UserResponse>, Status> {
         let req = request.into_inner();
-        // TODO: 调用 UserAppService::get_by_id
-        let resp = UserResponse {
-            id: req.user_id,
-            username: "placeholder".into(),
-            nickname: "Placeholder".into(),
-            email: None,
-            mobile: None,
-            sex: 0,
-            status: 1,
-            remark: None,
-            role_ids: vec![],
-            dept_ids: vec![],
+        services::get().user.get_user(req.user_id).await
+            .map(|r| Response::new(map_user(r)))
+            .map_err(|e| Status::internal(e.to_string()))
+    }
+
+    async fn list_users(&self, request: Request<ListUsersRequest>) -> Result<Response<ListUsersResponse>, Status> {
+        let req = request.into_inner();
+        let status = req.status.and_then(|s| UserStatus::try_from_i32(s).ok());
+        let query = admin_app::user::dto::UserQueryRequest {
+            username: req.username, nickname: req.nickname, mobile: req.mobile,
+            status, dept_id: req.dept_id, page: req.page, size: req.page_size,
         };
-        Ok(Response::new(resp))
+        services::get().user.get_user_page(query).await
+            .map(|p| {
+                let total = p.total; let page = p.page; let size = p.size; let total_pages = p.total_pages();
+                let items = p.list.into_iter().map(map_user).collect();
+                Response::new(ListUsersResponse { items, page_info: Some(PageResponse { total, page, size, total_pages }) })
+            })
+            .map_err(|e| Status::internal(e.to_string()))
     }
 
-    async fn list_users(
-        &self,
-        request: Request<ListUsersRequest>,
-    ) -> Result<Response<ListUsersResponse>, Status> {
-        let _req = request.into_inner();
-        // TODO: 调用 UserAppService::list
-        let resp = ListUsersResponse {
-            items: vec![],
-            page_info: None,
-        };
-        Ok(Response::new(resp))
+    async fn change_password(&self, request: Request<ChangePasswordRequest>) -> Result<Response<Empty>, Status> {
+        let req = request.into_inner();
+        let cmd = admin_app::user::dto::ChangePasswordCommand { user_id: req.user_id, new_password: req.new_password };
+        services::get().user.change_password(cmd, None).await
+            .map(|_| Response::new(Empty {}))
+            .map_err(|e| Status::internal(e.to_string()))
     }
 
-    async fn change_password(
-        &self,
-        _request: Request<ChangePasswordRequest>,
-    ) -> Result<Response<Empty>, Status> {
-        // TODO: 调用 UserAppService::change_password
-        Ok(Response::new(Empty {}))
+    async fn assign_roles(&self, request: Request<AssignRolesRequest>) -> Result<Response<Empty>, Status> {
+        let req = request.into_inner();
+        let cmd = admin_app::user::dto::AssignRolesCommand { user_id: req.user_id, role_ids: req.role_ids };
+        services::get().user.assign_roles(cmd).await
+            .map(|_| Response::new(Empty {}))
+            .map_err(|e| Status::internal(e.to_string()))
     }
 
-    async fn assign_roles(
-        &self,
-        _request: Request<AssignRolesRequest>,
-    ) -> Result<Response<Empty>, Status> {
-        // TODO: 调用 UserAppService::assign_roles
-        Ok(Response::new(Empty {}))
-    }
-
-    async fn assign_depts(
-        &self,
-        _request: Request<AssignDeptsRequest>,
-    ) -> Result<Response<Empty>, Status> {
-        // TODO: 调用 UserAppService::assign_depts
-        Ok(Response::new(Empty {}))
+    async fn assign_depts(&self, request: Request<AssignDeptsRequest>) -> Result<Response<Empty>, Status> {
+        let req = request.into_inner();
+        let cmd = admin_app::user::dto::AssignDeptsCommand { user_id: req.user_id, dept_ids: req.dept_ids };
+        services::get().user.assign_departments(cmd).await
+            .map(|_| Response::new(Empty {}))
+            .map_err(|e| Status::internal(e.to_string()))
     }
 }

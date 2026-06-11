@@ -1,14 +1,15 @@
 //! 部门管理 HTTP API
 
 use axum::{Json, Router, extract::State, routing::{get, post, put, delete}};
+use axum::response::IntoResponse;
 use std::sync::Arc;
 use tx_di_core::App;
 
 use admin_proto::{
-    CreateDeptRequest, UpdateDeptRequest, DeleteDeptRequest, GetDeptRequest,
-    ListDeptsRequest, DeptResponse, Empty,
+    CreateDeptRequest, UpdateDeptRequest, ListDeptsRequest, DeptResponse, Empty,
 };
-use crate::interfaces::dto::ApiResponse;
+use crate::services;
+use tx_common::{ApiR, ApiRes};
 
 pub fn router(app: Arc<App>) -> Router {
     Router::new()
@@ -20,80 +21,73 @@ pub fn router(app: Arc<App>) -> Router {
         .with_state(app)
 }
 
-/// POST /api/dept/
+fn map_dept(d: admin_app::department::dto::DeptResponse) -> DeptResponse {
+    DeptResponse {
+        id: d.id, name: d.name, parent_id: d.parent_id, sort: d.sort,
+        leader_user_id: d.leader_user_id, phone: d.phone, email: d.email,
+        status: d.status,
+    }
+}
+
 async fn create_dept(
-    State(_app): State<Arc<App>>,
     Json(req): Json<CreateDeptRequest>,
-) -> Result<Json<ApiResponse<DeptResponse>>, tx_error::AppError> {
-    // TODO: 调用 DeptAppService::create
-    let resp = DeptResponse {
-        id: 1,
-        name: req.name.clone(),
-        parent_id: req.parent_id,
-        sort: req.sort,
-        leader_user_id: req.leader_user_id,
-        phone: req.phone.clone(),
-        email: req.email.clone(),
-        status: 1,
+) -> impl IntoResponse {
+    let cmd = admin_app::department::dto::CreateDeptCommand {
+        name: req.name, parent_id: req.parent_id, sort: req.sort,
+        leader_user_id: req.leader_user_id, phone: req.phone, email: req.email,
     };
-    Ok(Json(ApiResponse::success(resp)))
+    match services::get().dept.create_dept(cmd, None).await {
+        Ok(r) => ApiR::success(map_dept(r)),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
-/// GET /api/dept/{dept_id}
 async fn get_dept(
-    State(_app): State<Arc<App>>,
     axum::extract::Path(dept_id): axum::extract::Path<u64>,
-) -> Result<Json<ApiResponse<DeptResponse>>, tx_error::AppError> {
-    // TODO: 调用 DeptAppService::get_by_id
-    let resp = DeptResponse {
-        id: dept_id,
-        name: "placeholder".into(),
-        parent_id: 0,
-        sort: 0,
-        leader_user_id: None,
-        phone: None,
-        email: None,
-        status: 1,
-    };
-    Ok(Json(ApiResponse::success(resp)))
+) -> impl IntoResponse {
+    let query = admin_app::department::dto::DeptQueryRequest { name: None, status: None };
+    match services::get().dept.get_dept_list(query).await {
+        Ok(list) => {
+            match list.into_iter().find(|d| d.id == dept_id) {
+                Some(d) => ApiR::success(map_dept(d)),
+                None => ApiRes::error(404, "部门不存在".into()).into_typed(),
+            }
+        }
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
-/// PUT /api/dept/{dept_id}
 async fn update_dept(
-    State(_app): State<Arc<App>>,
     axum::extract::Path(dept_id): axum::extract::Path<u64>,
-    Json(mut req): Json<UpdateDeptRequest>,
-) -> Result<Json<ApiResponse<DeptResponse>>, tx_error::AppError> {
-    // TODO: 调用 DeptAppService::update
-    req.dept_id = dept_id;
-    let resp = DeptResponse {
-        id: dept_id,
-        name: req.name.clone(),
-        parent_id: req.parent_id,
-        sort: req.sort,
-        leader_user_id: req.leader_user_id,
-        phone: req.phone.clone(),
-        email: req.email.clone(),
-        status: 1,
+    Json(req): Json<UpdateDeptRequest>,
+) -> impl IntoResponse {
+    let cmd = admin_app::department::dto::UpdateDeptCommand {
+        dept_id, name: req.name, parent_id: req.parent_id, sort: req.sort,
+        leader_user_id: req.leader_user_id, phone: req.phone, email: req.email,
     };
-    Ok(Json(ApiResponse::success(resp)))
+    match services::get().dept.update_dept(cmd, None).await {
+        Ok(r) => ApiR::success(map_dept(r)),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }
 
-/// DELETE /api/dept/{dept_id}
 async fn delete_dept(
-    State(_app): State<Arc<App>>,
     axum::extract::Path(dept_id): axum::extract::Path<u64>,
-) -> Result<Json<ApiResponse<Empty>>, tx_error::AppError> {
-    // TODO: 调用 DeptAppService::delete
-    let _ = dept_id;
-    Ok(Json(ApiResponse::success(Empty {})))
+) -> impl IntoResponse {
+    match services::get().dept.delete_dept(dept_id, None).await {
+        Ok(()) => ApiRes::ok(),
+        Err(e) => ApiRes::from(e),
+    }
 }
 
-/// POST /api/dept/list
 async fn list_depts(
-    State(_app): State<Arc<App>>,
-    Json(_req): Json<ListDeptsRequest>,
-) -> Result<Json<ApiResponse<Vec<DeptResponse>>>, tx_error::AppError> {
-    // TODO: 调用 DeptAppService::list (部门为树形，不分页)
-    Ok(Json(ApiResponse::success(vec![])))
+    Json(req): Json<ListDeptsRequest>,
+) -> impl IntoResponse {
+    let query = admin_app::department::dto::DeptQueryRequest {
+        name: req.name, status: req.status,
+    };
+    match services::get().dept.get_dept_list(query).await {
+        Ok(list) => ApiR::success(list.into_iter().map(map_dept).collect::<Vec<_>>()),
+        Err(e) => ApiRes::from(e).into_typed(),
+    }
 }

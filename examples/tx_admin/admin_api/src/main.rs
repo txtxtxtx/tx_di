@@ -1,5 +1,6 @@
 mod plugin;
 mod interfaces;
+mod services;
 
 use tx_di_core::BuildContext;
 
