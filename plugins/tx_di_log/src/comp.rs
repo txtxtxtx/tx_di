@@ -1,8 +1,7 @@
 use crate::LogConfig;
-use log::{error};
 use std::sync::{Arc, OnceLock};
 use std::{fs, panic};
-use tracing::info;
+use tracing::{info,debug,error};
 use tracing_appender::non_blocking::NonBlocking;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
@@ -29,7 +28,7 @@ impl CompInit for LogPlugins{
     fn inner_init(&mut self, _: &InnerContext ) -> RIE<()>{
         // 如果全局守卫已经初始化（例如并行测试场景），跳过重复设置
         if is_log_initialized() {
-            info!("日志系统已初始化，跳过重复初始化");
+            debug!("日志系统已初始化，跳过重复初始化");
             return Ok(());
         }
 
@@ -58,7 +57,7 @@ impl CompInit for LogPlugins{
 
         if LOG_GUARD.set(guard).is_err() {
             // 竞态条件：另一个线程在我们检查后完成了初始化，直接返回
-            info!("日志全局守卫已被其他线程设置，跳过");
+            debug!("日志全局守卫已被其他线程设置，跳过");
             return Ok(());
         }
 
@@ -128,7 +127,7 @@ impl CompInit for LogPlugins{
         panic::set_hook(Box::new(|panic_info| {
             error!("程序异常终止: {}", panic_info);
         }));
-        info!("日志初始化完成");
+        debug!("日志初始化完成");
         Ok(())
     }
 
