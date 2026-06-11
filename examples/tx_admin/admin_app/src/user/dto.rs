@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use admin_domain::user::model::aggregate::User;
 use admin_domain::user::model::value_object::{Sex, UserStatus};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,8 +68,8 @@ pub struct UserResponse {
     pub dept_ids: Vec<u64>,
 }
 
-impl From<admin_domain::user::model::aggregate::User> for UserResponse {
-    fn from(user: admin_domain::user::model::aggregate::User) -> Self {
+impl From<User> for UserResponse {
+    fn from(user: User) -> Self {
         Self {
             id: user.id,
             username: user.username,
