@@ -1,6 +1,7 @@
 //! Integration tests for DDD domain and application layers
 //! Uses mock repositories to verify functionality without real database
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use admin_app::mock::*;
@@ -902,7 +903,7 @@ async fn test_check_permission() {
     let permission_repo = Arc::new(
         permission_repo::MockPermissionRepository::new()
             .with_user_roles(1, vec![1])
-            .with_role_permissions(1, vec!["system:user:list".to_string(), "system:user:create".to_string()])
+            .with_role_permissions(1, HashSet::from(["system:user:list".to_string(), "system:user:create".to_string()]))
     );
     let permission_service = Arc::new(PermissionService::new(permission_repo));
     let app_service = PermissionAppService::new(permission_service);
@@ -929,8 +930,8 @@ async fn test_get_user_permissions() {
     let permission_repo = Arc::new(
         permission_repo::MockPermissionRepository::new()
             .with_user_roles(1, vec![1, 2])
-            .with_role_permissions(1, vec!["system:user:list".to_string()])
-            .with_role_permissions(2, vec!["system:role:list".to_string()])
+            .with_role_permissions(1, HashSet::from(["system:user:list".to_string()]))
+            .with_role_permissions(2, HashSet::from(["system:role:list".to_string()]))
     );
     let permission_service = Arc::new(PermissionService::new(permission_repo));
     let app_service = PermissionAppService::new(permission_service);
@@ -954,7 +955,7 @@ async fn test_login_success() {
     let permission_repo = Arc::new(
         permission_repo::MockPermissionRepository::new()
             .with_user_roles(1, vec![1])
-            .with_role_permissions(1, vec!["*".to_string()])
+            .with_role_permissions(1, HashSet::from(["*".to_string()]))
     );
     let role_repo = Arc::new(role_repo::MockRoleRepository::new());
 
