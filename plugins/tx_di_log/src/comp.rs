@@ -1,7 +1,7 @@
 use crate::LogConfig;
 use std::sync::{Arc, OnceLock};
 use std::{fs, panic};
-use tracing::{info,debug,error};
+use tracing::{debug,error};
 use tracing_appender::non_blocking::NonBlocking;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;

@@ -2,7 +2,7 @@
 
 use super::{FileInfo, FileStorage, FileStorageError, UploadParams, guess_mime_type};
 use async_trait::async_trait;
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 use tokio::fs;
 
 /// 本地文件系统存储
