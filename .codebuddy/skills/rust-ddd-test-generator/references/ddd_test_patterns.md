@@ -635,3 +635,177 @@ For each DDD aggregate / bounded context, ensure:
 | External service failure | `ExternalServiceError` / `ServiceUnavailable` |
 | Concurrency conflict | `OptimisticLockError` / `ConcurrencyConflict` |
 | Validation failure | `ValidationError` with field details |
+
+---
+
+## 11. Concurrency and Optimistic Lock Tests
+
+DDD aggregates that use version-based optimistic locking must test concurrent write conflicts.
+
+### 11.1 Optimistic Lock Conflict Test
+
+```rust
+#[tokio::test]
+async fn test_concurrent_order_confirm_raises_optimistic_lock_error() {
+    // Simulate two handlers reading the same aggregate version
+    let order_v1 = OrderBuilder::new().with_version(1).build();
+    let order_v1_copy = OrderBuilder::new().with_version(1).build(); // same version
+
+    let mut mock_repo = MockOrderRepository::new();
+    // First save succeeds (version 1 -> 2)
+    mock_repo
+        .expect_save()
+        .times(1)
+        .returning(|_| Ok(()));
+    // Second save fails — stale version
+    mock_repo
+        .expect_save()
+        .times(1)
+        .returning(|_| Err(RepositoryError::OptimisticLockConflict {
+            expected_version: 1,
+            actual_version: 2,
+        }));
+
+    let repo = Arc::new(mock_repo);
+
+    // First command succeeds
+    let result_a = confirm_order(order_v1, Arc::clone(&repo)).await;
+    assert!(result_a.is_ok());
+
+    // Second command with stale data fails
+    let result_b = confirm_order(order_v1_copy, Arc::clone(&repo)).await;
+    assert!(matches!(result_b, Err(ApplicationError::ConcurrencyConflict { .. })));
+}
+```
+
+### 11.2 Concurrent Access via tokio::join!
+
+For testing that the domain enforces consistency under parallel load:
+
+```rust
+#[tokio::test]
+async fn test_parallel_reads_do_not_interfere() {
+    let pool = test_db_pool().await;
+    let repo = Arc::new(SqlxOrderRepository::new(pool));
+
+    // Seed one order
+    let order = OrderBuilder::new().build();
+    repo.save(&order).await.unwrap();
+    let id = order.id().clone();
+
+    // Concurrent reads should all succeed and return the same data
+    let (r1, r2, r3) = tokio::join!(
+        repo.find_by_id(&id),
+        repo.find_by_id(&id),
+        repo.find_by_id(&id),
+    );
+    assert!(r1.unwrap().is_some());
+    assert!(r2.unwrap().is_some());
+    assert!(r3.unwrap().is_some());
+}
+
+#[tokio::test]
+async fn test_concurrent_writes_last_write_wins_or_conflicts() {
+    let pool = test_db_pool().await;
+    let repo = Arc::new(SqlxOrderRepository::new(pool));
+
+    let order = OrderBuilder::new().build();
+    repo.save(&order).await.unwrap();
+
+    let repo_a = Arc::clone(&repo);
+    let repo_b = Arc::clone(&repo);
+    let id_a = order.id().clone();
+    let id_b = order.id().clone();
+
+    let (result_a, result_b) = tokio::join!(
+        async move {
+            let mut o = repo_a.find_by_id(&id_a).await.unwrap().unwrap();
+            o.confirm().unwrap();
+            repo_a.save(&o).await
+        },
+        async move {
+            let mut o = repo_b.find_by_id(&id_b).await.unwrap().unwrap();
+            o.confirm().unwrap();
+            repo_b.save(&o).await
+        }
+    );
+
+    // Exactly one should succeed, the other should return a conflict error
+    let success_count = [result_a.is_ok(), result_b.is_ok()].iter().filter(|&&b| b).count();
+    assert_eq!(success_count, 1, "exactly one concurrent write should succeed");
+}
+```
+
+---
+
+## 12. testcontainers Integration Pattern
+
+Use `testcontainers` when you need a real database without relying on `sqlx::test` auto-provision.
+
+```toml
+# Cargo.toml [dev-dependencies]
+testcontainers = "0.22"
+testcontainers-modules = { version = "0.11", features = ["postgres"] }
+```
+
+```rust
+use testcontainers::{clients::Cli, Container};
+use testcontainers_modules::postgres::Postgres;
+
+async fn start_postgres() -> (Container<'static, Postgres>, PgPool) {
+    let docker = Cli::default();
+    let node = docker.run(Postgres::default());
+    let port = node.get_host_port_ipv4(5432);
+    let url = format!("postgres://postgres:postgres@127.0.0.1:{}/postgres", port);
+
+    let pool = PgPool::connect(&url).await.unwrap();
+    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+
+    (node, pool)  // keep node alive for test duration
+}
+
+#[tokio::test]
+async fn test_order_repository_with_real_postgres() {
+    let (_node, pool) = start_postgres().await;
+    let repo = SqlxOrderRepository::new(pool);
+
+    let order = OrderBuilder::new().build();
+    repo.save(&order).await.unwrap();
+
+    let found = repo.find_by_id(order.id()).await.unwrap();
+    assert!(found.is_some());
+}
+```
+
+> Note: `_node` must be kept alive (not dropped early) or the container stops immediately.
+> For Redis: use `testcontainers_modules::redis::Redis` with port 6379.
+
+---
+
+## 13. Workspace and Feature Flag Notes
+
+For **multi-crate Cargo workspaces**, always run integration tests with explicit features:
+
+```bash
+# Run all tests with all features (recommended for CI)
+cargo test --workspace --all-features
+
+# Run a specific crate's tests
+cargo test -p my-domain-crate --all-features
+
+# Feature-gated integration tests (e.g. only run when "integration" feature is on)
+cargo test --features integration
+```
+
+In `Cargo.toml`, gate slow integration tests behind a feature:
+
+```toml
+[features]
+integration = []   # enable with --features integration
+```
+
+```rust
+#[cfg(feature = "integration")]
+#[tokio::test]
+async fn test_full_checkout_flow_with_real_db() { ... }
+```

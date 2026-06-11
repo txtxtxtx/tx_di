@@ -240,6 +240,10 @@ cargo test --lib                    # unit tests only
 cargo test --test '*'               # integration tests only
 cargo test                          # all tests
 cargo test -- --nocapture           # with stdout output
+
+# Multi-crate workspace (always use --all-features to avoid feature flag issues)
+cargo test --workspace --all-features
+cargo test -p my-crate --all-features
 ```
 
 **Minimum coverage targets:**
@@ -247,6 +251,11 @@ cargo test -- --nocapture           # with stdout output
 - Application layer: ≥ 85%
 - Infrastructure layer: ≥ 75%
 - Overall: ≥ 80%
+
+**Cargo workspace and feature flag note:** In multi-crate workspaces, integration tests that depend
+on optional features must be run with `--all-features` or `--features <name>`. Gate slow
+integration tests behind a Cargo feature (e.g. `[features] integration = []`) to keep
+`cargo test` fast in development.
 
 ### Step 10: CI-Ready Test Configuration
 
