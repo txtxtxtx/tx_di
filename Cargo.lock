@@ -9,6 +9,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
+name = "admin_api"
+version = "0.1.0"
+
+[[package]]
 name = "admin_app"
 version = "0.1.0"
 dependencies = [
@@ -39,6 +43,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "admin_infra"
+version = "0.1.0"
+
+[[package]]
 name = "admin_macros"
 version = "0.1.0"
 dependencies = [
@@ -46,6 +54,10 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "admin_proto"
+version = "0.1.0"
 
 [[package]]
 name = "admin_server"

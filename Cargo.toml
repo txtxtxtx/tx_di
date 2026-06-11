@@ -37,7 +37,7 @@ members = [
     "examples/admin_server",
     "examples/tx_admin/admin_app",
     "examples/tx_admin/admin_domain",
-    "examples/tx_admin/admin_macros",
+    "examples/tx_admin/admin_macros", "examples/tx_admin/admin_infra", "examples/tx_admin/admin_api", "examples/tx_admin/admin_proto",
 ]
 resolver = "3"
 [workspace.package]

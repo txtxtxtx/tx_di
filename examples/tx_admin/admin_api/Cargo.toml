@@ -1,0 +1,10 @@
+[package]
+name = "admin_api"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+
+[dependencies]
