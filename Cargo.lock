@@ -11,6 +11,22 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 [[package]]
 name = "admin_api"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "jiff",
+ "serde",
+ "serde_json",
+ "toasty",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tx-di-core",
+ "tx_di_axum",
+ "tx_di_log",
+ "tx_error",
+]
 
 [[package]]
 name = "admin_app"
