@@ -26,6 +26,7 @@ dependencies = [
  "tower 0.5.3",
  "tracing",
  "tx-di-core",
+ "tx_common",
  "tx_di_axum",
  "tx_di_log",
  "tx_error",
