@@ -1,3 +1,6 @@
+//! 用来桥接di 与 业务
+//!
+
 use std::any::Any;
 use std::any::TypeId;
 use std::sync::Arc;
@@ -35,7 +38,8 @@ use crate::dictionary::app_service::{DictTypeAppService, DictDataAppService};
 use crate::log::app_service::{OperateLogAppService, LoginLogAppService};
 use crate::file::app_service::FileAppService;
 
-// 为 AppService 实现 ComponentDescriptor，使其可通过 DiComp<T> 注入 axum handler
+/// 为 AppService 实现 ComponentDescriptor，使其可通过 DiComp<T> 注入 axum handler
+/// 且不走初始化流程
 macro_rules! make_injectable {
     ($t:ty) => {
         impl CompInit for $t {}
@@ -66,7 +70,7 @@ pub struct AppPlugin;
 impl CompInit for AppPlugin {
     async_method!(
         fn async_init_impl(ctx: Arc<App>, _token: CancellationToken) -> RIE<()> {
-            // ── 创建 Mock 仓库 ──
+            // ── 创建 Mock 仓库 ── todo 之后使用具体的仓储
             let user_repo = Arc::new(MockUserRepository::new());
             let role_repo = Arc::new(MockRoleRepository::new());
             let menu_repo = Arc::new(MockMenuRepository::new());
