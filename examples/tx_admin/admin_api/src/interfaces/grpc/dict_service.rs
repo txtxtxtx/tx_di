@@ -73,9 +73,9 @@ impl DictService for DictGrpcService {
         };
         services::get().dict_type.get_dict_type_page(q).await
             .map(|p| {
-                let total = p.total; let page = p.page; let size = p.size; let total_pages = p.total_pages();
+                let total = p.total; let page = p.page; let size = p.size;
                 let items = p.list.into_iter().map(map_type).collect();
-                Response::new(ListDictTypesResponse { items, page_info: Some(PageResponse { total, page, size, total_pages }) })
+                Response::new(ListDictTypesResponse { items, page_info: Some(PageResponse { total, page, size }) })
             })
             .map_err(|e| Status::internal(e.to_string()))
     }
@@ -130,9 +130,9 @@ impl DictService for DictGrpcService {
         };
         services::get().dict_data.get_dict_data_page(q).await
             .map(|p| {
-                let total = p.total; let page = p.page; let size = p.size; let total_pages = p.total_pages();
+                let total = p.total; let page = p.page; let size = p.size;
                 let items = p.list.into_iter().map(map_data).collect();
-                Response::new(ListDictDataResponse { items, page_info: Some(PageResponse { total, page, size, total_pages }) })
+                Response::new(ListDictDataResponse { items, page_info: Some(PageResponse { total, page, size }) })
             })
             .map_err(|e| Status::internal(e.to_string()))
     }

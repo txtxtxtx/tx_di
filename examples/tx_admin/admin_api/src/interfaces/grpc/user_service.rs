@@ -7,6 +7,7 @@ use admin_proto::admin::user::{
     CreateUserRequest, UserResponse, UpdateUserRequest, DeleteUserRequest,
     GetUserRequest, ListUsersRequest, ListUsersResponse,
     ChangePasswordRequest, AssignRolesRequest, AssignDeptsRequest,
+    ChangeUserStatusRequest,
 };
 use admin_proto::Empty;
 use admin_proto::admin::common::PageResponse;
@@ -22,6 +23,9 @@ fn map_user(r: admin_app::user::dto::UserResponse) -> UserResponse {
         email: r.email, mobile: r.mobile, sex: r.sex as i32,
         status: r.status as i32, remark: r.remark,
         role_ids: r.role_ids, dept_ids: r.dept_ids,
+        avatar: r.avatar, login_ip: r.login_ip, login_date: r.login_date.unwrap_or(0),
+        tenant_id: r.tenant_id,
+        create_time: r.create_time, update_time: r.update_time,
     }
 }
 
@@ -45,10 +49,21 @@ impl UserService for UserGrpcService {
         let req = request.into_inner();
         let cmd = admin_app::user::dto::UpdateUserCommand {
             user_id: req.user_id, nickname: req.nickname, email: req.email,
-            mobile: req.mobile, sex: Sex::from(req.sex), remark: req.remark,
+            mobile: req.mobile, sex: req.sex.map(Sex::from),
+            status: req.status.and_then(|s| UserStatus::try_from_i32(s).ok()),
+            remark: req.remark,
         };
         services::get().user.update_user(cmd, None).await
             .map(|r| Response::new(map_user(r)))
+            .map_err(|e| Status::internal(e.to_string()))
+    }
+
+    async fn change_user_status(&self, request: Request<ChangeUserStatusRequest>) -> Result<Response<Empty>, Status> {
+        let req = request.into_inner();
+        let status = UserStatus::try_from_i32(req.status)
+            .map_err(|e| Status::invalid_argument(e.to_string()))?;
+        services::get().user.change_status(req.user_id, status, None).await
+            .map(|_| Response::new(Empty {}))
             .map_err(|e| Status::internal(e.to_string()))
     }
 
@@ -69,15 +84,16 @@ impl UserService for UserGrpcService {
     async fn list_users(&self, request: Request<ListUsersRequest>) -> Result<Response<ListUsersResponse>, Status> {
         let req = request.into_inner();
         let status = req.status.and_then(|s| UserStatus::try_from_i32(s).ok());
+        let page_info = req.page_info.unwrap_or_default();
         let query = admin_app::user::dto::UserQueryRequest {
             username: req.username, nickname: req.nickname, mobile: req.mobile,
-            status, dept_id: req.dept_id, page: req.page, size: req.page_size,
+            status, dept_id: req.dept_id, page: page_info.page, size: page_info.size,
         };
         services::get().user.get_user_page(query).await
             .map(|p| {
-                let total = p.total; let page = p.page; let size = p.size; let total_pages = p.total_pages();
+                let total = p.total; let page = p.page; let size = p.size;
                 let items = p.list.into_iter().map(map_user).collect();
-                Response::new(ListUsersResponse { items, page_info: Some(PageResponse { total, page, size, total_pages }) })
+                Response::new(ListUsersResponse { items, page_info: Some(PageResponse { total, page, size }) })
             })
             .map_err(|e| Status::internal(e.to_string()))
     }

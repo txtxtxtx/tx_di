@@ -54,9 +54,9 @@ impl LogService for LogGrpcService {
         };
         services::get().oper_log.get_log_page(q).await
             .map(|p| {
-                let total = p.total; let page = p.page; let size = p.size; let total_pages = p.total_pages();
+                let total = p.total; let page = p.page; let size = p.size;
                 let items = p.list.into_iter().map(map_oper_log).collect();
-                Response::new(ListOperateLogsResponse { items, page_info: Some(PageResponse { total, page, size, total_pages }) })
+                Response::new(ListOperateLogsResponse { items, page_info: Some(PageResponse { total, page, size }) })
             })
             .map_err(|e| Status::internal(e.to_string()))
     }
@@ -83,9 +83,9 @@ impl LogService for LogGrpcService {
         };
         services::get().login_log.get_log_page(q).await
             .map(|p| {
-                let total = p.total; let page = p.page; let size = p.size; let total_pages = p.total_pages();
+                let total = p.total; let page = p.page; let size = p.size;
                 let items = p.list.into_iter().map(map_login_log).collect();
-                Response::new(ListLoginLogsResponse { items, page_info: Some(PageResponse { total, page, size, total_pages }) })
+                Response::new(ListLoginLogsResponse { items, page_info: Some(PageResponse { total, page, size }) })
             })
             .map_err(|e| Status::internal(e.to_string()))
     }

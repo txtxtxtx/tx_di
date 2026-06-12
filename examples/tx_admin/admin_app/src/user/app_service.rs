@@ -87,10 +87,10 @@ impl UserAppService {
             .user_service
             .update_user(
                 cmd.user_id,
-                cmd.nickname,
+                cmd.nickname.unwrap_or_default(),
                 cmd.email,
                 cmd.mobile,
-                cmd.sex,
+                cmd.sex.unwrap_or(Sex::Unknown),
                 cmd.remark,
                 updater,
             )

@@ -11,6 +11,7 @@ import "common.proto";
 service UserService {
   rpc CreateUser(CreateUserRequest) returns (UserResponse);
   rpc UpdateUser(UpdateUserRequest) returns (UserResponse);
+  rpc ChangeUserStatus(ChangeUserStatusRequest) returns (admin.common.Empty);
   rpc DeleteUser(DeleteUserRequest) returns (admin.common.Empty);
   rpc GetUser(GetUserRequest) returns (UserResponse);
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
@@ -20,24 +21,31 @@ service UserService {
 }
 
 message CreateUserRequest {
-  string username = 1;
-  string password = 2;
-  string nickname = 3;
+  string username = 1;      // 必填
+  string password = 2;      // 必填
+  string nickname = 3;      // 必填
   optional string email = 4;
   optional string mobile = 5;
-  optional int32 sex = 6;
+  optional int32 sex = 6;   // 0-未知, 1-男, 2-女
   optional string remark = 7;
   repeated uint64 role_ids = 8;
   repeated uint64 dept_ids = 9;
 }
 
+// 部分更新：仅传需要修改的字段
 message UpdateUserRequest {
-  uint64 user_id = 1;
-  string nickname = 2;
+  uint64 user_id = 1;           // 必填
+  optional string nickname = 2;
   optional string email = 3;
   optional string mobile = 4;
-  int32 sex = 5;
+  optional int32 sex = 5;       // 0-未知, 1-男, 2-女
   optional string remark = 6;
+  optional int32 status = 7;    // 0-正常, 1-禁用, 2-锁定
+}
+
+message ChangeUserStatusRequest {
+  uint64 user_id = 1;
+  int32 status = 2;             // 0-正常, 1-禁用, 2-锁定
 }
 
 message DeleteUserRequest {
@@ -54,8 +62,7 @@ message ListUsersRequest {
   optional string mobile = 3;
   optional int32 status = 4;
   optional uint64 dept_id = 5;
-  int64 page = 6;
-  int64 page_size = 7;
+  admin.common.PageRequest page_info = 6;
 }
 
 message ChangePasswordRequest {
@@ -79,11 +86,17 @@ message UserResponse {
   string nickname = 3;
   optional string email = 4;
   optional string mobile = 5;
-  int32 sex = 6;
-  int32 status = 7;
+  int32 sex = 6;                // 0-未知, 1-男, 2-女
+  int32 status = 7;             // 0-正常, 1-禁用, 2-锁定
   optional string remark = 8;
   repeated uint64 role_ids = 9;
   repeated uint64 dept_ids = 10;
+  optional string avatar = 11;
+  optional string login_ip = 12;
+  int64 login_date = 13;        // Unix 时间戳（毫秒），0 表示未登录
+  uint64 tenant_id = 14;
+  int64 create_time = 15;       // Unix 时间戳（毫秒）
+  int64 update_time = 16;       // Unix 时间戳（毫秒）
 }
 
 message ListUsersResponse {

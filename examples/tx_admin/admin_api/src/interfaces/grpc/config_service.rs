@@ -71,9 +71,9 @@ impl ConfigService for ConfigGrpcService {
         };
         services::get().config.get_config_page(query).await
             .map(|p| {
-                let total = p.total; let page = p.page; let size = p.size; let total_pages = p.total_pages();
+                let total = p.total; let page = p.page; let size = p.size;
                 let items = p.list.into_iter().map(map_config).collect();
-                Response::new(ListConfigsResponse { items, page_info: Some(PageResponse { total, page, size, total_pages }) })
+                Response::new(ListConfigsResponse { items, page_info: Some(PageResponse { total, page, size }) })
             })
             .map_err(|e| Status::internal(e.to_string()))
     }

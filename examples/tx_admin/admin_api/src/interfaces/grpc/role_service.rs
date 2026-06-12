@@ -69,9 +69,9 @@ impl RoleService for RoleGrpcService {
         };
         services::get().role.get_role_page(query).await
             .map(|p| {
-                let total = p.total; let page = p.page; let size = p.size; let total_pages = p.total_pages();
+                let total = p.total; let page = p.page; let size = p.size;
                 let items = p.list.into_iter().map(map_role).collect();
-                Response::new(ListRolesResponse { items, page_info: Some(PageResponse { total, page, size, total_pages }) })
+                Response::new(ListRolesResponse { items, page_info: Some(PageResponse { total, page, size }) })
             })
             .map_err(|e| Status::internal(e.to_string()))
     }

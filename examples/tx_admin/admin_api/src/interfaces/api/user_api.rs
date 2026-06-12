@@ -39,6 +39,12 @@ fn map_user(r: admin_app::user::dto::UserResponse) -> UserResponse {
         remark: r.remark,
         role_ids: r.role_ids,
         dept_ids: r.dept_ids,
+        avatar: r.avatar,
+        login_ip: r.login_ip,
+        login_date: r.login_date.unwrap_or(0),
+        tenant_id: r.tenant_id,
+        create_time: r.create_time,
+        update_time: r.update_time,
     }
 }
 
@@ -84,7 +90,8 @@ async fn update_user(
         nickname: req.nickname,
         email: req.email,
         mobile: req.mobile,
-        sex: Sex::from(req.sex),
+        sex: req.sex.map(Sex::from),
+        status: req.status.and_then(|s| UserStatus::try_from_i32(s).ok()),
         remark: req.remark,
     };
     match services::get().user.update_user(cmd, None).await {
@@ -111,14 +118,15 @@ async fn list_users(
         Some(s) => UserStatus::try_from_i32(s).ok(),
         None => None,
     };
+    let page_info = req.page_info.unwrap_or_default();
     let query = admin_app::user::dto::UserQueryRequest {
         username: req.username,
         nickname: req.nickname,
         mobile: req.mobile,
         status,
         dept_id: req.dept_id,
-        page: req.page,
-        size: req.page_size,
+        page: page_info.page,
+        size: page_info.size,
     };
     match services::get().user.get_user_page(query).await {
         Ok(page) => ApiR::success(Page::new(
