@@ -198,23 +198,6 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
         vec![]
     };
 
-    // 生成 trait 注册代码（如果有 as_trait 属性）
-    let trait_registration = if let Some(trait_name) = &comp_attr.as_trait {
-        let trait_type: syn::Type = syn::parse_str(trait_name).unwrap();
-        quote! {
-            // 注册 trait object 映射
-            // 将具体类型转换为 trait object，包装为 TraitWrapper 后注册
-            let trait_instance: ::std::sync::Arc<dyn #trait_type> = ::std::sync::Arc::new(instance);
-            let wrapper = ::tx_di_core::TraitWrapper { inner: trait_instance };
-            store.insert(
-                ::std::any::TypeId::of::<::tx_di_core::TraitWrapper<dyn #trait_type>>(),
-                ::tx_di_core::CompRef::Cached(::std::sync::Arc::new(wrapper)),
-            );
-        }
-    } else {
-        quote! {}
-    };
-
     let output = quote! {
         // ── 原始结构体定义（已去掉 #[tx_cst] 属性） ───────────────────────
         #clean_input
@@ -246,9 +229,6 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
             // build — 统一 store-based factory_fn 签名
             factory_fn: Some((|store: &::tx_di_core::DashMap<::std::any::TypeId, ::tx_di_core::CompRef>| {
                 let instance = <#struct_name as ::tx_di_core::ComponentDescriptor>::build(store);
-                
-                // 如果有 as_trait 属性，同时注册 trait object
-                #trait_registration
                 
                 ::std::boxed::Box::new(
                     instance

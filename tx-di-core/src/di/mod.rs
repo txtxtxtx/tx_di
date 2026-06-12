@@ -16,7 +16,7 @@ use dashmap::DashMap;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use tokio::signal;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -30,8 +30,8 @@ pub type InnerContext = DashMap<TypeId, CompRef>;
 /// trait → 具体类型的映射表
 /// key: trait 的 TypeId（如 TypeId::of::<dyn UserRepository>()）
 /// value: 具体类型的 TypeId（如 TypeId::of::<SqliteUserRepository>()）
-static TRAIT_IMPL_MAP: once_cell::sync::Lazy<DashMap<TypeId, TypeId>> = 
-    once_cell::sync::Lazy::new(DashMap::new);
+static TRAIT_IMPL_MAP: LazyLock<DashMap<TypeId, TypeId>> = 
+    LazyLock::new(DashMap::new);
 
 /// 构建上下文
 pub struct BuildContext {

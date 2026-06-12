@@ -85,7 +85,7 @@ pub struct ComponentMeta {
     /// //     ...
     /// // }
     /// ```
-    pub impl_traits: &'static [&'static str],
+    pub impl_traits: &'static [fn() -> TypeId],
 
     /// 初始化顺序
     pub init_sort_fn: fn() -> i32,
