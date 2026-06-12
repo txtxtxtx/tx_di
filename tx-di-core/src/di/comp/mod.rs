@@ -38,7 +38,8 @@ pub static COMPONENT_REGISTRY: [ComponentMeta] = [..];
 /// - `name`: 组件的类型名称字符串，用于调试和错误提示
 /// - `scope`: 组件的作用域（Singleton 或 Prototype），决定实例的生命周期
 /// - `factory_fn`: 工厂函数，接收 `&DashMap<TypeId, CompRef>`，用于构建组件实例
-/// - `impl_traits`: 该组件实现的 trait 名称列表，用于支持 trait object 注入
+/// - `impl_traits`: 该组件实现的 trait TypeId 列表，用于支持 trait object 注入
+/// - `trait_register_fn`: trait 注册函数，将具体类型转型为 trait object 存入 store
 pub struct ComponentMeta {
     /// 返回组件类型 `TypeId` 的函数指针。
     ///
@@ -69,23 +70,29 @@ pub struct ComponentMeta {
     /// - App 阶段：Prototype 调用闭包每次创建新实例
     pub factory_fn: Option<StoreFactoryFn>,
 
-    /// 该组件实现的 trait 名称列表。
+    /// 该组件实现的 trait TypeId 列表。
     ///
-    /// 用于支持 trait object 注入。当用户使用 `#[tx_comp(as_trait = "TraitName")]` 时，
-    /// 宏会将 trait 名称记录到此字段。注入时，框架可以通过此字段查找实现了特定 trait 的具体类型。
+    /// 用于支持 trait object 注入。当用户使用 `#[tx_comp(as_trait = dyn Trait)]` 时，
+    /// 宏会生成 `|| TypeId::of::<dyn Trait>()` 记录到此字段。
     ///
     /// # 示例
     ///
     /// ```ignore
-    /// #[tx_comp(as_trait = "UserRepository")]
+    /// #[tx_comp(as_trait = dyn UserRepository)]
     /// pub struct SqliteUserRepository { ... }
     ///
     /// // ComponentMeta {
-    /// //     impl_traits: &["UserRepository"],
+    /// //     impl_traits: &[|| TypeId::of::<dyn UserRepository>()],
     /// //     ...
     /// // }
     /// ```
     pub impl_traits: &'static [fn() -> TypeId],
+
+    /// trait 注册函数：在 `auto_register_all` 阶段调用，将 trait object 存入 store。
+    ///
+    /// 宏为每个 `as_trait` 组件生成此函数，内部将具体实例转型为 `Arc<dyn Trait>`
+    /// 并以 `TypeId::of::<dyn Trait>()` 为 key 存入 store。
+    pub trait_register_fn: Option<fn(&DashMap<TypeId, CompRef>)>,
 
     /// 初始化顺序
     pub init_sort_fn: fn() -> i32,

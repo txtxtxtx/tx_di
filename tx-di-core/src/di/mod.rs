@@ -16,7 +16,7 @@ use dashmap::DashMap;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 use tokio::signal;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -27,11 +27,6 @@ use tracing::{debug, info};
 /// 构建上下文,本质上就是一个map
 pub type InnerContext = DashMap<TypeId, CompRef>;
 
-/// trait → 具体类型的映射表
-/// key: trait 的 TypeId（如 TypeId::of::<dyn UserRepository>()）
-/// value: 具体类型的 TypeId（如 TypeId::of::<SqliteUserRepository>()）
-static TRAIT_IMPL_MAP: LazyLock<DashMap<TypeId, TypeId>> = 
-    LazyLock::new(DashMap::new);
 
 /// 构建上下文
 pub struct BuildContext {
@@ -86,13 +81,12 @@ impl crate::BuildContext {
                 if let Some(factory_fn) = meta.factory_fn {
                     // 注册具体类型
                     self.register_factory_boxed((meta.type_id)(), meta.scope, factory_fn);
-                    
-                    // 如果组件实现了 trait，记录 trait → 具体类型的映射
-                    for trait_name in meta.impl_traits {
-                        debug!("组件 '{}' 实现了 trait '{}'", meta.name, trait_name);
-                        // 注意：这里无法在运行时直接获取 trait 的 TypeId
-                        // 因为 trait_name 是字符串，不是类型
-                        // 映射关系需要在宏层面处理
+                }
+                // 注册 trait object 到 store
+                if let Some(register_fn) = meta.trait_register_fn {
+                    register_fn(&self.store);
+                    for trait_fn in meta.impl_traits {
+                        debug!("组件 '{}' 实现了 trait {:?}", meta.name, trait_fn());
                     }
                 }
                 self.metas.push(meta);

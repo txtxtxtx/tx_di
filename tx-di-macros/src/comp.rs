@@ -191,11 +191,48 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
         }
     };
 
-    // 生成 impl_traits 数组
-    let impl_traits: Vec<String> = if let Some(trait_name) = &comp_attr.as_trait {
-        vec![trait_name.clone()]
+    // 生成 impl_traits 数组：fn() -> TypeId
+    let impl_trait_fns: Vec<TokenStream2> = if let Some(trait_ty) = &comp_attr.as_trait {
+        vec![quote! { || ::std::any::TypeId::of::<#trait_ty>() }]
     } else {
         vec![]
+    };
+
+    // 生成 trait_register_fn：将 Arc<Concrete> 转型为 Arc<dyn Trait> 并存入 store
+    let trait_register_fn = if let (Some(trait_ty), scope_attr) = (&comp_attr.as_trait, &comp_attr.scope) {
+        match scope_attr {
+            ScopeAttr::Singleton => {
+                // Singleton：取出已缓存的实例，转型后存为 Cached
+                quote! {
+                    Some((|store: &::tx_di_core::DashMap<::std::any::TypeId, ::tx_di_core::CompRef>| {
+                        let concrete = ::tx_di_core::inject_from_store::<#struct_name>(store);
+                        let as_trait: ::std::sync::Arc<#trait_ty> = concrete;
+                        store.insert(
+                            ::std::any::TypeId::of::<#trait_ty>(),
+                            ::tx_di_core::CompRef::Cached(::std::sync::Arc::new(as_trait) as ::std::sync::Arc<dyn ::std::any::Any + ::std::marker::Send + ::std::marker::Sync>),
+                        );
+                    }) as fn(&::tx_di_core::DashMap<::std::any::TypeId, ::tx_di_core::CompRef>))
+                }
+            }
+            ScopeAttr::Prototype => {
+                // Prototype：注册工厂闭包，每次注入时创建新实例
+                quote! {
+                    Some((|store: &::tx_di_core::DashMap<::std::any::TypeId, ::tx_di_core::CompRef>| {
+                        store.insert(
+                            ::std::any::TypeId::of::<#trait_ty>(),
+                            ::tx_di_core::CompRef::Factory(::std::sync::Arc::new(|store| {
+                                let instance = <#struct_name as ::tx_di_core::ComponentDescriptor>::build(store);
+                                let concrete = ::std::sync::Arc::new(instance);
+                                let as_trait: ::std::sync::Arc<#trait_ty> = concrete;
+                                ::std::sync::Arc::new(as_trait) as ::std::sync::Arc<dyn ::std::any::Any + ::std::marker::Send + ::std::marker::Sync>
+                            })),
+                        );
+                    }) as fn(&::tx_di_core::DashMap<::std::any::TypeId, ::tx_di_core::CompRef>))
+                }
+            }
+        }
+    } else {
+        quote! { None }
     };
 
     let output = quote! {
@@ -234,7 +271,8 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
                     instance
                 ) as ::std::boxed::Box<dyn ::std::any::Any + ::std::marker::Send + ::std::marker::Sync>
             }) as fn(&::tx_di_core::DashMap<::std::any::TypeId, ::tx_di_core::CompRef>) -> ::std::boxed::Box<dyn ::std::any::Any + ::std::marker::Send + ::std::marker::Sync>),
-            impl_traits: &[ #( #impl_traits ),* ],
+            impl_traits: &[ #( #impl_trait_fns ),* ],
+            trait_register_fn: #trait_register_fn,
             init_sort_fn: <#struct_name as ::tx_di_core::CompInit>::init_sort,
             init_fn: Some(<#struct_name as ::tx_di_core::CompInit>::init),
             async_init_fn: Some(<#struct_name as ::tx_di_core::CompInit>::async_init),
@@ -252,7 +290,7 @@ fn parse_component_attr(attr_tokens: TokenStream) -> SynResult<CompAttr> {
         return Ok(CompAttr { scope: ScopeAttr::Singleton, has_init: false, conf: None, as_trait: None });
     }
 
-    struct AttrArgs { scope: ScopeAttr, has_init: bool, conf: Option<Option<String>>, as_trait: Option<String> }
+    struct AttrArgs { scope: ScopeAttr, has_init: bool, conf: Option<Option<String>>, as_trait: Option<Type> }
 
     impl Parse for AttrArgs {
         fn parse(input: ParseStream) -> SynResult<Self> {
@@ -298,20 +336,15 @@ fn parse_component_attr(attr_tokens: TokenStream) -> SynResult<CompAttr> {
                 else if key == "as_trait" {
                     if input.peek(Token![=]) {
                         let _eq: Token![=] = input.parse()?;
-                        let value: Expr = input.parse()?;
-                        let trait_name = match &value {
-                            Expr::Lit(lit) => if let syn::Lit::Str(s) = &lit.lit { s.value() }
-                                else { return Err(syn::Error::new_spanned(&value, "as_trait 值必须是字符串")); },
-                            _ => return Err(syn::Error::new_spanned(&value, "as_trait 值必须是字符串")),
-                        };
-                        as_trait = Some(trait_name);
+                        let trait_type: Type = input.parse()?;
+                        as_trait = Some(trait_type);
                     } else {
-                        return Err(syn::Error::new_spanned(key, "as_trait 必须指定值，例如 as_trait = \"UserRepository\""));
+                        return Err(syn::Error::new_spanned(key, "as_trait 必须指定值，例如 as_trait = dyn UserRepository"));
                     }
                 }
                 else {
                     return Err(syn::Error::new_spanned(key,
-                        "#[tx_comp] 支持 scope / init / conf / as_trait 参数"));
+                        "#[tx_comp] 支持 scope / init / conf / as_trait 参数（as_trait 使用类型路径，如 as_trait = dyn Trait）"));
                 }
 
                 if input.peek(Token![,]) { let _: Token![,] = input.parse()?; }
@@ -330,7 +363,7 @@ struct CompAttr {
     scope: ScopeAttr,
     has_init: bool,
     conf: Option<Option<String>>,
-    as_trait: Option<String>,
+    as_trait: Option<Type>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

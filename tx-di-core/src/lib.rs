@@ -15,8 +15,6 @@
 
 mod di;
 
-use std::any::TypeId;
-
 pub use linkme;
 pub use dashmap;
 pub use dashmap::DashMap;
@@ -33,7 +31,7 @@ pub type IE = AppError;
 pub use tx_common::{ApiR, ApiRes, RCode, FormattedDateTime};
 pub use di::{BuildContext, scopes::Scope, App, InnerContext,
              comp::{ComponentMeta, topo_sort, COMPONENT_REGISTRY, config::AppAllConfig},
-             comp::comp_ref::{CompRef, ComponentDescriptor, CompInit, BoxFuture, inject_from_store, inject_trait_from_store, TraitWrapper},
+             comp::comp_ref::{CompRef, ComponentDescriptor, CompInit, BoxFuture, inject_from_store, inject_trait_from_store},
 };
 pub use tokio_util::sync::CancellationToken;
 

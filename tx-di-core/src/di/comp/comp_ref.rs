@@ -212,25 +212,13 @@ pub fn inject_from_store<T: Any + Send + Sync + 'static>(
         })
 }
 
-/// Trait object 包装器
-///
-/// 用于将 `Arc<dyn Trait>` 存储在 `Arc<dyn Any + Send + Sync>` 中。
-/// 由于 Rust 的类型系统限制，`Arc<dyn Trait>` 不能直接转换为 `Arc<dyn Any + Send + Sync>`，
-/// 需要通过此包装器中转。
-///
-/// # 使用场景
-///
-/// 当组件使用 `#[tx_comp(as_trait = "TraitName")]` 注册时，框架会将 `Arc<dyn Trait>`
-/// 包装为 `TraitWrapper<dyn Trait>` 后存储在 store 中。
-#[repr(transparent)]
-pub struct TraitWrapper<T: ?Sized> {
-    pub inner: Arc<T>,
-}
-
 /// 从 store 中注入 trait object。
 ///
-/// 当组件使用 `#[tx_comp(as_trait = "TraitName")]` 注册时，框架会在 store 中
-/// 同时注册具体类型和 trait object（通过 TraitWrapper 包装）。此函数用于从 store 中获取 trait object。
+/// 当组件使用 `#[tx_comp(as_trait = dyn Trait)]` 注册时，框架会在 store 中
+/// 同时注册具体类型和 trait object。此函数用于从 store 中获取 trait object。
+///
+/// 内部使用 double-Arc 包装：`Arc<Arc<dyn Trait>>` 存储为 `Arc<dyn Any + Send + Sync>`，
+/// 取出时通过 `downcast_ref::<Arc<T>>()` 还原。
 ///
 /// # 参数
 ///
@@ -243,19 +231,12 @@ pub struct TraitWrapper<T: ?Sized> {
 /// # Panics
 ///
 /// - 组件未注册时 panic
-///
-/// # 示例
-///
-/// ```ignore
-/// let repo: Arc<dyn UserRepository> = inject_trait_from_store(store);
-/// ```
 pub fn inject_trait_from_store<T: ?Sized + Any + Send + Sync + 'static>(
     store: &DashMap<TypeId, CompRef>,
 ) -> Arc<T> {
-    let tid = TypeId::of::<TraitWrapper<T>>();
+    let tid = TypeId::of::<T>();
     let type_name = std::any::type_name::<T>();
-    
-    // 从 store 中获取 TraitWrapper<T>
+
     store
         .get(&tid)
         .map(|entry| match &*entry {
@@ -263,10 +244,11 @@ pub fn inject_trait_from_store<T: ?Sized + Any + Send + Sync + 'static>(
             CompRef::Factory(f) => f(store),
         })
         .map(|arc_any| {
-            // 从 Arc<dyn Any + Send + Sync> 中取出 TraitWrapper<T>
-            let wrapper = arc_any.downcast_ref::<TraitWrapper<T>>()
-                .expect("[di] 注入失败: TraitWrapper 类型不匹配");
-            wrapper.inner.clone()
+            // 存储的是 Arc<Arc<T>>（即 Arc<dyn Any> 内部是 Arc<T>）
+            // downcast_ref 到 &Arc<T> 然后 clone 得到 Arc<T>
+            let inner = arc_any.downcast_ref::<Arc<T>>()
+                .expect("[di] 注入失败: trait 类型不匹配，存储的不是 Arc<dyn Trait>");
+            inner.clone()
         })
         .unwrap_or_else(|| {
             let registered: Vec<String> = store
@@ -276,7 +258,7 @@ pub fn inject_trait_from_store<T: ?Sized + Any + Send + Sync + 'static>(
             panic!(
                 "[di] 注入失败: trait `{}` 未注册。\n\
                  请确认:\n\
-                 1. 实现该 trait 的结构体已标注 #[tx_comp(as_trait = \"...\")]\n\
+                 1. 实现该 trait 的结构体已标注 #[tx_comp(as_trait = dyn Trait)]\n\
                  2. trait 继承了 Any + Send + Sync\n\
                  已注册组件 ({} 个): [{}]",
                 type_name,
