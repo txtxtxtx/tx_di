@@ -4,7 +4,7 @@ pub mod config;
 use dashmap::DashMap;
 use std::any::{Any, TypeId};
 use tracing::debug;
-use crate::{App, BoxFuture, CompRef, Scope};
+use crate::{App, BoxFuture, CompRef, Scope, TRAIT_IMPL_MAP};
 use crate::RIE;
 use std::collections::{BinaryHeap, HashMap};
 use std::cmp::Reverse;
@@ -149,11 +149,20 @@ pub fn topo_sort(metas: &[&ComponentMeta]) -> Vec<TypeId> {
     for (i, meta) in metas.iter().enumerate() {
         // 遍历组件 i 的所有依赖
         for dep_fn in meta.deps {
-            // 获取依赖的类型ID
             let one_type_id = dep_fn();
             if let Some(&(j_idx, _j_name)) = id_to_idx.get(&one_type_id) {
-                adj[j_idx].push(i);  // 建立边：j → i（j 被 i 依赖）
+                // 直接匹配具体类型
+                adj[j_idx].push(i);
                 in_degree[i] += 1;
+            } else if let Some(entries) = TRAIT_IMPL_MAP.get(&one_type_id) {
+                // 依赖是 trait：通过 TRAIT_IMPL_MAP 解析出具体实现
+                for entry in entries.iter() {
+                    let concrete_id = (entry.concrete_tid)();
+                    if let Some(&(j_idx, _j_name)) = id_to_idx.get(&concrete_id) {
+                        adj[j_idx].push(i);
+                        in_degree[i] += 1;
+                    }
+                }
             } else {
                 let registered: Vec<&str> = metas.iter().map(|m| m.name).collect();
                 panic!(
