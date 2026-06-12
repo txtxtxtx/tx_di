@@ -1,0 +1,2 @@
+# 由 build.rs 从 proto 文件生成的 Rust 代码
+src/pb/
