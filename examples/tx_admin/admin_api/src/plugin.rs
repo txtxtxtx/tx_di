@@ -22,8 +22,6 @@ pub struct AdminPlugin;
 impl CompInit for AdminPlugin {
     async_method!(
         fn async_init_impl(ctx: Arc<App>, _token: CancellationToken) -> RIE<()> {
-            // 初始化 Mock 服务集合
-            services::init_services();
             // 注册 HTTP 路由（通过 WebPlugin 全局注册表）
             WebPlugin::add_router(api::router(ctx));
             info!("admin HTTP 路由已注册");

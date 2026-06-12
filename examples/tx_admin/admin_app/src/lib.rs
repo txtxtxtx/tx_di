@@ -9,3 +9,4 @@ pub mod config;
 pub mod dictionary;
 pub mod log;
 pub mod auth;
+mod plugin;

@@ -50,6 +50,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
+ "tx-di-core",
  "tx_common",
  "tx_error",
 ]

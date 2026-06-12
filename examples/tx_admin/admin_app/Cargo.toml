@@ -13,6 +13,8 @@ admin_domain = { path = "../admin_domain" }
 admin_proto = { path = "../admin_proto" }
 tx_error = { path = "../../../common/tx_error"}
 tx_common = { path = "../../../common/crates/tx_common"}
+tx-di-core  = { path = "../../../tx-di-core" }
+
 async-trait = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
