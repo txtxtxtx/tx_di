@@ -12,7 +12,6 @@ use admin_proto::admin::user::{
 use admin_proto::Empty;
 use admin_proto::admin::common::PageResponse;
 use admin_domain::user::model::value_object::{Sex, UserStatus};
-use crate::services;
 
 #[derive(Debug, Default)]
 pub struct UserGrpcService;

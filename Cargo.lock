@@ -41,6 +41,7 @@ dependencies = [
  "admin_proto",
  "async-trait",
  "chrono",
+ "dashmap",
  "jiff",
  "mockall",
  "pretty_assertions",

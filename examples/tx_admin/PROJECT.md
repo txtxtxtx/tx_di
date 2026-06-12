@@ -1,5 +1,7 @@
 # tx_admin 项目详细说明文档
-
+```shell
+cargo build -p admin_api --release
+```
 > **生成时间**: 2026-06-12  
 > **适用范围**: Bug 修复、功能开发、架构演进指引
 

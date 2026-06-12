@@ -7,7 +7,6 @@ use admin_proto::admin::permission::{
     PermissionCheckRequest, PermissionCheckResponse,
     GetUserPermissionsRequest, UserPermissionsResponse,
 };
-use crate::services;
 
 #[derive(Debug, Default)]
 pub struct PermissionGrpcService;

@@ -8,7 +8,6 @@ use admin_proto::admin::dept::{
     GetDeptRequest, ListDeptsRequest, ListDeptsResponse,
 };
 use admin_proto::Empty;
-use crate::services;
 
 #[derive(Debug, Default)]
 pub struct DeptGrpcService;

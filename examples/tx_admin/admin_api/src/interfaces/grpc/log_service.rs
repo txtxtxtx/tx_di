@@ -9,7 +9,6 @@ use admin_proto::admin::log::{
 };
 use admin_proto::admin::common::PageResponse;
 use admin_proto::Empty;
-use crate::services;
 
 #[derive(Debug, Default)]
 pub struct LogGrpcService;
