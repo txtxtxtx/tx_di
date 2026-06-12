@@ -113,7 +113,7 @@ impl CompInit for ToastyConfig {
             url = %self.database_url,
             auto_schema = self.auto_schema,
             max_pool = ?self.max_pool_size,
-            "Toasty 数据库配置已加载"
+            "Toasty ORM 数据库配置已加载"
         );
         Ok(())
     }
