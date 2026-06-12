@@ -41,24 +41,24 @@ async fn main() -> AppResult<()> {
     let app = app.ins_run().await?;
 
     // 并行启动 gRPC 服务
-    let grpc = tonic::transport::Server::builder()
-        .add_service(AuthServiceServer::new(AuthGrpcService::default()))
-        .add_service(UserServiceServer::new(UserGrpcService::default()))
-        .add_service(RoleServiceServer::new(RoleGrpcService::default()))
-        .add_service(MenuServiceServer::new(MenuGrpcService::default()))
-        .add_service(DepartmentServiceServer::new(DeptGrpcService::default()))
-        .add_service(PermissionServiceServer::new(PermissionGrpcService::default()))
-        .add_service(ConfigServiceServer::new(ConfigGrpcService::default()))
-        .add_service(DictServiceServer::new(DictGrpcService::default()))
-        .add_service(LogServiceServer::new(LogGrpcService::default()))
-        .add_service(FileServiceServer::new(FileGrpcService::default()));
-    tokio::spawn(async move {
-        let addr = "[::]:50051".parse().unwrap();
-        tracing::info!("gRPC 服务器正在监听: {}", addr);
-        if let Err(e) = grpc.serve(addr).await {
-            tracing::error!("gRPC 服务器运行失败: {}", e);
-        }
-    });
+    // let grpc = tonic::transport::Server::builder()
+    //     .add_service(AuthServiceServer::new(AuthGrpcService::default()))
+    //     .add_service(UserServiceServer::new(UserGrpcService::default()))
+    //     .add_service(RoleServiceServer::new(RoleGrpcService::default()))
+    //     .add_service(MenuServiceServer::new(MenuGrpcService::default()))
+    //     .add_service(DepartmentServiceServer::new(DeptGrpcService::default()))
+    //     .add_service(PermissionServiceServer::new(PermissionGrpcService::default()))
+    //     .add_service(ConfigServiceServer::new(ConfigGrpcService::default()))
+    //     .add_service(DictServiceServer::new(DictGrpcService::default()))
+    //     .add_service(LogServiceServer::new(LogGrpcService::default()))
+    //     .add_service(FileServiceServer::new(FileGrpcService::default()));
+    // tokio::spawn(async move {
+    //     let addr = "[::]:50051".parse().unwrap();
+    //     tracing::info!("gRPC 服务器正在监听: {}", addr);
+    //     if let Err(e) = grpc.serve(addr).await {
+    //         tracing::error!("gRPC 服务器运行失败: {}", e);
+    //     }
+    // });
 
     Ok(app.waiting_exit().await)
 }
