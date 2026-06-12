@@ -57,7 +57,7 @@ async fn paginate_files() {
         }, Some("admin".into())).await.unwrap();
     }
     let page = app.get_file_page(FileQueryRequest {
-        name: None, file_type: None, config_id: None, page: 1, page_size: 2,
+        name: None, file_type: None, config_id: None, page: 1, size: 2,
     }).await.unwrap();
     assert_eq!(page.list.len(), 2);
     assert_eq!(page.total, 5);
@@ -95,7 +95,7 @@ async fn query_files_by_type() {
 
     let page = app.get_file_page(FileQueryRequest {
         name: None, file_type: Some("application/pdf".into()), config_id: None,
-        page: 1, page_size: 10,
+        page: 1, size: 10,
     }).await.unwrap();
     assert_eq!(page.list.len(), 1);
     assert_eq!(page.list[0].name, "doc.pdf");

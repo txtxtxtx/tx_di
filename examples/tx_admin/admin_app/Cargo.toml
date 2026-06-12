@@ -23,3 +23,6 @@ tokio = { workspace = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
+mockall = "0.13"
+rstest = "0.23"
+pretty_assertions = "1"

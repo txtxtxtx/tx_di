@@ -228,3 +228,6 @@ impl UserService {
         Ok(user)
     }
 }
+
+#[cfg(test)]
+mod tests;

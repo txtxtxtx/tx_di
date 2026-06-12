@@ -586,7 +586,7 @@ async fn paginate_users() {
             status: None,
             dept_id: None,
             page: 1,
-            page_size: 3,
+            size: 3,
         })
         .await
         .unwrap();
@@ -638,7 +638,7 @@ async fn query_user_by_username_fuzzy() {
             status: None,
             dept_id: None,
             page: 1,
-            page_size: 10,
+            size: 10,
         })
         .await
         .unwrap();
@@ -678,7 +678,7 @@ async fn query_user_by_status() {
             status: Some(UserStatus::Disabled),
             dept_id: None,
             page: 1,
-            page_size: 10,
+            size: 10,
         })
         .await
         .unwrap();
@@ -733,7 +733,7 @@ async fn query_user_by_nickname() {
             status: None,
             dept_id: None,
             page: 1,
-            page_size: 10,
+            size: 10,
         })
         .await
         .unwrap();

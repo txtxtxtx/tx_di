@@ -50,7 +50,7 @@ async fn paginate_operate_logs() {
     }
     let page = app.get_log_page(OperateLogQueryRequest {
         user_id: None, log_type: None, sub_type: None, success: None,
-        begin_time: None, end_time: None, page: 1, page_size: 2,
+        begin_time: None, end_time: None, page: 1, size: 2,
     }).await.unwrap();
     assert_eq!(page.list.len(), 2);
     assert_eq!(page.total, 5);
@@ -72,7 +72,7 @@ async fn query_operate_logs_by_sub_type() {
 
     let page = app.get_log_page(OperateLogQueryRequest {
         user_id: None, log_type: None, sub_type: Some("用户管理".into()),
-        success: None, begin_time: None, end_time: None, page: 1, page_size: 10,
+        success: None, begin_time: None, end_time: None, page: 1, size: 10,
     }).await.unwrap();
     assert_eq!(page.list.len(), 1);
     assert_eq!(page.list[0].sub_type, "用户管理");
@@ -102,7 +102,7 @@ async fn clean_operate_logs() {
     app.clean_logs().await.unwrap();
     let page = app.get_log_page(OperateLogQueryRequest {
         user_id: None, log_type: None, sub_type: None, success: None,
-        begin_time: None, end_time: None, page: 1, page_size: 10,
+        begin_time: None, end_time: None, page: 1, size: 10,
     }).await.unwrap();
     assert_eq!(page.total, 0);
 }
@@ -143,7 +143,7 @@ async fn paginate_login_logs() {
     }
     let page = app.get_log_page(LoginLogQueryRequest {
         user_id: None, username: None, login_ip: None, login_type: None,
-        result: None, begin_time: None, end_time: None, page: 1, page_size: 2,
+        result: None, begin_time: None, end_time: None, page: 1, size: 2,
     }).await.unwrap();
     assert_eq!(page.list.len(), 2);
     assert_eq!(page.total, 5);
@@ -163,7 +163,7 @@ async fn query_login_logs_by_result() {
 
     let page = app.get_log_page(LoginLogQueryRequest {
         user_id: None, username: None, login_ip: None, login_type: None,
-        result: Some(0), begin_time: None, end_time: None, page: 1, page_size: 10,
+        result: Some(0), begin_time: None, end_time: None, page: 1, size: 10,
     }).await.unwrap();
     assert_eq!(page.list.len(), 1);
     assert_eq!(page.list[0].result, 0);
@@ -191,7 +191,7 @@ async fn clean_login_logs() {
     app.clean_logs().await.unwrap();
     let page = app.get_log_page(LoginLogQueryRequest {
         user_id: None, username: None, login_ip: None, login_type: None,
-        result: None, begin_time: None, end_time: None, page: 1, page_size: 10,
+        result: None, begin_time: None, end_time: None, page: 1, size: 10,
     }).await.unwrap();
     assert_eq!(page.total, 0);
 }

@@ -113,7 +113,7 @@ async fn full_crud_workflow() {
 
     // 9. 验证配置管理分页
     let cfg_page = config_app.get_config_page(ConfigQueryRequest {
-        category: None, config_key: None, name: None, config_type: None, page: 1, page_size: 10,
+        category: None, config_key: None, name: None, config_type: None, page: 1, size: 10,
     }).await.unwrap();
     assert!(cfg_page.total >= 1);
 

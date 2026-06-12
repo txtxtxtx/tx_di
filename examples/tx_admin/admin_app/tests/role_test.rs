@@ -98,7 +98,7 @@ async fn paginate_roles() {
         }, Some("admin".into())).await.unwrap();
     }
     let page = app.get_role_page(RoleQueryRequest {
-        name: None, code: None, status: None, page: 1, page_size: 2,
+        name: None, code: None, status: None, page: 1, size: 2,
     }).await.unwrap();
     assert_eq!(page.list.len(), 2);
     assert_eq!(page.total, 5);
@@ -115,7 +115,7 @@ async fn query_role_by_name_fuzzy() {
     }, Some("admin".into())).await.unwrap();
 
     let page = app.get_role_page(RoleQueryRequest {
-        name: Some("管理".into()), code: None, status: None, page: 1, page_size: 10,
+        name: Some("管理".into()), code: None, status: None, page: 1, size: 10,
     }).await.unwrap();
     assert_eq!(page.list.len(), 1);
     assert_eq!(page.list[0].code, "sys_admin");

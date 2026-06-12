@@ -71,7 +71,7 @@ async fn paginate_dict_types() {
         }, Some("admin".into())).await.unwrap();
     }
     let page = app.get_dict_type_page(DictTypeQueryRequest {
-        name: None, dict_type: None, status: None, page: 1, page_size: 2,
+        name: None, dict_type: None, status: None, page: 1, size: 2,
     }).await.unwrap();
     assert_eq!(page.list.len(), 2);
     assert_eq!(page.total, 4);
@@ -172,7 +172,7 @@ async fn paginate_dict_data() {
         }, Some("admin".into())).await.unwrap();
     }
     let page = app.get_dict_data_page(DictDataQueryRequest {
-        dict_type: Some("test".into()), label: None, status: None, page: 1, page_size: 2,
+        dict_type: Some("test".into()), label: None, status: None, page: 1, size: 2,
     }).await.unwrap();
     assert_eq!(page.list.len(), 2);
     assert_eq!(page.total, 5);

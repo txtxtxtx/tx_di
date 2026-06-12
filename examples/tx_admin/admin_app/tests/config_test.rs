@@ -87,7 +87,7 @@ async fn paginate_configs() {
         }, Some("admin".into())).await.unwrap();
     }
     let page = app.get_config_page(ConfigQueryRequest {
-        category: None, config_key: None, name: None, config_type: None, page: 1, page_size: 2,
+        category: None, config_key: None, name: None, config_type: None, page: 1, size: 2,
     }).await.unwrap();
     assert_eq!(page.list.len(), 2);
     assert_eq!(page.total, 5);
@@ -128,7 +128,7 @@ async fn query_config_by_category() {
 
     let page = app.get_config_page(ConfigQueryRequest {
         category: Some("email".into()), config_key: None, name: None,
-        config_type: None, page: 1, page_size: 10,
+        config_type: None, page: 1, size: 10,
     }).await.unwrap();
     assert_eq!(page.list.len(), 1);
     assert_eq!(page.list[0].config_key, "email.smtp");

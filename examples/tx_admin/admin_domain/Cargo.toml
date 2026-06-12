@@ -18,3 +18,9 @@ serde.workspace = true
 serde_repr.workspace = true
 serde_json.workspace = true
 jiff.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+mockall = "0.13"
+rstest = "0.23"
+pretty_assertions = "1"
