@@ -74,7 +74,15 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
                 FieldKind::Optional { .. } => quote! { #fname: None },
                 FieldKind::Inject { ty } => {
                     let inject_ty = strip_arc(ty);
-                    quote! { #fname: ::tx_di_core::inject_from_store::<#inject_ty>(store) }
+                    let type_str = quote!(#inject_ty).to_string();
+                    // 检查是否是 trait object（以 "dyn " 开头）
+                    if type_str.starts_with("dyn ") {
+                        // trait object 注入：使用专门的注入函数
+                        quote! { #fname: ::tx_di_core::inject_trait_from_store::<#inject_ty>(store) }
+                    } else {
+                        // 具体类型注入
+                        quote! { #fname: ::tx_di_core::inject_from_store::<#inject_ty>(store) }
+                    }
                 }
                 FieldKind::Custom { expr } => quote! { #fname: #expr },
             }
@@ -183,6 +191,30 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
         }
     };
 
+    // 生成 impl_traits 数组
+    let impl_traits: Vec<String> = if let Some(trait_name) = &comp_attr.as_trait {
+        vec![trait_name.clone()]
+    } else {
+        vec![]
+    };
+
+    // 生成 trait 注册代码（如果有 as_trait 属性）
+    let trait_registration = if let Some(trait_name) = &comp_attr.as_trait {
+        let trait_type: syn::Type = syn::parse_str(trait_name).unwrap();
+        quote! {
+            // 注册 trait object 映射
+            // 将具体类型转换为 trait object，包装为 TraitWrapper 后注册
+            let trait_instance: ::std::sync::Arc<dyn #trait_type> = ::std::sync::Arc::new(instance);
+            let wrapper = ::tx_di_core::TraitWrapper { inner: trait_instance };
+            store.insert(
+                ::std::any::TypeId::of::<::tx_di_core::TraitWrapper<dyn #trait_type>>(),
+                ::tx_di_core::CompRef::Cached(::std::sync::Arc::new(wrapper)),
+            );
+        }
+    } else {
+        quote! {}
+    };
+
     let output = quote! {
         // ── 原始结构体定义（已去掉 #[tx_cst] 属性） ───────────────────────
         #clean_input
@@ -213,10 +245,16 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
             scope: #scope_const,
             // build — 统一 store-based factory_fn 签名
             factory_fn: Some((|store: &::tx_di_core::DashMap<::std::any::TypeId, ::tx_di_core::CompRef>| {
+                let instance = <#struct_name as ::tx_di_core::ComponentDescriptor>::build(store);
+                
+                // 如果有 as_trait 属性，同时注册 trait object
+                #trait_registration
+                
                 ::std::boxed::Box::new(
-                    <#struct_name as ::tx_di_core::ComponentDescriptor>::build(store)
+                    instance
                 ) as ::std::boxed::Box<dyn ::std::any::Any + ::std::marker::Send + ::std::marker::Sync>
             }) as fn(&::tx_di_core::DashMap<::std::any::TypeId, ::tx_di_core::CompRef>) -> ::std::boxed::Box<dyn ::std::any::Any + ::std::marker::Send + ::std::marker::Sync>),
+            impl_traits: &[ #( #impl_traits ),* ],
             init_sort_fn: <#struct_name as ::tx_di_core::CompInit>::init_sort,
             init_fn: Some(<#struct_name as ::tx_di_core::CompInit>::init),
             async_init_fn: Some(<#struct_name as ::tx_di_core::CompInit>::async_init),
@@ -231,16 +269,17 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
 
 fn parse_component_attr(attr_tokens: TokenStream) -> SynResult<CompAttr> {
     if attr_tokens.is_empty() {
-        return Ok(CompAttr { scope: ScopeAttr::Singleton, has_init: false, conf: None });
+        return Ok(CompAttr { scope: ScopeAttr::Singleton, has_init: false, conf: None, as_trait: None });
     }
 
-    struct AttrArgs { scope: ScopeAttr, has_init: bool, conf: Option<Option<String>> }
+    struct AttrArgs { scope: ScopeAttr, has_init: bool, conf: Option<Option<String>>, as_trait: Option<String> }
 
     impl Parse for AttrArgs {
         fn parse(input: ParseStream) -> SynResult<Self> {
             let mut scope = ScopeAttr::Singleton;
             let mut has_init = false;
             let mut conf = None;
+            let mut as_trait = None;
             loop {
                 if input.is_empty() { break; }
                 let key: Ident = input.parse()?;
@@ -276,20 +315,34 @@ fn parse_component_attr(attr_tokens: TokenStream) -> SynResult<CompAttr> {
                         conf = Some(Some(key_str));
                     } else { conf = Some(None); }
                 }
+                else if key == "as_trait" {
+                    if input.peek(Token![=]) {
+                        let _eq: Token![=] = input.parse()?;
+                        let value: Expr = input.parse()?;
+                        let trait_name = match &value {
+                            Expr::Lit(lit) => if let syn::Lit::Str(s) = &lit.lit { s.value() }
+                                else { return Err(syn::Error::new_spanned(&value, "as_trait 值必须是字符串")); },
+                            _ => return Err(syn::Error::new_spanned(&value, "as_trait 值必须是字符串")),
+                        };
+                        as_trait = Some(trait_name);
+                    } else {
+                        return Err(syn::Error::new_spanned(key, "as_trait 必须指定值，例如 as_trait = \"UserRepository\""));
+                    }
+                }
                 else {
                     return Err(syn::Error::new_spanned(key,
-                        "#[tx_comp] 支持 scope / init / conf 参数"));
+                        "#[tx_comp] 支持 scope / init / conf / as_trait 参数"));
                 }
 
                 if input.peek(Token![,]) { let _: Token![,] = input.parse()?; }
                 else { break; }
             }
-            Ok(AttrArgs { scope, has_init, conf })
+            Ok(AttrArgs { scope, has_init, conf, as_trait })
         }
     }
 
     let args: AttrArgs = syn::parse(attr_tokens)?;
-    Ok(CompAttr { scope: args.scope, has_init: args.has_init, conf: args.conf })
+    Ok(CompAttr { scope: args.scope, has_init: args.has_init, conf: args.conf, as_trait: args.as_trait })
 }
 
 #[derive(Debug)]
@@ -297,6 +350,7 @@ struct CompAttr {
     scope: ScopeAttr,
     has_init: bool,
     conf: Option<Option<String>>,
+    as_trait: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

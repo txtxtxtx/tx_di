@@ -38,6 +38,7 @@ pub static COMPONENT_REGISTRY: [ComponentMeta] = [..];
 /// - `name`: 组件的类型名称字符串，用于调试和错误提示
 /// - `scope`: 组件的作用域（Singleton 或 Prototype），决定实例的生命周期
 /// - `factory_fn`: 工厂函数，接收 `&DashMap<TypeId, CompRef>`，用于构建组件实例
+/// - `impl_traits`: 该组件实现的 trait 名称列表，用于支持 trait object 注入
 pub struct ComponentMeta {
     /// 返回组件类型 `TypeId` 的函数指针。
     ///
@@ -67,6 +68,25 @@ pub struct ComponentMeta {
     /// - `auto_register_all` 阶段：Singleton 立即调用并缓存，Prototype 存为闭包
     /// - App 阶段：Prototype 调用闭包每次创建新实例
     pub factory_fn: Option<StoreFactoryFn>,
+
+    /// 该组件实现的 trait 名称列表。
+    ///
+    /// 用于支持 trait object 注入。当用户使用 `#[tx_comp(as_trait = "TraitName")]` 时，
+    /// 宏会将 trait 名称记录到此字段。注入时，框架可以通过此字段查找实现了特定 trait 的具体类型。
+    ///
+    /// # 示例
+    ///
+    /// ```ignore
+    /// #[tx_comp(as_trait = "UserRepository")]
+    /// pub struct SqliteUserRepository { ... }
+    ///
+    /// // ComponentMeta {
+    /// //     impl_traits: &["UserRepository"],
+    /// //     ...
+    /// // }
+    /// ```
+    pub impl_traits: &'static [&'static str],
+
     /// 初始化顺序
     pub init_sort_fn: fn() -> i32,
     /// 内部初始化阶段的初始化方法

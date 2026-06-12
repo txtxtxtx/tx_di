@@ -26,6 +26,13 @@ use tracing::{debug, info};
 
 /// 构建上下文,本质上就是一个map
 pub type InnerContext = DashMap<TypeId, CompRef>;
+
+/// trait → 具体类型的映射表
+/// key: trait 的 TypeId（如 TypeId::of::<dyn UserRepository>()）
+/// value: 具体类型的 TypeId（如 TypeId::of::<SqliteUserRepository>()）
+static TRAIT_IMPL_MAP: once_cell::sync::Lazy<DashMap<TypeId, TypeId>> = 
+    once_cell::sync::Lazy::new(DashMap::new);
+
 /// 构建上下文
 pub struct BuildContext {
     /// TypeId → CompRef（使用 DashMap 支持并发访问）
@@ -77,7 +84,16 @@ impl crate::BuildContext {
         for tid in &sorted_ids {
             if let Some(meta) = metas.iter().find(|m| (m.type_id)() == *tid) {
                 if let Some(factory_fn) = meta.factory_fn {
+                    // 注册具体类型
                     self.register_factory_boxed((meta.type_id)(), meta.scope, factory_fn);
+                    
+                    // 如果组件实现了 trait，记录 trait → 具体类型的映射
+                    for trait_name in meta.impl_traits {
+                        debug!("组件 '{}' 实现了 trait '{}'", meta.name, trait_name);
+                        // 注意：这里无法在运行时直接获取 trait 的 TypeId
+                        // 因为 trait_name 是字符串，不是类型
+                        // 映射关系需要在宏层面处理
+                    }
                 }
                 self.metas.push(meta);
             }

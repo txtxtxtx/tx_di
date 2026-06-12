@@ -31,6 +31,40 @@ pub type IE = AppError;
 pub use tx_common::{ApiR, ApiRes, RCode, FormattedDateTime};
 pub use di::{BuildContext, scopes::Scope, App, InnerContext,
              comp::{ComponentMeta, topo_sort, COMPONENT_REGISTRY, config::AppAllConfig},
-             comp::comp_ref::{CompRef, ComponentDescriptor, CompInit, BoxFuture, inject_from_store},
+             comp::comp_ref::{CompRef, ComponentDescriptor, CompInit, BoxFuture, inject_from_store, inject_trait_from_store, TraitWrapper},
 };
 pub use tokio_util::sync::CancellationToken;
+
+/// 查找实现了指定 trait 的具体类型名称。
+///
+/// 该函数在编译期被宏调用，用于查找实现了特定 trait 的组件类型名称。
+/// 返回的名称可以用于在 COMPONENT_REGISTRY 中定位具体的组件。
+///
+/// # 参数
+///
+/// - `trait_name`: trait 的名称（不含 `dyn` 前缀）
+///
+/// # 返回值
+///
+/// 返回实现了该 trait 的组件类型名称，如果未找到则返回 `None`。
+///
+/// # 示例
+///
+/// ```ignore
+/// // 假设有以下定义：
+/// #[tx_comp(as_trait = "UserRepository")]
+/// pub struct SqliteUserRepository { ... }
+///
+/// // 调用：
+/// let name = find_impl_type_for_trait("UserRepository");
+/// assert_eq!(name, Some("SqliteUserRepository"));
+/// ```
+pub fn find_impl_type_for_trait(trait_name: &str) -> Option<&'static str> {
+    COMPONENT_REGISTRY.iter().find_map(|meta| {
+        if meta.impl_traits.contains(&trait_name) {
+            Some(meta.name)
+        } else {
+            None
+        }
+    })
+}
