@@ -1,6 +1,6 @@
 mod config;
 mod comp;
-mod bound;
+pub mod bound;
 mod e;
 pub mod err;
 mod r;
