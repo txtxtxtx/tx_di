@@ -86,7 +86,9 @@ pub struct LogConfig {
 }
 
 fn time_format_str() -> String {
-    "[year][month padding:zero][day padding:zero] [hour]:[minute]:[second].[subsecond digits:3]".to_string()
+    // [year][month padding:zero][day padding:zero] [hour]:[minute]:[second].[subsecond digits:3]
+    // 文件名已经包含了日期所以只需要时间
+    "[hour]:[minute]:[second].[subsecond digits:3]".to_string()
 }
 impl Default for LogConfig {
     fn default() -> Self {
