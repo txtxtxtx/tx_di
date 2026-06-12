@@ -66,6 +66,8 @@ fn make_independent_metas(n: usize) -> Vec<ComponentMeta> {
                 init_fn: None,
                 async_init_fn: None,
                 async_run_fn: None,
+                impl_traits: &[],
+                trait_impls: &[],
             }
         })
         .collect()
@@ -108,6 +110,8 @@ fn make_chain_metas(n: usize) -> Vec<ComponentMeta> {
                 init_fn: None,
                 async_init_fn: None,
                 async_run_fn: None,
+                impl_traits: &[],
+                trait_impls: &[],
             }
         })
         .collect()

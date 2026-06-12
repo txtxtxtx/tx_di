@@ -39,7 +39,7 @@ pub static COMPONENT_REGISTRY: [ComponentMeta] = [..];
 /// - `scope`: 组件的作用域（Singleton 或 Prototype），决定实例的生命周期
 /// - `factory_fn`: 工厂函数，接收 `&DashMap<TypeId, CompRef>`，用于构建组件实例
 /// - `impl_traits`: 该组件实现的 trait TypeId 列表，用于支持 trait object 注入
-/// - `trait_register_fn`: trait 注册函数，将具体类型转型为 trait object 存入 store
+/// - `trait_impls`: trait 实现条目列表，用于填充 TRAIT_IMPL_MAP
 pub struct ComponentMeta {
     /// 返回组件类型 `TypeId` 的函数指针。
     ///
@@ -88,11 +88,11 @@ pub struct ComponentMeta {
     /// ```
     pub impl_traits: &'static [fn() -> TypeId],
 
-    /// trait 注册函数：在 `auto_register_all` 阶段调用，将 trait object 存入 store。
+    /// trait 实现条目列表：记录该组件实现的 trait 及其 upcast 函数。
     ///
-    /// 宏为每个 `as_trait` 组件生成此函数，内部将具体实例转型为 `Arc<dyn Trait>`
-    /// 并以 `TypeId::of::<dyn Trait>()` 为 key 存入 store。
-    pub trait_register_fn: Option<fn(&DashMap<TypeId, CompRef>)>,
+    /// 宏为每个 `as_trait` 组件生成 `TraitImplEntry`，在 `auto_register_all` 阶段
+    /// 填充到全局 `TRAIT_IMPL_MAP` 中。
+    pub trait_impls: &'static [crate::di::comp::comp_ref::TraitImplEntry],
 
     /// 初始化顺序
     pub init_sort_fn: fn() -> i32,

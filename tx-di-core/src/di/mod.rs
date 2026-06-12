@@ -8,9 +8,9 @@ pub mod scopes;
 use crate::di::comp::StoreFactoryFn;
 use crate::di::comp::config::AppAllConfig;
 use crate::{
-    COMPONENT_REGISTRY, CompRef, ComponentDescriptor, ComponentMeta, Scope, topo_sort, inject_from_store,
+    COMPONENT_REGISTRY, CompRef, ComponentDescriptor, ComponentMeta, Scope, TRAIT_IMPL_MAP,
+    inject_from_store, topo_sort,
 };
-use tx_error::{CodeMsg, DiErr};
 use crate::{IE, RIE};
 use dashmap::DashMap;
 use std::any::{Any, TypeId};
@@ -23,10 +23,10 @@ use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
+use tx_error::{CodeMsg, DiErr};
 
 /// 构建上下文,本质上就是一个map
 pub type InnerContext = DashMap<TypeId, CompRef>;
-
 
 /// 构建上下文
 pub struct BuildContext {
@@ -73,7 +73,22 @@ impl crate::BuildContext {
 
     /// 自动注册所有通过 #[tx_comp] 标记的组件
     fn auto_register_all(&mut self) {
-        let metas: Vec<&ComponentMeta> = COMPONENT_REGISTRY.iter().collect();
+        let metas: Vec<&ComponentMeta> = COMPONENT_REGISTRY
+            .iter()
+            .map(|meta| {
+                // 填充 TRAIT_IMPL_MAP：trait TypeId → TraitImplEntry
+                if !meta.trait_impls.is_empty() {
+                    for trait_fn in meta.impl_traits {
+                        let trait_tid = trait_fn();
+                        let entries: Vec<_> = meta.trait_impls.to_vec();
+                        TRAIT_IMPL_MAP.entry(trait_tid).or_default().extend(entries);
+                        debug!("组件 '{}' 实现了 trait {:?}", meta.name, trait_tid);
+                    }
+                }
+                meta
+            })
+            .collect();
+        // todo 拓扑排序需要优化
         let sorted_ids = topo_sort(&metas);
 
         for tid in &sorted_ids {
@@ -81,13 +96,6 @@ impl crate::BuildContext {
                 if let Some(factory_fn) = meta.factory_fn {
                     // 注册具体类型
                     self.register_factory_boxed((meta.type_id)(), meta.scope, factory_fn);
-                }
-                // 注册 trait object 到 store
-                if let Some(register_fn) = meta.trait_register_fn {
-                    register_fn(&self.store);
-                    for trait_fn in meta.impl_traits {
-                        debug!("组件 '{}' 实现了 trait {:?}", meta.name, trait_fn());
-                    }
                 }
                 self.metas.push(meta);
             }
@@ -164,10 +172,7 @@ impl crate::BuildContext {
         debug!("组件注册表：");
         debug!("{:20} scope      deps", "name");
         for meta in ans.iter() {
-            let meta = metas[id_to_idx
-                .get(meta)
-                .ok_or(DiErr::RegistryError)?
-                .0];
+            let meta = metas[id_to_idx.get(meta).ok_or(DiErr::RegistryError)?.0];
             let dep_names: Vec<&str> = meta
                 .deps
                 .iter()
@@ -365,7 +370,11 @@ impl App {
             match handle.await {
                 Ok(Ok(_)) => {}
                 Ok(Err(e)) => errors.push(e),
-                Err(e) => errors.push(IE::Internal(anyhow::anyhow!("{}: {}", DiErr::TaskPanic.message(), e))),
+                Err(e) => errors.push(IE::Internal(anyhow::anyhow!(
+                    "{}: {}",
+                    DiErr::TaskPanic.message(),
+                    e
+                ))),
             }
         }
 

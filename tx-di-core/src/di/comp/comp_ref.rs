@@ -1,6 +1,6 @@
 use std::any::{Any, TypeId};
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use dashmap::DashMap;
 use tokio_util::sync::CancellationToken;
 use crate::{App, InnerContext, Scope};
@@ -212,60 +212,96 @@ pub fn inject_from_store<T: Any + Send + Sync + 'static>(
         })
 }
 
-/// 从 store 中注入 trait object。
+/// trait 实现条目：记录某个 trait 的一个具体实现。
 ///
-/// 当组件使用 `#[tx_comp(as_trait = dyn Trait)]` 注册时，框架会在 store 中
-/// 同时注册具体类型和 trait object。此函数用于从 store 中获取 trait object。
+/// `concrete_tid` 标识具体类型，`upcast` 函数将具体实例转换为 trait object。
+/// 由 `#[tx_comp(as_trait = dyn Trait)]` 宏自动生成。
+#[derive(Clone, Copy)]
+pub struct TraitImplEntry {
+    /// 具体类型的 TypeId
+    pub concrete_tid: fn() -> TypeId,
+    /// 将具体实例 (Arc<dyn Any + Send + Sync>) 转型为 trait object
+    /// 返回的 Arc<dyn Any + Send + Sync> 内部是 Arc<dyn Trait>
+    pub upcast: fn(Arc<dyn Any + Send + Sync>) -> Arc<dyn Any + Send + Sync>,
+}
+
+/// trait TypeId → 实现列表的映射表类型
+pub type TraitImplMap = DashMap<TypeId, Vec<TraitImplEntry>>;
+
+/// 全局 trait 实现映射表，在 `auto_register_all` 阶段填充。
+pub static TRAIT_IMPL_MAP: LazyLock<TraitImplMap> = LazyLock::new(DashMap::new);
+
+/// 从 store 中注入 trait object（返回第一个实现）。
 ///
-/// 内部使用 double-Arc 包装：`Arc<Arc<dyn Trait>>` 存储为 `Arc<dyn Any + Send + Sync>`，
-/// 取出时通过 `downcast_ref::<Arc<T>>()` 还原。
-///
-/// # 参数
-///
-/// - `store`: 组件存储
-///
-/// # 返回值
-///
-/// 返回 `Arc<dyn Trait>`，其中 Trait 是通过泛型参数指定的 trait object 类型。
+/// 通过 `TRAIT_IMPL_MAP` 查找 trait 的具体实现，获取实例后通过 upcast 函数转换。
 ///
 /// # Panics
 ///
-/// - 组件未注册时 panic
+/// - trait 无实现时 panic
 pub fn inject_trait_from_store<T: ?Sized + Any + Send + Sync + 'static>(
     store: &DashMap<TypeId, CompRef>,
 ) -> Arc<T> {
     let tid = TypeId::of::<T>();
     let type_name = std::any::type_name::<T>();
 
-    store
+    TRAIT_IMPL_MAP
         .get(&tid)
-        .map(|entry| match &*entry {
-            CompRef::Cached(any_arc) => any_arc.clone(),
-            CompRef::Factory(f) => f(store),
-        })
-        .map(|arc_any| {
-            // 存储的是 Arc<Arc<T>>（即 Arc<dyn Any> 内部是 Arc<T>）
-            // downcast_ref 到 &Arc<T> 然后 clone 得到 Arc<T>
-            let inner = arc_any.downcast_ref::<Arc<T>>()
-                .expect("[di] 注入失败: trait 类型不匹配，存储的不是 Arc<dyn Trait>");
-            inner.clone()
+        .and_then(|entries| entries.first().cloned())
+        .map(|entry| {
+            let concrete = store
+                .get(&(entry.concrete_tid)())
+                .map(|r| match &*r {
+                    CompRef::Cached(any_arc) => any_arc.clone(),
+                    CompRef::Factory(f) => f(store),
+                })
+                .unwrap_or_else(|| panic!(
+                    "[di] trait `{}` 的具体实现未注册到 store", type_name
+                ));
+            let trait_any = (entry.upcast)(concrete);
+            trait_any.downcast_ref::<Arc<T>>()
+                .expect("[di] trait upcast 类型不匹配")
+                .clone()
         })
         .unwrap_or_else(|| {
-            let registered: Vec<String> = store
-                .iter()
-                .map(|entry| format!("{:?}", entry.key()))
-                .collect();
             panic!(
-                "[di] 注入失败: trait `{}` 未注册。\n\
+                "[di] 注入失败: trait `{}` 无任何实现。\n\
                  请确认:\n\
                  1. 实现该 trait 的结构体已标注 #[tx_comp(as_trait = dyn Trait)]\n\
-                 2. trait 继承了 Any + Send + Sync\n\
-                 已注册组件 ({} 个): [{}]",
-                type_name,
-                registered.len(),
-                registered.join(", ")
+                 2. 所在 crate 已在 Cargo.toml 中引入",
+                type_name
             )
         })
+}
+
+/// 从 store 中注入 trait object 的所有实现。
+///
+/// 返回该 trait 的所有已注册实现，每个都通过 upcast 转换为 `Arc<T>`。
+pub fn inject_all_traits_from_store<T: ?Sized + Any + Send + Sync + 'static>(
+    store: &DashMap<TypeId, CompRef>,
+) -> Vec<Arc<T>> {
+    let tid = TypeId::of::<T>();
+
+    TRAIT_IMPL_MAP
+        .get(&tid)
+        .map(|entries| {
+            entries
+                .iter()
+                .map(|entry| {
+                    let concrete = store
+                        .get(&(entry.concrete_tid)())
+                        .map(|r| match &*r {
+                            CompRef::Cached(any_arc) => any_arc.clone(),
+                            CompRef::Factory(f) => f(store),
+                        })
+                        .expect("[di] trait 具体实现未注册到 store");
+                    let trait_any = (entry.upcast)(concrete);
+                    trait_any.downcast_ref::<Arc<T>>()
+                        .expect("[di] trait upcast 类型不匹配")
+                        .clone()
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// 组件初始化 trait，用于在依赖注入完成后执行自定义初始化逻辑。

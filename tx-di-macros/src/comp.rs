@@ -198,41 +198,21 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
         vec![]
     };
 
-    // 生成 trait_register_fn：将 Arc<Concrete> 转型为 Arc<dyn Trait> 并存入 store
-    let trait_register_fn = if let (Some(trait_ty), scope_attr) = (&comp_attr.as_trait, &comp_attr.scope) {
-        match scope_attr {
-            ScopeAttr::Singleton => {
-                // Singleton：取出已缓存的实例，转型后存为 Cached
-                quote! {
-                    Some((|store: &::tx_di_core::DashMap<::std::any::TypeId, ::tx_di_core::CompRef>| {
-                        let concrete = ::tx_di_core::inject_from_store::<#struct_name>(store);
-                        let as_trait: ::std::sync::Arc<#trait_ty> = concrete;
-                        store.insert(
-                            ::std::any::TypeId::of::<#trait_ty>(),
-                            ::tx_di_core::CompRef::Cached(::std::sync::Arc::new(as_trait) as ::std::sync::Arc<dyn ::std::any::Any + ::std::marker::Send + ::std::marker::Sync>),
-                        );
-                    }) as fn(&::tx_di_core::DashMap<::std::any::TypeId, ::tx_di_core::CompRef>))
-                }
+    // 生成 trait_impls 数组：TraitImplEntry 列表
+    let trait_impls: Vec<TokenStream2> = if let Some(trait_ty) = &comp_attr.as_trait {
+        vec![quote! {
+            ::tx_di_core::TraitImplEntry {
+                concrete_tid: || ::std::any::TypeId::of::<#struct_name>(),
+                upcast: |concrete: ::std::sync::Arc<dyn ::std::any::Any + ::std::marker::Send + ::std::marker::Sync>| {
+                    let instance = concrete.downcast::<#struct_name>()
+                        .expect("[di] trait upcast: 具体类型 downcast 失败");
+                    let as_trait: ::std::sync::Arc<#trait_ty> = instance;
+                    ::std::sync::Arc::new(as_trait) as ::std::sync::Arc<dyn ::std::any::Any + ::std::marker::Send + ::std::marker::Sync>
+                },
             }
-            ScopeAttr::Prototype => {
-                // Prototype：注册工厂闭包，每次注入时创建新实例
-                quote! {
-                    Some((|store: &::tx_di_core::DashMap<::std::any::TypeId, ::tx_di_core::CompRef>| {
-                        store.insert(
-                            ::std::any::TypeId::of::<#trait_ty>(),
-                            ::tx_di_core::CompRef::Factory(::std::sync::Arc::new(|store| {
-                                let instance = <#struct_name as ::tx_di_core::ComponentDescriptor>::build(store);
-                                let concrete = ::std::sync::Arc::new(instance);
-                                let as_trait: ::std::sync::Arc<#trait_ty> = concrete;
-                                ::std::sync::Arc::new(as_trait) as ::std::sync::Arc<dyn ::std::any::Any + ::std::marker::Send + ::std::marker::Sync>
-                            })),
-                        );
-                    }) as fn(&::tx_di_core::DashMap<::std::any::TypeId, ::tx_di_core::CompRef>))
-                }
-            }
-        }
+        }]
     } else {
-        quote! { None }
+        vec![]
     };
 
     let output = quote! {
@@ -272,7 +252,7 @@ fn component_impl(comp_attr: CompAttr, input: ItemStruct) -> SynResult<TokenStre
                 ) as ::std::boxed::Box<dyn ::std::any::Any + ::std::marker::Send + ::std::marker::Sync>
             }) as fn(&::tx_di_core::DashMap<::std::any::TypeId, ::tx_di_core::CompRef>) -> ::std::boxed::Box<dyn ::std::any::Any + ::std::marker::Send + ::std::marker::Sync>),
             impl_traits: &[ #( #impl_trait_fns ),* ],
-            trait_register_fn: #trait_register_fn,
+            trait_impls: &[ #( #trait_impls ),* ],
             init_sort_fn: <#struct_name as ::tx_di_core::CompInit>::init_sort,
             init_fn: Some(<#struct_name as ::tx_di_core::CompInit>::init),
             async_init_fn: Some(<#struct_name as ::tx_di_core::CompInit>::async_init),
