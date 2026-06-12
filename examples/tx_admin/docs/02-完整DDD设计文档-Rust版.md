@@ -4,7 +4,27 @@
 > **状态**: 生产可用
 > **认证框架**: sa-token-rust
 > **最后更新**: 2026-06-09
+```rust
+trait A {
+    fn a(&self)->String;
+}
+struct B {
+    name:String
+}
+impl A for B {
+    fn a(&self)->String {
+        "B".to_string()
+    }
+}
+struct C{
+    a:Arc<dyn A>
+}
+// 我的想法是编译期直接替换掉 Arc<dyn A> 为 Arc<B>
 
+fn test(){
+    let a: Arc<dyn A> = Arc::new(B{name:"a".to_string()});
+}
+```
 ---
 
 ## 目录
