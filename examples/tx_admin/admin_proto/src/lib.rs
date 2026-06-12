@@ -9,57 +9,57 @@
 pub mod admin {
     /// 通用类型（PageRequest, Empty, PageResponse 等）
     pub mod common {
-        tonic::include_proto!("admin.common");
+        include!("pb/admin.common.rs");
     }
 
     /// 认证
     pub mod auth {
-        tonic::include_proto!("admin.auth");
+        include!("pb/admin.auth.rs");
     }
 
     /// 用户
     pub mod user {
-        tonic::include_proto!("admin.user");
+        include!("pb/admin.user.rs");
     }
 
     /// 角色
     pub mod role {
-        tonic::include_proto!("admin.role");
+        include!("pb/admin.role.rs");
     }
 
     /// 菜单
     pub mod menu {
-        tonic::include_proto!("admin.menu");
+        include!("pb/admin.menu.rs");
     }
 
     /// 部门
     pub mod dept {
-        tonic::include_proto!("admin.dept");
+        include!("pb/admin.dept.rs");
     }
 
     /// 权限
     pub mod permission {
-        tonic::include_proto!("admin.permission");
+        include!("pb/admin.permission.rs");
     }
 
     /// 配置
     pub mod config {
-        tonic::include_proto!("admin.config");
+        include!("pb/admin.config.rs");
     }
 
     /// 字典
     pub mod dict {
-        tonic::include_proto!("admin.dict");
+        include!("pb/admin.dict.rs");
     }
 
     /// 日志
     pub mod log {
-        tonic::include_proto!("admin.log");
+        include!("pb/admin.log.rs");
     }
 
     /// 文件
     pub mod file {
-        tonic::include_proto!("admin.file");
+        include!("pb/admin.file.rs");
     }
 }
 

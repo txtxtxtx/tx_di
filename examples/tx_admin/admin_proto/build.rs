@@ -6,6 +6,9 @@ fn main() -> Result<()> {
     // SAFETY: build.rs 是单线程的，set_var 仅用于引导 protoc 路径
     unsafe { std::env::set_var("PROTOC", protoc_path); }
 
+    // 确保生成目录存在（首次 clone 构建时需要）
+    std::fs::create_dir_all("src/pb")?;
+
     let proto_dir = "protos";
 
     let proto_files = [
@@ -28,6 +31,8 @@ fn main() -> Result<()> {
         .collect();
 
     tonic_build::configure()
+        // 生成到 src/pb/ 目录，IDE 可直接索引和跳转
+        .out_dir("src/pb")
         // 为所有 message 类型添加 Serialize/Deserialize，使 HTTP JSON 可用
         .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
         // 为所有 message 添加 serde rename_all = "camelCase"

@@ -17,18 +17,6 @@ use crate::services;
 #[derive(Debug, Default)]
 pub struct UserGrpcService;
 
-fn map_user(r: admin_app::user::dto::UserResponse) -> UserResponse {
-    UserResponse {
-        id: r.id, username: r.username, nickname: r.nickname,
-        email: r.email, mobile: r.mobile, sex: r.sex as i32,
-        status: r.status as i32, remark: r.remark,
-        role_ids: r.role_ids, dept_ids: r.dept_ids,
-        avatar: r.avatar, login_ip: r.login_ip, login_date: r.login_date.unwrap_or(0),
-        tenant_id: r.tenant_id,
-        create_time: r.create_time, update_time: r.update_time,
-    }
-}
-
 #[tonic::async_trait]
 impl UserService for UserGrpcService {
     async fn create_user(&self, request: Request<CreateUserRequest>) -> Result<Response<UserResponse>, Status> {
@@ -41,7 +29,7 @@ impl UserService for UserGrpcService {
             dept_ids: if req.dept_ids.is_empty() { None } else { Some(req.dept_ids) },
         };
         services::get().user.create_user(cmd, None).await
-            .map(|r| Response::new(map_user(r)))
+            .map(Response::new)
             .map_err(|e| Status::internal(e.to_string()))
     }
 
@@ -54,7 +42,7 @@ impl UserService for UserGrpcService {
             remark: req.remark,
         };
         services::get().user.update_user(cmd, None).await
-            .map(|r| Response::new(map_user(r)))
+            .map(Response::new)
             .map_err(|e| Status::internal(e.to_string()))
     }
 
@@ -77,7 +65,7 @@ impl UserService for UserGrpcService {
     async fn get_user(&self, request: Request<GetUserRequest>) -> Result<Response<UserResponse>, Status> {
         let req = request.into_inner();
         services::get().user.get_user(req.user_id).await
-            .map(|r| Response::new(map_user(r)))
+            .map(Response::new)
             .map_err(|e| Status::internal(e.to_string()))
     }
 
@@ -92,8 +80,7 @@ impl UserService for UserGrpcService {
         services::get().user.get_user_page(query).await
             .map(|p| {
                 let total = p.total; let page = p.page; let size = p.size;
-                let items = p.list.into_iter().map(map_user).collect();
-                Response::new(ListUsersResponse { items, page_info: Some(PageResponse { total, page, size }) })
+                Response::new(ListUsersResponse { items: p.list, page_info: Some(PageResponse { total, page, size }) })
             })
             .map_err(|e| Status::internal(e.to_string()))
     }

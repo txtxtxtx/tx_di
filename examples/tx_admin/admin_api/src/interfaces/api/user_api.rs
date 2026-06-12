@@ -8,11 +8,10 @@ use tx_di_core::App;
 use admin_proto::{
     CreateUserRequest, UpdateUserRequest, ChangePasswordRequest,
     AssignRolesRequest, AssignDeptsRequest, ListUsersRequest,
-    UserResponse, Empty,
 };
 use admin_domain::user::model::value_object::{Sex, UserStatus};
 use crate::services;
-use tx_common::{ApiR, ApiRes, Page};
+use tx_common::{ApiR, ApiRes};
 
 pub fn router(app: Arc<App>) -> Router {
     Router::new()
@@ -25,27 +24,6 @@ pub fn router(app: Arc<App>) -> Router {
         .route("/assign_roles", post(assign_roles))
         .route("/assign_depts", post(assign_depts))
         .with_state(app)
-}
-
-fn map_user(r: admin_app::user::dto::UserResponse) -> UserResponse {
-    UserResponse {
-        id: r.id,
-        username: r.username,
-        nickname: r.nickname,
-        email: r.email,
-        mobile: r.mobile,
-        sex: r.sex as i32,
-        status: r.status as i32,
-        remark: r.remark,
-        role_ids: r.role_ids,
-        dept_ids: r.dept_ids,
-        avatar: r.avatar,
-        login_ip: r.login_ip,
-        login_date: r.login_date.unwrap_or(0),
-        tenant_id: r.tenant_id,
-        create_time: r.create_time,
-        update_time: r.update_time,
-    }
 }
 
 /// POST /api/user/
@@ -65,7 +43,7 @@ async fn create_user(
         dept_ids: if req.dept_ids.is_empty() { None } else { Some(req.dept_ids) },
     };
     match services::get().user.create_user(cmd, None).await {
-        Ok(r) => ApiR::success(map_user(r)),
+        Ok(r) => ApiR::success(r),
         Err(e) => ApiRes::from(e).into_typed(),
     }
 }
@@ -75,7 +53,7 @@ async fn get_user(
     axum::extract::Path(user_id): axum::extract::Path<u64>,
 ) -> impl IntoResponse {
     match services::get().user.get_user(user_id).await {
-        Ok(r) => ApiR::success(map_user(r)),
+        Ok(r) => ApiR::success(r),
         Err(e) => ApiRes::from(e).into_typed(),
     }
 }
@@ -95,7 +73,7 @@ async fn update_user(
         remark: req.remark,
     };
     match services::get().user.update_user(cmd, None).await {
-        Ok(r) => ApiR::success(map_user(r)),
+        Ok(r) => ApiR::success(r),
         Err(e) => ApiRes::from(e).into_typed(),
     }
 }
@@ -129,12 +107,7 @@ async fn list_users(
         size: page_info.size,
     };
     match services::get().user.get_user_page(query).await {
-        Ok(page) => ApiR::success(Page::new(
-            page.list.into_iter().map(map_user).collect(),
-            page.page,
-            page.size,
-            page.total,
-        )),
+        Ok(page) => ApiR::success(page),
         Err(e) => ApiRes::from(e).into_typed(),
     }
 }

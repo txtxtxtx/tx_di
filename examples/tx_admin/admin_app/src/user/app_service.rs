@@ -74,7 +74,7 @@ impl UserAppService {
             user.dept_ids = dept_ids;
         }
 
-        Ok(UserResponse::from(user))
+        Ok(user_to_response(user))
     }
 
     /// Update user
@@ -95,7 +95,7 @@ impl UserAppService {
                 updater,
             )
             .await?;
-        Ok(UserResponse::from(user))
+        Ok(user_to_response(user))
     }
 
     /// Delete user
@@ -115,7 +115,7 @@ impl UserAppService {
         updater: Option<String>,
     ) -> AppResult<UserResponse> {
         let user = self.user_service.change_status(user_id, status, updater).await?;
-        Ok(UserResponse::from(user))
+        Ok(user_to_response(user))
     }
 
     /// Change password
@@ -143,7 +143,7 @@ impl UserAppService {
     /// Get user by ID
     pub async fn get_user(&self, user_id: u64) -> AppResult<UserResponse> {
         let user = self.user_service.get_user(user_id).await?;
-        Ok(UserResponse::from(user))
+        Ok(user_to_response(user))
     }
 
     /// Get user page
@@ -164,7 +164,7 @@ impl UserAppService {
         let result = self.user_service.get_user_page(&query, page).await?;
 
         Ok(Page::new(
-            result.list.into_iter().map(UserResponse::from).collect(),
+            result.list.into_iter().map(user_to_response).collect(),
             result.page,
             result.size,
             result.total,

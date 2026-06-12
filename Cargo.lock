@@ -38,6 +38,7 @@ name = "admin_app"
 version = "0.1.0"
 dependencies = [
  "admin_domain",
+ "admin_proto",
  "async-trait",
  "chrono",
  "serde",
