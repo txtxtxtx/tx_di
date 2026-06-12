@@ -5,6 +5,7 @@ use admin_domain::user::service::UserService;
 use admin_domain::role::service::RoleService;
 use admin_domain::permission::service::PermissionService;
 use admin_domain::shared::repository::RepositoryError;
+use admin_domain::password;
 use tx_error::AppResult;
 
 /// Authentication application service
@@ -45,8 +46,11 @@ impl AuthAppService {
             return Err(RepositoryError::Validation)?;
         }
 
-        // Verify password (in real app, compare hashed passwords)
-        if user.password != cmd.password {
+        // Verify password using Argon2id hash verification
+        let is_valid = password::verify_password(&cmd.password, &user.password)
+            .map_err(|_| RepositoryError::Validation)?;
+
+        if !is_valid {
             return Err(RepositoryError::Validation)?;
         }
 

@@ -140,3 +140,4 @@ livekit-api = { version = "0.4", default-features = false }
 livekit = { version = "0.7.42", default-features = false }
 toasty = { version = "0.6", default-features = false, features = ["serde"] }
 jiff = { version = "0.2", default-features = false, features = ["std", "serde"] }
+argon2 = { version = "0.5", features = ["std"] }

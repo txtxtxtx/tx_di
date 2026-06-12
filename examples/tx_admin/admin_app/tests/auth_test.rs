@@ -15,6 +15,13 @@ use admin_domain::user::model::value_object::UserStatus;
 use admin_domain::user::service::UserService;
 use admin_domain::role::service::RoleService;
 use admin_domain::permission::service::PermissionService;
+use admin_domain::password::hash_password;
+
+/// 创建带哈希密码的用户（测试辅助函数）
+fn create_user_with_hashed_password(id: u64, username: &str, password: &str, nickname: &str) -> User {
+    let hashed_password = hash_password(password).expect("密码哈希失败");
+    User::create(id, username.into(), hashed_password, nickname.into(), None)
+}
 
 fn make_auth_app(
     user: User,
@@ -46,7 +53,7 @@ fn make_auth_app(
 
 #[tokio::test]
 async fn login_success() {
-    let user = User::create(1, "admin".into(), "password123".into(), "管理员".into(), None);
+    let user = create_user_with_hashed_password(1, "admin", "password123", "管理员");
     let app = make_auth_app(user, vec![1], vec![(1, vec!["*"])]);
 
     let resp = app.login(LoginCommand {
@@ -62,7 +69,7 @@ async fn login_success() {
 
 #[tokio::test]
 async fn login_wrong_password() {
-    let user = User::create(1, "admin".into(), "password123".into(), "管理员".into(), None);
+    let user = create_user_with_hashed_password(1, "admin", "password123", "管理员");
     let app = make_auth_app(user, vec![], vec![]);
 
     let r = app.login(LoginCommand {
@@ -73,7 +80,7 @@ async fn login_wrong_password() {
 
 #[tokio::test]
 async fn login_nonexistent_user() {
-    let user = User::create(1, "admin".into(), "pwd".into(), "管理员".into(), None);
+    let user = create_user_with_hashed_password(1, "admin", "pwd", "管理员");
     let app = make_auth_app(user, vec![], vec![]);
 
     let r = app.login(LoginCommand {
@@ -84,7 +91,7 @@ async fn login_nonexistent_user() {
 
 #[tokio::test]
 async fn login_disabled_user() {
-    let mut user = User::create(1, "admin".into(), "password123".into(), "管理员".into(), None);
+    let mut user = create_user_with_hashed_password(1, "admin", "password123", "管理员");
     user.change_status(UserStatus::Disabled, None);
     let app = make_auth_app(user, vec![], vec![]);
 
@@ -96,7 +103,7 @@ async fn login_disabled_user() {
 
 #[tokio::test]
 async fn login_locked_user() {
-    let mut user = User::create(1, "admin".into(), "password123".into(), "管理员".into(), None);
+    let mut user = create_user_with_hashed_password(1, "admin", "password123", "管理员");
     user.change_status(UserStatus::Locked, None);
     let app = make_auth_app(user, vec![], vec![]);
 

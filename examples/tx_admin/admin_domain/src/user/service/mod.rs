@@ -8,6 +8,7 @@ use crate::user::model::value_object::{LoginUser, Sex, UserQuery, UserStatus};
 use crate::user::repository::UserRepository;
 use crate::permission::repository::PermissionRepository;
 use crate::shared::repository::RepositoryError::NotFound;
+use crate::password;
 
 /// User domain service
 pub struct UserService {
@@ -54,8 +55,11 @@ impl UserService {
             return Err(RepositoryError::Duplicate)?;
         }
 
+        // Hash password with Argon2id
+        let hashed_password = password::hash_password(&password)?;
+
         let user_id = id::next_id();
-        let user = User::create(user_id, username, password, nickname, creator);
+        let user = User::create(user_id, username, hashed_password, nickname, creator);
         self.user_repo.insert(&user).await?;
         Ok(user)
     }
@@ -130,7 +134,10 @@ impl UserService {
             .await?
             .ok_or_else(|| NotFound)?;
 
-        user.change_password(password, updater);
+        // Hash new password with Argon2id
+        let hashed_password = password::hash_password(&password)?;
+
+        user.change_password(hashed_password, updater);
         self.user_repo.update(&user).await?;
         Ok(user)
     }
