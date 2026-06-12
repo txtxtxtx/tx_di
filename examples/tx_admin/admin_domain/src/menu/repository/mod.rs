@@ -1,3 +1,4 @@
+use std::any::Any;
 use async_trait::async_trait;
 use tx_error::AppResult;
 use crate::menu::model::aggregate::Menu;
@@ -5,7 +6,7 @@ use crate::menu::model::value_object::MenuQuery;
 
 /// Menu repository trait
 #[async_trait]
-pub trait MenuRepository: Send + Sync {
+pub trait MenuRepository: Any + Send + Sync {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Menu>>;
     async fn find_all(&self, query: &MenuQuery) -> AppResult<Vec<Menu>>;
     async fn find_by_ids(&self, ids: &[u64]) -> AppResult<Vec<Menu>>;

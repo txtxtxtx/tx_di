@@ -8,12 +8,17 @@ use admin_domain::user::repository::UserRepository;
 use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::repository::RepositoryError;
 use tx_common::page::Page;
+use tx_di_core::{tx_comp, tx_cst};
 use tx_error::AppResult;
 
 /// Mock user repository for testing
+#[tx_comp(as_trait = dyn UserRepository)]
 pub struct MockUserRepository {
+    #[tx_cst(RwLock::new(HashMap::new()))]
     users: RwLock<HashMap<u64, User>>,
+    #[tx_cst(RwLock::new(HashMap::new()))]
     user_roles: RwLock<HashMap<u64, Vec<u64>>>,
+    #[tx_cst(RwLock::new(HashMap::new()))]
     user_depts: RwLock<HashMap<u64, Vec<u64>>>,
 }
 

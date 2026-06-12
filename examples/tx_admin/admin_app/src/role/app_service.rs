@@ -3,9 +3,11 @@ use std::sync::Arc;
 use crate::role::dto::*;
 use admin_domain::role::model::value_object::RoleQuery;
 use admin_domain::role::service::RoleService;
+use tx_di_core::tx_comp;
 use tx_error::AppResult;
 use tx_common::page::Page;
 
+#[tx_comp]
 pub struct RoleAppService {
     role_service: Arc<RoleService>,
 }

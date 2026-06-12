@@ -3,9 +3,11 @@ use std::sync::Arc;
 use crate::log::dto::*;
 use admin_domain::log::model::value_object::{LoginLogQuery, OperateLogQuery};
 use admin_domain::log::service::{LoginLogService, OperateLogService};
+use tx_di_core::tx_comp;
 use tx_error::AppResult;
 use tx_common::page::Page;
 
+#[tx_comp]
 pub struct OperateLogAppService {
     log_service: Arc<OperateLogService>,
 }
@@ -68,6 +70,7 @@ impl OperateLogAppService {
     }
 }
 
+#[tx_comp]
 pub struct LoginLogAppService {
     log_service: Arc<LoginLogService>,
 }

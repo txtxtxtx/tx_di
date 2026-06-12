@@ -3,9 +3,11 @@ use admin_domain::config::model::aggregate::Config;
 use crate::config::dto::*;
 use admin_domain::config::model::value_object::ConfigQuery;
 use admin_domain::config::service::ConfigService;
+use tx_di_core::tx_comp;
 use tx_error::AppResult;
 use tx_common::page::Page;
 
+#[tx_comp]
 pub struct ConfigAppService {
     config_service: Arc<ConfigService>,
 }

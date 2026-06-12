@@ -3,8 +3,10 @@ use std::sync::Arc;
 use crate::menu::dto::*;
 use admin_domain::menu::model::value_object::{MenuQuery, MenuTreeNode};
 use admin_domain::menu::service::MenuService;
+use tx_di_core::tx_comp;
 use tx_error::AppResult;
 
+#[tx_comp]
 pub struct MenuAppService {
     menu_service: Arc<MenuService>,
 }

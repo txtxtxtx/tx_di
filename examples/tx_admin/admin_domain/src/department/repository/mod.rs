@@ -1,10 +1,11 @@
+use std::any::Any;
 use async_trait::async_trait;
 use tx_error::AppResult;
 use crate::department::model::aggregate::Department;
 use crate::department::model::value_object::DeptQuery;
 
 #[async_trait]
-pub trait DepartmentRepository: Send + Sync {
+pub trait DepartmentRepository: Any + Send + Sync {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Department>>;
     async fn find_all(&self, query: &DeptQuery) -> AppResult<Vec<Department>>;
     async fn find_by_ids(&self, ids: &[u64]) -> AppResult<Vec<Department>>;

@@ -4,15 +4,20 @@ use async_trait::async_trait;
 
 use admin_domain::permission::model::value_object::{PermissionCheck, PermissionType};
 use admin_domain::permission::repository::PermissionRepository;
+use tx_di_core::{tx_comp, tx_cst};
 use tx_error::AppResult;
 
 /// Mock permission repository for testing
+#[tx_comp(as_trait = dyn PermissionRepository)]
 pub struct MockPermissionRepository {
     /// role_id -> set of permission codes
+    #[tx_cst(RwLock::new(HashMap::new()))]
     role_permissions: RwLock<HashMap<u64, HashSet<String>>>,
     /// user_id -> role_ids
+    #[tx_cst(RwLock::new(HashMap::new()))]
     user_roles: RwLock<HashMap<u64, Vec<u64>>>,
     /// all available permissions
+    #[tx_cst(Self::default_permissions())]
     all_permissions: HashSet<PermissionCheck>,
 }
 

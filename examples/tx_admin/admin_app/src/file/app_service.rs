@@ -3,9 +3,11 @@ use std::sync::Arc;
 use crate::file::dto::*;
 use admin_domain::file::model::value_object::{FileQuery, FileUploadCommand};
 use admin_domain::file::service::FileService;
+use tx_di_core::tx_comp;
 use tx_error::AppResult;
 use tx_common::page::Page;
 
+#[tx_comp]
 pub struct FileAppService {
     file_service: Arc<FileService>,
 }

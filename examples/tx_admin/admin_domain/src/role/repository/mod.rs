@@ -1,3 +1,4 @@
+use std::any::Any;
 use async_trait::async_trait;
 use tx_common::page::Page;
 use tx_error::AppResult;
@@ -6,7 +7,7 @@ use crate::role::model::value_object::RoleQuery;
 
 /// Role repository trait
 #[async_trait]
-pub trait RoleRepository: Send + Sync {
+pub trait RoleRepository: Any + Send + Sync {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Role>>;
     async fn find_by_code(&self, code: &str) -> AppResult<Option<Role>>;
     async fn find_by_ids(&self, ids: &[u64]) -> AppResult<Vec<Role>>;

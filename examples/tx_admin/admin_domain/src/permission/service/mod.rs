@@ -1,11 +1,12 @@
 use std::collections::HashSet;
-use std::sync::Arc;  // 引入Arc智能指针，用于共享所有权
-use tx_error::AppResult;  // 引入自定义错误类型AppResult，用于处理可能的错误
-use crate::permission::model::value_object::PermissionCheck;  // 引入权限检查的值对象
-use crate::permission::repository::PermissionRepository;  // 引入权限仓库trait
+use std::sync::Arc;
+use tx_di_core::tx_comp;
+use tx_error::AppResult;
+use crate::permission::model::value_object::PermissionCheck;
+use crate::permission::repository::PermissionRepository;
 
 /// Permission domain service
-/// 权限领域服务，负责处理权限相关的业务逻辑
+#[tx_comp]
 pub struct PermissionService {
     permission_repo: Arc<dyn PermissionRepository>,  // 权限仓库的Arc包装，支持多线程共享
 }

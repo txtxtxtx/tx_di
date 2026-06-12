@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use tx_common::id;
+use tx_di_core::tx_comp;
 use tx_error::AppResult;
 use crate::shared::repository::RepositoryError;
 use crate::menu::model::aggregate::Menu;
@@ -9,6 +10,7 @@ use crate::menu::repository::MenuRepository;
 use crate::shared::repository::RepositoryError::NotFound;
 
 /// Menu domain service
+#[tx_comp]
 pub struct MenuService {
     menu_repo: Arc<dyn MenuRepository>,
 }

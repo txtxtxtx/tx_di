@@ -2,8 +2,10 @@ use std::sync::Arc;
 
 use crate::permission::dto::*;
 use admin_domain::permission::service::PermissionService;
+use tx_di_core::tx_comp;
 use tx_error::AppResult;
 
+#[tx_comp]
 pub struct PermissionAppService {
     permission_service: Arc<PermissionService>,
 }

@@ -7,9 +7,12 @@ use admin_domain::menu::model::value_object::MenuQuery;
 use admin_domain::menu::repository::MenuRepository;
 use admin_domain::shared::repository::RepositoryError;
 use admin_domain::shared::model::value_object::DeletedStatus;
+use tx_di_core::{tx_comp, tx_cst};
 use tx_error::AppResult;
 
+#[tx_comp(as_trait = dyn MenuRepository)]
 pub struct MockMenuRepository {
+    #[tx_cst(RwLock::new(HashMap::new()))]
     menus: RwLock<HashMap<u64, Menu>>,
 }
 

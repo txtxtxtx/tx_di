@@ -4,9 +4,11 @@ use crate::log::model::aggregate::{LoginLog, OperateLog};
 use crate::log::model::value_object::{LoginLogQuery, OperateLogQuery};
 use crate::log::repository::{LoginLogRepository, OperateLogRepository};
 use tx_common::page::Page;
+use tx_di_core::tx_comp;
 use tx_error::AppResult;
 use tx_common::id;
 
+#[tx_comp]
 pub struct OperateLogService {
     log_repo: Arc<dyn OperateLogRepository>,
 }
@@ -53,6 +55,7 @@ impl OperateLogService {
     }
 }
 
+#[tx_comp]
 pub struct LoginLogService {
     log_repo: Arc<dyn LoginLogRepository>,
 }

@@ -1,3 +1,4 @@
+use std::any::Any;
 use async_trait::async_trait;
 
 use crate::dictionary::model::aggregate::{DictData, DictType};
@@ -6,7 +7,7 @@ use tx_common::page::Page;
 use tx_error::AppResult;
 
 #[async_trait]
-pub trait DictTypeRepository: Send + Sync {
+pub trait DictTypeRepository: Any + Send + Sync {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<DictType>>;
     async fn find_by_type(&self, dict_type: &str) -> AppResult<Option<DictType>>;
     async fn find_page(
@@ -22,7 +23,7 @@ pub trait DictTypeRepository: Send + Sync {
 }
 
 #[async_trait]
-pub trait DictDataRepository: Send + Sync {
+pub trait DictDataRepository: Any + Send + Sync {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<DictData>>;
     async fn find_by_type(&self, dict_type: &str) -> AppResult<Vec<DictData>>;
     async fn find_page(

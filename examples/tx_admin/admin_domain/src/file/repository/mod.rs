@@ -1,3 +1,4 @@
+use std::any::Any;
 use async_trait::async_trait;
 
 use crate::file::model::aggregate::{File, FileConfig};
@@ -6,7 +7,7 @@ use tx_common::page::Page;
 use tx_error::AppResult;
 
 #[async_trait]
-pub trait FileRepository: Send + Sync {
+pub trait FileRepository: Any + Send + Sync {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<File>>;
     async fn find_page(
         &self,
@@ -18,7 +19,7 @@ pub trait FileRepository: Send + Sync {
 }
 
 #[async_trait]
-pub trait FileConfigRepository: Send + Sync {
+pub trait FileConfigRepository: Any + Send + Sync {
     async fn find_by_id(&self, id: i32) -> AppResult<Option<FileConfig>>;
     async fn find_master(&self) -> AppResult<Option<FileConfig>>;
     async fn find_all(&self) -> AppResult<Vec<FileConfig>>;

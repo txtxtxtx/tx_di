@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use tx_common::id;
+use tx_di_core::tx_comp;
 use tx_error::AppResult;
 use crate::shared::repository::RepositoryError;
 use crate::department::model::aggregate::Department;
@@ -8,6 +9,7 @@ use crate::department::model::value_object::{DeptQuery, DeptTreeNode};
 use crate::department::repository::DepartmentRepository;
 use crate::shared::repository::RepositoryError::NotFound;
 
+#[tx_comp]
 pub struct DepartmentService {
     dept_repo: Arc<dyn DepartmentRepository>,
 }

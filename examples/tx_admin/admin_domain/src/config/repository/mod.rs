@@ -1,3 +1,4 @@
+use std::any::Any;
 use async_trait::async_trait;
 
 use crate::config::model::aggregate::Config;
@@ -6,7 +7,7 @@ use tx_common::page::Page;
 use tx_error::AppResult;
 
 #[async_trait]
-pub trait ConfigRepository: Send + Sync {
+pub trait ConfigRepository: Any + Send + Sync {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Config>>;
     async fn find_by_key(&self, key: &str) -> AppResult<Option<Config>>;
     async fn find_page(

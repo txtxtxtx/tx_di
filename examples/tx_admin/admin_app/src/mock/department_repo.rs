@@ -7,10 +7,14 @@ use admin_domain::department::model::value_object::DeptQuery;
 use admin_domain::department::repository::DepartmentRepository;
 use admin_domain::shared::repository::RepositoryError;
 use admin_domain::shared::model::value_object::DeletedStatus;
+use tx_di_core::{tx_comp, tx_cst};
 use tx_error::AppResult;
 
+#[tx_comp(as_trait = dyn DepartmentRepository)]
 pub struct MockDepartmentRepository {
+    #[tx_cst(RwLock::new(HashMap::new()))]
     depts: RwLock<HashMap<u64, Department>>,
+    #[tx_cst(RwLock::new(HashMap::new()))]
     dept_users: RwLock<HashMap<u64, Vec<u64>>>,
 }
 

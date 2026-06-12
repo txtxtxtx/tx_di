@@ -1,3 +1,4 @@
+use std::any::Any;
 use async_trait::async_trait;
 
 use crate::log::model::aggregate::{LoginLog, OperateLog};
@@ -6,7 +7,7 @@ use tx_common::page::Page;
 use tx_error::AppResult;
 
 #[async_trait]
-pub trait OperateLogRepository: Send + Sync {
+pub trait OperateLogRepository: Any + Send + Sync {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<OperateLog>>;
     async fn find_page(
         &self,
@@ -19,7 +20,7 @@ pub trait OperateLogRepository: Send + Sync {
 }
 
 #[async_trait]
-pub trait LoginLogRepository: Send + Sync {
+pub trait LoginLogRepository: Any + Send + Sync {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<LoginLog>>;
     async fn find_page(
         &self,

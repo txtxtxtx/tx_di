@@ -8,10 +8,14 @@ use admin_domain::role::repository::RoleRepository;
 use admin_domain::shared::repository::RepositoryError;
 use admin_domain::shared::model::value_object::DeletedStatus;
 use tx_common::page::Page;
+use tx_di_core::{tx_comp, tx_cst};
 use tx_error::AppResult;
 
+#[tx_comp(as_trait = dyn RoleRepository)]
 pub struct MockRoleRepository {
+    #[tx_cst(RwLock::new(HashMap::new()))]
     roles: RwLock<HashMap<u64, Role>>,
+    #[tx_cst(RwLock::new(HashMap::new()))]
     role_menus: RwLock<HashMap<u64, Vec<u64>>>,
 }
 

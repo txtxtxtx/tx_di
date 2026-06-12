@@ -6,9 +6,12 @@ use admin_domain::log::model::aggregate::{LoginLog, OperateLog};
 use admin_domain::log::model::value_object::{LoginLogQuery, OperateLogQuery};
 use admin_domain::log::repository::{LoginLogRepository, OperateLogRepository};
 use tx_common::page::Page;
+use tx_di_core::{tx_comp, tx_cst};
 use tx_error::AppResult;
 
+#[tx_comp(as_trait = dyn OperateLogRepository)]
 pub struct MockOperateLogRepository {
+    #[tx_cst(RwLock::new(HashMap::new()))]
     logs: RwLock<HashMap<u64, OperateLog>>,
 }
 
@@ -71,7 +74,9 @@ impl OperateLogRepository for MockOperateLogRepository {
     }
 }
 
+#[tx_comp(as_trait = dyn LoginLogRepository)]
 pub struct MockLoginLogRepository {
+    #[tx_cst(RwLock::new(HashMap::new()))]
     logs: RwLock<HashMap<u64, LoginLog>>,
 }
 

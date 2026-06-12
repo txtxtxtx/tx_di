@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::HashSet;
 use async_trait::async_trait;
 use tx_error::AppResult;
@@ -5,7 +6,7 @@ use crate::permission::model::value_object::PermissionCheck;
 
 /// Permission repository trait
 #[async_trait]
-pub trait PermissionRepository: Send + Sync {
+pub trait PermissionRepository: Any + Send + Sync {
     /// Get all permission codes for given role IDs
     async fn find_by_role_ids(&self, role_ids: &[u64]) -> AppResult<HashSet<String>>;
 

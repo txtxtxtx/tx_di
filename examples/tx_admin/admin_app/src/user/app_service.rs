@@ -4,10 +4,12 @@ use crate::user::dto::*;
 use admin_domain::user::model::value_object::{Sex, UserQuery, UserStatus};
 use admin_domain::user::service::UserService;
 use admin_domain::shared::repository::RepositoryError;
+use tx_di_core::tx_comp;
 use tx_error::AppResult;
 use tx_common::page::Page;
 
 /// User application service - orchestrates domain operations
+#[tx_comp]
 pub struct UserAppService {
     user_service: Arc<UserService>,
 }

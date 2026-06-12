@@ -73,6 +73,8 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "tokio",
+ "tracing",
+ "tx-di-core",
  "tx_common",
  "tx_error",
 ]

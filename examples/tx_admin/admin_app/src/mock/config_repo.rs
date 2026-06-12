@@ -8,9 +8,12 @@ use admin_domain::config::repository::ConfigRepository;
 use admin_domain::shared::repository::RepositoryError;
 use admin_domain::shared::model::value_object::DeletedStatus;
 use tx_common::page::Page;
+use tx_di_core::{tx_comp, tx_cst};
 use tx_error::AppResult;
 
+#[tx_comp(as_trait = dyn ConfigRepository)]
 pub struct MockConfigRepository {
+    #[tx_cst(RwLock::new(HashMap::new()))]
     configs: RwLock<HashMap<u64, Config>>,
 }
 

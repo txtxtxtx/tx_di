@@ -3,9 +3,11 @@ use std::sync::Arc;
 use crate::dictionary::dto::*;
 use admin_domain::dictionary::model::value_object::{DictDataQuery, DictTypeQuery};
 use admin_domain::dictionary::service::{DictDataService, DictTypeService};
+use tx_di_core::tx_comp;
 use tx_error::AppResult;
 use tx_common::page::Page;
 
+#[tx_comp]
 pub struct DictTypeAppService {
     dict_type_service: Arc<DictTypeService>,
 }
@@ -69,6 +71,7 @@ impl DictTypeAppService {
     }
 }
 
+#[tx_comp]
 pub struct DictDataAppService {
     dict_data_service: Arc<DictDataService>,
 }

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use tx_common::id;
 use tx_common::page::Page;
+use tx_di_core::tx_comp;
 use tx_error::AppResult;
 use crate::shared::repository::RepositoryError;
 use crate::role::model::aggregate::Role;
@@ -9,6 +10,7 @@ use crate::role::repository::RoleRepository;
 use crate::shared::repository::RepositoryError::NotFound;
 
 /// Role domain service
+#[tx_comp]
 pub struct RoleService {
     role_repo: Arc<dyn RoleRepository>,
 }

@@ -1,3 +1,4 @@
+use std::any::Any;
 use async_trait::async_trait;
 use tx_common::page::Page;
 use tx_error::AppResult;
@@ -6,7 +7,7 @@ use crate::user::model::value_object::UserQuery;
 
 /// User repository trait
 #[async_trait]
-pub trait UserRepository: Send + Sync {
+pub trait UserRepository: Any + Send + Sync {
     /// Find user by ID
     async fn find_by_id(&self, id: u64) -> AppResult<Option<User>>;
 

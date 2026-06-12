@@ -8,9 +8,12 @@ use admin_domain::dictionary::repository::{DictDataRepository, DictTypeRepositor
 use admin_domain::shared::repository::RepositoryError;
 use admin_domain::shared::model::value_object::DeletedStatus;
 use tx_common::page::Page;
+use tx_di_core::{tx_comp, tx_cst};
 use tx_error::AppResult;
 
+#[tx_comp(as_trait = dyn DictTypeRepository)]
 pub struct MockDictTypeRepository {
+    #[tx_cst(RwLock::new(HashMap::new()))]
     dict_types: RwLock<HashMap<u64, DictType>>,
 }
 
@@ -126,7 +129,9 @@ impl DictTypeRepository for MockDictTypeRepository {
     }
 }
 
+#[tx_comp(as_trait = dyn DictDataRepository)]
 pub struct MockDictDataRepository {
+    #[tx_cst(RwLock::new(HashMap::new()))]
     dict_data: RwLock<HashMap<u64, DictData>>,
 }
 

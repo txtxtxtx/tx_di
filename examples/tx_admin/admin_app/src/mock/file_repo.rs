@@ -8,9 +8,12 @@ use admin_domain::file::repository::{FileConfigRepository, FileRepository};
 use admin_domain::shared::repository::RepositoryError;
 use admin_domain::shared::model::value_object::DeletedStatus;
 use tx_common::page::Page;
+use tx_di_core::{tx_comp, tx_cst};
 use tx_error::AppResult;
 
+#[tx_comp(as_trait = dyn FileRepository)]
 pub struct MockFileRepository {
+    #[tx_cst(RwLock::new(HashMap::new()))]
     files: RwLock<HashMap<u64, File>>,
 }
 
@@ -83,7 +86,9 @@ impl FileRepository for MockFileRepository {
     }
 }
 
+#[tx_comp(as_trait = dyn FileConfigRepository)]
 pub struct MockFileConfigRepository {
+    #[tx_cst(RwLock::new(HashMap::new()))]
     configs: RwLock<HashMap<i32, FileConfig>>,
 }
 

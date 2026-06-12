@@ -6,9 +6,11 @@ use admin_domain::role::service::RoleService;
 use admin_domain::permission::service::PermissionService;
 use admin_domain::shared::repository::RepositoryError;
 use admin_domain::password;
+use tx_di_core::tx_comp;
 use tx_error::AppResult;
 
 /// Authentication application service
+#[tx_comp]
 pub struct AuthAppService {
     user_service: Arc<UserService>,
     role_service: Arc<RoleService>,

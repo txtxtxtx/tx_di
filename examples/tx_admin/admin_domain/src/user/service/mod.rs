@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use tx_common::id;
 use tx_common::page::Page;
+use tx_di_core::tx_comp;
 use tx_error::AppResult;
 use crate::shared::repository::RepositoryError;
 use crate::user::model::aggregate::User;
@@ -11,6 +12,7 @@ use crate::shared::repository::RepositoryError::NotFound;
 use crate::password;
 
 /// User domain service
+#[tx_comp]
 pub struct UserService {
     user_repo: Arc<dyn UserRepository>,
     permission_repo: Arc<dyn PermissionRepository>,
