@@ -1,4 +1,4 @@
-use chrono::Utc; // 引入时间处理库
+use jiff::Timestamp; // 引入时间处理库
 use serde::{Deserialize, Serialize}; // 引入序列化和反序列化库
 
 use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent}; // 引入共享模块中的模型定义
@@ -57,9 +57,9 @@ impl Role {
             tenant_id: 0,
             audit: AuditFields {
                 creator: creator.clone(),
-                create_time: Utc::now(),
+                create_time: Timestamp::now(),
                 updater: creator,
-                update_time: Utc::now(),
+                update_time: Timestamp::now(),
                 deleted: DeletedStatus::Normal,
             },
             menu_ids: Vec::new(),
@@ -85,7 +85,7 @@ impl Role {
         self.data_scope = data_scope;
         self.remark = remark;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
         self.add_event(DomainEvent::RoleUpdated { role_id: self.id });
     }
 
@@ -93,13 +93,13 @@ impl Role {
     pub fn change_status(&mut self, status: i32, updater: Option<String>) {
         self.status = status;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
     }
 
     /// Set menu permissions
     pub fn set_menus(&mut self, menu_ids: Vec<u64>) {
         self.menu_ids = menu_ids;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
         self.add_event(DomainEvent::RolePermissionsChanged { role_id: self.id });
     }
 
@@ -107,7 +107,7 @@ impl Role {
     pub fn soft_delete(&mut self, updater: Option<String>) {
         self.audit.deleted = DeletedStatus::Deleted;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
         self.add_event(DomainEvent::RoleDeleted { role_id: self.id });
     }
 

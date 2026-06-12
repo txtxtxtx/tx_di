@@ -56,7 +56,7 @@ version = "0.1.0"
 dependencies = [
  "admin_macros",
  "async-trait",
- "chrono",
+ "jiff",
  "serde",
  "serde_json",
  "serde_repr",

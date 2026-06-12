@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent, Entity};
@@ -109,7 +109,7 @@ pub struct LoginLog {
     pub login_type: String,
     pub result: i32,
     pub msg: Option<String>,
-    pub login_time: DateTime<Utc>,
+    pub login_time: Timestamp,
     pub tenant_id: i32,
     pub audit: AuditFields,
     events: Vec<DomainEvent>,
@@ -156,7 +156,7 @@ impl LoginLog {
             login_type,
             result,
             msg: None,
-            login_time: Utc::now(),
+            login_time: Timestamp::now(),
             tenant_id: 0,
             audit: AuditFields::default(),
             events: Vec::new(),

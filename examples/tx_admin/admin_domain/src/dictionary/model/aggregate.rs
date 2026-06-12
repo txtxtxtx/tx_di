@@ -1,4 +1,4 @@
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent, Entity};
@@ -50,9 +50,9 @@ impl DictType {
             remark: None,
             audit: AuditFields {
                 creator: creator.clone(),
-                create_time: Utc::now(),
+                create_time: Timestamp::now(),
                 updater: creator,
-                update_time: Utc::now(),
+                update_time: Timestamp::now(),
                 deleted: DeletedStatus::Normal,
             },
             events: Vec::new(),
@@ -66,20 +66,20 @@ impl DictType {
         self.dict_type = dict_type;
         self.remark = remark;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
         self.add_event(DomainEvent::DictTypeUpdated { dict_type_id: self.id });
     }
 
     pub fn change_status(&mut self, status: i32, updater: Option<String>) {
         self.status = status;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
     }
 
     pub fn soft_delete(&mut self, updater: Option<String>) {
         self.audit.deleted = DeletedStatus::Deleted;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
         self.add_event(DomainEvent::DictTypeDeleted { dict_type_id: self.id });
     }
 }
@@ -140,9 +140,9 @@ impl DictData {
             remark: None,
             audit: AuditFields {
                 creator: creator.clone(),
-                create_time: Utc::now(),
+                create_time: Timestamp::now(),
                 updater: creator,
-                update_time: Utc::now(),
+                update_time: Timestamp::now(),
                 deleted: DeletedStatus::Normal,
             },
             events: Vec::new(),
@@ -170,20 +170,20 @@ impl DictData {
         self.css_class = css_class;
         self.remark = remark;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
         self.add_event(DomainEvent::DictDataUpdated { dict_data_id: self.id });
     }
 
     pub fn change_status(&mut self, status: i32, updater: Option<String>) {
         self.status = status;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
     }
 
     pub fn soft_delete(&mut self, updater: Option<String>) {
         self.audit.deleted = DeletedStatus::Deleted;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
         self.add_event(DomainEvent::DictDataDeleted { dict_data_id: self.id });
     }
 }

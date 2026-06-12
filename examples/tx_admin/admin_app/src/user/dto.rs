@@ -73,9 +73,9 @@ pub fn user_to_response(user: User) -> UserResponse {
         dept_ids: user.dept_ids,
         avatar: user.avatar,
         login_ip: user.login_ip,
-        login_date: user.login_date.map(|d| d.timestamp_millis()).unwrap_or(0),
+        login_date: user.login_date.map(|d| d.as_millisecond()).unwrap_or(0),
         tenant_id: user.tenant_id.into_inner(),
-        create_time: user.audit.create_time.timestamp_millis(),
-        update_time: user.audit.update_time.timestamp_millis(),
+        create_time: user.audit.create_time.as_millisecond(),
+        update_time: user.audit.update_time.as_millisecond(),
     }
 }

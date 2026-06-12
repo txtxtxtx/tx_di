@@ -1,4 +1,4 @@
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent, Entity};
@@ -58,9 +58,9 @@ impl File {
             size,
             audit: AuditFields {
                 creator: creator.clone(),
-                create_time: Utc::now(),
+                create_time: Timestamp::now(),
                 updater: creator,
-                update_time: Utc::now(),
+                update_time: Timestamp::now(),
                 deleted: DeletedStatus::Normal,
             },
             events: Vec::new(),
@@ -72,7 +72,7 @@ impl File {
     pub fn soft_delete(&mut self, updater: Option<String>) {
         self.audit.deleted = DeletedStatus::Deleted;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
         self.add_event(DomainEvent::FileDeleted { file_id: self.id });
     }
 }
@@ -126,9 +126,9 @@ impl FileConfig {
             config,
             audit: AuditFields {
                 creator: creator.clone(),
-                create_time: Utc::now(),
+                create_time: Timestamp::now(),
                 updater: creator,
-                update_time: Utc::now(),
+                update_time: Timestamp::now(),
                 deleted: DeletedStatus::Normal,
             },
             events: Vec::new(),

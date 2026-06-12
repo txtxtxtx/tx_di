@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc}; // 引入chrono库中的DateTime和Utc类型，用于处理时间
+use jiff::Timestamp; // 引入jiff库中的Timestamp类型，用于处理时间
 use serde::{Deserialize, Serialize}; // 引入serde库中的Deserialize和Serialize trait，用于序列化和反序列化
 
 use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent}; // 引入共享模块中的相关模型和trait
@@ -34,7 +34,7 @@ pub struct User {
     /// 用户最近登录的IP地址，可选字段
     pub login_ip: Option<String>,
     /// 用户最近登录的时间，可选字段，使用UTC时间
-    pub login_date: Option<DateTime<Utc>>,
+    pub login_date: Option<Timestamp>,
     /// 租户ID，用于多租户系统中的租户隔离
     pub tenant_id: TenantId,
     /// 审计字段，包含创建、修改等信息
@@ -72,9 +72,9 @@ impl User {
             tenant_id: TenantId::default(),
             audit: AuditFields {
                 creator: creator.clone(),
-                create_time: Utc::now(),
+                create_time: Timestamp::now(),
                 updater: creator,
-                update_time: Utc::now(),
+                update_time: Timestamp::now(),
                 deleted: DeletedStatus::Normal,
             },
             role_ids: Vec::new(),
@@ -104,7 +104,7 @@ impl User {
         self.sex = sex;
         self.remark = remark;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
         self.add_event(DomainEvent::UserUpdated { user_id: self.id });
     }
 
@@ -112,7 +112,7 @@ impl User {
     pub fn change_status(&mut self, status: UserStatus, updater: Option<String>) {
         self.status = status;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
         self.add_event(DomainEvent::UserStatusChanged {
             user_id: self.id,
             status,
@@ -123,14 +123,14 @@ impl User {
     pub fn change_password(&mut self, password: String, updater: Option<String>) {
         self.password = password;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
         self.add_event(DomainEvent::UserPasswordChanged { user_id: self.id });
     }
 
     /// Record login
     pub fn record_login(&mut self, ip: String) {
         self.login_ip = Some(ip.clone());
-        self.login_date = Some(Utc::now());
+        self.login_date = Some(Timestamp::now());
         self.add_event(DomainEvent::UserLoggedIn {
             user_id: self.id,
             ip,

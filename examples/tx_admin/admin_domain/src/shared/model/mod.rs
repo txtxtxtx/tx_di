@@ -1,7 +1,7 @@
 pub mod value_object;
 
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
 use crate::shared::model::value_object::DeletedStatus;
 use crate::user::model::value_object::UserStatus;
 
@@ -74,9 +74,9 @@ pub enum DomainEvent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditFields {
     pub creator: Option<String>,
-    pub create_time: DateTime<Utc>,
+    pub create_time: Timestamp,
     pub updater: Option<String>,
-    pub update_time: DateTime<Utc>,
+    pub update_time: Timestamp,
     pub deleted: DeletedStatus,
 }
 
@@ -89,12 +89,12 @@ impl AuditFields {
     // 将deleted字段设置为DeletedStatus::Deleted，表示对象已被删除
         self.deleted = DeletedStatus::Deleted;
         self.updater = updater;
-        self.update_time = Utc::now();
+        self.update_time = Timestamp::now();
     }
 }
 impl Default for AuditFields {
     fn default() -> Self {
-        let now = Utc::now();
+        let now = Timestamp::now();
         Self {
             creator: None,
             create_time: now,

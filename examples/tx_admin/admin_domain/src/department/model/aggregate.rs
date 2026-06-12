@@ -1,4 +1,4 @@
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent};
@@ -42,9 +42,9 @@ impl Department {
             tenant_id: 0,
             audit: AuditFields {
                 creator: creator.clone(),
-                create_time: Utc::now(),
+                create_time: Timestamp::now(),
                 updater: creator,
-                update_time: Utc::now(),
+                update_time: Timestamp::now(),
                 deleted: DeletedStatus::Normal,
             },
             children: Vec::new(),
@@ -71,20 +71,20 @@ impl Department {
         self.phone = phone;
         self.email = email;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
         self.add_event(DomainEvent::DepartmentUpdated { dept_id: self.id });
     }
 
     pub fn change_status(&mut self, status: i32, updater: Option<String>) {
         self.status = status;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
     }
 
     pub fn soft_delete(&mut self, updater: Option<String>) {
         self.audit.deleted = DeletedStatus::Deleted;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
         self.add_event(DomainEvent::DepartmentDeleted { dept_id: self.id });
     }
 

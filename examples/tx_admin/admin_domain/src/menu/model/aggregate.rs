@@ -1,4 +1,4 @@
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent};
@@ -74,9 +74,9 @@ impl Menu {
             tenant_id: 0,
             audit: AuditFields {
                 creator: creator.clone(),
-                create_time: Utc::now(),
+                create_time: Timestamp::now(),
                 updater: creator,
-                update_time: Utc::now(),
+                update_time: Timestamp::now(),
                 deleted: DeletedStatus::Normal,
             },
             children: Vec::new(),
@@ -114,7 +114,7 @@ impl Menu {
         self.visible = visible;
         self.keep_alive = keep_alive;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
         self.add_event(DomainEvent::MenuUpdated { menu_id: self.id });
     }
 
@@ -122,14 +122,14 @@ impl Menu {
     pub fn change_status(&mut self, status: i32, updater: Option<String>) {
         self.status = status;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
     }
 
     /// Soft delete
     pub fn soft_delete(&mut self, updater: Option<String>) {
         self.audit.deleted = DeletedStatus::Deleted;
         self.audit.updater = updater;
-        self.audit.update_time = Utc::now();
+        self.audit.update_time = Timestamp::now();
         self.add_event(DomainEvent::MenuDeleted { menu_id: self.id });
     }
 
