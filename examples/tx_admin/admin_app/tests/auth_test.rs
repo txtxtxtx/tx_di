@@ -21,15 +21,19 @@ fn make_auth_app(
     user_roles: Vec<u64>,
     role_perms: Vec<(u64, Vec<&str>)>,
 ) -> AuthAppService {
+    let uid = user.id;
+    let user_roles_clone = user_roles.clone();
     let mut perm_repo = permission_repo::MockPermissionRepository::new()
-        .with_user_roles(user.id, user_roles);
+        .with_user_roles(uid, user_roles);
     for (rid, perms) in role_perms {
         perm_repo = perm_repo.with_role_permissions(
             rid,
             HashSet::from_iter(perms.into_iter().map(|s| s.to_string())),
         );
     }
-    let user_repo = Arc::new(user_repo::MockUserRepository::new().with_user(user));
+    let user_repo = Arc::new(user_repo::MockUserRepository::new()
+        .with_user(user)
+        .with_user_roles(uid, user_roles_clone));
     let perm_repo = Arc::new(perm_repo);
     let role_repo = Arc::new(role_repo::MockRoleRepository::new());
     let user_svc = Arc::new(UserService::new(user_repo, perm_repo.clone()));

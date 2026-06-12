@@ -10,6 +10,7 @@
 mod common;
 use admin_app::user::dto::*;
 use admin_domain::shared::model::value_object::DeletedStatus;
+use jiff::Timestamp;
 use admin_domain::user::model::value_object::{Sex, UserStatus};
 use admin_domain::user::repository::UserRepository;
 
@@ -57,8 +58,8 @@ async fn create_user_success() {
     assert_eq!(user.nickname, "测试用户");
     assert_eq!(user.email, Some("test@example.com".into()));
     assert_eq!(user.mobile, Some("13800138000".into()));
-    assert_eq!(user.sex, Sex::Male);
-    assert_eq!(user.status, UserStatus::Active, "新用户默认状态应为 Active");
+    assert_eq!(Sex::from(user.sex as i32), Sex::Male);
+    assert_eq!(UserStatus::from(user.status), UserStatus::Active, "新用户默认状态应为 Active");
     assert_eq!(user.remark, None, "未提供备注时应为 None");
     assert!(user.role_ids.is_empty(), "未分配角色时 role_ids 应为空 Vec");
     assert!(user.dept_ids.is_empty(), "未分配部门时 dept_ids 应为空 Vec");
@@ -72,8 +73,8 @@ async fn create_user_success() {
     assert_eq!(found.nickname, "测试用户");
     assert_eq!(found.email, Some("test@example.com".into()));
     assert_eq!(found.mobile, Some("13800138000".into()));
-    assert_eq!(found.sex, Sex::Male);
-    assert_eq!(found.status, UserStatus::Active);
+    assert_eq!(Sex::from(found.sex as i32), Sex::Male);
+    assert_eq!(UserStatus::from(found.status), UserStatus::Active);
     assert_eq!(found.remark, None);
     assert!(found.role_ids.is_empty());
     assert!(found.dept_ids.is_empty());
@@ -100,7 +101,7 @@ async fn create_user_success() {
     );
 
     // 审计：时间戳已设置（不超过当前时间，且两个时间相近）
-    let now = chrono::Utc::now();
+    let now = jiff::Timestamp::now();
     assert!(raw.audit.create_time <= now, "创建时间不应超过当前时间");
     assert!(raw.audit.update_time <= now, "更新时间不应超过当前时间");
     assert!(
@@ -246,10 +247,11 @@ async fn update_user_success() {
     app.update_user(
         UpdateUserCommand {
             user_id: user.id,
-            nickname: "NewName".into(),
+            nickname: Some("NewName".into()),
             email: Some("new@example.com".into()),
             mobile: Some("13800000000".into()),
-            sex: Sex::Female,
+            sex: Some(Sex::Female),
+            status: None,
             remark: Some("已更新".into()),
         },
         Some("admin".into()),
@@ -262,7 +264,7 @@ async fn update_user_success() {
     assert_eq!(found.nickname, "NewName");
     assert_eq!(found.email, Some("new@example.com".into()));
     assert_eq!(found.mobile, Some("13800000000".into()));
-    assert_eq!(found.sex, Sex::Female);
+    assert_eq!(Sex::from(found.sex as i32), Sex::Female);
     assert_eq!(found.remark, Some("已更新".into()));
 }
 
@@ -318,7 +320,7 @@ async fn get_user_detail() {
     assert_eq!(found.username, "detail");
     assert_eq!(found.nickname, "详情");
     assert_eq!(found.email, Some("detail@test.com".into()));
-    assert_eq!(found.sex, Sex::Male);
+    assert_eq!(Sex::from(found.sex as i32), Sex::Male);
 }
 
 // ── 1.2 用户状态管理 ───────────────────────────────────────────────────────
@@ -350,7 +352,7 @@ async fn change_status_to_disabled() {
 
     // 回查验证状态已持久化
     let found = app.get_user(user.id).await.unwrap();
-    assert_eq!(found.status, UserStatus::Disabled);
+    assert_eq!(UserStatus::from(found.status), UserStatus::Disabled);
 }
 
 #[tokio::test]
@@ -382,7 +384,7 @@ async fn change_status_to_active_reenable() {
 
     // 回查验证重新启用已持久化
     let found = app.get_user(user.id).await.unwrap();
-    assert_eq!(found.status, UserStatus::Active);
+    assert_eq!(UserStatus::from(found.status), UserStatus::Active);
 }
 
 #[tokio::test]
@@ -411,7 +413,7 @@ async fn change_status_to_locked() {
 
     // 回查验证锁定已持久化
     let found = app.get_user(user.id).await.unwrap();
-    assert_eq!(found.status, UserStatus::Locked);
+    assert_eq!(UserStatus::from(found.status), UserStatus::Locked);
 }
 
 // ── 1.4 角色分配 ───────────────────────────────────────────────────────────
@@ -685,7 +687,7 @@ async fn query_user_by_status() {
     assert!(
         page.list
             .iter()
-            .any(|u| u.username == "active_user" && u.status == UserStatus::Disabled)
+            .any(|u| u.username == "active_user" && UserStatus::from(u.status) == UserStatus::Disabled)
     );
 }
 

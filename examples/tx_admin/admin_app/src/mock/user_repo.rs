@@ -33,6 +33,14 @@ impl MockUserRepository {
         }
         self
     }
+
+    pub fn with_user_roles(self, user_id: u64, role_ids: Vec<u64>) -> Self {
+        {
+            let mut user_roles = self.user_roles.write().unwrap();
+            user_roles.insert(user_id, role_ids);
+        }
+        self
+    }
 }
 
 impl Default for MockUserRepository {
