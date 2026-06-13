@@ -12,6 +12,10 @@ pub use bound::DiComp;
 pub use err::WebErrCode;
 pub use r::R;
 pub use layers::{add_arc_layer, add_layer};
+
+/// aide 重新导出，方便用户使用 `ApiRouter` 等类型
+#[cfg(feature = "api-doc")]
+pub use aide;
 #[cfg(test)]
 mod tests {
     use tx_di_core::{BuildContext};
