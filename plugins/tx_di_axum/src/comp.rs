@@ -17,6 +17,10 @@ use crate::layers::{add_static_path_prefix, freeze_static_path_prefixes, LAYER_R
 static ROUTER_REGISTRY: LazyLock<Mutex<Vec<crate::Router>>> =
     LazyLock::new(|| Mutex::new(Vec::new()));
 
+/// 生成的 OpenAPI spec（JSON Value），供文档端点使用
+#[cfg(feature = "api-doc")]
+static OPENAPI_SPEC: OnceLock<serde_json::Value> = OnceLock::new();
+
 /// Web 服务器插件组件
 ///
 /// 提供基于 axum 的 web 服务器功能，支持依赖注入和配置管理。
@@ -36,22 +40,27 @@ impl CompInit for WebPlugin {
         let config = ctx.inject::<WebConfig>();
         let web = ctx.inject::<WebPlugin>();
         async move {
-            let router = WebPlugin::merge_routers();
+            // ═══ 中间件内的路由（API 接口） ═══
+            let mut api_router = WebPlugin::merge_routers();
             let app_status = AppStatus { app: ctx.clone() };
-            let mut router = router
-                // todo 这里可以全局注入 DB
-                // 吧 app 注入到 extensions
+            api_router = api_router
                 .layer(tower::ServiceBuilder::new()
                     .map_request(move |mut req: Request<_>| {
                         req.extensions_mut().insert(app_status.clone());
                         req
                     })
                     .into_inner());
-            // 如果配置了静态文件目录，添加静态文件服务
+            // 应用中间件（日志、CORS、超时等）
+            api_router = WebPlugin::layer_with_router(api_router);
+
+            // ═══ 中间件外的路由（静态资源、文档） ═══
+            let mut outer_router = axum::Router::new();
+
+            // 静态文件服务
             let static_dir = config.static_dir();
             if static_dir.exists() {
                 info!("静态文件目录已配置: {:?}", static_dir);
-                router = router.nest_service(
+                outer_router = outer_router.nest_service(
                     "/static",
                     tower_http::services::ServeDir::new(&static_dir)
                         .precompressed_gzip()
@@ -60,10 +69,16 @@ impl CompInit for WebPlugin {
             } else {
                 debug!("静态文件目录不存在，跳过静态文件服务: {:?}", static_dir);
             }
-            router = WebPlugin::setup_spa_apps(router, &config);
 
-            // 添加中间件
-            router = WebPlugin::layer_with_router(router);
+            // SPA 应用
+            outer_router = WebPlugin::setup_spa_apps(outer_router, &config);
+
+            // API 文档端点（/docs, /api-docs/openapi.json）
+            outer_router = WebPlugin::setup_doc_routes(outer_router);
+
+            // 合并：中间件外的路由优先匹配
+            let router = outer_router.merge(api_router);
+
             web.router.set(router).map_err(|_| "已经设置过路由了")?;
             Ok(())
         }
@@ -155,12 +170,10 @@ impl WebPlugin {
 
     /// 合并所有已注册的路由器
     ///
-    /// - `api-doc` 启用时：合并 `ApiRouter` 并生成 OpenAPI spec，注册文档端点
-    /// - `api-doc` 禁用时：合并普通 `Router`
+    /// 返回 `(Router, Option<OpenApi>)`，OpenAPI spec 用于后续注册文档端点
     #[cfg(feature = "api-doc")]
     fn merge_routers() -> axum::Router {
         use aide::openapi::OpenApi;
-        use aide::redoc::Redoc;
 
         let mut main_router = axum::Router::new()
             .route("/health", get(health_check));
@@ -168,7 +181,6 @@ impl WebPlugin {
         let mut routers = ROUTER_REGISTRY.lock();
         if let Ok(ref mut routers) = routers {
             if !routers.is_empty() {
-                // drain 取出所有路由器（ApiRouter 不实现 Clone）
                 let all = routers.drain(..).collect::<Vec<_>>();
                 let count = all.len();
                 let api_router = all.into_iter()
@@ -179,32 +191,15 @@ impl WebPlugin {
                 let api_routes = api_router.finish_api(&mut api);
                 main_router = main_router.merge(api_routes);
 
-                // 注册 OpenAPI JSON 端点
+                // 存储 OpenAPI spec，供 setup_doc_routes 使用
                 match serde_json::to_value(&api) {
-                    Ok(spec) => {
-                        main_router = main_router.route(
-                            "/api-docs/openapi.json",
-                            get(move || async { axum::response::Json(spec) }),
-                        );
-                    }
+                    Ok(spec) => { let _ = OPENAPI_SPEC.set(spec); }
                     Err(e) => error!("序列化 OpenAPI spec 失败: {}", e),
                 }
 
-                // 注册 Redoc 文档页面（JS 内嵌在 aide crate 中，无外部依赖）
-                let redoc_html: &'static str = Box::leak(
-                    Redoc::new("/api-docs/openapi.json")
-                        .with_title("API Documentation")
-                        .html()
-                        .into_boxed_str()
-                );
-                main_router = main_router.route(
-                    "/docs",
-                    get(move || async move { axum::response::Html(redoc_html) }),
-                );
-
-                info!("已合并 {} 个路由器，已注册 /docs 和 /api-docs/openapi.json", count);
+                info!("已合并 {} 个路由器", count);
             } else {
-                debug!("未注册任何路由器，跳过 OpenAPI 文档生成");
+                debug!("未注册任何路由器");
             }
         } else {
             error!("无法获取路由器注册表的锁");
@@ -212,6 +207,35 @@ impl WebPlugin {
 
         main_router
     }
+
+    /// 注册文档路由（在中间件之外）
+    ///
+    /// 包括 `/docs`（Redoc）和 `/api-docs/openapi.json`
+    #[cfg(feature = "api-doc")]
+    fn setup_doc_routes(router: axum::Router) -> axum::Router {
+        use aide::redoc::Redoc;
+
+        let spec = match OPENAPI_SPEC.get() {
+            Some(s) => s.clone(),
+            None => return router,
+        };
+
+        let router = router.route(
+            "/api-docs/openapi.json",
+            get(move || async { axum::response::Json(spec) }),
+        );
+
+        let redoc_html: &'static str = Box::leak(
+            Redoc::new("/api-docs/openapi.json")
+                .with_title("API Documentation")
+                .html()
+                .into_boxed_str()
+        );
+        router.route("/docs", get(move || async move { axum::response::Html(redoc_html) }))
+    }
+
+    #[cfg(not(feature = "api-doc"))]
+    fn setup_doc_routes(router: axum::Router) -> axum::Router { router }
 
     /// 合并所有已注册的路由器
     #[cfg(not(feature = "api-doc"))]
