@@ -34,7 +34,7 @@ pub struct RoleQueryRequest {
     pub size: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct RoleResponse {
     pub id: u64,
     pub name: String,

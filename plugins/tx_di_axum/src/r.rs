@@ -44,3 +44,18 @@ impl<T: serde::Serialize> IntoResponse for R<T> {
         (StatusCode::OK, Json(self.0)).into_response()
     }
 }
+
+/// R<T> 的 OperationOutput 实现（api-doc feature 启用时可用）
+///
+/// 让 aide 能自动为 R<T> 响应生成 OpenAPI 文档
+#[cfg(feature = "api-doc")]
+impl<T: serde::Serialize + schemars::JsonSchema> aide::operation::OperationOutput for R<T> {
+    type Inner = ApiR<T>;
+
+    fn operation_response(
+        ctx: &mut aide::generate::GenContext,
+        operation: &mut aide::openapi::Operation,
+    ) -> Option<aide::openapi::Response> {
+        <Json<ApiR<T>> as aide::operation::OperationOutput>::operation_response(ctx, operation)
+    }
+}

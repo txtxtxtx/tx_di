@@ -13,7 +13,7 @@ mod dict_api;
 mod log_api;
 mod file_api;
 
-use axum::Router;
+use tx_di_axum::Router;
 
 /// 注册所有 HTTP 路由
 pub fn router() -> Router {

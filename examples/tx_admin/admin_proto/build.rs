@@ -35,6 +35,8 @@ fn main() -> Result<()> {
         .out_dir("src/pb")
         // 为所有 message 类型添加 Serialize/Deserialize，使 HTTP JSON 可用
         .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
+        // 为所有 message 添加 JsonSchema，用于 OpenAPI 文档生成（aide）
+        .type_attribute(".", "#[derive(schemars::JsonSchema)]")
         // 为所有 message 添加 serde rename_all = "camelCase"
         .type_attribute(".", "#[serde(rename_all = \"camelCase\")]")
         // prost 的 optional 字段 -> Option<T>，跳过 None 值

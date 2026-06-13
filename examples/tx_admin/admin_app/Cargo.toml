@@ -24,6 +24,7 @@ jiff = { workspace = true }
 dashmap = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
+schemars = { workspace = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

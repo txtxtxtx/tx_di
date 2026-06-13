@@ -19,7 +19,7 @@ pub struct MenuQuery {
 ///
 /// 该结构体实现了 Debug、Clone、Serialize 和 Deserialize 特性，
 /// 支持调试输出、克隆、序列化和反序列化操作
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct MenuTreeNode {
     /// 菜单节点的唯一标识符
     pub id: u64,

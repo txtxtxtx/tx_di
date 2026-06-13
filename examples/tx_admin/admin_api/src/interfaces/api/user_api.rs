@@ -1,34 +1,36 @@
 //! 用户管理 HTTP API
 
-use axum::{Json, Router, routing::{get, post, put, delete}};
-use axum::response::IntoResponse;
+use axum::Json;
+use tx_di_axum::{R, Router};
+use tx_di_axum::aide::axum::routing::{get, post, put, delete};
 use tx_di_axum::bound::DiComp;
 use admin_app::user::app_service::UserAppService;
 
 use admin_proto::{
     CreateUserRequest, UpdateUserRequest, ChangePasswordRequest,
     AssignRolesRequest, AssignDeptsRequest, ListUsersRequest,
+    UserResponse, Empty,
 };
 use admin_domain::user::model::value_object::{Sex, UserStatus};
-use tx_common::{ApiR, ApiRes};
+use tx_common::{ApiR, ApiRes, Page};
 
 pub fn router() -> Router {
     Router::new()
-        .route("/", post(create_user))
-        .route("/{user_id}", get(get_user))
-        .route("/{user_id}", put(update_user))
-        .route("/{user_id}", delete(delete_user))
-        .route("/list", post(list_users))
-        .route("/change_password", post(change_password))
-        .route("/assign_roles", post(assign_roles))
-        .route("/assign_depts", post(assign_depts))
+        .api_route("/", post(create_user))
+        .api_route("/{user_id}", get(get_user))
+        .api_route("/{user_id}", put(update_user))
+        .api_route("/{user_id}", delete(delete_user))
+        .api_route("/list", post(list_users))
+        .api_route("/change_password", post(change_password))
+        .api_route("/assign_roles", post(assign_roles))
+        .api_route("/assign_depts", post(assign_depts))
 }
 
 /// POST /api/user/
 async fn create_user(
     DiComp(user_svc): DiComp<UserAppService>,
     Json(req): Json<CreateUserRequest>,
-) -> impl IntoResponse {
+) -> R<UserResponse> {
     let cmd = admin_app::user::dto::CreateUserCommand {
         username: req.username,
         password: req.password,
@@ -41,8 +43,8 @@ async fn create_user(
         dept_ids: if req.dept_ids.is_empty() { None } else { Some(req.dept_ids) },
     };
     match user_svc.create_user(cmd, None).await {
-        Ok(r) => ApiR::success(r),
-        Err(e) => ApiRes::from(e).into_typed(),
+        Ok(r) => R(ApiR::success(r)),
+        Err(e) => R(ApiRes::from(e).into_typed()),
     }
 }
 
@@ -50,10 +52,10 @@ async fn create_user(
 async fn get_user(
     DiComp(user_svc): DiComp<UserAppService>,
     axum::extract::Path(user_id): axum::extract::Path<u64>,
-) -> impl IntoResponse {
+) -> R<UserResponse> {
     match user_svc.get_user(user_id).await {
-        Ok(r) => ApiR::success(r),
-        Err(e) => ApiRes::from(e).into_typed(),
+        Ok(r) => R(ApiR::success(r)),
+        Err(e) => R(ApiRes::from(e).into_typed()),
     }
 }
 
@@ -62,7 +64,7 @@ async fn update_user(
     DiComp(user_svc): DiComp<UserAppService>,
     axum::extract::Path(user_id): axum::extract::Path<u64>,
     Json(req): Json<UpdateUserRequest>,
-) -> impl IntoResponse {
+) -> R<UserResponse> {
     let cmd = admin_app::user::dto::UpdateUserCommand {
         user_id,
         nickname: req.nickname,
@@ -73,8 +75,8 @@ async fn update_user(
         remark: req.remark,
     };
     match user_svc.update_user(cmd, None).await {
-        Ok(r) => ApiR::success(r),
-        Err(e) => ApiRes::from(e).into_typed(),
+        Ok(r) => R(ApiR::success(r)),
+        Err(e) => R(ApiRes::from(e).into_typed()),
     }
 }
 
@@ -82,10 +84,10 @@ async fn update_user(
 async fn delete_user(
     DiComp(user_svc): DiComp<UserAppService>,
     axum::extract::Path(user_id): axum::extract::Path<u64>,
-) -> impl IntoResponse {
+) -> R<Empty> {
     match user_svc.delete_user(user_id, None).await {
-        Ok(()) => ApiRes::ok(),
-        Err(e) => ApiRes::from(e),
+        Ok(()) => R(ApiRes::ok().into_typed()),
+        Err(e) => R(ApiRes::from(e).into_typed()),
     }
 }
 
@@ -93,7 +95,7 @@ async fn delete_user(
 async fn list_users(
     DiComp(user_svc): DiComp<UserAppService>,
     Json(req): Json<ListUsersRequest>,
-) -> impl IntoResponse {
+) -> R<Page<UserResponse>> {
     let status = match req.status {
         Some(s) => UserStatus::try_from_i32(s).ok(),
         None => None,
@@ -109,8 +111,8 @@ async fn list_users(
         size: page_info.size,
     };
     match user_svc.get_user_page(query).await {
-        Ok(page) => ApiR::success(page),
-        Err(e) => ApiRes::from(e).into_typed(),
+        Ok(page) => R(ApiR::success(page)),
+        Err(e) => R(ApiRes::from(e).into_typed()),
     }
 }
 
@@ -118,14 +120,14 @@ async fn list_users(
 async fn change_password(
     DiComp(user_svc): DiComp<UserAppService>,
     Json(req): Json<ChangePasswordRequest>,
-) -> impl IntoResponse {
+) -> R<Empty> {
     let cmd = admin_app::user::dto::ChangePasswordCommand {
         user_id: req.user_id,
         new_password: req.new_password,
     };
     match user_svc.change_password(cmd, None).await {
-        Ok(()) => ApiRes::ok(),
-        Err(e) => ApiRes::from(e),
+        Ok(()) => R(ApiRes::ok().into_typed()),
+        Err(e) => R(ApiRes::from(e).into_typed()),
     }
 }
 
@@ -133,14 +135,14 @@ async fn change_password(
 async fn assign_roles(
     DiComp(user_svc): DiComp<UserAppService>,
     Json(req): Json<AssignRolesRequest>,
-) -> impl IntoResponse {
+) -> R<Empty> {
     let cmd = admin_app::user::dto::AssignRolesCommand {
         user_id: req.user_id,
         role_ids: req.role_ids,
     };
     match user_svc.assign_roles(cmd).await {
-        Ok(()) => ApiRes::ok(),
-        Err(e) => ApiRes::from(e),
+        Ok(()) => R(ApiRes::ok().into_typed()),
+        Err(e) => R(ApiRes::from(e).into_typed()),
     }
 }
 
@@ -148,13 +150,13 @@ async fn assign_roles(
 async fn assign_depts(
     DiComp(user_svc): DiComp<UserAppService>,
     Json(req): Json<AssignDeptsRequest>,
-) -> impl IntoResponse {
+) -> R<Empty> {
     let cmd = admin_app::user::dto::AssignDeptsCommand {
         user_id: req.user_id,
         dept_ids: req.dept_ids,
     };
     match user_svc.assign_departments(cmd).await {
-        Ok(()) => ApiRes::ok(),
-        Err(e) => ApiRes::from(e),
+        Ok(()) => R(ApiRes::ok().into_typed()),
+        Err(e) => R(ApiRes::from(e).into_typed()),
     }
 }

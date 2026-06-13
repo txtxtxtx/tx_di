@@ -25,7 +25,7 @@ pub struct OperateLogQueryRequest {
     pub size: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct OperateLogResponse {
     pub id: u64,
     pub trace_id: String,
@@ -85,7 +85,7 @@ pub struct LoginLogQueryRequest {
     pub size: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct LoginLogResponse {
     pub id: u64,
     pub user_id: u64,

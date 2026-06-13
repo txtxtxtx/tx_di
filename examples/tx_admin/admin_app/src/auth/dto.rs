@@ -8,7 +8,7 @@ pub struct LoginCommand {
     pub login_ip: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct LoginResponse {
     pub user_id: u64,
     pub username: String,
@@ -19,7 +19,7 @@ pub struct LoginResponse {
     pub dept_ids: Vec<u64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct UserInfoResponse {
     pub user_id: u64,
     pub username: String,

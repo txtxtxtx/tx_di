@@ -6,7 +6,7 @@ pub struct DeptQuery {
     pub status: Option<i32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct DeptTreeNode {
     pub id: u64,
     pub name: String,

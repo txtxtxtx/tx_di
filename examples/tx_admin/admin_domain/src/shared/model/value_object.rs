@@ -52,6 +52,15 @@ impl FromStr for TenantId {
     }
 }
 
+impl schemars::JsonSchema for TenantId {
+    fn schema_name() -> String {
+        "TenantId".to_string()
+    }
+    fn json_schema(r#gen: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
+        r#gen.subschema_for::<u64>()
+    }
+}
+
 impl Serialize for TenantId {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

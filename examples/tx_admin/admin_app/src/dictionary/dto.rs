@@ -24,7 +24,7 @@ pub struct DictTypeQueryRequest {
     pub size: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct DictTypeResponse {
     pub id: u64,
     pub name: String,
@@ -77,7 +77,7 @@ pub struct DictDataQueryRequest {
     pub size: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct DictDataResponse {
     pub id: u64,
     pub sort: i32,

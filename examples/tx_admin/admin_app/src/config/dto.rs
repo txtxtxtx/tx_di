@@ -32,7 +32,7 @@ pub struct ConfigQueryRequest {
     pub size: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ConfigResponse {
     pub id: u64,
     pub category: String,

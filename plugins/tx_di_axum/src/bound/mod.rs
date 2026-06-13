@@ -9,6 +9,26 @@ use tx_di_core::{App, ComponentDescriptor, IE, RIE};
 use crate::WebErrCode;
 use crate::e::WebErr;
 
+/// DiComp<T> 的 JsonSchema 实现（api-doc feature 启用时可用）
+///
+/// 作为 extractor 不出现在请求 body 中，使用空 schema 占位
+#[cfg(feature = "api-doc")]
+impl<T: ComponentDescriptor> schemars::JsonSchema for DiComp<T> {
+    fn schema_name() -> String {
+        format!("DiComp_{}", std::any::type_name::<T>().replace("::", "_"))
+    }
+    fn json_schema(_gen: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
+        schemars::schema::Schema::Object(Default::default())
+    }
+    fn is_referenceable() -> bool { false }
+}
+
+/// DiComp<T> 的 OperationInput 实现（api-doc feature 启用时可用）
+///
+/// 作为 DI 容器注入的 extractor，不参与请求参数文档生成
+#[cfg(feature = "api-doc")]
+impl<T: ComponentDescriptor> aide::operation::OperationInput for DiComp<T> {}
+
 #[derive(Clone)]
 pub struct AppStatus {
     pub app: Arc<App>,

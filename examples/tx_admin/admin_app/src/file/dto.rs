@@ -19,7 +19,7 @@ pub struct FileQueryRequest {
     pub size: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct FileResponse {
     pub id: u64,
     pub config_id: Option<i32>,

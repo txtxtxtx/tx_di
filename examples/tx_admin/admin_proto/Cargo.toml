@@ -13,6 +13,7 @@ prost-types = "0.13"
 tonic = "0.12"
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+schemars = { workspace = true }
 
 [build-dependencies]
 tonic-build = "0.12"
