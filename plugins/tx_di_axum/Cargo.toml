@@ -8,7 +8,7 @@ readme = "README.md"
 repository.workspace = true
 
 [features]
-default = []
+default = ["api-doc"]
 api-doc = ["dep:aide", "dep:schemars", "tx_common/api-doc"]
 
 [dependencies]
