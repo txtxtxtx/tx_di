@@ -13,9 +13,21 @@ pub use err::WebErrCode;
 pub use r::R;
 pub use layers::{add_arc_layer, add_layer};
 
-/// aide 重新导出，方便用户使用 `ApiRouter` 等类型
+/// aide 重新导出，方便用户使用 `JsonSchema` 等派生宏
 #[cfg(feature = "api-doc")]
 pub use aide;
+
+/// 统一路由器类型
+///
+/// - `api-doc` 启用时：`aide::axum::ApiRouter`（自动生成 OpenAPI 文档）
+/// - `api-doc` 禁用时：`axum::Router`
+///
+/// 用户始终使用 `tx_di_axum::Router` 注册路由，无需关心底层实现。
+#[cfg(feature = "api-doc")]
+pub type Router = aide::axum::ApiRouter;
+
+#[cfg(not(feature = "api-doc"))]
+pub type Router = axum::Router;
 #[cfg(test)]
 mod tests {
     use tx_di_core::{BuildContext};

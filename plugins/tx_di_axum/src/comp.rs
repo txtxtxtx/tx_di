@@ -1,9 +1,9 @@
 use std::net::{SocketAddr, TcpListener};
 use crate::bound::AppStatus;
 use crate::{WebConfig, R};
-use axum::http::{Request};
-use axum::{routing::get, Router};
-use std::sync::{Arc, LazyLock, OnceLock, RwLock};
+use axum::http::Request;
+use axum::routing::get;
+use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::TcpListener as TokioTcpListener;
 use tokio_util::sync::CancellationToken;
@@ -13,28 +13,22 @@ use crate::layers::{add_static_path_prefix, freeze_static_path_prefixes, LAYER_R
 
 /// 全局路由器注册表
 ///
-/// - `api-doc` 启用时：存储 `ApiRouter`，自动生成 OpenAPI 文档
-/// - `api-doc` 禁用时：存储普通 `Router`
-#[cfg(feature = "api-doc")]
-static ROUTER_REGISTRY: LazyLock<Arc<RwLock<Vec<aide::axum::ApiRouter>>>> =
-    LazyLock::new(|| Arc::new(RwLock::new(Vec::new())));
-#[cfg(not(feature = "api-doc"))]
-static ROUTER_REGISTRY: LazyLock<Arc<RwLock<Vec<Router>>>> =
-    LazyLock::new(|| Arc::new(RwLock::new(Vec::new())));
+/// 使用 `Mutex<Vec>` 存储，合并时 drain 取出（`ApiRouter` 不实现 `Clone`）
+static ROUTER_REGISTRY: LazyLock<Mutex<Vec<crate::Router>>> =
+    LazyLock::new(|| Mutex::new(Vec::new()));
 
 /// Web 服务器插件组件
 ///
 /// 提供基于 axum 的 web 服务器功能，支持依赖注入和配置管理。
 /// 该组件会在 DI 框架初始化时自动注册并启动 web 服务器。
-// #[derive(Clone, Debug)]
 #[tx_comp(init)]
 pub struct WebPlugin {
     /// Web 服务器配置
     pub config: Arc<WebConfig>,
 
-    /// Axum 路由器
+    /// Axum 路由器（最终合并后的标准 Router，用于 axum::serve）
     #[tx_cst(OnceLock::new())]
-    pub router: OnceLock<Router>,
+    pub router: OnceLock<axum::Router>,
 }
 
 impl CompInit for WebPlugin {
@@ -92,7 +86,7 @@ impl CompInit for WebPlugin {
 
 impl WebPlugin {
     /// 配置静态文件服务（支持 SPA 和多前端项目）
-    fn setup_spa_apps(mut router: Router, config: &WebConfig) -> Router {
+    fn setup_spa_apps(mut router: axum::Router, config: &WebConfig) -> axum::Router {
         // 如果配置了 spa_apps，使用多前端项目模式
         if let Some(spa_apps) = &config.spa_apps {
             info!("检测到 {} 个 SPA 应用配置", spa_apps.len());
@@ -122,41 +116,40 @@ impl WebPlugin {
 
     /// 添加路由器
     ///
-    /// 该方法用于添加一个新的路由器，该路由器将合并到 Web 插件的路由器中。
-    ///
-    /// - `api-doc` 启用时：接受 `ApiRouter`，自动生成 OpenAPI 文档
-    /// - `api-doc` 禁用时：接受普通 `Router`
+    /// 使用 [`crate::Router`] 注册路由，该类型根据 `api-doc` feature 自动切换：
+    /// - `api-doc` 启用时：`Router` = `ApiRouter`，自动生成 OpenAPI 文档
+    /// - `api-doc` 禁用时：`Router` = `axum::Router`
     ///
     /// ## **必须在上下文创建前添加路由器，否则路由无效**
     ///
     /// # Arguments
     ///
     /// * `router` - 要添加的路由器
-    #[cfg(feature = "api-doc")]
-    pub fn add_router(router: aide::axum::ApiRouter) {
-        if let Ok(mut routers) = ROUTER_REGISTRY.write() {
-            routers.push(router);
-            info!("API 路由器已注册到全局注册表（带 OpenAPI 文档）");
-        } else {
-            error!("无法获取路由器注册表的写锁");
-        }
-    }
-
-    /// 添加路由器
-    ///
-    /// 该方法用于添加一个新的路由器，该路由器将合并到 Web 插件的路由器中。
-    /// ## **必须在上下文创建前添加路由器，否则路由无效**
-    ///
-    /// # Arguments
-    ///
-    /// * `router` - 要添加的路由器
-    #[cfg(not(feature = "api-doc"))]
-    pub fn add_router(router: Router) {
-        if let Ok(mut routers) = ROUTER_REGISTRY.write() {
+    pub fn add_router(router: crate::Router) {
+        if let Ok(mut routers) = ROUTER_REGISTRY.lock() {
             routers.push(router);
             info!("路由器已注册到全局注册表");
         } else {
-            error!("无法获取路由器注册表的写锁");
+            error!("无法获取路由器注册表的锁");
+        }
+    }
+
+    /// 添加原始 axum 路由器（不参与 OpenAPI 文档生成）
+    ///
+    /// 当 `api-doc` 启用时，接受 `axum::Router` 并包装为 `ApiRouter`。
+    /// 适用于不需要文档的路由（如内部管理接口、第三方库提供的路由）。
+    ///
+    /// ## **必须在上下文创建前添加路由器，否则路由无效**
+    pub fn add_axum_router(router: axum::Router) {
+        #[cfg(feature = "api-doc")]
+        {
+            use aide::axum::ApiRouter;
+            let api_router = ApiRouter::new().merge(router);
+            Self::add_router(api_router);
+        }
+        #[cfg(not(feature = "api-doc"))]
+        {
+            Self::add_router(router);
         }
     }
 
@@ -165,21 +158,22 @@ impl WebPlugin {
     /// - `api-doc` 启用时：合并 `ApiRouter` 并生成 OpenAPI spec，注册文档端点
     /// - `api-doc` 禁用时：合并普通 `Router`
     #[cfg(feature = "api-doc")]
-    fn merge_routers() -> Router {
-        use aide::axum::ApiRouter;
+    fn merge_routers() -> axum::Router {
         use aide::openapi::OpenApi;
         use aide::redoc::Redoc;
 
-        let mut main_router = Router::new()
+        let mut main_router = axum::Router::new()
             .route("/health", get(health_check));
 
-        let routers = ROUTER_REGISTRY.read();
-        match routers {
-            Ok(routers) if !routers.is_empty() => {
-                let mut api_router = ApiRouter::new();
-                for r in routers.iter() {
-                    api_router = api_router.merge(r.clone());
-                }
+        let mut routers = ROUTER_REGISTRY.lock();
+        if let Ok(ref mut routers) = routers {
+            if !routers.is_empty() {
+                // drain 取出所有路由器（ApiRouter 不实现 Clone）
+                let all = routers.drain(..).collect::<Vec<_>>();
+                let count = all.len();
+                let api_router = all.into_iter()
+                    .reduce(|acc, r| acc.merge(r))
+                    .unwrap();
 
                 let mut api = OpenApi::default();
                 let api_routes = api_router.finish_api(&mut api);
@@ -208,11 +202,12 @@ impl WebPlugin {
                     get(move || async move { axum::response::Html(redoc_html) }),
                 );
 
-                info!("已合并 {} 个路由器，已注册 /docs 和 /api-docs/openapi.json", routers.len());
-            }
-            _ => {
+                info!("已合并 {} 个路由器，已注册 /docs 和 /api-docs/openapi.json", count);
+            } else {
                 debug!("未注册任何路由器，跳过 OpenAPI 文档生成");
             }
+        } else {
+            error!("无法获取路由器注册表的锁");
         }
 
         main_router
@@ -220,24 +215,26 @@ impl WebPlugin {
 
     /// 合并所有已注册的路由器
     #[cfg(not(feature = "api-doc"))]
-    fn merge_routers() -> Router {
-        let mut main_router = Router::new()
+    fn merge_routers() -> axum::Router {
+        let mut main_router = axum::Router::new()
             .route("/health", get(health_check));
 
-        if let Ok(routers) = ROUTER_REGISTRY.read() {
-            for router in routers.iter() {
-                main_router = main_router.merge(router.clone());
+        if let Ok(mut routers) = ROUTER_REGISTRY.lock() {
+            let all = routers.drain(..).collect::<Vec<_>>();
+            let count = all.len();
+            for router in all {
+                main_router = main_router.merge(router);
             }
-            info!("已合并 {} 个路由器", routers.len());
+            info!("已合并 {} 个路由器", count);
         } else {
-            error!("无法获取路由器注册表的读锁");
+            error!("无法获取路由器注册表的锁");
         }
 
         main_router
     }
 
     /// 应用所有中间件层
-    pub fn layer_with_router(router: Router) -> Router {
+    pub fn layer_with_router(router: axum::Router) -> axum::Router {
         let mut router = router;
         // 应用所有中间件层（按优先级排序）sort 大的在外层，sort 小的在内层
         if let Ok(layers) = LAYER_REGISTRY.read() {
@@ -260,7 +257,7 @@ impl WebPlugin {
     ///
     /// 主要用于测试场景
     pub fn clear_routers() {
-        if let Ok(mut routers) = ROUTER_REGISTRY.write() {
+        if let Ok(mut routers) = ROUTER_REGISTRY.lock() {
             routers.clear();
             info!("已清空所有注册的路由器");
         }
@@ -276,14 +273,9 @@ impl WebPlugin {
         }
     }
 
-    /// 获取所有已注册的路由器（仅 api-doc 禁用时可用）
-    #[cfg(not(feature = "api-doc"))]
-    pub fn get_main_router() -> Vec<Router> {
-        if let Ok(routers) = ROUTER_REGISTRY.read(){
-            routers.clone()
-        }else {
-            vec![]
-        }
+    /// 获取已注册的路由器数量
+    pub fn router_count() -> usize {
+        ROUTER_REGISTRY.lock().map(|r| r.len()).unwrap_or(0)
     }
 }
 
@@ -344,7 +336,7 @@ async fn health_check() -> R<FormattedDateTime> {
 /// # Errors
 ///
 /// 如果服务器绑定失败或运行出错，将返回错误
-async fn start_server(config: Arc<WebConfig>, router: Router,token: CancellationToken) -> RIE<()> {
+async fn start_server(config: Arc<WebConfig>, router: axum::Router, token: CancellationToken) -> RIE<()> {
     let addr = config.socket_addr()?;
 
     info!("CORS 启用状态: {}", config.enable_cors);

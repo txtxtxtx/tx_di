@@ -109,7 +109,7 @@ impl CompInit for ApiRegisterComponent {
             let sa_state = sa_plugin.state().clone();
 
             // 7. 注册带 State 的 API 路由
-            WebPlugin::add_router(api::router(db, sa_state));
+            WebPlugin::add_axum_router(api::router(db, sa_state));
             info!("gb28181_admin 初始化完成");
             Ok(())
         })
