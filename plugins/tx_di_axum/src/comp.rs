@@ -1,5 +1,5 @@
 use std::net::{SocketAddr, TcpListener};
-use crate::bound::{AppStatus, DiComp};
+use crate::bound::AppStatus;
 use crate::{WebConfig, R};
 use axum::http::{Request};
 use axum::{routing::get, Router};
@@ -148,7 +148,7 @@ impl WebPlugin {
     /// 添加带 OpenAPI 文档的路由器
     ///
     /// 使用 `aide::axum::ApiRouter` 注册路由，启动后自动生成接口文档。
-    /// 访问 `/swagger-ui` 查看 Swagger UI，`/api-docs/openapi.json` 获取 OpenAPI spec。
+    /// 访问 `/docs` 查看 Redoc 文档，`/api-docs/openapi.json` 获取 OpenAPI spec。
     ///
     /// ## **必须在上下文创建前添加路由器，否则路由无效**
     ///
@@ -194,11 +194,12 @@ impl WebPlugin {
     ///
     /// 当 `enable_api_doc = true` 时，注册：
     /// - `/api-docs/openapi.json` — OpenAPI spec JSON
-    /// - `/swagger-ui` — Swagger UI 页面（从 crate 内嵌静态文件服务）
+    /// - `/docs` — Redoc 文档页面（JS 内嵌，无需外部文件）
     #[cfg(feature = "api-doc")]
     fn setup_api_doc(mut router: Router, config: &WebConfig) -> Router {
         use aide::axum::ApiRouter;
         use aide::openapi::OpenApi;
+        use aide::redoc::Redoc;
 
         if !config.enable_api_doc {
             info!("API 文档已禁用（enable_api_doc = false）");
@@ -206,7 +207,6 @@ impl WebPlugin {
         }
 
         let mut api = OpenApi::default();
-        api.
         let api_count;
 
         // 合并所有 API 路由器
@@ -244,20 +244,17 @@ impl WebPlugin {
             }
         }
 
-        // Swagger UI 静态文件目录（crate 内嵌）
-        let swagger_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("static").join("swagger-ui");
+        // 注册 Redoc 文档页面（JS 内嵌在 aide crate 中，无外部依赖）
+        // 泄漏 HTML 字符串为 'static，服务整个进程生命周期
+        let redoc_html: &'static str = Box::leak(
+            Redoc::new("/api-docs/openapi.json")
+                .with_title("API Documentation")
+                .html()
+                .into_boxed_str()
+        );
+        router = router.route("/docs", get(move || async move { axum::response::Html(redoc_html) }));
 
-        if swagger_dir.exists() {
-            router = router.nest_service(
-                "/swagger-ui",
-                tower_http::services::ServeDir::new(&swagger_dir)
-                    .fallback(tower_http::services::ServeFile::new(swagger_dir.join("index.html"))),
-            );
-            info!("已合并 {} 个 API 路由器，已注册 /swagger-ui 和 /api-docs/openapi.json", api_count);
-        } else {
-            error!("Swagger UI 目录不存在: {:?}，仅注册 /api-docs/openapi.json", swagger_dir);
-        }
+        info!("已合并 {} 个 API 路由器，已注册 /docs 和 /api-docs/openapi.json", api_count);
 
         router
     }
