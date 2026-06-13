@@ -7,7 +7,6 @@ use std::pin::Pin;
 use tokio::time::Instant;
 use tower::{Layer, Service};
 use tracing::{info, warn, Span};
-use crate::layers::should_filter_path;
 
 /// API 日志中间件 Layer
 /// 
@@ -61,9 +60,7 @@ where
         let uri = req.uri().clone();
         let query = req.uri().query().unwrap_or("").to_string();
         let path = req.uri().path().to_string();
-        // 判断是否为静态文件请求，如果是则跳过日志记录
-        let is_static_request = is_static_path(&path);
-        
+
         // 提取 Content-Type 头部
         let content_type = req
             .headers()
@@ -73,10 +70,6 @@ where
             .to_string();
 
         Box::pin(async move {
-            // 如果是静态文件请求，直接调用内部服务，不记录日志
-            if is_static_request {
-                return inner.call(req).await;
-            }
             // 记录请求开始时间
             let start_time = Instant::now();
 
@@ -203,13 +196,3 @@ fn should_log_body(content_type: &str) -> bool {
         || content_type.contains("application/xml")
 }
 
-/// 判断是否为静态文件路径，需要跳过日志记录
-///
-/// 以下路径会被认为是静态文件请求：
-/// - `/static/*` - 传统静态文件目录
-/// - SPA 应用路径（需要根据配置动态判断，这里提供常见示例）
-///   - 可以根据实际需求扩展此函数
-fn is_static_path(path: &str) -> bool {
-    // 传统静态文件路径
-    should_filter_path(path)
-}

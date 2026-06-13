@@ -9,7 +9,7 @@ use tokio::net::TcpListener as TokioTcpListener;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 use tx_di_core::{tx_comp, ApiR, App, CompInit, FormattedDateTime, RIE};
-use crate::layers::{add_static_path_prefix, freeze_static_path_prefixes, LAYER_REGISTRY};
+use crate::layers::LAYER_REGISTRY;
 
 /// 全局路由器注册表
 ///
@@ -119,12 +119,10 @@ impl WebPlugin {
                             .precompressed_br()
                             .fallback(fallback)
                     );
-                    add_static_path_prefix(path_prefix)
                 } else {
                     error!("SPA 应用目录不存在: {:?}，已跳过", dist_path);
                 }
             }
-            freeze_static_path_prefixes();
         }
         router
     }
