@@ -24,10 +24,6 @@ static ROUTER_REGISTRY: LazyLock<Arc<RwLock<Vec<Router>>>> =
 static API_ROUTER_REGISTRY: LazyLock<Arc<RwLock<Vec<aide::axum::ApiRouter>>>> =
     LazyLock::new(|| Arc::new(RwLock::new(Vec::new())));
 
-/// 生成的 OpenAPI spec（JSON Value）
-#[cfg(feature = "api-doc")]
-static OPENAPI_SPEC: OnceLock<serde_json::Value> = OnceLock::new();
-
 /// Web 服务器插件组件
 ///
 /// 提供基于 axum 的 web 服务器功能，支持依赖注入和配置管理。
@@ -169,30 +165,16 @@ impl WebPlugin {
         }
     }
 
-    /// 合并所有已注册的路由器并应用中间件
+    /// 合并所有已注册的路由器
     ///
-    /// 将全局注册表中的所有路由器合并为一个主路由器，并应用所有注册的中间件层。
-    /// 中间件会按照优先级排序后依次应用（sort 值越小，优先级越高，越先执行）。
-    ///
-    /// # 执行顺序说明
-    ///
-    /// 中间件遵循"洋葱模型"：
-    /// - **请求阶段**：优先级高的中间件先执行（外层 → 内层）
-    /// - **响应阶段**：优先级高的中间件后执行（内层 → 外层）
-    ///
-    /// 例如：A(sort=1) → B(sort=2) → C(sort=3)
-    /// - 请求: A → B → C → Handler
-    /// - 响应: A ← B ← C ← Handler
-    ///
-    /// # 返回值
-    ///
-    /// 返回应用了所有中间件后的主路由器，如果没有任何注册的路由器，则返回空路由器
+    /// 将全局注册表中的所有普通路由器合并为一个主路由器。
+    /// API 路由器的合并由 `setup_api_doc` 负责。
     fn merge_routers() -> Router {
         let mut main_router = Router::new()
             .route("/health", get(health_check))
-            .route("/di", get(hello_di));
+            ;
 
-        // 合并所有路由器
+        // 合并所有普通路由器
         if let Ok(routers) = ROUTER_REGISTRY.read() {
             for router in routers.iter() {
                 main_router = main_router.merge(router.clone());
@@ -202,99 +184,82 @@ impl WebPlugin {
             error!("无法获取路由器注册表的读锁");
         }
 
-        // [api-doc] 合并 API 路由器（仅合并路由，不注册文档端点）
-        #[cfg(feature = "api-doc")]
-        {
-            main_router = Self::merge_api_routers(main_router);
-        }
-
-        main_router
-    }
-
-    /// 合并所有 API 路由器
-    ///
-    /// 将 `API_ROUTER_REGISTRY` 中的所有 `ApiRouter` 合并到主路由器，
-    /// 同时生成 OpenAPI spec 存储到 `OPENAPI_SPEC` 中。
-    #[cfg(feature = "api-doc")]
-    fn merge_api_routers(mut main_router: Router) -> Router {
-        use aide::axum::ApiRouter;
-        use aide::openapi::OpenApi;
-
-        let mut api = OpenApi::default();
-
-        if let Ok(routers) = API_ROUTER_REGISTRY.read() {
-            if routers.is_empty() {
-                debug!("未注册任何 API 路由器，跳过 OpenAPI 文档生成");
-                return main_router;
-            }
-
-            let mut api_router = ApiRouter::new();
-            for r in routers.iter() {
-                api_router = api_router.merge(r.clone());
-            }
-
-            // finish_api 将 ApiRouter 转为 Router，同时填充 OpenAPI spec
-            let router = api_router.finish_api(&mut api);
-            main_router = main_router.merge(router);
-
-            info!("已合并 {} 个 API 路由器", routers.len());
-        } else {
-            error!("无法获取 API 路由器注册表的读锁");
-            return main_router;
-        }
-
-        // 存储 OpenAPI spec
-        match serde_json::to_value(&api) {
-            Ok(spec) => { let _ = OPENAPI_SPEC.set(spec); }
-            Err(e) => error!("序列化 OpenAPI spec 失败: {}", e),
-        }
-
         main_router
     }
 
     /// 注册 API 文档端点（受 `enable_api_doc` 配置控制）
     ///
+    /// 从 `API_ROUTER_REGISTRY` 中取出所有 `ApiRouter`，合并后通过 `finish_api`
+    /// 同时生成 OpenAPI spec 和 axum Router，然后注册文档端点。
+    ///
     /// 当 `enable_api_doc = true` 时，注册：
     /// - `/api-docs/openapi.json` — OpenAPI spec JSON
     /// - `/swagger-ui` — Swagger UI 页面（从 crate 内嵌静态文件服务）
     #[cfg(feature = "api-doc")]
-    fn setup_api_doc(router: Router, config: &WebConfig) -> Router {
+    fn setup_api_doc(mut router: Router, config: &WebConfig) -> Router {
+        use aide::axum::ApiRouter;
+        use aide::openapi::OpenApi;
+
         if !config.enable_api_doc {
             info!("API 文档已禁用（enable_api_doc = false）");
             return router;
         }
 
-        let spec = match OPENAPI_SPEC.get() {
-            Some(s) => s.clone(),
-            None => {
-                debug!("无 OpenAPI spec，跳过文档端点注册");
-                return router;
+        let mut api = OpenApi::default();
+        api.
+        let api_count;
+
+        // 合并所有 API 路由器
+        {
+            let routers = API_ROUTER_REGISTRY.read();
+            match routers {
+                Ok(routers) if !routers.is_empty() => {
+                    let mut api_router = ApiRouter::new();
+                    for r in routers.iter() {
+                        api_router = api_router.merge(r.clone());
+                    }
+                    // finish_api 消耗 ApiRouter，同时产出 Router + OpenAPI spec
+                    let api_routes = api_router.finish_api(&mut api);
+                    router = router.merge(api_routes);
+                    api_count = routers.len();
+                }
+                _ => {
+                    debug!("未注册任何 API 路由器，跳过 OpenAPI 文档生成");
+                    return router;
+                }
             }
-        };
+        }
 
         // 注册 OpenAPI JSON 端点
-        let router = router.route(
-            "/api-docs/openapi.json",
-            get(move || async { axum::response::Json(spec) }),
-        );
+        match serde_json::to_value(&api) {
+            Ok(spec) => {
+                router = router.route(
+                    "/api-docs/openapi.json",
+                    get(move || async { axum::response::Json(spec) }),
+                );
+            }
+            Err(e) => {
+                error!("序列化 OpenAPI spec 失败: {}", e);
+                return router;
+            }
+        }
 
         // Swagger UI 静态文件目录（crate 内嵌）
         let swagger_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("static").join("swagger-ui");
 
         if swagger_dir.exists() {
-            info!("Swagger UI 目录: {:?}", swagger_dir);
-            let router = router.nest_service(
+            router = router.nest_service(
                 "/swagger-ui",
                 tower_http::services::ServeDir::new(&swagger_dir)
                     .fallback(tower_http::services::ServeFile::new(swagger_dir.join("index.html"))),
             );
-            info!("已注册 /swagger-ui 和 /api-docs/openapi.json 端点");
-            router
+            info!("已合并 {} 个 API 路由器，已注册 /swagger-ui 和 /api-docs/openapi.json", api_count);
         } else {
             error!("Swagger UI 目录不存在: {:?}，仅注册 /api-docs/openapi.json", swagger_dir);
-            router
         }
+
+        router
     }
 
     /// 应用所有中间件层
@@ -394,9 +359,6 @@ async fn health_check() -> R<FormattedDateTime> {
     ApiR::success(FormattedDateTime::now()).into()
 }
 
-async fn hello_di(web_config: DiComp<WebConfig>) -> R<String> {
-    R::from(ApiR::success(web_config.address()))
-}
 /// 启动 web 服务器
 ///
 /// # Arguments
