@@ -77,7 +77,19 @@ pub struct WebConfig {
     #[serde(default = "default_timeout_secs")]
     pub timeout_secs: u64,
     /// 中间件列表
-    pub layers: Option<Vec<(i32,String)>>
+    pub layers: Option<Vec<(i32,String)>>,
+
+    /// 是否启用 API 文档端点（需要 api-doc feature）
+    ///
+    /// 启用后可访问 `/swagger-ui` 查看接口文档，`/api-docs/openapi.json` 获取 OpenAPI spec。
+    /// 生产环境建议关闭以避免接口信息泄露。
+    ///
+    /// 默认为 `true`。
+    ///
+    /// 该字段在 TOML 配置文件中对应 `web_config.enable_api_doc`。
+    #[cfg(feature = "api-doc")]
+    #[serde(default = "default_true")]
+    pub enable_api_doc: bool,
 }
 
 impl Default for WebConfig {
@@ -91,6 +103,8 @@ impl Default for WebConfig {
             spa_apps: None,
             timeout_secs: default_timeout_secs(),
             layers: None,
+            #[cfg(feature = "api-doc")]
+            enable_api_doc: true,
         }
     }
 }
@@ -173,4 +187,10 @@ fn default_static_dir() -> String {
 /// 提供默认的超时时间（30秒）
 fn default_timeout_secs() -> u64 {
     30
+}
+
+/// 默认启用 API 文档
+#[cfg(feature = "api-doc")]
+fn default_true() -> bool {
+    true
 }
