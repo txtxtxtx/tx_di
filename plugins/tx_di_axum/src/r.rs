@@ -6,6 +6,7 @@ use tx_di_core::{ApiR, ApiRes};
 
 
 /// A wrapper around [`ApiR`]
+#[cfg_attr(feature = "api-doc", derive(schemars::JsonSchema))]
 pub struct R<T>(pub ApiR<T>);
 
 impl<T> Deref for R<T> {

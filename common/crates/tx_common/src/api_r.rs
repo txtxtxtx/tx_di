@@ -2,6 +2,7 @@ use serde::Serialize;
 
 /// 接口返回结构体
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "api-doc", derive(schemars::JsonSchema))]
 pub struct ApiR<T> {
     // 业务状态码，通常 200 或是 0 表示成功
     pub code: i32,

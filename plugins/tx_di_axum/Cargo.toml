@@ -7,6 +7,10 @@ license.workspace = true
 readme = "README.md"
 repository.workspace = true
 
+[features]
+default = []
+api-doc = ["dep:aide", "dep:schemars", "tx_common/api-doc"]
+
 [dependencies]
 tx_error = { workspace = true }
 tx-di-core.workspace = true
@@ -16,6 +20,7 @@ axum.workspace = true
 tokio.workspace = true
 socket2.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
 thiserror.workspace = true
@@ -23,3 +28,6 @@ tower.workspace = true
 tower-http.workspace = true
 http.workspace = true
 tokio-util.workspace = true
+tx_common = { workspace = true }
+aide = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true }

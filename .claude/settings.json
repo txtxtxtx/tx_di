@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo info *)",
+      "Bash(curl -sL -o swagger-ui-bundle.js \"https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js\")",
+      "Bash(curl -sL -o swagger-ui.css \"https://unpkg.com/swagger-ui-dist@5/swagger-ui.css\")"
+    ]
+  }
+}

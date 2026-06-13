@@ -10,6 +10,18 @@ pub enum WebErr {
     Other(#[from] anyhow::Error),
 }
 
+/// WebErr 作为 extractor rejection 类型，手动实现 JsonSchema
+/// 实际错误响应不体现在 API 文档中，使用空 schema 占位
+#[cfg(feature = "api-doc")]
+impl schemars::JsonSchema for WebErr {
+    fn schema_name() -> String {
+        "WebErr".to_string()
+    }
+    fn json_schema(_gen: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
+        schemars::schema::Schema::Object(Default::default())
+    }
+}
+
 impl IntoResponse for WebErr {
     fn into_response(self) -> Response {
         match self {

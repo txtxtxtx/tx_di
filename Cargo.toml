@@ -136,6 +136,10 @@ tonic-build = "0.12"
 
 sa-token-plugin-axum = { version = "0.1", default-features = false }
 
+# API 文档
+aide = { version = "0.14", features = ["axum"] }
+schemars = "0.8"
+
 livekit-api = { version = "0.4", default-features = false }
 livekit = { version = "0.7.42", default-features = false }
 toasty = { version = "0.6", default-features = false, features = ["serde"] }

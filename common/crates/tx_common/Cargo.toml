@@ -10,7 +10,9 @@ serde.workspace = true
 chrono.workspace = true
 tx_error = { path = "../../tx_error" }
 axum = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true }
 
 [features]
 default = []
 axum = ["dep:axum"]
+api-doc = ["dep:schemars"]
