@@ -21,6 +21,10 @@ pub struct ToastyDictTypeRepository {
 }
 
 impl ToastyDictTypeRepository {
+    pub fn new(plugin: Arc<ToastyPlugin>) -> Self {
+        Self { plugin }
+    }
+
     fn to_domain(d: &SysDictType) -> DictType {
         DictType::restore(
             d.id as u64,
@@ -130,6 +134,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
         let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysDictType::create()
+            .id(dict_type.id as i64)
             .name(dict_type.name.clone())
             .dict_type(dict_type.dict_type.clone())
             .status(dict_type.status)
@@ -199,6 +204,10 @@ pub struct ToastyDictDataRepository {
 }
 
 impl ToastyDictDataRepository {
+    pub fn new(plugin: Arc<ToastyPlugin>) -> Self {
+        Self { plugin }
+    }
+
     fn to_domain(d: &SysDictData) -> DictData {
         DictData::restore(
             d.id as u64,
@@ -301,6 +310,7 @@ impl DictDataRepository for ToastyDictDataRepository {
         let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysDictData::create()
+            .id(data.id as i64)
             .sort(data.sort)
             .label(data.label.clone())
             .value(data.value.clone())

@@ -21,6 +21,10 @@ pub struct ToastyFileRepository {
 }
 
 impl ToastyFileRepository {
+    pub fn new(plugin: Arc<ToastyPlugin>) -> Self {
+        Self { plugin }
+    }
+
     fn to_domain(f: &SysFile) -> File {
         File::restore(
             f.id as u64,
@@ -93,6 +97,7 @@ impl FileRepository for ToastyFileRepository {
         let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysFile::create()
+            .id(file.id as i64)
             .config_id(file.config_id.unwrap_or(0))
             .name(file.name.clone())
             .file_path(file.path.clone())
@@ -101,6 +106,28 @@ impl FileRepository for ToastyFileRepository {
             .size(file.size)
             .creator(file.audit.creator.clone().unwrap_or_default())
             .created_at(now.clone())
+            .updater(file.audit.updater.clone().unwrap_or_default())
+            .updated_at(now)
+            .deleted(file.audit.deleted as i32)
+            .exec(&mut db)
+            .await
+            .map_err(|_| RepositoryError::Database)?;
+        Ok(())
+    }
+
+    async fn update(&self, file: &File) -> AppResult<()> {
+        let mut db = self.plugin.db().clone();
+        let mut existing = SysFile::get_by_id(&mut db, file.id as i64)
+            .await
+            .map_err(|_| RepositoryError::NotFound)?;
+        let now = jiff::Timestamp::now().to_string();
+        existing
+            .update()
+            .name(file.name.clone())
+            .file_path(file.path.clone())
+            .url(file.url.clone())
+            .file_type(file.file_type.clone().unwrap_or_default())
+            .size(file.size)
             .updater(file.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
             .deleted(file.audit.deleted as i32)
@@ -144,6 +171,10 @@ pub struct ToastyFileConfigRepository {
 }
 
 impl ToastyFileConfigRepository {
+    pub fn new(plugin: Arc<ToastyPlugin>) -> Self {
+        Self { plugin }
+    }
+
     fn to_domain(c: &SysFileConfig) -> FileConfig {
         FileConfig::restore(
             c.id,
@@ -204,6 +235,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
         let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysFileConfig::create()
+            .id(config.id)
             .name(config.name.clone())
             .storage(config.storage)
             .remark(config.remark.clone().unwrap_or_default())

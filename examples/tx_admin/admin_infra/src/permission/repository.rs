@@ -24,6 +24,10 @@ pub struct ToastyPermissionRepository {
 }
 
 impl ToastyPermissionRepository {
+    pub fn new(plugin: Arc<ToastyPlugin>) -> Self {
+        Self { plugin }
+    }
+
     fn to_domain(p: &SysPermission) -> Permission {
         Permission::restore(
             p.id as u64,
@@ -145,6 +149,7 @@ impl PermissionRepository for ToastyPermissionRepository {
         let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysPermission::create()
+            .id(permission.id as i64)
             .name(permission.name.clone())
             .permission_code(permission.permission_code.clone())
             .permission_type(permission.permission_type as i32)

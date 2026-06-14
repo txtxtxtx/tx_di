@@ -41,6 +41,7 @@ name = "admin_app"
 version = "0.1.0"
 dependencies = [
  "admin_domain",
+ "admin_infra",
  "admin_proto",
  "async-trait",
  "chrono",
@@ -53,10 +54,12 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+ "toasty",
  "tokio",
  "tracing",
  "tx-di-core",
  "tx_common",
+ "tx_di_toasty",
  "tx_error",
 ]
 

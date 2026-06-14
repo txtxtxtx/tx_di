@@ -23,6 +23,10 @@ pub struct ToastyRoleRepository {
 }
 
 impl ToastyRoleRepository {
+    pub fn new(plugin: Arc<ToastyPlugin>) -> Self {
+        Self { plugin }
+    }
+
     fn to_domain(r: &SysRole, menu_ids: Vec<u64>) -> Role {
         Role::restore(
             r.id as u64,
@@ -189,6 +193,7 @@ impl RoleRepository for ToastyRoleRepository {
         let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         let model = SysRole::create()
+            .id(role.id as i64)
             .name(role.name.clone())
             .code(role.code.clone())
             .sort(role.sort)

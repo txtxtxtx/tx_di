@@ -21,6 +21,10 @@ pub struct ToastyDepartmentRepository {
 }
 
 impl ToastyDepartmentRepository {
+    pub fn new(plugin: Arc<ToastyPlugin>) -> Self {
+        Self { plugin }
+    }
+
     fn to_domain(d: &SysDepartment) -> Department {
         Department::restore(
             d.id as u64,
@@ -108,6 +112,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
         let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysDepartment::create()
+            .id(dept.id as i64)
             .name(dept.name.clone())
             .parent_id(dept.parent_id as i64)
             .sort(dept.sort)

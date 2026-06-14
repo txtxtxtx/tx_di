@@ -21,6 +21,10 @@ pub struct ToastyConfigRepository {
 }
 
 impl ToastyConfigRepository {
+    pub fn new(plugin: Arc<ToastyPlugin>) -> Self {
+        Self { plugin }
+    }
+
     fn to_domain(c: &SysConfig) -> Config {
         Config::restore(
             c.id as u64,
@@ -147,6 +151,7 @@ impl ConfigRepository for ToastyConfigRepository {
         let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysConfig::create()
+            .id(config.id as i64)
             .category(config.category.clone())
             .config_type(config.config_type)
             .name(config.name.clone())

@@ -1,8 +1,12 @@
 //! Common test helpers — shared by all integration test files.
+//!
+//! 使用真实 toasty 内存数据库进行测试。
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock, RwLock};
 
-use admin_app::mock::*;
+use tx_di_toasty::ToastyPlugin;
+use toasty::ModelSet;
+
 use admin_app::auth::app_service::AuthAppService;
 use admin_app::config::app_service::ConfigAppService;
 use admin_app::department::app_service::DepartmentAppService;
@@ -24,196 +28,209 @@ use admin_domain::permission::service::PermissionService;
 use admin_domain::role::service::RoleService;
 use admin_domain::user::service::UserService;
 
+use admin_infra::user::repository::ToastyUserRepository;
+use admin_infra::role::repository::ToastyRoleRepository;
+use admin_infra::permission::repository::ToastyPermissionRepository;
+use admin_infra::menu::repository::ToastyMenuRepository;
+use admin_infra::department::repository::ToastyDepartmentRepository;
+use admin_infra::config::repository::ToastyConfigRepository;
+use admin_infra::dictionary::repository::{ToastyDictTypeRepository, ToastyDictDataRepository};
+use admin_infra::file::repository::{ToastyFileRepository, ToastyFileConfigRepository};
+use admin_infra::log::repository::{ToastyOperateLogRepository, ToastyLoginLogRepository};
+
+use admin_infra::user::model::{SysUser, SysUserRole, SysUserDept};
+use admin_infra::role::model::{SysRole, SysRoleMenu};
+use admin_infra::permission::model::SysPermission;
+use admin_infra::menu::model::SysMenu;
+use admin_infra::department::model::SysDepartment;
+use admin_infra::file::model::{SysFile, SysFileConfig};
+use admin_infra::config::model::SysConfig;
+use admin_infra::dictionary::model::{SysDictType, SysDictData};
+use admin_infra::log::model::{SysOperateLog, SysLoginLog};
+
+/// 创建内存 SQLite 数据库插件
+pub async fn create_db_plugin() -> Arc<ToastyPlugin> {
+    let mut builder = toasty::Db::builder();
+    builder.models(toasty::models!(
+        SysUser, SysUserRole, SysUserDept,
+        SysRole, SysRoleMenu,
+        SysPermission,
+        SysMenu,
+        SysDepartment,
+        SysFile, SysFileConfig,
+        SysConfig,
+        SysDictType, SysDictData,
+        SysOperateLog, SysLoginLog
+    ));
+    let db = builder.connect("sqlite::memory:").await.unwrap();
+    db.push_schema().await.unwrap();
+
+    Arc::new(ToastyPlugin {
+        config: Arc::new(tx_di_toasty::ToastyConfig::default()),
+        db: OnceLock::from(db),
+        models: Arc::new(RwLock::new(ModelSet::new())),
+    })
+}
+
 // ── User helpers ───────────────────────────────────────────────────────────
 
-pub fn create_user_service() -> (Arc<UserService>, Arc<user_repo::MockUserRepository>) {
-    let user_repo = Arc::new(user_repo::MockUserRepository::new());
-    let permission_repo = Arc::new(permission_repo::MockPermissionRepository::new());
+pub async fn create_user_service() -> (Arc<UserService>, Arc<ToastyUserRepository>) {
+    let plugin = create_db_plugin().await;
+    let user_repo = Arc::new(ToastyUserRepository::new(plugin.clone()));
+    let permission_repo = Arc::new(ToastyPermissionRepository::new(plugin));
     let user_service = Arc::new(UserService::new(user_repo.clone(), permission_repo));
     (user_service, user_repo)
 }
 
-pub fn create_user_app(
-) -> (UserAppService, Arc<UserService>, Arc<user_repo::MockUserRepository>) {
-    let (svc, repo) = create_user_service();
+pub async fn create_user_app() -> (UserAppService, Arc<UserService>, Arc<ToastyUserRepository>) {
+    let (svc, repo) = create_user_service().await;
     let app = UserAppService::new(svc.clone());
     (app, svc, repo)
 }
 
 // ── Role helpers ───────────────────────────────────────────────────────────
 
-pub fn create_role_service() -> (Arc<RoleService>, Arc<role_repo::MockRoleRepository>) {
-    let role_repo = Arc::new(role_repo::MockRoleRepository::new());
+pub async fn create_role_service() -> (Arc<RoleService>, Arc<ToastyRoleRepository>) {
+    let plugin = create_db_plugin().await;
+    let role_repo = Arc::new(ToastyRoleRepository::new(plugin));
     let role_service = Arc::new(RoleService::new(role_repo.clone()));
     (role_service, role_repo)
 }
 
-pub fn create_role_app(
-) -> (RoleAppService, Arc<RoleService>, Arc<role_repo::MockRoleRepository>) {
-    let (svc, repo) = create_role_service();
+pub async fn create_role_app() -> (RoleAppService, Arc<RoleService>, Arc<ToastyRoleRepository>) {
+    let (svc, repo) = create_role_service().await;
     let app = RoleAppService::new(svc.clone());
     (app, svc, repo)
 }
 
 // ── Menu helpers ───────────────────────────────────────────────────────────
 
-pub fn create_menu_service() -> (Arc<MenuService>, Arc<menu_repo::MockMenuRepository>) {
-    let menu_repo = Arc::new(menu_repo::MockMenuRepository::new());
+pub async fn create_menu_service() -> (Arc<MenuService>, Arc<ToastyMenuRepository>) {
+    let plugin = create_db_plugin().await;
+    let menu_repo = Arc::new(ToastyMenuRepository::new(plugin));
     let menu_service = Arc::new(MenuService::new(menu_repo.clone()));
     (menu_service, menu_repo)
 }
 
-pub fn create_menu_app(
-) -> (MenuAppService, Arc<MenuService>, Arc<menu_repo::MockMenuRepository>) {
-    let (svc, repo) = create_menu_service();
+pub async fn create_menu_app() -> (MenuAppService, Arc<MenuService>, Arc<ToastyMenuRepository>) {
+    let (svc, repo) = create_menu_service().await;
     let app = MenuAppService::new(svc.clone());
     (app, svc, repo)
 }
 
 // ── Department helpers ─────────────────────────────────────────────────────
 
-pub fn create_dept_service(
-) -> (Arc<DepartmentService>, Arc<department_repo::MockDepartmentRepository>) {
-    let dept_repo = Arc::new(department_repo::MockDepartmentRepository::new());
+pub async fn create_dept_service() -> (Arc<DepartmentService>, Arc<ToastyDepartmentRepository>) {
+    let plugin = create_db_plugin().await;
+    let dept_repo = Arc::new(ToastyDepartmentRepository::new(plugin));
     let dept_service = Arc::new(DepartmentService::new(dept_repo.clone()));
     (dept_service, dept_repo)
 }
 
-pub fn create_dept_app(
-) -> (
-    DepartmentAppService,
-    Arc<DepartmentService>,
-    Arc<department_repo::MockDepartmentRepository>,
-) {
-    let (svc, repo) = create_dept_service();
+pub async fn create_dept_app() -> (DepartmentAppService, Arc<DepartmentService>, Arc<ToastyDepartmentRepository>) {
+    let (svc, repo) = create_dept_service().await;
     let app = DepartmentAppService::new(svc.clone());
     (app, svc, repo)
 }
 
 // ── Config helpers ─────────────────────────────────────────────────────────
 
-pub fn create_config_service(
-) -> (Arc<ConfigService>, Arc<config_repo::MockConfigRepository>) {
-    let config_repo = Arc::new(config_repo::MockConfigRepository::new());
+pub async fn create_config_service() -> (Arc<ConfigService>, Arc<ToastyConfigRepository>) {
+    let plugin = create_db_plugin().await;
+    let config_repo = Arc::new(ToastyConfigRepository::new(plugin));
     let config_service = Arc::new(ConfigService::new(config_repo.clone()));
     (config_service, config_repo)
 }
 
-pub fn create_config_app(
-) -> (ConfigAppService, Arc<ConfigService>, Arc<config_repo::MockConfigRepository>) {
-    let (svc, repo) = create_config_service();
+pub async fn create_config_app() -> (ConfigAppService, Arc<ConfigService>, Arc<ToastyConfigRepository>) {
+    let (svc, repo) = create_config_service().await;
     let app = ConfigAppService::new(svc.clone());
     (app, svc, repo)
 }
 
 // ── Dict helpers ───────────────────────────────────────────────────────────
 
-pub fn create_dict_type_service(
-) -> (Arc<DictTypeService>, Arc<dict_repo::MockDictTypeRepository>) {
-    let dict_type_repo = Arc::new(dict_repo::MockDictTypeRepository::new());
+pub async fn create_dict_type_service() -> (Arc<DictTypeService>, Arc<ToastyDictTypeRepository>) {
+    let plugin = create_db_plugin().await;
+    let dict_type_repo = Arc::new(ToastyDictTypeRepository::new(plugin));
     let dict_type_service = Arc::new(DictTypeService::new(dict_type_repo.clone()));
     (dict_type_service, dict_type_repo)
 }
 
-pub fn create_dict_type_app(
-) -> (
-    DictTypeAppService,
-    Arc<DictTypeService>,
-    Arc<dict_repo::MockDictTypeRepository>,
-) {
-    let (svc, repo) = create_dict_type_service();
+pub async fn create_dict_type_app() -> (DictTypeAppService, Arc<DictTypeService>, Arc<ToastyDictTypeRepository>) {
+    let (svc, repo) = create_dict_type_service().await;
     let app = DictTypeAppService::new(svc.clone());
     (app, svc, repo)
 }
 
-pub fn create_dict_data_service(
-) -> (Arc<DictDataService>, Arc<dict_repo::MockDictDataRepository>) {
-    let dict_data_repo = Arc::new(dict_repo::MockDictDataRepository::new());
+pub async fn create_dict_data_service() -> (Arc<DictDataService>, Arc<ToastyDictDataRepository>) {
+    let plugin = create_db_plugin().await;
+    let dict_data_repo = Arc::new(ToastyDictDataRepository::new(plugin));
     let dict_data_service = Arc::new(DictDataService::new(dict_data_repo.clone()));
     (dict_data_service, dict_data_repo)
 }
 
-pub fn create_dict_data_app(
-) -> (
-    DictDataAppService,
-    Arc<DictDataService>,
-    Arc<dict_repo::MockDictDataRepository>,
-) {
-    let (svc, repo) = create_dict_data_service();
+pub async fn create_dict_data_app() -> (DictDataAppService, Arc<DictDataService>, Arc<ToastyDictDataRepository>) {
+    let (svc, repo) = create_dict_data_service().await;
     let app = DictDataAppService::new(svc.clone());
     (app, svc, repo)
 }
 
 // ── Permission helpers ─────────────────────────────────────────────────────
 
-pub fn create_permission_service(
-) -> (Arc<PermissionService>, Arc<permission_repo::MockPermissionRepository>) {
-    let permission_repo = Arc::new(permission_repo::MockPermissionRepository::new());
+pub async fn create_permission_service() -> (Arc<PermissionService>, Arc<ToastyPermissionRepository>) {
+    let plugin = create_db_plugin().await;
+    let permission_repo = Arc::new(ToastyPermissionRepository::new(plugin));
     let permission_service = Arc::new(PermissionService::new(permission_repo.clone()));
     (permission_service, permission_repo)
 }
 
-pub fn create_permission_app(
-) -> (
-    PermissionAppService,
-    Arc<PermissionService>,
-    Arc<permission_repo::MockPermissionRepository>,
-) {
-    let (svc, repo) = create_permission_service();
+pub async fn create_permission_app() -> (PermissionAppService, Arc<PermissionService>, Arc<ToastyPermissionRepository>) {
+    let (svc, repo) = create_permission_service().await;
     let app = PermissionAppService::new(svc.clone());
     (app, svc, repo)
 }
 
 // ── File helpers ───────────────────────────────────────────────────────────
 
-pub fn create_file_service() -> (Arc<FileService>, Arc<file_repo::MockFileRepository>) {
-    let file_repo = Arc::new(file_repo::MockFileRepository::new());
-    let file_config_repo = Arc::new(file_repo::MockFileConfigRepository::new());
+pub async fn create_file_service() -> (Arc<FileService>, Arc<ToastyFileRepository>) {
+    let plugin = create_db_plugin().await;
+    let file_repo = Arc::new(ToastyFileRepository::new(plugin.clone()));
+    let file_config_repo = Arc::new(ToastyFileConfigRepository::new(plugin));
     let file_service = Arc::new(FileService::new(file_repo.clone(), file_config_repo));
     (file_service, file_repo)
 }
 
-pub fn create_file_app(
-) -> (FileAppService, Arc<FileService>, Arc<file_repo::MockFileRepository>) {
-    let (svc, repo) = create_file_service();
+pub async fn create_file_app() -> (FileAppService, Arc<FileService>, Arc<ToastyFileRepository>) {
+    let (svc, repo) = create_file_service().await;
     let app = FileAppService::new(svc.clone());
     (app, svc, repo)
 }
 
 // ── Log helpers ────────────────────────────────────────────────────────────
 
-pub fn create_operate_log_service(
-) -> (Arc<OperateLogService>, Arc<log_repo::MockOperateLogRepository>) {
-    let log_repo = Arc::new(log_repo::MockOperateLogRepository::new());
+pub async fn create_operate_log_service() -> (Arc<OperateLogService>, Arc<ToastyOperateLogRepository>) {
+    let plugin = create_db_plugin().await;
+    let log_repo = Arc::new(ToastyOperateLogRepository::new(plugin));
     let log_service = Arc::new(OperateLogService::new(log_repo.clone()));
     (log_service, log_repo)
 }
 
-pub fn create_operate_log_app(
-) -> (
-    OperateLogAppService,
-    Arc<OperateLogService>,
-    Arc<log_repo::MockOperateLogRepository>,
-) {
-    let (svc, repo) = create_operate_log_service();
+pub async fn create_operate_log_app() -> (OperateLogAppService, Arc<OperateLogService>, Arc<ToastyOperateLogRepository>) {
+    let (svc, repo) = create_operate_log_service().await;
     let app = OperateLogAppService::new(svc.clone());
     (app, svc, repo)
 }
 
-pub fn create_login_log_service(
-) -> (Arc<LoginLogService>, Arc<log_repo::MockLoginLogRepository>) {
-    let log_repo = Arc::new(log_repo::MockLoginLogRepository::new());
+pub async fn create_login_log_service() -> (Arc<LoginLogService>, Arc<ToastyLoginLogRepository>) {
+    let plugin = create_db_plugin().await;
+    let log_repo = Arc::new(ToastyLoginLogRepository::new(plugin));
     let log_service = Arc::new(LoginLogService::new(log_repo.clone()));
     (log_service, log_repo)
 }
 
-pub fn create_login_log_app(
-) -> (
-    LoginLogAppService,
-    Arc<LoginLogService>,
-    Arc<log_repo::MockLoginLogRepository>,
-) {
-    let (svc, repo) = create_login_log_service();
+pub async fn create_login_log_app() -> (LoginLogAppService, Arc<LoginLogService>, Arc<ToastyLoginLogRepository>) {
+    let (svc, repo) = create_login_log_service().await;
     let app = LoginLogAppService::new(svc.clone());
     (app, svc, repo)
 }

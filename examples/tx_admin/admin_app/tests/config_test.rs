@@ -12,7 +12,7 @@ use admin_app::config::dto::*;
 
 #[tokio::test]
 async fn create_config_success() {
-    let (app, _, _) = common::create_config_app();
+    let (app, _, _) = common::create_config_app().await;
     let cmd = CreateConfigCommand {
         category: "system".into(),
         config_type: 0,
@@ -30,7 +30,7 @@ async fn create_config_success() {
 
 #[tokio::test]
 async fn create_duplicate_key_should_fail() {
-    let (app, _, _) = common::create_config_app();
+    let (app, _, _) = common::create_config_app().await;
     let cmd = |key: &str, val: &str| CreateConfigCommand {
         category: "sys".into(), config_type: 0,
         name: "名称".into(), config_key: key.into(), value: val.into(), remark: None,
@@ -41,7 +41,7 @@ async fn create_duplicate_key_should_fail() {
 
 #[tokio::test]
 async fn update_config() {
-    let (app, _, _) = common::create_config_app();
+    let (app, _, _) = common::create_config_app().await;
     let cfg = app.create_config(CreateConfigCommand {
         category: "email".into(), config_type: 0,
         name: "SMTP".into(), config_key: "email.smtp".into(),
@@ -65,7 +65,7 @@ async fn update_config() {
 
 #[tokio::test]
 async fn delete_config() {
-    let (app, _, _) = common::create_config_app();
+    let (app, _, _) = common::create_config_app().await;
     let cfg = app.create_config(CreateConfigCommand {
         category: "test".into(), config_type: 0,
         name: "待删除".into(), config_key: "test.del".into(),
@@ -78,7 +78,7 @@ async fn delete_config() {
 
 #[tokio::test]
 async fn paginate_configs() {
-    let (app, _, _) = common::create_config_app();
+    let (app, _, _) = common::create_config_app().await;
     for i in 0..5 {
         app.create_config(CreateConfigCommand {
             category: "test".into(), config_type: 0,
@@ -97,7 +97,7 @@ async fn paginate_configs() {
 
 #[tokio::test]
 async fn get_config_by_key() {
-    let (app, _, _) = common::create_config_app();
+    let (app, _, _) = common::create_config_app().await;
     app.create_config(CreateConfigCommand {
         category: "system".into(), config_type: 0,
         name: "系统名称".into(), config_key: "sys.name".into(),
@@ -110,13 +110,13 @@ async fn get_config_by_key() {
 
 #[tokio::test]
 async fn get_config_by_key_not_found() {
-    let (app, _, _) = common::create_config_app();
+    let (app, _, _) = common::create_config_app().await;
     assert!(app.get_by_key("nonexistent.key").await.is_err());
 }
 
 #[tokio::test]
 async fn query_config_by_category() {
-    let (app, _, _) = common::create_config_app();
+    let (app, _, _) = common::create_config_app().await;
     app.create_config(CreateConfigCommand {
         category: "email".into(), config_type: 0, name: "SMTP".into(),
         config_key: "email.smtp".into(), value: "smtp.com".into(), remark: None,

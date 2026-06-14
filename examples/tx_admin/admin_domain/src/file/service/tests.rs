@@ -50,6 +50,9 @@ mod file_service_tests {
         async fn insert(&self, file: &File) -> AppResult<()> {
             (self.insert_fn)(file)
         }
+        async fn update(&self, _file: &File) -> AppResult<()> {
+            Ok(())
+        }
         async fn soft_delete(&self, id: u64) -> AppResult<()> {
             (self.soft_delete_fn)(id)
         }

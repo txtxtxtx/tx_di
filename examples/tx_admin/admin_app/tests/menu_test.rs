@@ -12,7 +12,7 @@ use admin_app::menu::dto::*;
 
 #[tokio::test]
 async fn create_menu_directory() {
-    let (app, _, _) = common::create_menu_app();
+    let (app, _, _) = common::create_menu_app().await;
     let menu = app.create_menu(CreateMenuCommand {
         name: "系统管理".into(), permission: "system".into(), types: 0, sort: 1,
         parent_id: 0, path: Some("/system".into()), icon: Some("setting".into()),
@@ -25,7 +25,7 @@ async fn create_menu_directory() {
 
 #[tokio::test]
 async fn create_menu_page() {
-    let (app, _, _) = common::create_menu_app();
+    let (app, _, _) = common::create_menu_app().await;
     let menu = app.create_menu(CreateMenuCommand {
         name: "用户管理".into(), permission: "system:user:list".into(), types: 1, sort: 1,
         parent_id: 1, path: Some("/system/user".into()), icon: Some("user".into()),
@@ -37,7 +37,7 @@ async fn create_menu_page() {
 
 #[tokio::test]
 async fn create_menu_button() {
-    let (app, _, _) = common::create_menu_app();
+    let (app, _, _) = common::create_menu_app().await;
     let menu = app.create_menu(CreateMenuCommand {
         name: "新增用户".into(), permission: "system:user:create".into(), types: 2, sort: 1,
         parent_id: 2, path: None, icon: None, component: None, component_name: Some("UserCreate".into()),
@@ -48,7 +48,7 @@ async fn create_menu_button() {
 
 #[tokio::test]
 async fn create_menu_hierarchy() {
-    let (app, _, _) = common::create_menu_app();
+    let (app, _, _) = common::create_menu_app().await;
     let parent = app.create_menu(CreateMenuCommand {
         name: "系统".into(), permission: "sys".into(), types: 0, sort: 1,
         parent_id: 0, path: Some("/sys".into()), icon: Some("gear".into()),
@@ -64,7 +64,7 @@ async fn create_menu_hierarchy() {
 
 #[tokio::test]
 async fn update_menu() {
-    let (app, _, _) = common::create_menu_app();
+    let (app, _, _) = common::create_menu_app().await;
     let menu = app.create_menu(CreateMenuCommand {
         name: "旧名称".into(), permission: "old".into(), types: 1, sort: 1,
         parent_id: 0, path: None, icon: None, component: None, component_name: None,
@@ -92,7 +92,7 @@ async fn update_menu() {
 
 #[tokio::test]
 async fn delete_menu() {
-    let (app, _, _) = common::create_menu_app();
+    let (app, _, _) = common::create_menu_app().await;
     let menu = app.create_menu(CreateMenuCommand {
         name: "待删除".into(), permission: "del".into(), types: 1, sort: 99,
         parent_id: 0, path: None, icon: None, component: None, component_name: None,
@@ -104,7 +104,7 @@ async fn delete_menu() {
 
 #[tokio::test]
 async fn get_menu_tree() {
-    let (app, _, _) = common::create_menu_app();
+    let (app, _, _) = common::create_menu_app().await;
     let root = app.create_menu(CreateMenuCommand {
         name: "系统管理".into(), permission: "system".into(), types: 0, sort: 1,
         parent_id: 0, path: Some("/system".into()), icon: Some("setting".into()),
@@ -128,7 +128,7 @@ async fn get_menu_tree() {
 
 #[tokio::test]
 async fn get_menu_list_flat() {
-    let (app, _, _) = common::create_menu_app();
+    let (app, _, _) = common::create_menu_app().await;
     for i in 0..3 {
         app.create_menu(CreateMenuCommand {
             name: format!("菜单{}", i), permission: format!("m{}", i), types: 1, sort: i,

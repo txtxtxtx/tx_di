@@ -7,10 +7,6 @@ license.workspace = true
 readme.workspace = true
 repository.workspace = true
 
-[features]
-default = []
-mock = []
-
 [dependencies]
 admin_domain = { path = "../admin_domain" }
 tx_di_toasty = { path = "../../../plugins/tx_di_toasty", features = ["sqlite"] }

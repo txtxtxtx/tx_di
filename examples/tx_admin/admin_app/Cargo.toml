@@ -31,3 +31,6 @@ tokio = { version = "1", features = ["full", "test-util"] }
 mockall = "0.13"
 rstest = "0.23"
 pretty_assertions = "1"
+admin_infra = { path = "../admin_infra" }
+toasty = { version = "0.7", features = ["sqlite"] }
+tx_di_toasty = { path = "../../../plugins/tx_di_toasty", features = ["sqlite"] }

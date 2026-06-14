@@ -29,7 +29,7 @@ use admin_domain::user::repository::UserRepository;
 /// | 6 | 副作用         | 独立用例                  | 角色绑定/部门绑定 → 略（另有用例）       |
 #[tokio::test]
 async fn create_user_success() {
-    let (app, _, repo) = common::create_user_app();
+    let (app, _, repo) = common::create_user_app().await;
 
     // ── Act ──────────────────────────────────────────────────────────────
     let user = app
@@ -116,13 +116,13 @@ async fn create_user_success() {
         "新用户不应处于软删除状态"
     );
 
-    // 密码：确认密码已持久化
-    assert_eq!(raw.password, "password123", "密码应正确存储");
+    // 密码：确认密码已哈希存储（argon2）
+    assert!(raw.password.starts_with("$argon2"), "密码应以 argon2 哈希存储");
 }
 
 #[tokio::test]
 async fn create_user_with_roles_and_depts() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
             CreateUserCommand {
@@ -153,7 +153,7 @@ async fn create_user_with_roles_and_depts() {
 
 #[tokio::test]
 async fn create_duplicate_username_should_fail() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, _) = common::create_user_app().await;
     let cmd = |name: &str| CreateUserCommand {
         username: name.into(),
         password: "pwd".into(),
@@ -177,7 +177,7 @@ async fn create_duplicate_username_should_fail() {
 
 #[tokio::test]
 async fn create_duplicate_email_should_fail() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, _) = common::create_user_app().await;
     let cmd = |name: &str, email: &str| CreateUserCommand {
         username: name.into(),
         password: "pwd".into(),
@@ -201,7 +201,7 @@ async fn create_duplicate_email_should_fail() {
 
 #[tokio::test]
 async fn create_duplicate_mobile_should_fail() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, _) = common::create_user_app().await;
     let cmd = |name: &str, mobile: &str| CreateUserCommand {
         username: name.into(),
         password: "pwd".into(),
@@ -225,7 +225,7 @@ async fn create_duplicate_mobile_should_fail() {
 
 #[tokio::test]
 async fn update_user_success() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
             CreateUserCommand {
@@ -270,7 +270,7 @@ async fn update_user_success() {
 
 #[tokio::test]
 async fn delete_user_soft_delete() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
             CreateUserCommand {
@@ -297,7 +297,7 @@ async fn delete_user_soft_delete() {
 
 #[tokio::test]
 async fn get_user_detail() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
             CreateUserCommand {
@@ -327,7 +327,7 @@ async fn get_user_detail() {
 
 #[tokio::test]
 async fn change_status_to_disabled() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
             CreateUserCommand {
@@ -357,7 +357,7 @@ async fn change_status_to_disabled() {
 
 #[tokio::test]
 async fn change_status_to_active_reenable() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
             CreateUserCommand {
@@ -389,7 +389,7 @@ async fn change_status_to_active_reenable() {
 
 #[tokio::test]
 async fn change_status_to_locked() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
             CreateUserCommand {
@@ -420,7 +420,7 @@ async fn change_status_to_locked() {
 
 #[tokio::test]
 async fn assign_roles_to_user() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
             CreateUserCommand {
@@ -456,7 +456,7 @@ async fn assign_roles_to_user() {
 
 #[tokio::test]
 async fn assign_roles_empty_should_clear() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
             CreateUserCommand {
@@ -491,7 +491,7 @@ async fn assign_roles_empty_should_clear() {
 
 #[tokio::test]
 async fn assign_departments_to_user() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
             CreateUserCommand {
@@ -526,7 +526,7 @@ async fn assign_departments_to_user() {
 
 #[tokio::test]
 async fn assign_departments_empty_should_clear() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
             CreateUserCommand {
@@ -561,7 +561,7 @@ async fn assign_departments_empty_should_clear() {
 
 #[tokio::test]
 async fn paginate_users() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, _) = common::create_user_app().await;
     for i in 0..7 {
         app.create_user(
             CreateUserCommand {
@@ -598,7 +598,7 @@ async fn paginate_users() {
 
 #[tokio::test]
 async fn query_user_by_username_fuzzy() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, _) = common::create_user_app().await;
     app.create_user(
         CreateUserCommand {
             username: "zhangsan".into(),
@@ -650,7 +650,7 @@ async fn query_user_by_username_fuzzy() {
 
 #[tokio::test]
 async fn query_user_by_status() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, _) = common::create_user_app().await;
     let u = app
         .create_user(
             CreateUserCommand {
@@ -693,7 +693,7 @@ async fn query_user_by_status() {
 
 #[tokio::test]
 async fn query_user_by_nickname() {
-    let (app, _, _) = common::create_user_app();
+    let (app, _, _) = common::create_user_app().await;
     app.create_user(
         CreateUserCommand {
             username: "nick1".into(),

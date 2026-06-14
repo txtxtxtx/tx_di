@@ -55,7 +55,7 @@ impl FileService {
             .ok_or_else(|| NotFound)?;
 
         file.soft_delete(updater);
-        // Note: we would need update method in repository, using insert as workaround
+        self.file_repo.update(&file).await?;
         Ok(())
     }
 

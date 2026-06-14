@@ -11,7 +11,7 @@ use admin_app::log::dto::*;
 
 #[tokio::test]
 async fn create_operate_log() {
-    let (app, _, _) = common::create_operate_log_app();
+    let (app, _, _) = common::create_operate_log_app().await;
     let log = app.create_log(CreateOperateLogCommand {
         trace_id: "trace-001".into(), user_id: 1, user_type: 1,
         log_type: "操作日志".into(), sub_type: "用户管理".into(),
@@ -28,7 +28,7 @@ async fn create_operate_log() {
 
 #[tokio::test]
 async fn create_operate_log_failure() {
-    let (app, _, _) = common::create_operate_log_app();
+    let (app, _, _) = common::create_operate_log_app().await;
     let log = app.create_log(CreateOperateLogCommand {
         trace_id: "trace-002".into(), user_id: 2, user_type: 1,
         log_type: "操作日志".into(), sub_type: "角色管理".into(),
@@ -40,7 +40,7 @@ async fn create_operate_log_failure() {
 
 #[tokio::test]
 async fn paginate_operate_logs() {
-    let (app, _, _) = common::create_operate_log_app();
+    let (app, _, _) = common::create_operate_log_app().await;
     for i in 1..=5 {
         app.create_log(CreateOperateLogCommand {
             trace_id: format!("trace-{}", i), user_id: i as u64, user_type: 1,
@@ -58,7 +58,7 @@ async fn paginate_operate_logs() {
 
 #[tokio::test]
 async fn query_operate_logs_by_sub_type() {
-    let (app, _, _) = common::create_operate_log_app();
+    let (app, _, _) = common::create_operate_log_app().await;
     app.create_log(CreateOperateLogCommand {
         trace_id: "t1".into(), user_id: 1, user_type: 1,
         log_type: "操作".into(), sub_type: "用户管理".into(),
@@ -80,7 +80,7 @@ async fn query_operate_logs_by_sub_type() {
 
 #[tokio::test]
 async fn delete_operate_logs() {
-    let (app, _, _) = common::create_operate_log_app();
+    let (app, _, _) = common::create_operate_log_app().await;
     app.create_log(CreateOperateLogCommand {
         trace_id: "t".into(), user_id: 1, user_type: 1,
         log_type: "m".into(), sub_type: "m".into(),
@@ -91,7 +91,7 @@ async fn delete_operate_logs() {
 
 #[tokio::test]
 async fn clean_operate_logs() {
-    let (app, _, _) = common::create_operate_log_app();
+    let (app, _, _) = common::create_operate_log_app().await;
     for i in 1..=3 {
         app.create_log(CreateOperateLogCommand {
             trace_id: format!("t{}", i), user_id: i as u64, user_type: 1,
@@ -111,7 +111,7 @@ async fn clean_operate_logs() {
 
 #[tokio::test]
 async fn create_login_log_success() {
-    let (app, _, _) = common::create_login_log_app();
+    let (app, _, _) = common::create_login_log_app().await;
     let log = app.create_log(CreateLoginLogCommand {
         user_id: 1, user_type: 1, username: "admin".into(),
         login_ip: "10.0.0.1".into(), login_type: "password".into(), result: 1,
@@ -123,7 +123,7 @@ async fn create_login_log_success() {
 
 #[tokio::test]
 async fn create_login_log_failure() {
-    let (app, _, _) = common::create_login_log_app();
+    let (app, _, _) = common::create_login_log_app().await;
     let log = app.create_log(CreateLoginLogCommand {
         user_id: 0, user_type: 0, username: "hacker".into(),
         login_ip: "1.2.3.4".into(), login_type: "password".into(), result: 0,
@@ -134,7 +134,7 @@ async fn create_login_log_failure() {
 
 #[tokio::test]
 async fn paginate_login_logs() {
-    let (app, _, _) = common::create_login_log_app();
+    let (app, _, _) = common::create_login_log_app().await;
     for i in 1..=5 {
         app.create_log(CreateLoginLogCommand {
             user_id: i as u64, user_type: 1, username: format!("u{}", i),
@@ -151,7 +151,7 @@ async fn paginate_login_logs() {
 
 #[tokio::test]
 async fn query_login_logs_by_result() {
-    let (app, _, _) = common::create_login_log_app();
+    let (app, _, _) = common::create_login_log_app().await;
     app.create_log(CreateLoginLogCommand {
         user_id: 1, user_type: 1, username: "u1".into(),
         login_ip: "1.1.1.1".into(), login_type: "password".into(), result: 1,
@@ -171,7 +171,7 @@ async fn query_login_logs_by_result() {
 
 #[tokio::test]
 async fn delete_login_logs() {
-    let (app, _, _) = common::create_login_log_app();
+    let (app, _, _) = common::create_login_log_app().await;
     app.create_log(CreateLoginLogCommand {
         user_id: 1, user_type: 1, username: "u1".into(),
         login_ip: "127.0.0.1".into(), login_type: "password".into(), result: 1,
@@ -181,7 +181,7 @@ async fn delete_login_logs() {
 
 #[tokio::test]
 async fn clean_login_logs() {
-    let (app, _, _) = common::create_login_log_app();
+    let (app, _, _) = common::create_login_log_app().await;
     for i in 1..=3 {
         app.create_log(CreateLoginLogCommand {
             user_id: i as u64, user_type: 1, username: format!("u{}", i),

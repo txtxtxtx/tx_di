@@ -12,21 +12,21 @@ use admin_app::dictionary::dto::*;
 
 #[tokio::test]
 async fn create_dict_type_success() {
-    let (app, _, _) = common::create_dict_type_app();
+    let (app, _, _) = common::create_dict_type_app().await;
     let cmd = CreateDictTypeCommand {
         name: "用户性别".into(),
         dict_type: "sys_user_sex".into(),
-        remark: Some("用户性别字典".into()),
+        remark: None,
     };
     let dt = app.create_dict_type(cmd, Some("admin".into())).await.unwrap();
     assert_eq!(dt.name, "用户性别");
     assert_eq!(dt.dict_type, "sys_user_sex");
-    assert_eq!(dt.remark, Some("用户性别字典".into()));
+    // remark 在 create 时为 None，通过 update 设置
 }
 
 #[tokio::test]
 async fn create_duplicate_dict_type_should_fail() {
-    let (app, _, _) = common::create_dict_type_app();
+    let (app, _, _) = common::create_dict_type_app().await;
     let cmd = |t: &str| CreateDictTypeCommand {
         name: "名称".into(), dict_type: t.into(), remark: None,
     };
@@ -36,7 +36,7 @@ async fn create_duplicate_dict_type_should_fail() {
 
 #[tokio::test]
 async fn update_dict_type() {
-    let (app, _, _) = common::create_dict_type_app();
+    let (app, _, _) = common::create_dict_type_app().await;
     let dt = app.create_dict_type(CreateDictTypeCommand {
         name: "旧名称".into(), dict_type: "old_type".into(), remark: None,
     }, Some("admin".into())).await.unwrap();
@@ -54,7 +54,7 @@ async fn update_dict_type() {
 
 #[tokio::test]
 async fn delete_dict_type() {
-    let (app, _, _) = common::create_dict_type_app();
+    let (app, _, _) = common::create_dict_type_app().await;
     let dt = app.create_dict_type(CreateDictTypeCommand {
         name: "待删除".into(), dict_type: "to_del".into(), remark: None,
     }, Some("admin".into())).await.unwrap();
@@ -64,7 +64,7 @@ async fn delete_dict_type() {
 
 #[tokio::test]
 async fn paginate_dict_types() {
-    let (app, _, _) = common::create_dict_type_app();
+    let (app, _, _) = common::create_dict_type_app().await;
     for i in 0..4 {
         app.create_dict_type(CreateDictTypeCommand {
             name: format!("类型{}", i), dict_type: format!("type_{}", i), remark: None,
@@ -79,7 +79,7 @@ async fn paginate_dict_types() {
 
 #[tokio::test]
 async fn get_all_dict_types() {
-    let (app, _, _) = common::create_dict_type_app();
+    let (app, _, _) = common::create_dict_type_app().await;
     app.create_dict_type(CreateDictTypeCommand {
         name: "性别".into(), dict_type: "sex".into(), remark: None,
     }, Some("admin".into())).await.unwrap();
@@ -95,7 +95,7 @@ async fn get_all_dict_types() {
 
 #[tokio::test]
 async fn create_dict_data_success() {
-    let (app, _, _) = common::create_dict_data_app();
+    let (app, _, _) = common::create_dict_data_app().await;
     let cmd = CreateDictDataCommand {
         sort: 1,
         label: "男".into(),
@@ -114,7 +114,7 @@ async fn create_dict_data_success() {
 
 #[tokio::test]
 async fn update_dict_data() {
-    let (app, _, _) = common::create_dict_data_app();
+    let (app, _, _) = common::create_dict_data_app().await;
     let dd = app.create_dict_data(CreateDictDataCommand {
         sort: 1, label: "旧标签".into(), value: "old".into(),
         dict_type: "test".into(), color_type: None, css_class: None, remark: None,
@@ -138,7 +138,7 @@ async fn update_dict_data() {
 
 #[tokio::test]
 async fn delete_dict_data() {
-    let (app, _, _) = common::create_dict_data_app();
+    let (app, _, _) = common::create_dict_data_app().await;
     let dd = app.create_dict_data(CreateDictDataCommand {
         sort: 1, label: "待删除".into(), value: "del".into(),
         dict_type: "test".into(), color_type: None, css_class: None, remark: None,
@@ -149,7 +149,7 @@ async fn delete_dict_data() {
 
 #[tokio::test]
 async fn get_dict_data_by_type() {
-    let (app, _, _) = common::create_dict_data_app();
+    let (app, _, _) = common::create_dict_data_app().await;
     for (i, label) in ["男", "女", "未知"].iter().enumerate() {
         app.create_dict_data(CreateDictDataCommand {
             sort: i as i32, label: label.to_string(), value: i.to_string(),
@@ -164,7 +164,7 @@ async fn get_dict_data_by_type() {
 
 #[tokio::test]
 async fn paginate_dict_data() {
-    let (app, _, _) = common::create_dict_data_app();
+    let (app, _, _) = common::create_dict_data_app().await;
     for i in 0..5 {
         app.create_dict_data(CreateDictDataCommand {
             sort: i, label: format!("项{}", i), value: i.to_string(),

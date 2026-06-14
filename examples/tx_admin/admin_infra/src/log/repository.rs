@@ -21,6 +21,10 @@ pub struct ToastyOperateLogRepository {
 }
 
 impl ToastyOperateLogRepository {
+    pub fn new(plugin: Arc<ToastyPlugin>) -> Self {
+        Self { plugin }
+    }
+
     fn to_domain(l: &SysOperateLog) -> OperateLog {
         OperateLog::restore(
             l.id as u64,
@@ -104,6 +108,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
         let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysOperateLog::create()
+            .id(log.id as i64)
             .trace_id(log.trace_id.clone())
             .user_id(log.user_id as i64)
             .user_type(log.user_type)
@@ -164,6 +169,10 @@ pub struct ToastyLoginLogRepository {
 }
 
 impl ToastyLoginLogRepository {
+    pub fn new(plugin: Arc<ToastyPlugin>) -> Self {
+        Self { plugin }
+    }
+
     fn to_domain(l: &SysLoginLog) -> LoginLog {
         LoginLog::restore(
             l.id as u64,
@@ -248,6 +257,7 @@ impl LoginLogRepository for ToastyLoginLogRepository {
         let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysLoginLog::create()
+            .id(log.id as i64)
             .user_id(log.user_id as i64)
             .user_type(log.user_type)
             .username(log.username.clone())

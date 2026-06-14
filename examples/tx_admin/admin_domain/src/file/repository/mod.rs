@@ -15,6 +15,7 @@ pub trait FileRepository: Any + Send + Sync {
         page: Page<File>,
     ) -> AppResult<Page<File>>;
     async fn insert(&self, file: &File) -> AppResult<()>;
+    async fn update(&self, file: &File) -> AppResult<()>;
     async fn soft_delete(&self, id: u64) -> AppResult<()>;
     async fn find_file_path(&self, id: u64) -> AppResult<String>;
 }

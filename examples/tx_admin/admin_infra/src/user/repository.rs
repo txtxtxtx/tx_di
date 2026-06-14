@@ -21,6 +21,10 @@ pub struct ToastyUserRepository {
 }
 
 impl ToastyUserRepository {
+    pub fn new(plugin: Arc<ToastyPlugin>) -> Self {
+        Self { plugin }
+    }
+
     /// 将 toasty SysUser 转换为 domain User
     fn to_domain(u: &SysUser, role_ids: Vec<u64>, dept_ids: Vec<u64>) -> User {
         User::restore(
@@ -170,6 +174,7 @@ impl UserRepository for ToastyUserRepository {
         let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         let model = SysUser::create()
+            .id(user.id as i64)
             .username(user.username.clone())
             .password_hash(user.password.clone())
             .nickname(user.nickname.clone())

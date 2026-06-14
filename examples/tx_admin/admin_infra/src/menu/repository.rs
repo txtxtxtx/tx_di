@@ -20,6 +20,10 @@ pub struct ToastyMenuRepository {
 }
 
 impl ToastyMenuRepository {
+    pub fn new(plugin: Arc<ToastyPlugin>) -> Self {
+        Self { plugin }
+    }
+
     fn to_domain(m: &SysMenu) -> Menu {
         Menu::restore(
             m.id as u64,
@@ -115,6 +119,7 @@ impl MenuRepository for ToastyMenuRepository {
         let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysMenu::create()
+            .id(menu.id as i64)
             .name(menu.name.clone())
             .permission(menu.permission.clone())
             .types(menu.types)

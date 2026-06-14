@@ -11,7 +11,7 @@ use admin_app::file::dto::*;
 
 #[tokio::test]
 async fn upload_file_success() {
-    let (app, _, _) = common::create_file_app();
+    let (app, _, _) = common::create_file_app().await;
     let cmd = UploadFileCommand {
         name: "report.pdf".into(),
         path: "/uploads/2024/report.pdf".into(),
@@ -29,7 +29,7 @@ async fn upload_file_success() {
 
 #[tokio::test]
 async fn upload_file_minimal() {
-    let (app, _, _) = common::create_file_app();
+    let (app, _, _) = common::create_file_app().await;
     let file = app.upload_file(UploadFileCommand {
         name: "photo.jpg".into(),
         path: "/uploads/photos/1.jpg".into(),
@@ -45,7 +45,7 @@ async fn upload_file_minimal() {
 
 #[tokio::test]
 async fn paginate_files() {
-    let (app, _, _) = common::create_file_app();
+    let (app, _, _) = common::create_file_app().await;
     for i in 0..5 {
         app.upload_file(UploadFileCommand {
             name: format!("file{}.txt", i),
@@ -65,7 +65,7 @@ async fn paginate_files() {
 
 #[tokio::test]
 async fn get_file_detail() {
-    let (app, _, _) = common::create_file_app();
+    let (app, _, _) = common::create_file_app().await;
     let f = app.upload_file(UploadFileCommand {
         name: "detail.txt".into(),
         path: "/uploads/detail.txt".into(),
@@ -83,7 +83,7 @@ async fn get_file_detail() {
 
 #[tokio::test]
 async fn query_files_by_type() {
-    let (app, _, _) = common::create_file_app();
+    let (app, _, _) = common::create_file_app().await;
     app.upload_file(UploadFileCommand {
         name: "doc.pdf".into(), path: "/p/doc.pdf".into(), url: "/p/doc.pdf".into(),
         file_type: Some("application/pdf".into()), size: 1000, config_id: None,
@@ -105,7 +105,7 @@ async fn query_files_by_type() {
 
 #[tokio::test]
 async fn delete_file() {
-    let (app, _, _) = common::create_file_app();
+    let (app, _, _) = common::create_file_app().await;
     let f = app.upload_file(UploadFileCommand {
         name: "todelete.txt".into(),
         path: "/uploads/todel.txt".into(),
