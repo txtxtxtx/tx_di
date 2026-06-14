@@ -6,6 +6,7 @@ use admin_proto::admin::role::role_service_server::RoleService;
 use admin_proto::admin::role::{
     CreateRoleRequest, RoleResponse, UpdateRoleRequest, DeleteRoleRequest,
     GetRoleRequest, ListRolesRequest, ListRolesResponse, AssignMenusRequest,
+    GetRoleUsersRequest, GetRoleUsersResponse, AddUsersToRoleRequest, RemoveUsersFromRoleRequest,
 };
 use admin_proto::Empty;
 use admin_proto::admin::common::PageResponse;
@@ -79,6 +80,27 @@ impl RoleService for RoleGrpcService {
         let req = request.into_inner();
         let cmd = admin_app::role::dto::AssignMenusCommand { role_id: req.role_id, menu_ids: req.menu_ids };
         services::get().role.assign_menus(cmd).await
+            .map(|_| Response::new(Empty {}))
+            .map_err(|e| Status::internal(e.to_string()))
+    }
+
+    async fn get_role_users(&self, request: Request<GetRoleUsersRequest>) -> Result<Response<GetRoleUsersResponse>, Status> {
+        let req = request.into_inner();
+        services::get().role.get_role_users(req.role_id).await
+            .map(|users| Response::new(GetRoleUsersResponse { users }))
+            .map_err(|e| Status::internal(e.to_string()))
+    }
+
+    async fn add_users_to_role(&self, request: Request<AddUsersToRoleRequest>) -> Result<Response<Empty>, Status> {
+        let req = request.into_inner();
+        services::get().role.add_users_to_role(req.role_id, req.user_ids).await
+            .map(|_| Response::new(Empty {}))
+            .map_err(|e| Status::internal(e.to_string()))
+    }
+
+    async fn remove_users_from_role(&self, request: Request<RemoveUsersFromRoleRequest>) -> Result<Response<Empty>, Status> {
+        let req = request.into_inner();
+        services::get().role.remove_users_from_role(req.role_id, req.user_ids).await
             .map(|_| Response::new(Empty {}))
             .map_err(|e| Status::internal(e.to_string()))
     }

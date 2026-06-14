@@ -102,3 +102,9 @@ message ListLoginLogsResponse {
   repeated LoginLogResponse items = 1;
   admin.common.PageResponse page_info = 2;
 }
+
+// ---- 通用删除请求 ----
+
+message DeleteLogsRequest {
+  repeated uint64 ids = 1;
+}

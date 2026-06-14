@@ -22,6 +22,9 @@ service DictService {
   rpc DeleteDictData(DeleteDictDataRequest) returns (admin.common.Empty);
   rpc GetDictData(GetDictDataRequest) returns (DictDataResponse);
   rpc ListDictData(ListDictDataRequest) returns (ListDictDataResponse);
+
+  // 批量查询
+  rpc GetByDictTypes(GetByDictTypesRequest) returns (GetByDictTypesResponse);
 }
 
 // ---- 字典类型 ----
@@ -122,4 +125,12 @@ message DictDataResponse {
 message ListDictDataResponse {
   repeated DictDataResponse items = 1;
   admin.common.PageResponse page_info = 2;
+}
+
+message GetByDictTypesRequest {
+  repeated string dict_types = 1;
+}
+
+message GetByDictTypesResponse {
+  map<string, ListDictDataResponse> dict_data = 1;
 }

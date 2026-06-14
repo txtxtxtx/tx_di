@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use crate::file::model::aggregate::File;
-use crate::file::model::value_object::{FileQuery, FileUploadCommand};
+use crate::file::model::value_object::{FileDownloadInfo, FileQuery, FileUploadCommand};
 use crate::file::repository::{FileConfigRepository, FileRepository};
+use crate::shared::repository::RepositoryError;
 use crate::shared::repository::RepositoryError::NotFound;
 use tx_common::page::Page;
 use tx_di_core::tx_comp;
@@ -71,5 +72,37 @@ impl FileService {
             .find_by_id(file_id)
             .await?
             .ok_or_else(|| NotFound)?)
+    }
+
+    pub async fn download_file(&self, file_id: u64) -> AppResult<FileDownloadInfo> {
+        let file = self.file_repo
+            .find_by_id(file_id)
+            .await?
+            .ok_or_else(|| NotFound)?;
+
+        // Determine MIME type from file extension
+        let content_type = match file.name.rsplit('.').next() {
+            Some("pdf") => "application/pdf",
+            Some("jpg" | "jpeg") => "image/jpeg",
+            Some("png") => "image/png",
+            Some("gif") => "image/gif",
+            Some("txt") => "text/plain",
+            Some("html" | "htm") => "text/html",
+            Some("css") => "text/css",
+            Some("js") => "application/javascript",
+            Some("json") => "application/json",
+            Some("xml") => "application/xml",
+            Some("zip") => "application/zip",
+            Some("doc" | "docx") => "application/msword",
+            Some("xls" | "xlsx") => "application/vnd.ms-excel",
+            _ => "application/octet-stream",
+        };
+
+        Ok(FileDownloadInfo {
+            url: file.url,
+            filename: file.name,
+            size: file.size,
+            content_type: content_type.to_string(),
+        })
     }
 }

@@ -127,4 +127,14 @@ impl ConfigRepository for MockConfigRepository {
             .values()
             .any(|c| c.config_key == key && c.audit.deleted == DeletedStatus::Normal))
     }
+
+    async fn find_by_keys(&self, keys: &[String]) -> AppResult<Vec<Config>> {
+        let configs = self.configs.read().unwrap();
+        Ok(configs
+            .values()
+            .filter(|c| c.audit.deleted == DeletedStatus::Normal)
+            .filter(|c| keys.contains(&c.config_key))
+            .cloned()
+            .collect())
+    }
 }

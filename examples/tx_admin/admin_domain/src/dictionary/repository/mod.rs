@@ -26,6 +26,7 @@ pub trait DictTypeRepository: Any + Send + Sync {
 pub trait DictDataRepository: Any + Send + Sync {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<DictData>>;
     async fn find_by_type(&self, dict_type: &str) -> AppResult<Vec<DictData>>;
+    async fn find_by_types(&self, dict_types: &[String]) -> AppResult<Vec<DictData>>;
     async fn find_page(
         &self,
         query: &DictDataQuery,

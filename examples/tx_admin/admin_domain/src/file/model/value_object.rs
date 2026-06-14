@@ -16,3 +16,12 @@ pub struct FileUploadCommand {
     pub size: i32,
     pub config_id: Option<i32>,
 }
+
+/// 文件下载信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileDownloadInfo {
+    pub url: String,
+    pub filename: String,
+    pub size: i32,
+    pub content_type: String,
+}

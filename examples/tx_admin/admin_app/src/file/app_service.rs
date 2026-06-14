@@ -62,4 +62,9 @@ impl FileAppService {
         let file = self.file_service.get_file(file_id).await?;
         Ok(FileResponse::from(file))
     }
+
+    pub async fn download_file(&self, file_id: u64) -> AppResult<FileDownloadResponse> {
+        let info = self.file_service.download_file(file_id).await?;
+        Ok(FileDownloadResponse::from(info))
+    }
 }

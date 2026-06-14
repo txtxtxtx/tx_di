@@ -43,3 +43,23 @@ impl From<admin_domain::file::model::aggregate::File> for FileResponse {
         }
     }
 }
+
+/// 文件下载响应
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct FileDownloadResponse {
+    pub url: String,
+    pub filename: String,
+    pub size: i32,
+    pub content_type: String,
+}
+
+impl From<admin_domain::file::model::value_object::FileDownloadInfo> for FileDownloadResponse {
+    fn from(info: admin_domain::file::model::value_object::FileDownloadInfo) -> Self {
+        Self {
+            url: info.url,
+            filename: info.filename,
+            size: info.size,
+            content_type: info.content_type,
+        }
+    }
+}

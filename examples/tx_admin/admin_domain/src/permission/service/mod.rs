@@ -1,44 +1,33 @@
 use std::collections::HashSet;
 use std::sync::Arc;
+use tx_common::id;
 use tx_di_core::tx_comp;
 use tx_error::AppResult;
-use crate::permission::model::value_object::PermissionCheck;
+use crate::permission::model::aggregate::Permission;
+use crate::permission::model::value_object::{PermissionCheck, PermissionType};
 use crate::permission::repository::PermissionRepository;
+use crate::shared::repository::RepositoryError;
+use crate::shared::repository::RepositoryError::NotFound;
 
 /// Permission domain service
 #[tx_comp]
 pub struct PermissionService {
-    permission_repo: Arc<dyn PermissionRepository>,  // 权限仓库的Arc包装，支持多线程共享
+    permission_repo: Arc<dyn PermissionRepository>,
 }
 
 impl PermissionService {
-    /// 创建新的PermissionService实例
-    /// # 参数
-    /// * `permission_repo` - 权限仓库的Arc包装
-    /// # 返回值
-    /// 返回一个新的PermissionService实例
     pub fn new(permission_repo: Arc<dyn PermissionRepository>) -> Self {
         Self { permission_repo }
     }
 
+    // === 原有查询方法 ===
+
     /// 获取指定用户的所有权限
-    ///
-    /// 这是一个异步方法，用于从权限存储库中检索特定用户的所有权限。
-    ///
-    /// # 参数
-    /// * `user_id` - 用户ID，类型为u64，用于标识要查询的用户
-    ///
-    /// # 返回值
-    /// * `AppResult<Vec<String>>` - 返回一个AppResult，其中包含权限字符串的向量(Vec)，
-    ///   表示用户拥有的所有权限。如果发生错误，则返回错误信息。
-    ///
-    /// # 异常
-    /// * 如果在查询过程中发生错误，可能会返回AppResult的错误变体
     pub async fn get_user_permissions(
-        &self,  // 引用self，表示这是对结构体实例的方法
-        user_id: u64,  // 用户ID参数，类型为u64
-    ) -> AppResult<HashSet<String>> {  // 返回类型为AppResult，其中包含字符串向量
-        self.permission_repo.find_by_user_id(user_id).await  // 调用权限存储库的异步方法，根据用户ID查找权限
+        &self,
+        user_id: u64,
+    ) -> AppResult<HashSet<String>> {
+        self.permission_repo.find_by_user_id(user_id).await
     }
 
     /// Check if user has specific permission
@@ -59,10 +48,110 @@ impl PermissionService {
         self.permission_repo.find_by_role_ids(role_ids).await
     }
 
-    /// Get all available permissions
+    /// Get all available permissions (lightweight)
     pub async fn get_all_permissions(
         &self,
     ) -> AppResult<HashSet<PermissionCheck>> {
         self.permission_repo.find_all().await
+    }
+
+    // === 新增 CRUD 方法 ===
+
+    /// Create a new permission
+    pub async fn create_permission(
+        &self,
+        name: String,
+        permission_code: String,
+        permission_type: PermissionType,
+        parent_id: u64,
+        sort: i32,
+        description: Option<String>,
+        creator: Option<String>,
+    ) -> AppResult<Permission> {
+        if self.permission_repo.exists_by_code(&permission_code).await? {
+            return Err(RepositoryError::Duplicate)?;
+        }
+
+        let id = id::next_id();
+        let permission = Permission::create(
+            id,
+            name,
+            permission_code,
+            permission_type,
+            parent_id,
+            sort,
+            description,
+            creator,
+        );
+        self.permission_repo.insert(&permission).await?;
+        Ok(permission)
+    }
+
+    /// Update permission
+    pub async fn update_permission(
+        &self,
+        permission_id: u64,
+        name: String,
+        permission_code: String,
+        permission_type: PermissionType,
+        parent_id: u64,
+        sort: i32,
+        description: Option<String>,
+        updater: Option<String>,
+    ) -> AppResult<Permission> {
+        let mut permission = self
+            .permission_repo
+            .find_by_id(permission_id)
+            .await?
+            .ok_or_else(|| NotFound)?;
+
+        // Check if code is taken by another permission
+        if let Some(existing) = self.permission_repo.find_by_code(&permission_code).await? {
+            if existing.id != permission_id {
+                return Err(RepositoryError::Duplicate)?;
+            }
+        }
+
+        permission.update_info(
+            name,
+            permission_code,
+            permission_type,
+            parent_id,
+            sort,
+            description,
+            updater,
+        );
+        self.permission_repo.update(&permission).await?;
+        Ok(permission)
+    }
+
+    /// Delete permission (soft delete)
+    pub async fn delete_permission(
+        &self,
+        permission_id: u64,
+        updater: Option<String>,
+    ) -> AppResult<()> {
+        let mut permission = self
+            .permission_repo
+            .find_by_id(permission_id)
+            .await?
+            .ok_or_else(|| NotFound)?;
+
+        permission.soft_delete(updater);
+        self.permission_repo.update(&permission).await?;
+        Ok(())
+    }
+
+    /// Get permission by ID
+    pub async fn get_permission(&self, permission_id: u64) -> AppResult<Permission> {
+        Ok(self.permission_repo
+            .find_by_id(permission_id)
+            .await?
+            .ok_or_else(|| NotFound)?)
+    }
+
+    /// Get all permissions (full entities)
+    pub async fn get_all_permission_details(&self) -> AppResult<Vec<Permission>> {
+        self.permission_repo.find_all_permissions().await
     }
 }

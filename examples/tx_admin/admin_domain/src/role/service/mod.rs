@@ -146,4 +146,25 @@ impl RoleService {
     pub async fn get_all_roles(&self, query: &RoleQuery) -> AppResult<Vec<Role>> {
         self.role_repo.find_all(query).await
     }
+
+    /// Get users associated with a role
+    pub async fn get_role_users(&self, role_id: u64) -> AppResult<Vec<crate::user::model::aggregate::User>> {
+        // Verify role exists
+        let _role = self.role_repo.find_by_id(role_id).await?.ok_or_else(|| NotFound)?;
+        self.role_repo.find_users_by_role_id(role_id).await
+    }
+
+    /// Add users to a role
+    pub async fn add_users_to_role(&self, role_id: u64, user_ids: Vec<u64>) -> AppResult<()> {
+        // Verify role exists
+        let _role = self.role_repo.find_by_id(role_id).await?.ok_or_else(|| NotFound)?;
+        self.role_repo.bind_users(role_id, &user_ids).await
+    }
+
+    /// Remove users from a role
+    pub async fn remove_users_from_role(&self, role_id: u64, user_ids: Vec<u64>) -> AppResult<()> {
+        // Verify role exists
+        let _role = self.role_repo.find_by_id(role_id).await?.ok_or_else(|| NotFound)?;
+        self.role_repo.unbind_users(role_id, &user_ids).await
+    }
 }

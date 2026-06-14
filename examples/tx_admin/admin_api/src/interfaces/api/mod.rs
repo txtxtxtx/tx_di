@@ -12,6 +12,8 @@ mod config_api;
 mod dict_api;
 mod log_api;
 mod file_api;
+mod monitor_api;
+mod tool_api;
 
 use tx_di_axum::Router;
 
@@ -28,4 +30,6 @@ pub fn router() -> Router {
         .nest("/api/dict", dict_api::router())
         .nest("/api/log", log_api::router())
         .nest("/api/file", file_api::router())
+        .nest("/api/monitor", monitor_api::router())
+        .nest("/api/tool", tool_api::router())
 }

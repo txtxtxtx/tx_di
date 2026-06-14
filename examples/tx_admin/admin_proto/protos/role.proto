@@ -3,6 +3,7 @@ syntax = "proto3";
 package admin.role;
 
 import "common.proto";
+import "user.proto";
 
 // ============================================================
 // 角色服务
@@ -15,6 +16,9 @@ service RoleService {
   rpc GetRole(GetRoleRequest) returns (RoleResponse);
   rpc ListRoles(ListRolesRequest) returns (ListRolesResponse);
   rpc AssignMenus(AssignMenusRequest) returns (admin.common.Empty);
+  rpc GetRoleUsers(GetRoleUsersRequest) returns (GetRoleUsersResponse);
+  rpc AddUsersToRole(AddUsersToRoleRequest) returns (admin.common.Empty);
+  rpc RemoveUsersFromRole(RemoveUsersFromRoleRequest) returns (admin.common.Empty);
 }
 
 message CreateRoleRequest {
@@ -69,4 +73,22 @@ message RoleResponse {
 message ListRolesResponse {
   repeated RoleResponse items = 1;
   admin.common.PageResponse page_info = 2;
+}
+
+message GetRoleUsersRequest {
+  uint64 role_id = 1;
+}
+
+message GetRoleUsersResponse {
+  repeated admin.user.UserResponse users = 1;
+}
+
+message AddUsersToRoleRequest {
+  uint64 role_id = 1;
+  repeated uint64 user_ids = 2;
+}
+
+message RemoveUsersFromRoleRequest {
+  uint64 role_id = 1;
+  repeated uint64 user_ids = 2;
 }

@@ -10,6 +10,7 @@ use tx_error::AppResult;
 pub trait ConfigRepository: Any + Send + Sync {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Config>>;
     async fn find_by_key(&self, key: &str) -> AppResult<Option<Config>>;
+    async fn find_by_keys(&self, keys: &[String]) -> AppResult<Vec<Config>>;
     async fn find_page(
         &self,
         query: &ConfigQuery,

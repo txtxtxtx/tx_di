@@ -7,7 +7,8 @@
       "Read(//c/Users/tx_home/.cargo/registry/src/rsproxy.cn-e3de039b2554c837/aide-0.14.2/src/redoc/**)",
       "Bash(grep -n \"with_state\\\\|fn route\\\\|fn nest\\\\|fn merge\" ~/.cargo/registry/src/*/aide-0.14.2/src/axum/mod.rs 2>/dev/null | head -20)",
       "Read(//c/Users/tx_home/.cargo/registry/src/**)",
-      "Bash(cargo tree *)"
+      "Bash(cargo tree *)",
+      "Bash(cargo build *)"
     ]
   }
 }

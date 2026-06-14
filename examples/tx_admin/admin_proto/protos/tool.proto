@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package admin.tool;
+
+import "google/protobuf/empty.proto";
+
+message CacheInfo {
+  string key = 1;
+  string value = 2;
+  uint64 ttl = 3;  // 剩余过期时间（秒）
+}
+
+message CacheStatsResponse {
+  uint64 total_keys = 1;
+  uint64 used_memory = 2;  // 字节
+  uint64 hit_count = 3;
+  uint64 miss_count = 4;
+  double hit_rate = 5;     // 百分比
+}
+
+service ToolService {
+  rpc GetCacheStats(google.protobuf.Empty) returns (CacheStatsResponse);
+}

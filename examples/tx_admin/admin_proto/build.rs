@@ -23,6 +23,8 @@ fn main() -> Result<()> {
         "dictionary",
         "log",
         "file",
+        "monitor",
+        "tool",
     ];
 
     let proto_paths: Vec<String> = proto_files

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::config::model::aggregate::Config;
@@ -94,5 +95,13 @@ impl ConfigService {
             .find_by_key(key)
             .await?
             .ok_or_else(|| NotFound)?)
+    }
+
+    pub async fn get_by_keys(&self, keys: &[String]) -> AppResult<HashMap<String, String>> {
+        let configs = self.config_repo.find_by_keys(keys).await?;
+        let map = configs.into_iter()
+            .map(|c| (c.config_key, c.value))
+            .collect();
+        Ok(map)
     }
 }

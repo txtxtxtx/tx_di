@@ -7,7 +7,7 @@ use admin_proto::admin::user::{
     CreateUserRequest, UserResponse, UpdateUserRequest, DeleteUserRequest,
     GetUserRequest, ListUsersRequest, ListUsersResponse,
     ChangePasswordRequest, AssignRolesRequest, AssignDeptsRequest,
-    ChangeUserStatusRequest,
+    ChangeUserStatusRequest, UserIdRequest,
 };
 use admin_proto::Empty;
 use admin_proto::admin::common::PageResponse;
@@ -104,6 +104,34 @@ impl UserService for UserGrpcService {
         let req = request.into_inner();
         let cmd = admin_app::user::dto::AssignDeptsCommand { user_id: req.user_id, dept_ids: req.dept_ids };
         services::get().user.assign_departments(cmd).await
+            .map(|_| Response::new(Empty {}))
+            .map_err(|e| Status::internal(e.to_string()))
+    }
+
+    async fn enable_user(&self, request: Request<UserIdRequest>) -> Result<Response<Empty>, Status> {
+        let req = request.into_inner();
+        services::get().user.change_status(req.user_id, UserStatus::Active, None).await
+            .map(|_| Response::new(Empty {}))
+            .map_err(|e| Status::internal(e.to_string()))
+    }
+
+    async fn disable_user(&self, request: Request<UserIdRequest>) -> Result<Response<Empty>, Status> {
+        let req = request.into_inner();
+        services::get().user.change_status(req.user_id, UserStatus::Disabled, None).await
+            .map(|_| Response::new(Empty {}))
+            .map_err(|e| Status::internal(e.to_string()))
+    }
+
+    async fn lock_user(&self, request: Request<UserIdRequest>) -> Result<Response<Empty>, Status> {
+        let req = request.into_inner();
+        services::get().user.change_status(req.user_id, UserStatus::Locked, None).await
+            .map(|_| Response::new(Empty {}))
+            .map_err(|e| Status::internal(e.to_string()))
+    }
+
+    async fn unlock_user(&self, request: Request<UserIdRequest>) -> Result<Response<Empty>, Status> {
+        let req = request.into_inner();
+        services::get().user.change_status(req.user_id, UserStatus::Active, None).await
             .map(|_| Response::new(Empty {}))
             .map_err(|e| Status::internal(e.to_string()))
     }

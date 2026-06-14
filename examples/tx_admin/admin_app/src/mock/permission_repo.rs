@@ -2,8 +2,11 @@ use std::collections::{HashMap, HashSet};
 use std::sync::RwLock;
 use async_trait::async_trait;
 
+use admin_domain::permission::model::aggregate::Permission;
 use admin_domain::permission::model::value_object::{PermissionCheck, PermissionType};
 use admin_domain::permission::repository::PermissionRepository;
+use admin_domain::shared::model::value_object::DeletedStatus;
+use admin_domain::shared::repository::RepositoryError;
 use tx_di_core::{tx_comp, tx_cst};
 use tx_error::AppResult;
 
@@ -16,9 +19,12 @@ pub struct MockPermissionRepository {
     /// user_id -> role_ids
     #[tx_cst(RwLock::new(HashMap::new()))]
     user_roles: RwLock<HashMap<u64, Vec<u64>>>,
-    /// all available permissions
+    /// all available permissions (lightweight check items)
     #[tx_cst(Self::default_permissions())]
     all_permissions: HashSet<PermissionCheck>,
+    /// Permission CRUD storage: id -> Permission
+    #[tx_cst(RwLock::new(HashMap::new()))]
+    permissions: RwLock<HashMap<u64, Permission>>,
 }
 
 impl MockPermissionRepository {
@@ -27,6 +33,7 @@ impl MockPermissionRepository {
             role_permissions: RwLock::new(HashMap::new()),
             user_roles: RwLock::new(HashMap::new()),
             all_permissions: Self::default_permissions(),
+            permissions: RwLock::new(HashMap::new()),
         }
     }
 
@@ -42,6 +49,14 @@ impl MockPermissionRepository {
         {
             let mut role_permissions = self.role_permissions.write().unwrap();
             role_permissions.insert(role_id, permissions);
+        }
+        self
+    }
+
+    pub fn with_permission(self, permission: Permission) -> Self {
+        {
+            let mut permissions = self.permissions.write().unwrap();
+            permissions.insert(permission.id, permission);
         }
         self
     }
@@ -85,6 +100,8 @@ impl Default for MockPermissionRepository {
 
 #[async_trait]
 impl PermissionRepository for MockPermissionRepository {
+    // === 原有查询方法 ===
+
     async fn find_by_role_ids(&self, role_ids: &[u64]) -> AppResult<HashSet<String>> {
         let role_permissions = self.role_permissions.read().unwrap();
         let mut permissions = HashSet::new();
@@ -106,5 +123,61 @@ impl PermissionRepository for MockPermissionRepository {
 
     async fn find_all(&self) -> AppResult<HashSet<PermissionCheck>> {
         Ok(self.all_permissions.clone())
+    }
+
+    // === 新增 CRUD 方法 ===
+
+    async fn find_by_id(&self, id: u64) -> AppResult<Option<Permission>> {
+        let permissions = self.permissions.read().unwrap();
+        Ok(permissions
+            .get(&id)
+            .filter(|p| p.audit.deleted == DeletedStatus::Normal)
+            .cloned())
+    }
+
+    async fn find_by_code(&self, code: &str) -> AppResult<Option<Permission>> {
+        let permissions = self.permissions.read().unwrap();
+        Ok(permissions
+            .values()
+            .find(|p| p.permission_code == code && p.audit.deleted == DeletedStatus::Normal)
+            .cloned())
+    }
+
+    async fn find_all_permissions(&self) -> AppResult<Vec<Permission>> {
+        let permissions = self.permissions.read().unwrap();
+        Ok(permissions
+            .values()
+            .filter(|p| p.audit.deleted == DeletedStatus::Normal)
+            .cloned()
+            .collect())
+    }
+
+    async fn insert(&self, permission: &Permission) -> AppResult<()> {
+        let mut permissions = self.permissions.write().unwrap();
+        permissions.insert(permission.id, permission.clone());
+        Ok(())
+    }
+
+    async fn update(&self, permission: &Permission) -> AppResult<()> {
+        let mut permissions = self.permissions.write().unwrap();
+        permissions.insert(permission.id, permission.clone());
+        Ok(())
+    }
+
+    async fn soft_delete(&self, id: u64) -> AppResult<()> {
+        let mut permissions = self.permissions.write().unwrap();
+        if let Some(perm) = permissions.get_mut(&id) {
+            perm.audit.deleted = DeletedStatus::Deleted;
+            Ok(())
+        } else {
+            Err(RepositoryError::NotFound)?
+        }
+    }
+
+    async fn exists_by_code(&self, code: &str) -> AppResult<bool> {
+        let permissions = self.permissions.read().unwrap();
+        Ok(permissions
+            .values()
+            .any(|p| p.permission_code == code && p.audit.deleted == DeletedStatus::Normal))
     }
 }

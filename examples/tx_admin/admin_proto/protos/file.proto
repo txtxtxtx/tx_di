@@ -13,6 +13,7 @@ service FileService {
   rpc DeleteFile(DeleteFileRequest) returns (admin.common.Empty);
   rpc GetFile(GetFileRequest) returns (FileResponse);
   rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
+  rpc DownloadFile(DownloadFileRequest) returns (DownloadFileResponse);
 }
 
 message UploadFileRequest {
@@ -53,4 +54,15 @@ message FileResponse {
 message ListFilesResponse {
   repeated FileResponse items = 1;
   admin.common.PageResponse page_info = 2;
+}
+
+message DownloadFileRequest {
+  uint64 file_id = 1;
+}
+
+message DownloadFileResponse {
+  string url = 1;          // 下载链接
+  string filename = 2;     // 文件名
+  uint64 size = 3;         // 文件大小
+  string content_type = 4; // MIME 类型
 }

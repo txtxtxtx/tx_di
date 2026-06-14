@@ -9,7 +9,7 @@ use admin_app::user::app_service::UserAppService;
 use admin_proto::{
     CreateUserRequest, UpdateUserRequest, ChangePasswordRequest,
     AssignRolesRequest, AssignDeptsRequest, ListUsersRequest,
-    UserResponse, Empty,
+    ChangeUserStatusRequest, UserResponse, Empty, UserIdRequest,
 };
 use admin_domain::user::model::value_object::{Sex, UserStatus};
 use tx_common::{ApiR, ApiRes, Page};
@@ -24,6 +24,11 @@ pub fn router() -> Router {
         .api_route("/change_password", post(change_password))
         .api_route("/assign_roles", post(assign_roles))
         .api_route("/assign_depts", post(assign_depts))
+        .api_route("/change-status", post(change_user_status))
+        .api_route("/enable", post(enable_user))
+        .api_route("/disable", post(disable_user))
+        .api_route("/lock", post(lock_user))
+        .api_route("/unlock", post(unlock_user))
 }
 
 /// POST /api/user/
@@ -157,6 +162,65 @@ async fn assign_depts(
     };
     match user_svc.assign_departments(cmd).await {
         Ok(()) => R(ApiRes::ok().into_typed()),
+        Err(e) => R(ApiRes::from(e).into_typed()),
+    }
+}
+
+/// POST /api/user/change-status
+async fn change_user_status(
+    DiComp(user_svc): DiComp<UserAppService>,
+    Json(req): Json<ChangeUserStatusRequest>,
+) -> R<UserResponse> {
+    let status = match UserStatus::try_from_i32(req.status) {
+        Ok(s) => s,
+        Err(_) => return R(ApiRes::fail("invalid status".into()).into_typed()),
+    };
+    match user_svc.change_status(req.user_id, status, None).await {
+        Ok(r) => R(ApiR::success(r)),
+        Err(e) => R(ApiRes::from(e).into_typed()),
+    }
+}
+
+/// POST /api/user/enable
+async fn enable_user(
+    DiComp(user_svc): DiComp<UserAppService>,
+    Json(req): Json<UserIdRequest>,
+) -> R<Empty> {
+    match user_svc.change_status(req.user_id, UserStatus::Active, None).await {
+        Ok(_) => R(ApiRes::ok().into_typed()),
+        Err(e) => R(ApiRes::from(e).into_typed()),
+    }
+}
+
+/// POST /api/user/disable
+async fn disable_user(
+    DiComp(user_svc): DiComp<UserAppService>,
+    Json(req): Json<UserIdRequest>,
+) -> R<Empty> {
+    match user_svc.change_status(req.user_id, UserStatus::Disabled, None).await {
+        Ok(_) => R(ApiRes::ok().into_typed()),
+        Err(e) => R(ApiRes::from(e).into_typed()),
+    }
+}
+
+/// POST /api/user/lock
+async fn lock_user(
+    DiComp(user_svc): DiComp<UserAppService>,
+    Json(req): Json<UserIdRequest>,
+) -> R<Empty> {
+    match user_svc.change_status(req.user_id, UserStatus::Locked, None).await {
+        Ok(_) => R(ApiRes::ok().into_typed()),
+        Err(e) => R(ApiRes::from(e).into_typed()),
+    }
+}
+
+/// POST /api/user/unlock
+async fn unlock_user(
+    DiComp(user_svc): DiComp<UserAppService>,
+    Json(req): Json<UserIdRequest>,
+) -> R<Empty> {
+    match user_svc.change_status(req.user_id, UserStatus::Active, None).await {
+        Ok(_) => R(ApiRes::ok().into_typed()),
         Err(e) => R(ApiRes::from(e).into_typed()),
     }
 }

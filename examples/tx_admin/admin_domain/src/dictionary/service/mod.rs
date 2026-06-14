@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::dictionary::model::aggregate::{DictData, DictType};
@@ -147,5 +148,14 @@ impl DictDataService {
 
     pub async fn get_by_dict_type(&self, dict_type: &str) -> AppResult<Vec<DictData>> {
         self.dict_data_repo.find_by_type(dict_type).await
+    }
+
+    pub async fn get_by_dict_types(&self, dict_types: &[String]) -> AppResult<HashMap<String, Vec<DictData>>> {
+        let all_data = self.dict_data_repo.find_by_types(dict_types).await?;
+        let mut map: HashMap<String, Vec<DictData>> = HashMap::new();
+        for data in all_data {
+            map.entry(data.dict_type.clone()).or_default().push(data);
+        }
+        Ok(map)
     }
 }

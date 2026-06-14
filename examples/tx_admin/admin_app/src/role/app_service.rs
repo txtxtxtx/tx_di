@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::role::dto::*;
+use crate::user::dto::user_to_response;
 use admin_domain::role::model::value_object::RoleQuery;
 use admin_domain::role::service::RoleService;
 use tx_di_core::tx_comp;
@@ -93,5 +94,21 @@ impl RoleAppService {
     pub async fn get_all_roles(&self) -> AppResult<Vec<RoleResponse>> {
         let roles = self.role_service.get_all_roles(&RoleQuery::default()).await?;
         Ok(roles.into_iter().map(RoleResponse::from).collect())
+    }
+
+    /// Get users associated with a role
+    pub async fn get_role_users(&self, role_id: u64) -> AppResult<Vec<crate::user::dto::UserResponse>> {
+        let users = self.role_service.get_role_users(role_id).await?;
+        Ok(users.into_iter().map(user_to_response).collect())
+    }
+
+    /// Add users to a role
+    pub async fn add_users_to_role(&self, role_id: u64, user_ids: Vec<u64>) -> AppResult<()> {
+        self.role_service.add_users_to_role(role_id, user_ids).await
+    }
+
+    /// Remove users from a role
+    pub async fn remove_users_from_role(&self, role_id: u64, user_ids: Vec<u64>) -> AppResult<()> {
+        self.role_service.remove_users_from_role(role_id, user_ids).await
     }
 }

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use admin_domain::config::model::aggregate::Config;
 use crate::config::dto::*;
@@ -84,5 +85,9 @@ impl ConfigAppService {
     pub async fn get_by_key(&self, key: &str) -> AppResult<ConfigResponse> {
         let config = self.config_service.get_by_key(key).await?;
         Ok(ConfigResponse::from(config))
+    }
+
+    pub async fn get_by_keys(&self, keys: Vec<String>) -> AppResult<HashMap<String, String>> {
+        self.config_service.get_by_keys(&keys).await
     }
 }

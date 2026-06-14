@@ -227,4 +227,14 @@ impl DictDataRepository for MockDictDataRepository {
             Err(RepositoryError::NotFound)?
         }
     }
+
+    async fn find_by_types(&self, dict_types: &[String]) -> AppResult<Vec<DictData>> {
+        let dict_data = self.dict_data.read().unwrap();
+        Ok(dict_data
+            .values()
+            .filter(|d| d.audit.deleted == DeletedStatus::Normal)
+            .filter(|d| dict_types.contains(&d.dict_type))
+            .cloned()
+            .collect())
+    }
 }

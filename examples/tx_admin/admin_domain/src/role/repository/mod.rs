@@ -4,6 +4,7 @@ use tx_common::page::Page;
 use tx_error::AppResult;
 use crate::role::model::aggregate::Role;
 use crate::role::model::value_object::RoleQuery;
+use crate::user::model::aggregate::User;
 
 /// Role repository trait
 #[async_trait]
@@ -23,4 +24,8 @@ pub trait RoleRepository: Any + Send + Sync {
     async fn exists_by_code(&self, code: &str) -> AppResult<bool>;
     async fn bind_menus(&self, role_id: u64, menu_ids: &[u64]) -> AppResult<()>;
     async fn get_menu_ids(&self, role_id: u64) -> AppResult<Vec<u64>>;
+    async fn get_user_ids(&self, role_id: u64) -> AppResult<Vec<u64>>;
+    async fn find_users_by_role_id(&self, role_id: u64) -> AppResult<Vec<User>>;
+    async fn bind_users(&self, role_id: u64, user_ids: &[u64]) -> AppResult<()>;
+    async fn unbind_users(&self, role_id: u64, user_ids: &[u64]) -> AppResult<()>;
 }

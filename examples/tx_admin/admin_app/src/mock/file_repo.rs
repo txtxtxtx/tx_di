@@ -84,6 +84,14 @@ impl FileRepository for MockFileRepository {
             Err(RepositoryError::NotFound)?
         }
     }
+
+    async fn find_file_path(&self, id: u64) -> AppResult<String> {
+        let files = self.files.read().unwrap();
+        files.get(&id)
+            .filter(|f| f.audit.deleted == DeletedStatus::Normal)
+            .map(|f| f.path.clone())
+            .ok_or_else(|| RepositoryError::NotFound.into())
+    }
 }
 
 #[tx_comp(as_trait = dyn FileConfigRepository)]

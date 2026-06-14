@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::dictionary::dto::*;
@@ -142,5 +143,12 @@ impl DictDataAppService {
     pub async fn get_by_dict_type(&self, dict_type: &str) -> AppResult<Vec<DictDataResponse>> {
         let data = self.dict_data_service.get_by_dict_type(dict_type).await?;
         Ok(data.into_iter().map(DictDataResponse::from).collect())
+    }
+
+    pub async fn get_by_dict_types(&self, dict_types: Vec<String>) -> AppResult<HashMap<String, Vec<DictDataResponse>>> {
+        let map = self.dict_data_service.get_by_dict_types(&dict_types).await?;
+        Ok(map.into_iter()
+            .map(|(k, v)| (k, v.into_iter().map(DictDataResponse::from).collect()))
+            .collect())
     }
 }

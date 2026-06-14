@@ -65,6 +65,11 @@ pub enum DomainEvent {
     DictDataUpdated { dict_data_id: u64 },
     DictDataDeleted { dict_data_id: u64 },
 
+    // Permission events
+    PermissionCreated { permission_id: u64 },
+    PermissionUpdated { permission_id: u64 },
+    PermissionDeleted { permission_id: u64 },
+
     // Log events
     OperateLogCreated { log_id: u64 },
     LoginLogCreated { log_id: u64 },

@@ -61,6 +61,16 @@ pub mod admin {
     pub mod file {
         include!("pb/admin.file.rs");
     }
+
+    /// 系统监控
+    pub mod monitor {
+        include!("pb/admin.monitor.rs");
+    }
+
+    /// 系统工具
+    pub mod tool {
+        include!("pb/admin.tool.rs");
+    }
 }
 
 // ============================================================
@@ -76,14 +86,15 @@ pub use admin::auth::{
 };
 // --- User ---
 pub use admin::user::{
-    CreateUserRequest, UpdateUserRequest, DeleteUserRequest, GetUserRequest,
+    CreateUserRequest, UpdateUserRequest, ChangeUserStatusRequest, DeleteUserRequest, GetUserRequest,
     ListUsersRequest, ChangePasswordRequest, AssignRolesRequest, AssignDeptsRequest,
-    UserResponse, ListUsersResponse,
+    UserResponse, ListUsersResponse, UserIdRequest,
 };
 // --- Role ---
 pub use admin::role::{
     CreateRoleRequest, UpdateRoleRequest, DeleteRoleRequest, GetRoleRequest,
     ListRolesRequest, AssignMenusRequest, RoleResponse, ListRolesResponse,
+    GetRoleUsersRequest, GetRoleUsersResponse, AddUsersToRoleRequest, RemoveUsersFromRoleRequest,
 };
 // --- Menu ---
 pub use admin::menu::{
@@ -98,12 +109,16 @@ pub use admin::dept::{
 // --- Permission ---
 pub use admin::permission::{
     PermissionCheckRequest, PermissionCheckResponse,
-    GetUserPermissionsRequest, UserPermissionsResponse, PermissionItem,
+    GetUserPermissionsRequest, UserPermissionsResponse, UserPermissionItem,
+    CreatePermissionRequest, UpdatePermissionRequest, DeletePermissionRequest,
+    GetPermissionRequest, ListPermissionsRequest, ListPermissionsResponse,
+    PermissionDetail,
 };
 // --- Config ---
 pub use admin::config::{
     CreateConfigRequest, UpdateConfigRequest, DeleteConfigRequest, GetConfigRequest,
     ListConfigsRequest, ConfigResponse, ListConfigsResponse,
+    GetByKeysRequest, GetByKeysResponse,
 };
 // --- Dictionary ---
 pub use admin::dict::{
@@ -111,17 +126,24 @@ pub use admin::dict::{
     ListDictTypesRequest, DictTypeResponse, ListDictTypesResponse,
     CreateDictDataRequest, UpdateDictDataRequest, DeleteDictDataRequest, GetDictDataRequest,
     ListDictDataRequest, DictDataResponse, ListDictDataResponse,
+    GetByDictTypesRequest, GetByDictTypesResponse,
 };
 // --- Log ---
 pub use admin::log::{
     CreateOperateLogRequest, ListOperateLogsRequest, OperateLogResponse, ListOperateLogsResponse,
     CreateLoginLogRequest, ListLoginLogsRequest, LoginLogResponse, ListLoginLogsResponse,
+    DeleteLogsRequest,
 };
 // --- File ---
 pub use admin::file::{
     UploadFileRequest, DeleteFileRequest, GetFileRequest, ListFilesRequest,
     FileResponse, ListFilesResponse,
+    DownloadFileRequest, DownloadFileResponse,
 };
+// --- Monitor ---
+pub use admin::monitor::{ServerInfo, OnlineUser, OnlineUserListResponse};
+// --- Tool ---
+pub use admin::tool::{CacheInfo, CacheStatsResponse};
 
 // ============================================================
 // serde u64 辅助模块：uint64 <-> JSON string

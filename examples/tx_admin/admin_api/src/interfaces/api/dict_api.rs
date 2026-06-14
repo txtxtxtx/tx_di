@@ -20,6 +20,8 @@ pub fn router() -> Router {
         .api_route("/data/{id}", put(update_dict_data))
         .api_route("/data/{id}", delete(delete_dict_data))
         .api_route("/data/list", post(list_dict_data))
+        .api_route("/data/type/{dict_type}", get(get_dict_data_by_type))
+        .api_route("/data/code/{dict_code}", get(get_dict_data_by_code))
 }
 
 fn map_type(d: admin_app::dictionary::dto::DictTypeResponse) -> DictTypeResponse { DictTypeResponse { id: d.id, name: d.name, dict_type: d.dict_type, status: d.status, remark: d.remark } }
@@ -85,4 +87,26 @@ async fn delete_dict_data(DiComp(dict_data): DiComp<DictDataAppService>, axum::e
 async fn list_dict_data(DiComp(dict_data): DiComp<DictDataAppService>, Json(req): Json<ListDictDataRequest>) -> R<Page<DictDataResponse>> {
     let query = admin_app::dictionary::dto::DictDataQueryRequest { dict_type: req.dict_type, label: req.label, status: req.status, page: req.page, size: req.page_size };
     match dict_data.get_dict_data_page(query).await { Ok(page) => R(ApiR::success(Page::new(page.list.into_iter().map(map_data).collect(), page.page, page.size, page.total))), Err(e) => R(ApiRes::from(e).into_typed()) }
+}
+
+/// GET /api/dict/data/type/{dict_type}
+async fn get_dict_data_by_type(
+    DiComp(dict_data): DiComp<DictDataAppService>,
+    axum::extract::Path(dict_type): axum::extract::Path<String>,
+) -> R<Vec<DictDataResponse>> {
+    match dict_data.get_by_dict_type(&dict_type).await {
+        Ok(list) => R(ApiR::success(list.into_iter().map(map_data).collect())),
+        Err(e) => R(ApiRes::from(e).into_typed()),
+    }
+}
+
+/// GET /api/dict/data/code/{dict_code}
+async fn get_dict_data_by_code(
+    DiComp(dict_data): DiComp<DictDataAppService>,
+    axum::extract::Path(dict_code): axum::extract::Path<String>,
+) -> R<Vec<DictDataResponse>> {
+    match dict_data.get_by_dict_type(&dict_code).await {
+        Ok(list) => R(ApiR::success(list.into_iter().map(map_data).collect())),
+        Err(e) => R(ApiRes::from(e).into_typed()),
+    }
 }

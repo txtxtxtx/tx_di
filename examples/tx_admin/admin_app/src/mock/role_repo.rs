@@ -7,6 +7,7 @@ use admin_domain::role::model::value_object::RoleQuery;
 use admin_domain::role::repository::RoleRepository;
 use admin_domain::shared::repository::RepositoryError;
 use admin_domain::shared::model::value_object::DeletedStatus;
+use admin_domain::user::model::aggregate::User;
 use tx_common::page::Page;
 use tx_di_core::{tx_comp, tx_cst};
 use tx_error::AppResult;
@@ -17,6 +18,8 @@ pub struct MockRoleRepository {
     roles: RwLock<HashMap<u64, Role>>,
     #[tx_cst(RwLock::new(HashMap::new()))]
     role_menus: RwLock<HashMap<u64, Vec<u64>>>,
+    #[tx_cst(RwLock::new(HashMap::new()))]
+    role_users: RwLock<HashMap<u64, Vec<u64>>>,
 }
 
 impl MockRoleRepository {
@@ -24,6 +27,7 @@ impl MockRoleRepository {
         Self {
             roles: RwLock::new(HashMap::new()),
             role_menus: RwLock::new(HashMap::new()),
+            role_users: RwLock::new(HashMap::new()),
         }
     }
 
@@ -158,5 +162,34 @@ impl RoleRepository for MockRoleRepository {
     async fn get_menu_ids(&self, role_id: u64) -> AppResult<Vec<u64>> {
         let role_menus = self.role_menus.read().unwrap();
         Ok(role_menus.get(&role_id).cloned().unwrap_or_default())
+    }
+
+    async fn get_user_ids(&self, role_id: u64) -> AppResult<Vec<u64>> {
+        let role_users = self.role_users.read().unwrap();
+        Ok(role_users.get(&role_id).cloned().unwrap_or_default())
+    }
+
+    async fn find_users_by_role_id(&self, _role_id: u64) -> AppResult<Vec<User>> {
+        // Mock: return empty list since we don't have access to UserRepository
+        Ok(vec![])
+    }
+
+    async fn bind_users(&self, role_id: u64, user_ids: &[u64]) -> AppResult<()> {
+        let mut role_users = self.role_users.write().unwrap();
+        let existing = role_users.entry(role_id).or_insert_with(Vec::new);
+        for uid in user_ids {
+            if !existing.contains(uid) {
+                existing.push(*uid);
+            }
+        }
+        Ok(())
+    }
+
+    async fn unbind_users(&self, role_id: u64, user_ids: &[u64]) -> AppResult<()> {
+        let mut role_users = self.role_users.write().unwrap();
+        if let Some(existing) = role_users.get_mut(&role_id) {
+            existing.retain(|uid| !user_ids.contains(uid));
+        }
+        Ok(())
     }
 }

@@ -18,6 +18,10 @@ service UserService {
   rpc ChangePassword(ChangePasswordRequest) returns (admin.common.Empty);
   rpc AssignRoles(AssignRolesRequest) returns (admin.common.Empty);
   rpc AssignDepts(AssignDeptsRequest) returns (admin.common.Empty);
+  rpc EnableUser(UserIdRequest) returns (admin.common.Empty);
+  rpc DisableUser(UserIdRequest) returns (admin.common.Empty);
+  rpc LockUser(UserIdRequest) returns (admin.common.Empty);
+  rpc UnlockUser(UserIdRequest) returns (admin.common.Empty);
 }
 
 message CreateUserRequest {
@@ -102,4 +106,8 @@ message UserResponse {
 message ListUsersResponse {
   repeated UserResponse items = 1;
   admin.common.PageResponse page_info = 2;
+}
+
+message UserIdRequest {
+  uint64 user_id = 1;
 }

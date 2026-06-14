@@ -15,6 +15,7 @@ pub fn router() -> Router {
         .api_route("/{config_id}", put(update_config))
         .api_route("/{config_id}", delete(delete_config))
         .api_route("/list", post(list_configs))
+        .api_route("/key/{key}", get(get_config_by_key))
 }
 
 fn map_config(c: admin_app::config::dto::ConfigResponse) -> ConfigResponse { ConfigResponse { id: c.id, category: c.category, config_type: c.config_type, name: c.name, config_key: c.config_key, value: c.value, visible: c.visible, remark: c.remark } }
@@ -40,4 +41,15 @@ async fn delete_config(DiComp(config): DiComp<ConfigAppService>, axum::extract::
 async fn list_configs(DiComp(config): DiComp<ConfigAppService>, Json(req): Json<ListConfigsRequest>) -> R<Page<ConfigResponse>> {
     let query = admin_app::config::dto::ConfigQueryRequest { name: req.name, category: req.category, config_key: req.config_key, config_type: req.config_type, page: req.page, size: req.page_size };
     match config.get_config_page(query).await { Ok(page) => R(ApiR::success(Page::new(page.list.into_iter().map(map_config).collect(), page.page, page.size, page.total))), Err(e) => R(ApiRes::from(e).into_typed()) }
+}
+
+/// GET /api/config/key/{key}
+async fn get_config_by_key(
+    DiComp(config): DiComp<ConfigAppService>,
+    axum::extract::Path(key): axum::extract::Path<String>,
+) -> R<ConfigResponse> {
+    match config.get_by_key(&key).await {
+        Ok(r) => R(ApiR::success(map_config(r))),
+        Err(e) => R(ApiRes::from(e).into_typed()),
+    }
 }
