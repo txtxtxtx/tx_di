@@ -12,3 +12,17 @@ pub mod file;
 pub mod config;
 pub mod dictionary;
 pub mod log;
+
+/// 注册所有 toasty 数据库模型
+///
+/// 自动扫描本 crate 中所有 `#[derive(Model)]` 的类型，
+/// 传给 `ToastyPlugin::register_models()` 使用。
+///
+/// # 用法
+/// ```ignore
+/// let plugin = ctx.inject::<ToastyPlugin>();
+/// plugin.register_models(admin_infra::register_models());
+/// ```
+pub fn register_models() -> toasty::ModelSet {
+    toasty::models!(crate::*)
+}
