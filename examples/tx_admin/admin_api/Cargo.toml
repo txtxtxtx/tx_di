@@ -12,6 +12,8 @@ repository.workspace = true
 admin_proto  = { path = "../admin_proto" }
 admin_app    = { path = "../admin_app" }
 admin_domain = { path = "../admin_domain" }
+admin_infra  = { path = "../admin_infra" }
+tx_di_toasty = { path = "../../../plugins/tx_di_toasty" }
 tx_error    = { path = "../../../common/tx_error", features = ["axum"] }
 tx_common    = { path = "../../../common/crates/tx_common", features = ["axum"] }
 tx-di-core  = { path = "../../../tx-di-core" }

@@ -9,6 +9,10 @@ use tx_di_axum;
 use tx_di_log;
 #[allow(unused_imports)]
 use admin_app;
+#[allow(unused_imports)]
+use admin_infra;
+#[allow(unused_imports)]
+use tx_di_toasty;
 use tx_error::AppResult;
 
 #[tokio::main]

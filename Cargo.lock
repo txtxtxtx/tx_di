@@ -14,6 +14,7 @@ version = "0.1.0"
 dependencies = [
  "admin_app",
  "admin_domain",
+ "admin_infra",
  "admin_proto",
  "anyhow",
  "async-trait",
@@ -30,6 +31,7 @@ dependencies = [
  "tx_common",
  "tx_di_axum",
  "tx_di_log",
+ "tx_di_toasty",
  "tx_error",
 ]
 
