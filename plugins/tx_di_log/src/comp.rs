@@ -126,6 +126,7 @@ impl CompInit for LogPlugins{
         // 设置 panic hook
         panic::set_hook(Box::new(|panic_info| {
             error!("程序异常终止: {}", panic_info);
+            std::process::exit(-1); // 退出程序
         }));
         debug!("日志初始化完成");
         Ok(())
