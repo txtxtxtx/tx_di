@@ -41,6 +41,6 @@ force_path_style = false
 
 # 数据库配置（Toasty ORM）
 [toasty_config]
-database_url = "sqlite://tx_admin.db"
-auto_schema = true
+database_url = "sqlite:examples/tx_admin/data/tx_admin.db"
+auto_schema = false # true,第一次需要true 来创建表
 max_pool_size = 10
