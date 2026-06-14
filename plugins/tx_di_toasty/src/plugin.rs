@@ -209,7 +209,8 @@ impl CompInit for ToastyPlugin {
         }
     );
     fn init_sort() -> i32 {
-        i32::MIN + 2
+        // 在业务插件注册模型之后初始化（AdminPlugin = MAX-100，WebPlugin = MAX）
+        i32::MAX - 50
     }
 }
 

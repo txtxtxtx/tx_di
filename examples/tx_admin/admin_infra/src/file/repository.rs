@@ -9,7 +9,7 @@ use admin_domain::shared::model::AuditFields;
 use admin_domain::shared::repository::RepositoryError;
 use tx_common::page::Page;
 use tx_di_core::tx_comp;
-use tx_di_toasty::ToastyDb;
+use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
 use super::model::{SysFile, SysFileConfig};
@@ -17,7 +17,7 @@ use super::model::{SysFile, SysFileConfig};
 /// Toasty 实现的 FileRepository
 #[tx_comp(as_trait = dyn FileRepository)]
 pub struct ToastyFileRepository {
-    db: Arc<ToastyDb>,
+    plugin: Arc<ToastyPlugin>,
 }
 
 impl ToastyFileRepository {
@@ -44,7 +44,7 @@ impl ToastyFileRepository {
 #[async_trait]
 impl FileRepository for ToastyFileRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<File>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         match SysFile::get_by_id(&mut db, id as i64).await {
             Ok(f) if f.deleted == 0 => Ok(Some(Self::to_domain(&f))),
             _ => Ok(None),
@@ -52,7 +52,7 @@ impl FileRepository for ToastyFileRepository {
     }
 
     async fn find_page(&self, query: &FileQuery, page: Page<File>) -> AppResult<Page<File>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysFile::all()
             .exec(&mut db)
             .await
@@ -90,7 +90,7 @@ impl FileRepository for ToastyFileRepository {
     }
 
     async fn insert(&self, file: &File) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysFile::create()
             .config_id(file.config_id.unwrap_or(0))
@@ -111,7 +111,7 @@ impl FileRepository for ToastyFileRepository {
     }
 
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let mut file = SysFile::get_by_id(&mut db, id as i64)
             .await
             .map_err(|_| RepositoryError::NotFound)?;
@@ -125,7 +125,7 @@ impl FileRepository for ToastyFileRepository {
     }
 
     async fn find_file_path(&self, id: u64) -> AppResult<String> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let file = SysFile::get_by_id(&mut db, id as i64)
             .await
             .map_err(|_| RepositoryError::NotFound)?;
@@ -140,7 +140,7 @@ impl FileRepository for ToastyFileRepository {
 /// Toasty 实现的 FileConfigRepository
 #[tx_comp(as_trait = dyn FileConfigRepository)]
 pub struct ToastyFileConfigRepository {
-    db: Arc<ToastyDb>,
+    plugin: Arc<ToastyPlugin>,
 }
 
 impl ToastyFileConfigRepository {
@@ -166,7 +166,7 @@ impl ToastyFileConfigRepository {
 #[async_trait]
 impl FileConfigRepository for ToastyFileConfigRepository {
     async fn find_by_id(&self, id: i32) -> AppResult<Option<FileConfig>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         match SysFileConfig::get_by_id(&mut db, id).await {
             Ok(c) if c.deleted == 0 => Ok(Some(Self::to_domain(&c))),
             _ => Ok(None),
@@ -174,7 +174,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
     }
 
     async fn find_master(&self) -> AppResult<Option<FileConfig>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysFileConfig::all()
             .exec(&mut db)
             .await
@@ -187,7 +187,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
     }
 
     async fn find_all(&self) -> AppResult<Vec<FileConfig>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysFileConfig::all()
             .exec(&mut db)
             .await
@@ -201,7 +201,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
     }
 
     async fn insert(&self, config: &FileConfig) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysFileConfig::create()
             .name(config.name.clone())
@@ -221,7 +221,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
     }
 
     async fn update(&self, config: &FileConfig) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let mut existing = SysFileConfig::get_by_id(&mut db, config.id)
             .await
             .map_err(|_| RepositoryError::NotFound)?;
@@ -244,7 +244,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
     }
 
     async fn soft_delete(&self, id: i32) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let mut config = SysFileConfig::get_by_id(&mut db, id)
             .await
             .map_err(|_| RepositoryError::NotFound)?;

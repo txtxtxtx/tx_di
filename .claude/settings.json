@@ -9,7 +9,9 @@
       "Read(//c/Users/tx_home/.cargo/registry/src/**)",
       "Bash(cargo tree *)",
       "Bash(cargo build *)",
-      "Bash(cargo fix *)"
+      "Bash(cargo fix *)",
+      "Bash(timeout 10 cargo run -p admin_api)",
+      "Bash(timeout 15 cargo run -p admin_api)"
     ]
   }
 }

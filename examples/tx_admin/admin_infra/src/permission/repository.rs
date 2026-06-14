@@ -9,7 +9,7 @@ use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::model::AuditFields;
 use admin_domain::shared::repository::RepositoryError;
 use tx_di_core::tx_comp;
-use tx_di_toasty::ToastyDb;
+use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
 use super::model::SysPermission;
@@ -20,7 +20,7 @@ use crate::user::model::SysUserRole;
 /// Toasty 实现的 PermissionRepository
 #[tx_comp(as_trait = dyn PermissionRepository)]
 pub struct ToastyPermissionRepository {
-    db: Arc<ToastyDb>,
+    plugin: Arc<ToastyPlugin>,
 }
 
 impl ToastyPermissionRepository {
@@ -53,7 +53,7 @@ impl ToastyPermissionRepository {
     }
 
     async fn get_permission_codes_by_role_ids(&self, role_ids: &[u64]) -> AppResult<HashSet<String>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let mut codes = HashSet::new();
 
         for &role_id in role_ids {
@@ -82,7 +82,7 @@ impl PermissionRepository for ToastyPermissionRepository {
     }
 
     async fn find_by_user_id(&self, user_id: u64) -> AppResult<HashSet<String>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let user_roles = SysUserRole::filter_by_user_id(user_id as i64)
             .exec(&mut db)
             .await
@@ -93,7 +93,7 @@ impl PermissionRepository for ToastyPermissionRepository {
     }
 
     async fn find_all(&self) -> AppResult<HashSet<PermissionCheck>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysPermission::all()
             .exec(&mut db)
             .await
@@ -107,7 +107,7 @@ impl PermissionRepository for ToastyPermissionRepository {
     }
 
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Permission>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         match SysPermission::get_by_id(&mut db, id as i64).await {
             Ok(p) if p.deleted == 0 => Ok(Some(Self::to_domain(&p))),
             _ => Ok(None),
@@ -115,7 +115,7 @@ impl PermissionRepository for ToastyPermissionRepository {
     }
 
     async fn find_by_code(&self, code: &str) -> AppResult<Option<Permission>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let perm = SysPermission::filter_by_permission_code(code)
             .first()
             .exec(&mut db)
@@ -128,7 +128,7 @@ impl PermissionRepository for ToastyPermissionRepository {
     }
 
     async fn find_all_permissions(&self) -> AppResult<Vec<Permission>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysPermission::all()
             .exec(&mut db)
             .await
@@ -142,7 +142,7 @@ impl PermissionRepository for ToastyPermissionRepository {
     }
 
     async fn insert(&self, permission: &Permission) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysPermission::create()
             .name(permission.name.clone())
@@ -164,7 +164,7 @@ impl PermissionRepository for ToastyPermissionRepository {
     }
 
     async fn update(&self, permission: &Permission) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let mut existing = SysPermission::get_by_id(&mut db, permission.id as i64)
             .await
             .map_err(|_| RepositoryError::NotFound)?;
@@ -189,7 +189,7 @@ impl PermissionRepository for ToastyPermissionRepository {
     }
 
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let mut perm = SysPermission::get_by_id(&mut db, id as i64)
             .await
             .map_err(|_| RepositoryError::NotFound)?;
@@ -203,7 +203,7 @@ impl PermissionRepository for ToastyPermissionRepository {
     }
 
     async fn exists_by_code(&self, code: &str) -> AppResult<bool> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let perm = SysPermission::filter_by_permission_code(code)
             .first()
             .exec(&mut db)

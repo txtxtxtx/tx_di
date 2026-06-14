@@ -9,7 +9,7 @@ use admin_domain::user::model::value_object::{Sex, UserQuery, UserStatus};
 use admin_domain::user::repository::UserRepository;
 use tx_common::page::Page;
 use tx_di_core::tx_comp;
-use tx_di_toasty::ToastyDb;
+use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
 use super::model::{SysUser, SysUserDept, SysUserRole};
@@ -17,7 +17,7 @@ use super::model::{SysUser, SysUserDept, SysUserRole};
 /// Toasty 实现的 UserRepository
 #[tx_comp(as_trait = dyn UserRepository)]
 pub struct ToastyUserRepository {
-    db: Arc<ToastyDb>,
+    plugin: Arc<ToastyPlugin>,
 }
 
 impl ToastyUserRepository {
@@ -51,7 +51,7 @@ impl ToastyUserRepository {
 
     /// 获取用户的角色ID列表
     async fn fetch_role_ids(&self, user_id: i64) -> AppResult<Vec<u64>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let roles = SysUserRole::filter_by_user_id(user_id)
             .exec(&mut db)
             .await
@@ -61,7 +61,7 @@ impl ToastyUserRepository {
 
     /// 获取用户的部门ID列表
     async fn fetch_dept_ids(&self, user_id: i64) -> AppResult<Vec<u64>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let depts = SysUserDept::filter_by_user_id(user_id)
             .exec(&mut db)
             .await
@@ -80,7 +80,7 @@ impl ToastyUserRepository {
 #[async_trait]
 impl UserRepository for ToastyUserRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<User>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         match SysUser::get_by_id(&mut db, id as i64).await {
             Ok(u) if u.deleted == 0 => Ok(Some(self.to_full_domain(&u).await?)),
             Ok(_) => Ok(None),
@@ -89,7 +89,7 @@ impl UserRepository for ToastyUserRepository {
     }
 
     async fn find_by_username(&self, username: &str) -> AppResult<Option<User>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let user = SysUser::filter_by_username(username)
             .first()
             .exec(&mut db)
@@ -102,7 +102,7 @@ impl UserRepository for ToastyUserRepository {
     }
 
     async fn find_page(&self, query: &UserQuery, page: Page<User>) -> AppResult<Page<User>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysUser::all()
             .exec(&mut db)
             .await
@@ -141,7 +141,7 @@ impl UserRepository for ToastyUserRepository {
     }
 
     async fn find_all(&self, query: &UserQuery) -> AppResult<Vec<User>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysUser::all()
             .exec(&mut db)
             .await
@@ -167,7 +167,7 @@ impl UserRepository for ToastyUserRepository {
     }
 
     async fn insert(&self, user: &User) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         let model = SysUser::create()
             .username(user.username.clone())
@@ -215,7 +215,7 @@ impl UserRepository for ToastyUserRepository {
     }
 
     async fn update(&self, user: &User) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let mut existing = SysUser::get_by_id(&mut db, user.id as i64)
             .await
             .map_err(|_| RepositoryError::NotFound)?;
@@ -246,7 +246,7 @@ impl UserRepository for ToastyUserRepository {
     }
 
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let mut user = SysUser::get_by_id(&mut db, id as i64)
             .await
             .map_err(|_| RepositoryError::NotFound)?;
@@ -261,7 +261,7 @@ impl UserRepository for ToastyUserRepository {
     }
 
     async fn exists_by_username(&self, username: &str) -> AppResult<bool> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let user = SysUser::filter_by_username(username)
             .first()
             .exec(&mut db)
@@ -271,7 +271,7 @@ impl UserRepository for ToastyUserRepository {
     }
 
     async fn exists_by_email(&self, email: &str) -> AppResult<bool> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysUser::all()
             .exec(&mut db)
             .await
@@ -280,7 +280,7 @@ impl UserRepository for ToastyUserRepository {
     }
 
     async fn exists_by_mobile(&self, mobile: &str) -> AppResult<bool> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysUser::all()
             .exec(&mut db)
             .await
@@ -289,7 +289,7 @@ impl UserRepository for ToastyUserRepository {
     }
 
     async fn count(&self, query: &UserQuery) -> AppResult<i64> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysUser::all()
             .exec(&mut db)
             .await
@@ -319,7 +319,7 @@ impl UserRepository for ToastyUserRepository {
     }
 
     async fn find_by_role_id(&self, role_id: u64) -> AppResult<Vec<User>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let user_roles = SysUserRole::filter_by_role_id(role_id as i64)
             .exec(&mut db)
             .await
@@ -337,7 +337,7 @@ impl UserRepository for ToastyUserRepository {
     }
 
     async fn find_by_dept_id(&self, dept_id: u64) -> AppResult<Vec<User>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let user_depts = SysUserDept::filter_by_dept_id(dept_id as i64)
             .exec(&mut db)
             .await
@@ -355,7 +355,7 @@ impl UserRepository for ToastyUserRepository {
     }
 
     async fn bind_roles(&self, user_id: u64, role_ids: &[u64]) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         // 先删除旧的关联
         let old = SysUserRole::filter_by_user_id(user_id as i64)
             .exec(&mut db)
@@ -382,7 +382,7 @@ impl UserRepository for ToastyUserRepository {
     }
 
     async fn bind_departments(&self, user_id: u64, dept_ids: &[u64]) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         // 先删除旧的关联
         let old = SysUserDept::filter_by_user_id(user_id as i64)
             .exec(&mut db)

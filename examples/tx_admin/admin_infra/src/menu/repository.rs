@@ -8,7 +8,7 @@ use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::model::AuditFields;
 use admin_domain::shared::repository::RepositoryError;
 use tx_di_core::tx_comp;
-use tx_di_toasty::ToastyDb;
+use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
 use super::model::SysMenu;
@@ -16,7 +16,7 @@ use super::model::SysMenu;
 /// Toasty 实现的 MenuRepository
 #[tx_comp(as_trait = dyn MenuRepository)]
 pub struct ToastyMenuRepository {
-    db: Arc<ToastyDb>,
+    plugin: Arc<ToastyPlugin>,
 }
 
 impl ToastyMenuRepository {
@@ -50,7 +50,7 @@ impl ToastyMenuRepository {
 #[async_trait]
 impl MenuRepository for ToastyMenuRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Menu>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         match SysMenu::get_by_id(&mut db, id as i64).await {
             Ok(m) if m.deleted == 0 => Ok(Some(Self::to_domain(&m))),
             _ => Ok(None),
@@ -58,7 +58,7 @@ impl MenuRepository for ToastyMenuRepository {
     }
 
     async fn find_all(&self, query: &MenuQuery) -> AppResult<Vec<Menu>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysMenu::all()
             .exec(&mut db)
             .await
@@ -84,7 +84,7 @@ impl MenuRepository for ToastyMenuRepository {
     }
 
     async fn find_by_ids(&self, ids: &[u64]) -> AppResult<Vec<Menu>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysMenu::all()
             .exec(&mut db)
             .await
@@ -98,7 +98,7 @@ impl MenuRepository for ToastyMenuRepository {
     }
 
     async fn find_by_parent_id(&self, parent_id: u64) -> AppResult<Vec<Menu>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysMenu::all()
             .exec(&mut db)
             .await
@@ -112,7 +112,7 @@ impl MenuRepository for ToastyMenuRepository {
     }
 
     async fn insert(&self, menu: &Menu) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysMenu::create()
             .name(menu.name.clone())
@@ -140,7 +140,7 @@ impl MenuRepository for ToastyMenuRepository {
     }
 
     async fn update(&self, menu: &Menu) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let mut existing = SysMenu::get_by_id(&mut db, menu.id as i64)
             .await
             .map_err(|_| RepositoryError::NotFound)?;
@@ -171,7 +171,7 @@ impl MenuRepository for ToastyMenuRepository {
     }
 
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let mut menu = SysMenu::get_by_id(&mut db, id as i64)
             .await
             .map_err(|_| RepositoryError::NotFound)?;
@@ -185,7 +185,7 @@ impl MenuRepository for ToastyMenuRepository {
     }
 
     async fn has_children(&self, parent_id: u64) -> AppResult<bool> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysMenu::all()
             .exec(&mut db)
             .await

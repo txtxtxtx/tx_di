@@ -9,7 +9,7 @@ use admin_domain::shared::model::AuditFields;
 use admin_domain::shared::repository::RepositoryError;
 use tx_common::page::Page;
 use tx_di_core::tx_comp;
-use tx_di_toasty::ToastyDb;
+use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
 use super::model::SysConfig;
@@ -17,7 +17,7 @@ use super::model::SysConfig;
 /// Toasty 实现的 ConfigRepository
 #[tx_comp(as_trait = dyn ConfigRepository)]
 pub struct ToastyConfigRepository {
-    db: Arc<ToastyDb>,
+    plugin: Arc<ToastyPlugin>,
 }
 
 impl ToastyConfigRepository {
@@ -45,7 +45,7 @@ impl ToastyConfigRepository {
 #[async_trait]
 impl ConfigRepository for ToastyConfigRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Config>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         match SysConfig::get_by_id(&mut db, id as i64).await {
             Ok(c) if c.deleted == 0 => Ok(Some(Self::to_domain(&c))),
             _ => Ok(None),
@@ -53,7 +53,7 @@ impl ConfigRepository for ToastyConfigRepository {
     }
 
     async fn find_by_key(&self, key: &str) -> AppResult<Option<Config>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let config = SysConfig::filter_by_config_key(key)
             .first()
             .exec(&mut db)
@@ -66,7 +66,7 @@ impl ConfigRepository for ToastyConfigRepository {
     }
 
     async fn find_by_keys(&self, keys: &[String]) -> AppResult<Vec<Config>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysConfig::all()
             .exec(&mut db)
             .await
@@ -80,7 +80,7 @@ impl ConfigRepository for ToastyConfigRepository {
     }
 
     async fn find_page(&self, query: &ConfigQuery, page: Page<Config>) -> AppResult<Page<Config>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysConfig::all()
             .exec(&mut db)
             .await
@@ -121,7 +121,7 @@ impl ConfigRepository for ToastyConfigRepository {
     }
 
     async fn find_all(&self, query: &ConfigQuery) -> AppResult<Vec<Config>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysConfig::all()
             .exec(&mut db)
             .await
@@ -144,7 +144,7 @@ impl ConfigRepository for ToastyConfigRepository {
     }
 
     async fn insert(&self, config: &Config) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysConfig::create()
             .category(config.category.clone())
@@ -166,7 +166,7 @@ impl ConfigRepository for ToastyConfigRepository {
     }
 
     async fn update(&self, config: &Config) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let mut existing = SysConfig::get_by_id(&mut db, config.id as i64)
             .await
             .map_err(|_| RepositoryError::NotFound)?;
@@ -191,7 +191,7 @@ impl ConfigRepository for ToastyConfigRepository {
     }
 
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let mut config = SysConfig::get_by_id(&mut db, id as i64)
             .await
             .map_err(|_| RepositoryError::NotFound)?;
@@ -205,7 +205,7 @@ impl ConfigRepository for ToastyConfigRepository {
     }
 
     async fn exists_by_key(&self, key: &str) -> AppResult<bool> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let config = SysConfig::filter_by_config_key(key)
             .first()
             .exec(&mut db)

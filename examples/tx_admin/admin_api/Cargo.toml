@@ -14,6 +14,7 @@ admin_app    = { path = "../admin_app" }
 admin_domain = { path = "../admin_domain" }
 admin_infra  = { path = "../admin_infra" }
 tx_di_toasty = { path = "../../../plugins/tx_di_toasty" }
+toasty = { version = "0.7", default-features = false, features = ["serde"] }
 tx_error    = { path = "../../../common/tx_error", features = ["axum"] }
 tx_common    = { path = "../../../common/crates/tx_common", features = ["axum"] }
 tx-di-core  = { path = "../../../tx-di-core" }

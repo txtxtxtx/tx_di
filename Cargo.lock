@@ -22,6 +22,7 @@ dependencies = [
  "prost 0.13.5",
  "serde",
  "serde_json",
+ "toasty",
  "tokio",
  "tokio-util",
  "tonic",

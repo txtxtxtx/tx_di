@@ -8,7 +8,7 @@ use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::model::AuditFields;
 use admin_domain::shared::repository::RepositoryError;
 use tx_di_core::tx_comp;
-use tx_di_toasty::ToastyDb;
+use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
 use super::model::SysDepartment;
@@ -17,7 +17,7 @@ use crate::user::model::SysUserDept;
 /// Toasty 实现的 DepartmentRepository
 #[tx_comp(as_trait = dyn DepartmentRepository)]
 pub struct ToastyDepartmentRepository {
-    db: Arc<ToastyDb>,
+    plugin: Arc<ToastyPlugin>,
 }
 
 impl ToastyDepartmentRepository {
@@ -46,7 +46,7 @@ impl ToastyDepartmentRepository {
 #[async_trait]
 impl DepartmentRepository for ToastyDepartmentRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Department>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         match SysDepartment::get_by_id(&mut db, id as i64).await {
             Ok(d) if d.deleted == 0 => Ok(Some(Self::to_domain(&d))),
             _ => Ok(None),
@@ -54,7 +54,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
     }
 
     async fn find_all(&self, query: &DeptQuery) -> AppResult<Vec<Department>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysDepartment::all()
             .exec(&mut db)
             .await
@@ -77,7 +77,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
     }
 
     async fn find_by_ids(&self, ids: &[u64]) -> AppResult<Vec<Department>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysDepartment::all()
             .exec(&mut db)
             .await
@@ -91,7 +91,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
     }
 
     async fn find_by_parent_id(&self, parent_id: u64) -> AppResult<Vec<Department>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysDepartment::all()
             .exec(&mut db)
             .await
@@ -105,7 +105,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
     }
 
     async fn insert(&self, dept: &Department) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysDepartment::create()
             .name(dept.name.clone())
@@ -128,7 +128,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
     }
 
     async fn update(&self, dept: &Department) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let mut existing = SysDepartment::get_by_id(&mut db, dept.id as i64)
             .await
             .map_err(|_| RepositoryError::NotFound)?;
@@ -154,7 +154,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
     }
 
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let mut dept = SysDepartment::get_by_id(&mut db, id as i64)
             .await
             .map_err(|_| RepositoryError::NotFound)?;
@@ -168,7 +168,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
     }
 
     async fn has_children(&self, parent_id: u64) -> AppResult<bool> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysDepartment::all()
             .exec(&mut db)
             .await
@@ -178,7 +178,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
     }
 
     async fn has_users(&self, dept_id: u64) -> AppResult<bool> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let user_depts = SysUserDept::filter_by_dept_id(dept_id as i64)
             .exec(&mut db)
             .await

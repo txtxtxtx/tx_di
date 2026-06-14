@@ -9,7 +9,7 @@ use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::repository::RepositoryError;
 use tx_common::page::Page;
 use tx_di_core::tx_comp;
-use tx_di_toasty::ToastyDb;
+use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
 use super::model::{SysLoginLog, SysOperateLog};
@@ -17,7 +17,7 @@ use super::model::{SysLoginLog, SysOperateLog};
 /// Toasty 实现的 OperateLogRepository
 #[tx_comp(as_trait = dyn OperateLogRepository)]
 pub struct ToastyOperateLogRepository {
-    db: Arc<ToastyDb>,
+    plugin: Arc<ToastyPlugin>,
 }
 
 impl ToastyOperateLogRepository {
@@ -52,7 +52,7 @@ impl ToastyOperateLogRepository {
 #[async_trait]
 impl OperateLogRepository for ToastyOperateLogRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<OperateLog>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         match SysOperateLog::get_by_id(&mut db, id as i64).await {
             Ok(l) if l.deleted == 0 => Ok(Some(Self::to_domain(&l))),
             _ => Ok(None),
@@ -60,7 +60,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
     }
 
     async fn find_page(&self, query: &OperateLogQuery, page: Page<OperateLog>) -> AppResult<Page<OperateLog>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysOperateLog::all()
             .exec(&mut db)
             .await
@@ -101,7 +101,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
     }
 
     async fn insert(&self, log: &OperateLog) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysOperateLog::create()
             .trace_id(log.trace_id.clone())
@@ -130,7 +130,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
     }
 
     async fn delete_by_ids(&self, ids: &[u64]) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         for &id in ids {
             if let Ok(log) = SysOperateLog::get_by_id(&mut db, id as i64).await {
                 log.delete().exec(&mut db)
@@ -142,7 +142,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
     }
 
     async fn clean_all(&self) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysOperateLog::all()
             .exec(&mut db)
             .await
@@ -160,7 +160,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
 /// Toasty 实现的 LoginLogRepository
 #[tx_comp(as_trait = dyn LoginLogRepository)]
 pub struct ToastyLoginLogRepository {
-    db: Arc<ToastyDb>,
+    plugin: Arc<ToastyPlugin>,
 }
 
 impl ToastyLoginLogRepository {
@@ -193,7 +193,7 @@ impl ToastyLoginLogRepository {
 #[async_trait]
 impl LoginLogRepository for ToastyLoginLogRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<LoginLog>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         match SysLoginLog::get_by_id(&mut db, id as i64).await {
             Ok(l) if l.deleted == 0 => Ok(Some(Self::to_domain(&l))),
             _ => Ok(None),
@@ -201,7 +201,7 @@ impl LoginLogRepository for ToastyLoginLogRepository {
     }
 
     async fn find_page(&self, query: &LoginLogQuery, page: Page<LoginLog>) -> AppResult<Page<LoginLog>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysLoginLog::all()
             .exec(&mut db)
             .await
@@ -245,7 +245,7 @@ impl LoginLogRepository for ToastyLoginLogRepository {
     }
 
     async fn insert(&self, log: &LoginLog) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysLoginLog::create()
             .user_id(log.user_id as i64)
@@ -272,7 +272,7 @@ impl LoginLogRepository for ToastyLoginLogRepository {
     }
 
     async fn delete_by_ids(&self, ids: &[u64]) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         for &id in ids {
             if let Ok(log) = SysLoginLog::get_by_id(&mut db, id as i64).await {
                 log.delete().exec(&mut db)
@@ -284,7 +284,7 @@ impl LoginLogRepository for ToastyLoginLogRepository {
     }
 
     async fn clean_all(&self) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysLoginLog::all()
             .exec(&mut db)
             .await

@@ -9,7 +9,7 @@ use admin_domain::shared::model::AuditFields;
 use admin_domain::shared::repository::RepositoryError;
 use tx_common::page::Page;
 use tx_di_core::tx_comp;
-use tx_di_toasty::ToastyDb;
+use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
 use super::model::{SysDictData, SysDictType};
@@ -17,7 +17,7 @@ use super::model::{SysDictData, SysDictType};
 /// Toasty 实现的 DictTypeRepository
 #[tx_comp(as_trait = dyn DictTypeRepository)]
 pub struct ToastyDictTypeRepository {
-    db: Arc<ToastyDb>,
+    plugin: Arc<ToastyPlugin>,
 }
 
 impl ToastyDictTypeRepository {
@@ -42,7 +42,7 @@ impl ToastyDictTypeRepository {
 #[async_trait]
 impl DictTypeRepository for ToastyDictTypeRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<DictType>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         match SysDictType::get_by_id(&mut db, id as i64).await {
             Ok(d) if d.deleted == 0 => Ok(Some(Self::to_domain(&d))),
             _ => Ok(None),
@@ -50,7 +50,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
     }
 
     async fn find_by_type(&self, dict_type: &str) -> AppResult<Option<DictType>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let dt = SysDictType::filter_by_dict_type(dict_type)
             .first()
             .exec(&mut db)
@@ -63,7 +63,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
     }
 
     async fn find_page(&self, query: &DictTypeQuery, page: Page<DictType>) -> AppResult<Page<DictType>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysDictType::all()
             .exec(&mut db)
             .await
@@ -101,7 +101,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
     }
 
     async fn find_all(&self, query: &DictTypeQuery) -> AppResult<Vec<DictType>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysDictType::all()
             .exec(&mut db)
             .await
@@ -127,7 +127,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
     }
 
     async fn insert(&self, dict_type: &DictType) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysDictType::create()
             .name(dict_type.name.clone())
@@ -146,7 +146,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
     }
 
     async fn update(&self, dict_type: &DictType) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let mut existing = SysDictType::get_by_id(&mut db, dict_type.id as i64)
             .await
             .map_err(|_| RepositoryError::NotFound)?;
@@ -168,7 +168,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
     }
 
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let mut dict_type = SysDictType::get_by_id(&mut db, id as i64)
             .await
             .map_err(|_| RepositoryError::NotFound)?;
@@ -182,7 +182,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
     }
 
     async fn exists_by_type(&self, dict_type: &str) -> AppResult<bool> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let dt = SysDictType::filter_by_dict_type(dict_type)
             .first()
             .exec(&mut db)
@@ -195,7 +195,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
 /// Toasty 实现的 DictDataRepository
 #[tx_comp(as_trait = dyn DictDataRepository)]
 pub struct ToastyDictDataRepository {
-    db: Arc<ToastyDb>,
+    plugin: Arc<ToastyPlugin>,
 }
 
 impl ToastyDictDataRepository {
@@ -224,7 +224,7 @@ impl ToastyDictDataRepository {
 #[async_trait]
 impl DictDataRepository for ToastyDictDataRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<DictData>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         match SysDictData::get_by_id(&mut db, id as i64).await {
             Ok(d) if d.deleted == 0 => Ok(Some(Self::to_domain(&d))),
             _ => Ok(None),
@@ -232,7 +232,7 @@ impl DictDataRepository for ToastyDictDataRepository {
     }
 
     async fn find_by_type(&self, dict_type: &str) -> AppResult<Vec<DictData>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysDictData::filter_by_dict_type(dict_type)
             .exec(&mut db)
             .await
@@ -246,7 +246,7 @@ impl DictDataRepository for ToastyDictDataRepository {
     }
 
     async fn find_by_types(&self, dict_types: &[String]) -> AppResult<Vec<DictData>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysDictData::all()
             .exec(&mut db)
             .await
@@ -260,7 +260,7 @@ impl DictDataRepository for ToastyDictDataRepository {
     }
 
     async fn find_page(&self, query: &DictDataQuery, page: Page<DictData>) -> AppResult<Page<DictData>> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let all = SysDictData::all()
             .exec(&mut db)
             .await
@@ -298,7 +298,7 @@ impl DictDataRepository for ToastyDictDataRepository {
     }
 
     async fn insert(&self, data: &DictData) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let now = jiff::Timestamp::now().to_string();
         SysDictData::create()
             .sort(data.sort)
@@ -321,7 +321,7 @@ impl DictDataRepository for ToastyDictDataRepository {
     }
 
     async fn update(&self, data: &DictData) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let mut existing = SysDictData::get_by_id(&mut db, data.id as i64)
             .await
             .map_err(|_| RepositoryError::NotFound)?;
@@ -347,7 +347,7 @@ impl DictDataRepository for ToastyDictDataRepository {
     }
 
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
-        let mut db = (*self.db).clone();
+        let mut db = self.plugin.db().clone();
         let mut data = SysDictData::get_by_id(&mut db, id as i64)
             .await
             .map_err(|_| RepositoryError::NotFound)?;
