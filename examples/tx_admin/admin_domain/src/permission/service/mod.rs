@@ -155,3 +155,6 @@ impl PermissionService {
         self.permission_repo.find_all_permissions().await
     }
 }
+
+#[cfg(test)]
+mod tests;

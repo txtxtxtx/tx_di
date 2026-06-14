@@ -5,11 +5,8 @@
 #[cfg(test)]
 mod user_service_tests {
     use std::sync::Arc;
-    use mockall::predicate::*;
-    use mockall::*;
     use tx_common::page::Page;
     use tx_error::AppResult;
-    use crate::shared::repository::RepositoryError;
     use crate::user::model::aggregate::User;
     use crate::user::model::value_object::{UserQuery, UserStatus};
     use crate::user::service::UserService;
@@ -90,6 +87,13 @@ mod user_service_tests {
         async fn find_all(&self) -> AppResult<std::collections::HashSet<crate::permission::model::value_object::PermissionCheck>> {
             Ok(std::collections::HashSet::new())
         }
+        async fn find_by_id(&self, _: u64) -> AppResult<Option<crate::permission::model::aggregate::Permission>> { Ok(None) }
+        async fn find_by_code(&self, _: &str) -> AppResult<Option<crate::permission::model::aggregate::Permission>> { Ok(None) }
+        async fn find_all_permissions(&self) -> AppResult<Vec<crate::permission::model::aggregate::Permission>> { Ok(vec![]) }
+        async fn insert(&self, _: &crate::permission::model::aggregate::Permission) -> AppResult<()> { Ok(()) }
+        async fn update(&self, _: &crate::permission::model::aggregate::Permission) -> AppResult<()> { Ok(()) }
+        async fn soft_delete(&self, _: u64) -> AppResult<()> { Ok(()) }
+        async fn exists_by_code(&self, _: &str) -> AppResult<bool> { Ok(false) }
     }
 
     fn make_user() -> User {

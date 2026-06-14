@@ -113,3 +113,6 @@ impl DepartmentService {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests;

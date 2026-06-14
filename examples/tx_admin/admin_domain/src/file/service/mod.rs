@@ -106,3 +106,6 @@ impl FileService {
         })
     }
 }
+
+#[cfg(test)]
+mod tests;

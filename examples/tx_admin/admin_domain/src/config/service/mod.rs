@@ -105,3 +105,6 @@ impl ConfigService {
         Ok(map)
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -141,3 +141,6 @@ impl MenuService {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests;

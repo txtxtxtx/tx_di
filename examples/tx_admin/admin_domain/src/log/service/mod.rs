@@ -96,3 +96,6 @@ impl LoginLogService {
         self.log_repo.clean_all().await
     }
 }
+
+#[cfg(test)]
+mod tests;

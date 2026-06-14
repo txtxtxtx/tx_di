@@ -159,3 +159,6 @@ impl DictDataService {
         Ok(map)
     }
 }
+
+#[cfg(test)]
+mod tests;

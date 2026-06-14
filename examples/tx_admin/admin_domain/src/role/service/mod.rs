@@ -168,3 +168,6 @@ impl RoleService {
         self.role_repo.unbind_users(role_id, &user_ids).await
     }
 }
+
+#[cfg(test)]
+mod tests;
