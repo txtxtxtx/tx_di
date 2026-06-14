@@ -8,10 +8,6 @@ license.workspace = true
 repository.workspace = true
 
 
-[features]
-default = ["mock"]
-mock = []
-
 [dependencies]
 admin_domain = { path = "../admin_domain" }
 admin_proto = { path = "../admin_proto" }
