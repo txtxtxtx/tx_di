@@ -39,6 +39,32 @@ impl AggregateRoot for Config {
 }
 
 impl Config {
+    /// 从持久化层恢复配置（不触发领域事件）
+    pub fn restore(
+        id: u64,
+        category: String,
+        config_type: i32,
+        name: String,
+        config_key: String,
+        value: String,
+        visible: i32,
+        remark: Option<String>,
+        audit: AuditFields,
+    ) -> Self {
+        Self {
+            id,
+            category,
+            config_type,
+            name,
+            config_key,
+            value,
+            visible,
+            remark,
+            audit,
+            events: Vec::new(),
+        }
+    }
+
     pub fn create(
         id: u64,
         category: String,

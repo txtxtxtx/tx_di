@@ -38,6 +38,30 @@ impl AggregateRoot for File {
 }
 
 impl File {
+    /// 从持久化层恢复文件（不触发领域事件）
+    pub fn restore(
+        id: u64,
+        config_id: Option<i32>,
+        name: String,
+        path: String,
+        url: String,
+        file_type: Option<String>,
+        size: i32,
+        audit: AuditFields,
+    ) -> Self {
+        Self {
+            id,
+            config_id,
+            name,
+            path,
+            url,
+            file_type,
+            size,
+            audit,
+            events: Vec::new(),
+        }
+    }
+
     pub fn create(
         id: u64,
         config_id: Option<i32>,
@@ -110,6 +134,28 @@ impl AggregateRoot for FileConfig {
 }
 
 impl FileConfig {
+    /// 从持久化层恢复文件配置（不触发领域事件）
+    pub fn restore(
+        id: i32,
+        name: String,
+        storage: i32,
+        remark: Option<String>,
+        master: i32,
+        config: String,
+        audit: AuditFields,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            storage,
+            remark,
+            master,
+            config,
+            audit,
+            events: Vec::new(),
+        }
+    }
+
     pub fn create(
         id: i32,
         name: String,

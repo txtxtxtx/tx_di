@@ -23,6 +23,35 @@ pub struct Department {
 }
 
 impl Department {
+    /// 从持久化层恢复部门（不触发领域事件）
+    pub fn restore(
+        id: u64,
+        name: String,
+        parent_id: u64,
+        sort: i32,
+        leader_user_id: Option<u64>,
+        phone: Option<String>,
+        email: Option<String>,
+        status: i32,
+        tenant_id: i32,
+        audit: AuditFields,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            parent_id,
+            sort,
+            leader_user_id,
+            phone,
+            email,
+            status,
+            tenant_id,
+            audit,
+            children: Vec::new(),
+            events: Vec::new(),
+        }
+    }
+
     pub fn create(
         id: u64,
         name: String,

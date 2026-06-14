@@ -36,6 +36,26 @@ impl AggregateRoot for DictType {
 }
 
 impl DictType {
+    /// 从持久化层恢复字典类型（不触发领域事件）
+    pub fn restore(
+        id: u64,
+        name: String,
+        dict_type: String,
+        status: i32,
+        remark: Option<String>,
+        audit: AuditFields,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            dict_type,
+            status,
+            remark,
+            audit,
+            events: Vec::new(),
+        }
+    }
+
     pub fn create(
         id: u64,
         name: String,
@@ -120,6 +140,34 @@ impl AggregateRoot for DictData {
 }
 
 impl DictData {
+    /// 从持久化层恢复字典数据（不触发领域事件）
+    pub fn restore(
+        id: u64,
+        sort: i32,
+        label: String,
+        value: String,
+        dict_type: String,
+        status: i32,
+        color_type: Option<String>,
+        css_class: Option<String>,
+        remark: Option<String>,
+        audit: AuditFields,
+    ) -> Self {
+        Self {
+            id,
+            sort,
+            label,
+            value,
+            dict_type,
+            status,
+            color_type,
+            css_class,
+            remark,
+            audit,
+            events: Vec::new(),
+        }
+    }
+
     pub fn create(
         id: u64,
         sort: i32,

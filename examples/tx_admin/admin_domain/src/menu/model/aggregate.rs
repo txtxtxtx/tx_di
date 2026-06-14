@@ -47,6 +47,45 @@ pub struct Menu {
 }
 
 impl Menu {
+    /// 从持久化层恢复菜单（不触发领域事件）
+    pub fn restore(
+        id: u64,
+        name: String,
+        permission: String,
+        types: i32,
+        sort: i32,
+        parent_id: u64,
+        path: Option<String>,
+        icon: Option<String>,
+        component: Option<String>,
+        component_name: Option<String>,
+        status: i32,
+        visible: i32,
+        keep_alive: i32,
+        tenant_id: i32,
+        audit: AuditFields,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            permission,
+            types,
+            sort,
+            parent_id,
+            path,
+            icon,
+            component,
+            component_name,
+            status,
+            visible,
+            keep_alive,
+            tenant_id,
+            audit,
+            children: Vec::new(),
+            events: Vec::new(),
+        }
+    }
+
     /// Create a new menu
     pub fn create(
         id: u64,

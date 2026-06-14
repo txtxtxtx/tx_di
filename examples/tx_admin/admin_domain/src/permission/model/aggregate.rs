@@ -22,6 +22,32 @@ pub struct Permission {
 }
 
 impl Permission {
+    /// 从持久化层恢复权限（不触发领域事件）
+    pub fn restore(
+        id: u64,
+        name: String,
+        permission_code: String,
+        permission_type: PermissionType,
+        parent_id: u64,
+        sort: i32,
+        description: Option<String>,
+        status: i32,
+        audit: AuditFields,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            permission_code,
+            permission_type,
+            parent_id,
+            sort,
+            description,
+            status,
+            audit,
+            events: Vec::new(),
+        }
+    }
+
     /// Create a new permission
     pub fn create(
         id: u64,

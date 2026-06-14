@@ -48,6 +48,46 @@ pub struct User {
 }
 
 impl User {
+    /// 从持久化层恢复用户（不触发领域事件）
+    pub fn restore(
+        id: u64,
+        username: String,
+        password: String,
+        nickname: String,
+        remark: Option<String>,
+        email: Option<String>,
+        mobile: Option<String>,
+        sex: Sex,
+        avatar: Option<String>,
+        status: UserStatus,
+        login_ip: Option<String>,
+        login_date: Option<Timestamp>,
+        tenant_id: TenantId,
+        audit: AuditFields,
+        role_ids: Vec<u64>,
+        dept_ids: Vec<u64>,
+    ) -> Self {
+        Self {
+            id,
+            username,
+            password,
+            nickname,
+            remark,
+            email,
+            mobile,
+            sex,
+            avatar,
+            status,
+            login_ip,
+            login_date,
+            tenant_id,
+            audit,
+            role_ids,
+            dept_ids,
+            events: Vec::new(),
+        }
+    }
+
     /// Create a new user
     pub fn create(
         id: u64,

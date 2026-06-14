@@ -26,6 +26,6 @@ tracing.workspace   = true
 chrono              = { workspace = true }
 tokio-stream        = { workspace = true }
 futures-core        = { workspace = true }
-toasty              = { version = "0.6", features = ["sqlite", "serde", "jiff"] }
+toasty              = { version = "0.7", features = ["sqlite", "serde", "jiff"] }
 jiff                = "0.2"
 bcrypt              = "0.16"

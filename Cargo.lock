@@ -84,6 +84,20 @@ dependencies = [
 [[package]]
 name = "admin_infra"
 version = "0.1.0"
+dependencies = [
+ "admin_domain",
+ "anyhow",
+ "async-trait",
+ "jiff",
+ "serde",
+ "toasty",
+ "tokio",
+ "tracing",
+ "tx-di-core",
+ "tx_common",
+ "tx_di_toasty",
+ "tx_error",
+]
 
 [[package]]
 name = "admin_macros"
@@ -1125,9 +1139,9 @@ dependencies = [
 
 [[package]]
 name = "btoi"
-version = "0.4.3"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9dd6407f73a9b8b6162d8a2ef999fe6afd7cc15902ebf42c5cd296addf17e0ad"
+checksum = "3b5ab9db53bcda568284df0fd39f6eac24ad6f7ba7ff1168b9e76eba6576b976"
 dependencies = [
  "num-traits",
 ]
@@ -3463,26 +3477,26 @@ checksum = "1d87ecb2933e8aeadb3e3a02b828fed80a7528047e68b4f424523a0981a3a084"
 
 [[package]]
 name = "mysql_async"
-version = "0.36.2"
+version = "0.37.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1d9585dc9058886ff3a1f48a23024dd1d054264dee7c5ae0e4bd640c953bee5"
+checksum = "3519e91b0d254ac1ffa495bc42053286cb2172ad7241d5b3b1b9f8a891f21ee2"
 dependencies = [
  "bytes",
  "crossbeam-queue",
+ "crossbeam-utils",
  "flate2",
  "futures-core",
  "futures-sink",
  "futures-util",
  "keyed_priority_queue",
- "lru 0.16.4",
+ "lru 0.18.0",
  "mysql_common",
  "native-tls",
  "pem",
  "percent-encoding",
- "rand 0.9.4",
+ "rand 0.10.1",
  "serde",
- "serde_json",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "thiserror 2.0.18",
  "tokio",
  "tokio-native-tls",
@@ -3493,9 +3507,9 @@ dependencies = [
 
 [[package]]
 name = "mysql_common"
-version = "0.35.5"
+version = "0.37.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbb9f371618ce723f095c61fbcdc36e8936956d2b62832f9c7648689b338e052"
+checksum = "4b42ced54aa8ac97226486337973f9bc3956e24f03a23e88a6e18f640959d6e2"
 dependencies = [
  "base64 0.22.1",
  "bitflags",
@@ -5800,9 +5814,9 @@ dependencies = [
 
 [[package]]
 name = "toasty"
-version = "0.6.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45ceadb6b554b29f2a29d23026d98c267b7e5635203a54be69b0d62a0bff33b2"
+checksum = "17bd9e42ba3c1aa195101d150ba281f3d426439e0d2b5991b4c7c6290204348f"
 dependencies = [
  "async-trait",
  "bit-set",
@@ -5830,9 +5844,9 @@ dependencies = [
 
 [[package]]
 name = "toasty-core"
-version = "0.6.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9582e63e379b54cf2e4940cedb3adfe1642c1ea4d7a71ca7cae7daa222852c0d"
+checksum = "7f06ecf2a9091a814d7cfa7edc39c24a791460431f55a0ee19c1b2cb4a15b98c"
 dependencies = [
  "async-trait",
  "bit-set",
@@ -5847,9 +5861,9 @@ dependencies = [
 
 [[package]]
 name = "toasty-driver-dynamodb"
-version = "0.6.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc8c00ba138c1f2cde2ebb625322326c76a3c2a750ee58c5af9de51a5733634e"
+checksum = "94e5b7c9fc5e3c10d1883beab14c7caec3def0e3903c518d6ed139818308c315"
 dependencies = [
  "async-trait",
  "aws-config",
@@ -5865,9 +5879,9 @@ dependencies = [
 
 [[package]]
 name = "toasty-driver-mysql"
-version = "0.6.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d7e3bbd056596c97d42a1af8a1067e47ed4f22695a2b6342c66e174fa83995f"
+checksum = "3f916b8020c7834fbb855557f667e3a8ae4d1c3d561cdacc27da1c0a995ef556"
 dependencies = [
  "async-trait",
  "jiff",
@@ -5883,9 +5897,9 @@ dependencies = [
 
 [[package]]
 name = "toasty-driver-postgresql"
-version = "0.6.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03757919a8d02176c451e903a05f906f570013702c405d053f92e09ef3e22fdd"
+checksum = "640ba7f423e027aa6f2088df3bbccb3ebb8f1c988b2d0796bb64e80fc1efa747"
 dependencies = [
  "async-trait",
  "fallible-iterator 0.2.0",
@@ -5899,23 +5913,21 @@ dependencies = [
  "rustls-pemfile",
  "rustls-platform-verifier",
  "rustls-webpki 0.103.12",
- "sha2 0.11.0",
  "toasty-core",
  "toasty-sql",
  "tokio",
  "tokio-postgres",
- "tokio-rustls 0.26.4",
+ "tokio-postgres-rustls",
  "tracing",
  "url",
  "uuid",
- "x509-cert",
 ]
 
 [[package]]
 name = "toasty-driver-sqlite"
-version = "0.6.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8b8e225927f95fe09f471981aed6e34cf9539c640c59171245eb4e1c2b0784a"
+checksum = "fd09e84ccfbd608949bc501c30e1c62334ddf07eb1c30976b2c470dfd19aef3e"
 dependencies = [
  "async-trait",
  "rusqlite",
@@ -5930,9 +5942,9 @@ dependencies = [
 
 [[package]]
 name = "toasty-macros"
-version = "0.6.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2e5ba9925ad344bf1f679cac1fb01db46929ac9c10c5a9b42623255d65603c1"
+checksum = "1d27469a13c35b53f3080ca24e4585f5cd2d1ba4dd71432125aa376759439131"
 dependencies = [
  "hashbrown 0.17.0",
  "heck 0.5.0",
@@ -5945,9 +5957,9 @@ dependencies = [
 
 [[package]]
 name = "toasty-sql"
-version = "0.6.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c37a2fb6d63578ea9231425fd1230a504b2438033fe01b08931c653402bf0f22"
+checksum = "2848a892303d9d63485a8f16d9c1b692b145c09940d2cdeefaf0f837e1bf6a49"
 dependencies = [
  "jiff",
  "serde_json",
@@ -6016,6 +6028,20 @@ dependencies = [
  "tokio",
  "tokio-util",
  "whoami",
+]
+
+[[package]]
+name = "tokio-postgres-rustls"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c2ad44aa0ae96db89c4742212ed41645b2f597311ff6e1945542a4d9fadc2fb"
+dependencies = [
+ "rustls 0.23.38",
+ "sha2 0.11.0",
+ "tokio",
+ "tokio-postgres",
+ "tokio-rustls 0.26.4",
+ "x509-cert",
 ]
 
 [[package]]

@@ -45,6 +45,46 @@ impl AggregateRoot for OperateLog {
 }
 
 impl OperateLog {
+    /// 从持久化层恢复操作日志（不触发领域事件）
+    pub fn restore(
+        id: u64,
+        trace_id: String,
+        user_id: u64,
+        user_type: i32,
+        log_type: String,
+        sub_type: String,
+        biz_id: u64,
+        action: String,
+        success: i32,
+        extra: String,
+        request_method: Option<String>,
+        request_url: Option<String>,
+        user_ip: Option<String>,
+        user_agent: Option<String>,
+        tenant_id: i32,
+        audit: AuditFields,
+    ) -> Self {
+        Self {
+            id,
+            trace_id,
+            user_id,
+            user_type,
+            log_type,
+            sub_type,
+            biz_id,
+            action,
+            success,
+            extra,
+            request_method,
+            request_url,
+            user_ip,
+            user_agent,
+            tenant_id,
+            audit,
+            events: Vec::new(),
+        }
+    }
+
     pub fn create(
         id: u64,
         trace_id: String,
@@ -135,6 +175,42 @@ impl AggregateRoot for LoginLog {
 }
 
 impl LoginLog {
+    /// 从持久化层恢复登录日志（不触发领域事件）
+    pub fn restore(
+        id: u64,
+        user_id: u64,
+        user_type: i32,
+        username: String,
+        login_ip: String,
+        login_location: Option<String>,
+        browser: Option<String>,
+        os: Option<String>,
+        login_type: String,
+        result: i32,
+        msg: Option<String>,
+        login_time: Timestamp,
+        tenant_id: i32,
+        audit: AuditFields,
+    ) -> Self {
+        Self {
+            id,
+            user_id,
+            user_type,
+            username,
+            login_ip,
+            login_location,
+            browser,
+            os,
+            login_type,
+            result,
+            msg,
+            login_time,
+            tenant_id,
+            audit,
+            events: Vec::new(),
+        }
+    }
+
     pub fn create(
         id: u64,
         user_id: u64,

@@ -7,4 +7,20 @@ license.workspace = true
 readme.workspace = true
 repository.workspace = true
 
+[features]
+default = []
+mock = []
+
 [dependencies]
+admin_domain = { path = "../admin_domain" }
+tx_di_toasty = { path = "../../../plugins/tx_di_toasty", features = ["sqlite"] }
+tx-di-core = { path = "../../../tx-di-core" }
+tx_error = { path = "../../../common/tx_error" }
+tx_common = { path = "../../../common/crates/tx_common" }
+toasty = "0.7"
+jiff = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }

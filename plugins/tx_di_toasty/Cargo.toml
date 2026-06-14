@@ -17,7 +17,7 @@ dynamodb = ["toasty/dynamodb"]
 [dependencies]
 tx_error = { workspace = true }
 tx-di-core = { path = "../../tx-di-core" }
-toasty = { version = "0.6", default-features = false, features = ["serde"] }
+toasty = { version = "0.7", default-features = false, features = ["serde"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }

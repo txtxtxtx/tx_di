@@ -37,6 +37,36 @@ pub struct Role {
 }
 
 impl Role {
+    /// 从持久化层恢复角色（不触发领域事件）
+    pub fn restore(
+        id: u64,
+        name: String,
+        code: String,
+        sort: i32,
+        data_scope: i32,
+        data_scope_dept_ids: Option<String>,
+        status: i32,
+        remark: Option<String>,
+        tenant_id: i32,
+        audit: AuditFields,
+        menu_ids: Vec<u64>,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            code,
+            sort,
+            data_scope,
+            data_scope_dept_ids,
+            status,
+            remark,
+            tenant_id,
+            audit,
+            menu_ids,
+            events: Vec::new(),
+        }
+    }
+
     /// Create a new role
     pub fn create(
         id: u64,

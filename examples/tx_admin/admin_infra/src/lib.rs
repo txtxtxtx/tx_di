@@ -1,14 +1,14 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! 基础设施层 - Toasty ORM Repository 实现
+//!
+//! 实现 domain 层定义的所有 Repository trait，
+//! 使用 toasty ORM 连接数据库（SQLite/PostgreSQL/MySQL）。
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub mod user;
+pub mod role;
+pub mod permission;
+pub mod menu;
+pub mod department;
+pub mod file;
+pub mod config;
+pub mod dictionary;
+pub mod log;
