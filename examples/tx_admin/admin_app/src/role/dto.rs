@@ -5,6 +5,7 @@ pub struct CreateRoleCommand {
     pub name: String,
     pub code: String,
     pub sort: i32,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub remark: Option<String>,
     pub menu_ids: Option<Vec<u64>>,
 }
@@ -16,6 +17,7 @@ pub struct UpdateRoleCommand {
     pub code: String,
     pub sort: i32,
     pub data_scope: i32,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub remark: Option<String>,
 }
 
@@ -27,7 +29,9 @@ pub struct AssignMenusCommand {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoleQueryRequest {
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub name: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub code: Option<String>,
     pub status: Option<i32>,
     pub page: i64,

@@ -7,9 +7,13 @@ pub struct CreateMenuCommand {
     pub types: i32,
     pub sort: i32,
     pub parent_id: u64,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub path: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub icon: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub component: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub component_name: Option<String>,
 }
 
@@ -21,9 +25,13 @@ pub struct UpdateMenuCommand {
     pub types: i32,
     pub sort: i32,
     pub parent_id: u64,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub path: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub icon: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub component: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub component_name: Option<String>,
     pub visible: i32,
     pub keep_alive: i32,
@@ -31,6 +39,7 @@ pub struct UpdateMenuCommand {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MenuQueryRequest {
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub name: Option<String>,
     pub status: Option<i32>,
     pub types: Option<i32>,

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 pub struct CreateDictTypeCommand {
     pub name: String,
     pub dict_type: String,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub remark: Option<String>,
 }
 
@@ -12,12 +13,15 @@ pub struct UpdateDictTypeCommand {
     pub id: u64,
     pub name: String,
     pub dict_type: String,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub remark: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DictTypeQueryRequest {
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub name: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub dict_type: Option<String>,
     pub status: Option<i32>,
     pub page: i64,
@@ -51,8 +55,11 @@ pub struct CreateDictDataCommand {
     pub label: String,
     pub value: String,
     pub dict_type: String,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub color_type: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub css_class: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub remark: Option<String>,
 }
 
@@ -63,14 +70,19 @@ pub struct UpdateDictDataCommand {
     pub label: String,
     pub value: String,
     pub dict_type: String,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub color_type: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub css_class: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub remark: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DictDataQueryRequest {
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub dict_type: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub label: Option<String>,
     pub status: Option<i32>,
     pub page: i64,

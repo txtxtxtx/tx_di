@@ -8,4 +8,5 @@ pub mod config;
 pub mod dictionary;
 pub mod log;
 pub mod auth;
+pub mod empty_string;
 mod plugin;

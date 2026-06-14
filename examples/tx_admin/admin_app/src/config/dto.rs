@@ -7,6 +7,7 @@ pub struct CreateConfigCommand {
     pub name: String,
     pub config_key: String,
     pub value: String,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub remark: Option<String>,
 }
 
@@ -19,13 +20,17 @@ pub struct UpdateConfigCommand {
     pub config_key: String,
     pub value: String,
     pub visible: i32,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub remark: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigQueryRequest {
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub name: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub category: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub config_key: Option<String>,
     pub config_type: Option<i32>,
     pub page: i64,

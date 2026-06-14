@@ -10,9 +10,12 @@ pub struct CreateUserCommand {
     pub username: String,
     pub password: String,
     pub nickname: String,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub email: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub mobile: Option<String>,
     pub sex: Option<Sex>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub remark: Option<String>,
     pub role_ids: Option<Vec<u64>>,
     pub dept_ids: Option<Vec<u64>>,
@@ -21,11 +24,15 @@ pub struct CreateUserCommand {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateUserCommand {
     pub user_id: u64,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub nickname: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub email: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub mobile: Option<String>,
     pub sex: Option<Sex>,
     pub status: Option<UserStatus>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub remark: Option<String>,
 }
 
@@ -49,8 +56,11 @@ pub struct AssignDeptsCommand {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserQueryRequest {
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub username: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub nickname: Option<String>,
+    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub mobile: Option<String>,
     pub status: Option<UserStatus>,
     pub dept_id: Option<u64>,
