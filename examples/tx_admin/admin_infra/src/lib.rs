@@ -12,6 +12,7 @@ pub mod file;
 pub mod config;
 pub mod dictionary;
 pub mod log;
+pub mod plugin;
 
 /// 注册所有 toasty 数据库模型
 ///
