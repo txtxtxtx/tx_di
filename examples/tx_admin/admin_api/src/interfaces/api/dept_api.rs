@@ -21,7 +21,8 @@ pub fn router() -> Router {
 fn map_dept(d: admin_app::department::dto::DeptResponse) -> DeptResponse { DeptResponse { id: d.id, name: d.name, parent_id: d.parent_id, sort: d.sort, leader_user_id: d.leader_user_id, phone: d.phone, email: d.email, status: d.status } }
 
 async fn create_dept(DiComp(dept): DiComp<DepartmentAppService>, Json(req): Json<CreateDeptRequest>) -> R<DeptResponse> {
-    let cmd = admin_app::department::dto::CreateDeptCommand { name: req.name, parent_id: req.parent_id, sort: req.sort, leader_user_id: req.leader_user_id, phone: req.phone, email: req.email };
+    use admin_app::empty_string::opt_filter;
+    let cmd = admin_app::department::dto::CreateDeptCommand { name: req.name, parent_id: req.parent_id, sort: req.sort, leader_user_id: req.leader_user_id, phone: opt_filter(req.phone), email: opt_filter(req.email) };
     match dept.create_dept(cmd, None).await { Ok(r) => R(ApiR::success(map_dept(r))), Err(e) => R(ApiRes::from(e).into_typed()) }
 }
 
@@ -30,7 +31,8 @@ async fn get_dept(DiComp(dept): DiComp<DepartmentAppService>, axum::extract::Pat
 }
 
 async fn update_dept(DiComp(dept): DiComp<DepartmentAppService>, axum::extract::Path(dept_id): axum::extract::Path<u64>, Json(req): Json<UpdateDeptRequest>) -> R<DeptResponse> {
-    let cmd = admin_app::department::dto::UpdateDeptCommand { dept_id, name: req.name, parent_id: req.parent_id, sort: req.sort, leader_user_id: req.leader_user_id, phone: req.phone, email: req.email };
+    use admin_app::empty_string::opt_filter;
+    let cmd = admin_app::department::dto::UpdateDeptCommand { dept_id, name: req.name, parent_id: req.parent_id, sort: req.sort, leader_user_id: req.leader_user_id, phone: opt_filter(req.phone), email: opt_filter(req.email) };
     match dept.update_dept(cmd, None).await { Ok(r) => R(ApiR::success(map_dept(r))), Err(e) => R(ApiRes::from(e).into_typed()) }
 }
 

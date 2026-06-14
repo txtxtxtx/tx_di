@@ -5,7 +5,6 @@ pub struct UploadFileCommand {
     pub name: String,
     pub path: String,
     pub url: String,
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub file_type: Option<String>,
     pub size: i32,
     pub config_id: Option<i32>,
@@ -13,9 +12,7 @@ pub struct UploadFileCommand {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileQueryRequest {
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub name: Option<String>,
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub file_type: Option<String>,
     pub config_id: Option<i32>,
     pub page: i64,

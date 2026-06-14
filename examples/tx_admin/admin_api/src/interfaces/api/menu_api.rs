@@ -21,7 +21,8 @@ pub fn router() -> Router {
 fn map_menu(m: admin_app::menu::dto::MenuResponse) -> MenuResponse { MenuResponse { id: m.id, name: m.name, permission: m.permission, types: m.types, sort: m.sort, parent_id: m.parent_id, path: m.path, icon: m.icon, component: m.component, component_name: m.component_name, status: m.status, visible: m.visible, keep_alive: m.keep_alive } }
 
 async fn create_menu(DiComp(menu): DiComp<MenuAppService>, Json(req): Json<CreateMenuRequest>) -> R<MenuResponse> {
-    let cmd = admin_app::menu::dto::CreateMenuCommand { name: req.name, permission: req.permission, types: req.types, sort: req.sort, parent_id: req.parent_id, path: None, icon: None, component: None, component_name: None };
+    use admin_app::empty_string::opt_filter;
+    let cmd = admin_app::menu::dto::CreateMenuCommand { name: req.name, permission: req.permission, types: req.types, sort: req.sort, parent_id: req.parent_id, path: opt_filter(req.path), icon: opt_filter(req.icon), component: opt_filter(req.component), component_name: opt_filter(req.component_name) };
     match menu.create_menu(cmd, None).await { Ok(r) => R(ApiR::success(map_menu(r))), Err(e) => R(ApiRes::from(e).into_typed()) }
 }
 
@@ -38,7 +39,8 @@ async fn get_menu(DiComp(menu): DiComp<MenuAppService>, axum::extract::Path(menu
 }
 
 async fn update_menu(DiComp(menu): DiComp<MenuAppService>, axum::extract::Path(menu_id): axum::extract::Path<u64>, Json(req): Json<UpdateMenuRequest>) -> R<MenuResponse> {
-    let cmd = admin_app::menu::dto::UpdateMenuCommand { menu_id, name: req.name, permission: req.permission, types: req.types, sort: req.sort, parent_id: req.parent_id, path: req.path, icon: req.icon, component: req.component, component_name: req.component_name, visible: req.visible, keep_alive: req.keep_alive };
+    use admin_app::empty_string::opt_filter;
+    let cmd = admin_app::menu::dto::UpdateMenuCommand { menu_id, name: req.name, permission: req.permission, types: req.types, sort: req.sort, parent_id: req.parent_id, path: opt_filter(req.path), icon: opt_filter(req.icon), component: opt_filter(req.component), component_name: opt_filter(req.component_name), visible: req.visible, keep_alive: req.keep_alive };
     match menu.update_menu(cmd, None).await { Ok(r) => R(ApiR::success(map_menu(r))), Err(e) => R(ApiRes::from(e).into_typed()) }
 }
 

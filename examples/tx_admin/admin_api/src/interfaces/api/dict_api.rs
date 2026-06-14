@@ -28,7 +28,8 @@ fn map_type(d: admin_app::dictionary::dto::DictTypeResponse) -> DictTypeResponse
 fn map_data(d: admin_app::dictionary::dto::DictDataResponse) -> DictDataResponse { DictDataResponse { id: d.id, sort: d.sort, label: d.label, value: d.value, dict_type: d.dict_type, status: d.status, color_type: d.color_type, css_class: d.css_class, remark: d.remark } }
 
 async fn create_dict_type(DiComp(dict_type): DiComp<DictTypeAppService>, Json(req): Json<CreateDictTypeRequest>) -> R<DictTypeResponse> {
-    let cmd = admin_app::dictionary::dto::CreateDictTypeCommand { name: req.name, dict_type: req.dict_type, remark: req.remark };
+    use admin_app::empty_string::opt_filter;
+    let cmd = admin_app::dictionary::dto::CreateDictTypeCommand { name: req.name, dict_type: req.dict_type, remark: opt_filter(req.remark) };
     match dict_type.create_dict_type(cmd, None).await { Ok(r) => R(ApiR::success(map_type(r))), Err(e) => R(ApiRes::from(e).into_typed()) }
 }
 
@@ -45,7 +46,8 @@ async fn get_dict_type(DiComp(dict_type): DiComp<DictTypeAppService>, axum::extr
 }
 
 async fn update_dict_type(DiComp(dict_type): DiComp<DictTypeAppService>, axum::extract::Path(id): axum::extract::Path<u64>, Json(req): Json<UpdateDictTypeRequest>) -> R<DictTypeResponse> {
-    let cmd = admin_app::dictionary::dto::UpdateDictTypeCommand { id, name: req.name, dict_type: req.dict_type, remark: req.remark };
+    use admin_app::empty_string::opt_filter;
+    let cmd = admin_app::dictionary::dto::UpdateDictTypeCommand { id, name: req.name, dict_type: req.dict_type, remark: opt_filter(req.remark) };
     match dict_type.update_dict_type(cmd, None).await { Ok(r) => R(ApiR::success(map_type(r))), Err(e) => R(ApiRes::from(e).into_typed()) }
 }
 
@@ -59,7 +61,8 @@ async fn list_dict_types(DiComp(dict_type): DiComp<DictTypeAppService>, Json(req
 }
 
 async fn create_dict_data(DiComp(dict_data): DiComp<DictDataAppService>, Json(req): Json<CreateDictDataRequest>) -> R<DictDataResponse> {
-    let cmd = admin_app::dictionary::dto::CreateDictDataCommand { sort: req.sort, label: req.label, value: req.value, dict_type: req.dict_type, color_type: req.color_type, css_class: req.css_class, remark: req.remark };
+    use admin_app::empty_string::opt_filter;
+    let cmd = admin_app::dictionary::dto::CreateDictDataCommand { sort: req.sort, label: req.label, value: req.value, dict_type: req.dict_type, color_type: opt_filter(req.color_type), css_class: opt_filter(req.css_class), remark: opt_filter(req.remark) };
     match dict_data.create_dict_data(cmd, None).await { Ok(r) => R(ApiR::success(map_data(r))), Err(e) => R(ApiRes::from(e).into_typed()) }
 }
 
@@ -76,7 +79,8 @@ async fn get_dict_data(DiComp(dict_data): DiComp<DictDataAppService>, axum::extr
 }
 
 async fn update_dict_data(DiComp(dict_data): DiComp<DictDataAppService>, axum::extract::Path(id): axum::extract::Path<u64>, Json(req): Json<UpdateDictDataRequest>) -> R<DictDataResponse> {
-    let cmd = admin_app::dictionary::dto::UpdateDictDataCommand { id, sort: req.sort, label: req.label, value: req.value, dict_type: req.dict_type, color_type: req.color_type, css_class: req.css_class, remark: req.remark };
+    use admin_app::empty_string::opt_filter;
+    let cmd = admin_app::dictionary::dto::UpdateDictDataCommand { id, sort: req.sort, label: req.label, value: req.value, dict_type: req.dict_type, color_type: opt_filter(req.color_type), css_class: opt_filter(req.css_class), remark: opt_filter(req.remark) };
     match dict_data.update_dict_data(cmd, None).await { Ok(r) => R(ApiR::success(map_data(r))), Err(e) => R(ApiRes::from(e).into_typed()) }
 }
 

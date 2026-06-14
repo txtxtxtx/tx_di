@@ -45,7 +45,6 @@ pub struct CreatePermissionCommand {
     pub permission_type: i32,
     pub parent_id: u64,
     pub sort: i32,
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub description: Option<String>,
 }
 
@@ -57,7 +56,6 @@ pub struct UpdatePermissionCommand {
     pub permission_type: i32,
     pub parent_id: u64,
     pub sort: i32,
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub description: Option<String>,
 }
 

@@ -20,7 +20,8 @@ pub fn router() -> Router {
 fn map_file(f: admin_app::file::dto::FileResponse) -> FileResponse { FileResponse { id: f.id, config_id: f.config_id, name: f.name, path: f.path, url: f.url, file_type: f.file_type, size: f.size } }
 
 async fn upload_file(DiComp(file_svc): DiComp<FileAppService>, Json(req): Json<UploadFileRequest>) -> R<FileResponse> {
-    let cmd = admin_app::file::dto::UploadFileCommand { name: req.name, path: req.path, url: req.url, file_type: req.file_type, size: req.size, config_id: req.config_id };
+    use admin_app::empty_string::opt_filter;
+    let cmd = admin_app::file::dto::UploadFileCommand { name: req.name, path: req.path, url: req.url, file_type: opt_filter(req.file_type), size: req.size, config_id: req.config_id };
     match file_svc.upload_file(cmd, None).await { Ok(r) => R(ApiR::success(map_file(r))), Err(e) => R(ApiRes::from(e).into_typed()) }
 }
 

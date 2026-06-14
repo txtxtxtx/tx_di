@@ -16,14 +16,10 @@ pub struct CreateOperateLogCommand {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OperateLogQueryRequest {
     pub user_id: Option<u64>,
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub log_type: Option<String>,
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub sub_type: Option<String>,
     pub success: Option<i32>,
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub begin_time: Option<String>,
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub end_time: Option<String>,
     pub page: i64,
     pub size: i64,
@@ -79,16 +75,11 @@ pub struct CreateLoginLogCommand {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoginLogQueryRequest {
     pub user_id: Option<u64>,
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub username: Option<String>,
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub login_ip: Option<String>,
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub login_type: Option<String>,
     pub result: Option<i32>,
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub begin_time: Option<String>,
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub end_time: Option<String>,
     pub page: i64,
     pub size: i64,

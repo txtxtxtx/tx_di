@@ -1,23 +1,20 @@
-//! 空字符串转 None 的 serde 辅助模块
+//! 空字符串转 None 辅助模块
 //!
-//! 前端发送 `""` 时，自动反序列化为 `None`。
-//!
-//! # 用法
-//! ```ignore
-//! #[derive(Deserialize)]
-//! struct MyDto {
-//!     #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string")]
-//!     pub remark: Option<String>,
-//! }
-//! ```
+//! 前端发送 `""` 时，转为 `None`。
+//! 用于 Proto 请求 → App Command 转换时处理空字符串。
 
-use serde::{Deserialize, Deserializer};
+/// 将空字符串转为 `None`
+///
+/// ```ignore
+/// use admin_app::empty_string::opt;
+///
+/// let s = opt(req.remark);  // "" → None, "hello" → Some("hello")
+/// ```
+pub fn opt(s: String) -> Option<String> {
+    if s.is_empty() { None } else { Some(s) }
+}
 
-/// 将空字符串 `""` 反序列化为 `None`，非空字符串为 `Some(s)`
-pub fn deserialize_optional_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let opt = Option::<String>::deserialize(deserializer)?;
-    Ok(opt.filter(|s| !s.is_empty()))
+/// 将 Option 中的空字符串转为 None
+pub fn opt_filter(s: Option<String>) -> Option<String> {
+    s.filter(|v| !v.is_empty())
 }

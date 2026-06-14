@@ -21,7 +21,8 @@ pub fn router() -> Router {
 fn map_config(c: admin_app::config::dto::ConfigResponse) -> ConfigResponse { ConfigResponse { id: c.id, category: c.category, config_type: c.config_type, name: c.name, config_key: c.config_key, value: c.value, visible: c.visible, remark: c.remark } }
 
 async fn create_config(DiComp(config): DiComp<ConfigAppService>, Json(req): Json<CreateConfigRequest>) -> R<ConfigResponse> {
-    let cmd = admin_app::config::dto::CreateConfigCommand { category: req.category, config_type: req.config_type, name: req.name, config_key: req.config_key, value: req.value, remark: req.remark };
+    use admin_app::empty_string::opt_filter;
+    let cmd = admin_app::config::dto::CreateConfigCommand { category: req.category, config_type: req.config_type, name: req.name, config_key: req.config_key, value: req.value, remark: opt_filter(req.remark) };
     match config.create_config(cmd, None).await { Ok(r) => R(ApiR::success(map_config(r))), Err(e) => R(ApiRes::from(e).into_typed()) }
 }
 
@@ -30,7 +31,8 @@ async fn get_config(DiComp(config): DiComp<ConfigAppService>, axum::extract::Pat
 }
 
 async fn update_config(DiComp(config): DiComp<ConfigAppService>, axum::extract::Path(config_id): axum::extract::Path<u64>, Json(req): Json<UpdateConfigRequest>) -> R<ConfigResponse> {
-    let cmd = admin_app::config::dto::UpdateConfigCommand { config_id, category: req.category, config_type: req.config_type, name: req.name, config_key: req.config_key, value: req.value, visible: req.visible, remark: req.remark };
+    use admin_app::empty_string::opt_filter;
+    let cmd = admin_app::config::dto::UpdateConfigCommand { config_id, category: req.category, config_type: req.config_type, name: req.name, config_key: req.config_key, value: req.value, visible: req.visible, remark: opt_filter(req.remark) };
     match config.update_config(cmd, None).await { Ok(r) => R(ApiR::success(map_config(r))), Err(e) => R(ApiRes::from(e).into_typed()) }
 }
 

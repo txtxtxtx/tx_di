@@ -28,7 +28,8 @@ fn map_role(r: admin_app::role::dto::RoleResponse) -> RoleResponse {
 }
 
 async fn create_role(DiComp(role): DiComp<RoleAppService>, Json(req): Json<CreateRoleRequest>) -> R<RoleResponse> {
-    let cmd = admin_app::role::dto::CreateRoleCommand { name: req.name, code: req.code, sort: req.sort, remark: req.remark, menu_ids: if req.menu_ids.is_empty() { None } else { Some(req.menu_ids) } };
+    use admin_app::empty_string::opt_filter;
+    let cmd = admin_app::role::dto::CreateRoleCommand { name: req.name, code: req.code, sort: req.sort, remark: opt_filter(req.remark), menu_ids: if req.menu_ids.is_empty() { None } else { Some(req.menu_ids) } };
     match role.create_role(cmd, None).await { Ok(r) => R(ApiR::success(map_role(r))), Err(e) => R(ApiRes::from(e).into_typed()) }
 }
 
@@ -37,7 +38,8 @@ async fn get_role(DiComp(role): DiComp<RoleAppService>, axum::extract::Path(role
 }
 
 async fn update_role(DiComp(role): DiComp<RoleAppService>, axum::extract::Path(role_id): axum::extract::Path<u64>, Json(req): Json<UpdateRoleRequest>) -> R<RoleResponse> {
-    let cmd = admin_app::role::dto::UpdateRoleCommand { role_id, name: req.name, code: req.code, sort: req.sort, data_scope: req.data_scope, remark: req.remark };
+    use admin_app::empty_string::opt_filter;
+    let cmd = admin_app::role::dto::UpdateRoleCommand { role_id, name: req.name, code: req.code, sort: req.sort, data_scope: req.data_scope, remark: opt_filter(req.remark) };
     match role.update_role(cmd, None).await { Ok(r) => R(ApiR::success(map_role(r))), Err(e) => R(ApiRes::from(e).into_typed()) }
 }
 

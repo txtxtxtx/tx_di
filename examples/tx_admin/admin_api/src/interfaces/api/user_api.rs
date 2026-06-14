@@ -36,14 +36,15 @@ async fn create_user(
     DiComp(user_svc): DiComp<UserAppService>,
     Json(req): Json<CreateUserRequest>,
 ) -> R<UserResponse> {
+    use admin_app::empty_string::opt_filter;
     let cmd = admin_app::user::dto::CreateUserCommand {
         username: req.username,
         password: req.password,
         nickname: req.nickname,
-        email: req.email,
-        mobile: req.mobile,
+        email: opt_filter(req.email),
+        mobile: opt_filter(req.mobile),
         sex: req.sex.map(Sex::from),
-        remark: req.remark,
+        remark: opt_filter(req.remark),
         role_ids: if req.role_ids.is_empty() { None } else { Some(req.role_ids) },
         dept_ids: if req.dept_ids.is_empty() { None } else { Some(req.dept_ids) },
     };
@@ -70,14 +71,15 @@ async fn update_user(
     axum::extract::Path(user_id): axum::extract::Path<u64>,
     Json(req): Json<UpdateUserRequest>,
 ) -> R<UserResponse> {
+    use admin_app::empty_string::opt_filter;
     let cmd = admin_app::user::dto::UpdateUserCommand {
         user_id,
-        nickname: req.nickname,
-        email: req.email,
-        mobile: req.mobile,
+        nickname: opt_filter(req.nickname),
+        email: opt_filter(req.email),
+        mobile: opt_filter(req.mobile),
         sex: req.sex.map(Sex::from),
         status: req.status.and_then(|s| UserStatus::try_from_i32(s).ok()),
-        remark: req.remark,
+        remark: opt_filter(req.remark),
     };
     match user_svc.update_user(cmd, None).await {
         Ok(r) => R(ApiR::success(r)),

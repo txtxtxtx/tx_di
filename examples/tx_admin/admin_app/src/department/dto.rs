@@ -6,9 +6,7 @@ pub struct CreateDeptCommand {
     pub parent_id: u64,
     pub sort: i32,
     pub leader_user_id: Option<u64>,
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub phone: Option<String>,
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub email: Option<String>,
 }
 
@@ -19,15 +17,12 @@ pub struct UpdateDeptCommand {
     pub parent_id: u64,
     pub sort: i32,
     pub leader_user_id: Option<u64>,
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub phone: Option<String>,
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub email: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeptQueryRequest {
-    #[serde(deserialize_with = "crate::empty_string::deserialize_optional_string", default)]
     pub name: Option<String>,
     pub status: Option<i32>,
 }
