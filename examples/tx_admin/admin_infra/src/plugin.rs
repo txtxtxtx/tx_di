@@ -4,7 +4,7 @@
 //! 1. `InfraPlugin` — 注册所有 toasty 模型（在 DB 连接之前）
 //! 2. `DbInitPlugin` — 检测首次启动，执行数据初始化（在 DB 连接之后）
 
-use tx_di_core::{tx_comp, App, CancellationToken, CompInit, RIE, async_method, get_sys_config, CONFIG_PATH};
+use tx_di_core::{tx_comp, App, CancellationToken, CompInit, RIE, async_method};
 use tx_di_toasty::{ToastyPlugin, ToastyDb, ToastyConfig};
 use std::sync::Arc;
 use tracing::{info, debug};
@@ -59,19 +59,6 @@ impl CompInit for DbInitPlugin {
     fn init_sort() -> i32 {
         // 在 ToastyPlugin（MAX-50）之后，确保 DB 已连接
         i32::MAX - 25
-    }
-}
-
-/// 检测数据库是否需要初始化
-///
-/// 通过查询 sys_user 表是否有数据来判断
-async fn needs_init(db: &ToastyDb) -> bool {
-    use crate::user::model::SysUser;
-
-    let mut db = db.clone();
-    match SysUser::all().count().exec(&mut db).await {
-        Ok(count) => count == 0,
-        Err(_) => true, // 表不存在也算需要初始化
     }
 }
 
