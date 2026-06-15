@@ -416,6 +416,7 @@ impl App {
         let app_handler = tokio::spawn(async move {
             if let Err(e) = App::run(app_clone.clone(), app_clone.shutdown_token.clone()).await {
                 tracing::error!("[di] App 初始化失败: {:?}", e);
+                std::process::exit(1);
             }
         });
 
