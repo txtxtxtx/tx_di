@@ -16,7 +16,7 @@ use dashmap::DashMap;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use tokio::signal;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -28,6 +28,19 @@ use tx_error::{CodeMsg, DiErr};
 /// 构建上下文,本质上就是一个map
 pub type InnerContext = DashMap<TypeId, CompRef>;
 
+/// 存储一些全局配置信息
+static SYS_CONFIG: LazyLock<DashMap<String,String>> = LazyLock::new(DashMap::new);
+
+/// 获取全局配置
+pub fn get_sys_config(key: &str) -> Option<String> {
+    SYS_CONFIG.get(key).map(|v| v.value().clone())
+}
+/// 设置全局配置
+pub fn set_sys_config(key: &str, value: String) {
+    SYS_CONFIG.insert(key.to_string(), value);
+}
+
+pub const CONFIG_PATH: &str = "config_path";
 /// 构建上下文
 pub struct BuildContext {
     /// TypeId → CompRef（使用 DashMap 支持并发访问）

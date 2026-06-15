@@ -35,3 +35,4 @@ pub use di::{BuildContext, scopes::Scope, App, InnerContext,
 };
 pub use tokio_util::sync::CancellationToken;
 
+pub use di::{set_sys_config,get_sys_config,CONFIG_PATH };

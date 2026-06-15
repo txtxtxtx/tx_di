@@ -5,6 +5,7 @@ use dashmap::DashMap;
 use serde::de::DeserializeOwned;
 use toml::Value::Table;
 use crate::{CompInit, ComponentDescriptor, CompRef, Scope};
+use crate::di::{set_sys_config, CONFIG_PATH};
 
 /// 全局配置文件
 pub struct AppAllConfig{
@@ -16,7 +17,8 @@ impl AppAllConfig {
         // 确定配置文件路径
         let final_config_path = if let Some(path) = config_path {
             path.into()
-        } else {
+        } 
+        else {
             // 默认使用可执行文件所在目录的 config/config.toml
             let exe_path = std::env::current_exe().unwrap_or_else(|e| {
                 panic!(
@@ -36,6 +38,8 @@ impl AppAllConfig {
 
             config_dir.join("config.toml")
         };
+        // 设置系统配置
+        set_sys_config(CONFIG_PATH, final_config_path.to_str().unwrap().to_string());
         let toml_value = Self::load_config(final_config_path.as_path());
         AppAllConfig {
             toml_value,
