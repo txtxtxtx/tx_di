@@ -2,56 +2,83 @@
 
 use axum::Json;
 use tx_di_axum::{R, Router};
-use tx_di_axum::aide::axum::routing::{get, post, put, delete};
+use axum::routing::{get, post, put, delete};
 use tx_di_axum::bound::DiComp;
 use admin_app::config::app_service::ConfigAppService;
 use admin_proto::{CreateConfigRequest, UpdateConfigRequest, ListConfigsRequest, ConfigResponse, Empty};
 use tx_common::{ApiR, ApiRes, Page};
+use tx_di_sa_token::sa_check_permission;
+use crate::error::ApiErr;
 
 pub fn router() -> Router {
     Router::new()
-        .api_route("/", post(create_config))
-        .api_route("/{config_id}", get(get_config))
-        .api_route("/{config_id}", put(update_config))
-        .api_route("/{config_id}", delete(delete_config))
-        .api_route("/list", post(list_configs))
-        .api_route("/key/{key}", get(get_config_by_key))
+        .route("/", post(create_config))
+        .route("/{config_id}", get(get_config))
+        .route("/{config_id}", put(update_config))
+        .route("/{config_id}", delete(delete_config))
+        .route("/list", post(list_configs))
+        .route("/key/{key}", get(get_config_by_key))
 }
 
 fn map_config(c: admin_app::config::dto::ConfigResponse) -> ConfigResponse { ConfigResponse { id: c.id, category: c.category, config_type: c.config_type, name: c.name, config_key: c.config_key, value: c.value, visible: c.visible, remark: c.remark } }
 
-async fn create_config(DiComp(config): DiComp<ConfigAppService>, Json(req): Json<CreateConfigRequest>) -> R<ConfigResponse> {
+#[sa_check_permission("config:create")]
+async fn create_config(
+    DiComp(config): DiComp<ConfigAppService>,
+    Json(req): Json<CreateConfigRequest>,
+) -> Result<R<ConfigResponse>, ApiErr> {
     use admin_app::empty_string::opt_filter;
     let cmd = admin_app::config::dto::CreateConfigCommand { category: req.category, config_type: req.config_type, name: req.name, config_key: req.config_key, value: req.value, remark: opt_filter(req.remark) };
-    match config.create_config(cmd, None).await { Ok(r) => R(ApiR::success(map_config(r))), Err(e) => R(ApiRes::from(e).into_typed()) }
+    let r = config.create_config(cmd, None).await?;
+    Ok(R(ApiR::success(map_config(r))))
 }
 
-async fn get_config(DiComp(config): DiComp<ConfigAppService>, axum::extract::Path(config_id): axum::extract::Path<u64>) -> R<ConfigResponse> {
-    match config.get_config(config_id).await { Ok(r) => R(ApiR::success(map_config(r))), Err(e) => R(ApiRes::from(e).into_typed()) }
+#[sa_check_permission("config:view")]
+async fn get_config(
+    DiComp(config): DiComp<ConfigAppService>,
+    axum::extract::Path(config_id): axum::extract::Path<u64>,
+) -> Result<R<ConfigResponse>, ApiErr> {
+    let r = config.get_config(config_id).await?;
+    Ok(R(ApiR::success(map_config(r))))
 }
 
-async fn update_config(DiComp(config): DiComp<ConfigAppService>, axum::extract::Path(config_id): axum::extract::Path<u64>, Json(req): Json<UpdateConfigRequest>) -> R<ConfigResponse> {
+#[sa_check_permission("config:update")]
+async fn update_config(
+    DiComp(config): DiComp<ConfigAppService>,
+    axum::extract::Path(config_id): axum::extract::Path<u64>,
+    Json(req): Json<UpdateConfigRequest>,
+) -> Result<R<ConfigResponse>, ApiErr> {
     use admin_app::empty_string::opt_filter;
     let cmd = admin_app::config::dto::UpdateConfigCommand { config_id, category: req.category, config_type: req.config_type, name: req.name, config_key: req.config_key, value: req.value, visible: req.visible, remark: opt_filter(req.remark) };
-    match config.update_config(cmd, None).await { Ok(r) => R(ApiR::success(map_config(r))), Err(e) => R(ApiRes::from(e).into_typed()) }
+    let r = config.update_config(cmd, None).await?;
+    Ok(R(ApiR::success(map_config(r))))
 }
 
-async fn delete_config(DiComp(config): DiComp<ConfigAppService>, axum::extract::Path(config_id): axum::extract::Path<u64>) -> R<Empty> {
-    match config.delete_config(config_id, None).await { Ok(()) => R(ApiRes::ok().into_typed()), Err(e) => R(ApiRes::from(e).into_typed()) }
+#[sa_check_permission("config:delete")]
+async fn delete_config(
+    DiComp(config): DiComp<ConfigAppService>,
+    axum::extract::Path(config_id): axum::extract::Path<u64>,
+) -> Result<R<Empty>, ApiErr> {
+    config.delete_config(config_id, None).await?;
+    Ok(R(ApiRes::ok().into_typed()))
 }
 
-async fn list_configs(DiComp(config): DiComp<ConfigAppService>, Json(req): Json<ListConfigsRequest>) -> R<Page<ConfigResponse>> {
+#[sa_check_permission("config:view")]
+async fn list_configs(
+    DiComp(config): DiComp<ConfigAppService>,
+    Json(req): Json<ListConfigsRequest>,
+) -> Result<R<Page<ConfigResponse>>, ApiErr> {
     let query = admin_app::config::dto::ConfigQueryRequest { name: req.name, category: req.category, config_key: req.config_key, config_type: req.config_type, page: req.page, size: req.page_size };
-    match config.get_config_page(query).await { Ok(page) => R(ApiR::success(Page::new(page.list.into_iter().map(map_config).collect(), page.page, page.size, page.total))), Err(e) => R(ApiRes::from(e).into_typed()) }
+    let page = config.get_config_page(query).await?;
+    Ok(R(ApiR::success(Page::new(page.list.into_iter().map(map_config).collect(), page.page, page.size, page.total))))
 }
 
 /// GET /api/config/key/{key}
+#[sa_check_permission("config:view")]
 async fn get_config_by_key(
     DiComp(config): DiComp<ConfigAppService>,
     axum::extract::Path(key): axum::extract::Path<String>,
-) -> R<ConfigResponse> {
-    match config.get_by_key(&key).await {
-        Ok(r) => R(ApiR::success(map_config(r))),
-        Err(e) => R(ApiRes::from(e).into_typed()),
-    }
+) -> Result<R<ConfigResponse>, ApiErr> {
+    let r = config.get_by_key(&key).await?;
+    Ok(R(ApiR::success(map_config(r))))
 }

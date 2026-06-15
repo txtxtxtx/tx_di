@@ -1,19 +1,22 @@
 //! 系统监控 HTTP API（示例 mock 数据）
 
 use tx_di_axum::{R, Router};
-use tx_di_axum::aide::axum::routing::get;
+use axum::routing::get;
 use admin_proto::{ServerInfo, OnlineUser, OnlineUserListResponse};
 use tx_common::ApiR;
+use tx_di_sa_token::sa_check_permission;
+use crate::error::ApiErr;
 
 pub fn router() -> Router {
     Router::new()
-        .api_route("/server", get(get_server_info))
-        .api_route("/online", get(get_online_users))
+        .route("/server", get(get_server_info))
+        .route("/online", get(get_online_users))
 }
 
 /// GET /api/monitor/server - 获取服务器信息
-async fn get_server_info() -> R<ServerInfo> {
-    R(ApiR::success(ServerInfo {
+#[sa_check_permission("system:view")]
+async fn get_server_info() -> Result<R<ServerInfo>, ApiErr> {
+    Ok(R(ApiR::success(ServerInfo {
         os_name: "Linux".to_string(),
         os_version: "5.15.0-78-generic".to_string(),
         hostname: "tx-admin-server".to_string(),
@@ -25,11 +28,12 @@ async fn get_server_info() -> R<ServerInfo> {
         total_disk: 512_000_000_000,   // 512 GB
         used_disk: 204_800_000_000,    // 200 GB
         disk_usage: 40.0,
-    }))
+    })))
 }
 
 /// GET /api/monitor/online - 获取在线用户列表
-async fn get_online_users() -> R<OnlineUserListResponse> {
+#[sa_check_permission("system:view")]
+async fn get_online_users() -> Result<R<OnlineUserListResponse>, ApiErr> {
     let users = vec![
         OnlineUser {
             user_id: 1,
@@ -51,5 +55,5 @@ async fn get_online_users() -> R<OnlineUserListResponse> {
         },
     ];
     let total = users.len() as u64;
-    R(ApiR::success(OnlineUserListResponse { users, total }))
+    Ok(R(ApiR::success(OnlineUserListResponse { users, total })))
 }

@@ -20,6 +20,7 @@ dependencies = [
  "async-trait",
  "axum 0.8.9",
  "prost 0.13.5",
+ "sa-token-core",
  "serde",
  "serde_json",
  "toasty",
