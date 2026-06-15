@@ -59,7 +59,7 @@ where
         let method = req.method().clone();
         let uri = req.uri().clone();
         let query = req.uri().query().unwrap_or("").to_string();
-        let path = req.uri().path().to_string();
+        // let path = req.uri().path().to_string();
 
         // 提取 Content-Type 头部
         let content_type = req

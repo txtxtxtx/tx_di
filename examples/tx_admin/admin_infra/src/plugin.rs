@@ -80,6 +80,7 @@ async fn needs_init(db: &ToastyDb) -> bool {
 /// 执行数据初始化
 ///
 /// 创建默认管理员账号、角色、权限等基础数据
+#[allow(dead_code)]
 async fn init_data(db: &ToastyDb) -> RIE<()> {
     use crate::user::model::SysUser;
     use crate::role::model::SysRole;

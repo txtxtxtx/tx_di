@@ -2,7 +2,7 @@
 
 use axum::Json;
 use tx_di_axum::{Router, R};
-use tx_di_axum::aide::axum::routing::{get, post};
+use tx_di_axum::aide::axum::routing::{post};
 use tx_di_axum::bound::DiComp;
 use admin_app::auth::app_service::AuthAppService;
 use admin_proto::{LoginRequest, GetUserInfoRequest, LogoutRequest, Empty};

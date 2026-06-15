@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use admin_domain::config::model::aggregate::Config;
 use crate::config::dto::*;
 use admin_domain::config::model::value_object::ConfigQuery;
 use admin_domain::config::service::ConfigService;

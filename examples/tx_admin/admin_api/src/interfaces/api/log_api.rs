@@ -2,7 +2,7 @@
 
 use axum::Json;
 use tx_di_axum::{R, Router};
-use tx_di_axum::aide::axum::routing::{get, post, delete};
+use tx_di_axum::aide::axum::routing::{ post, delete};
 use tx_di_axum::bound::DiComp;
 use admin_app::log::app_service::{OperateLogAppService, LoginLogAppService};
 use admin_proto::{CreateOperateLogRequest, ListOperateLogsRequest, OperateLogResponse, CreateLoginLogRequest, ListLoginLogsRequest, LoginLogResponse, DeleteLogsRequest, Empty};
