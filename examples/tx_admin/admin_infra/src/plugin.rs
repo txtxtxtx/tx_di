@@ -93,7 +93,7 @@ async fn init_data(db: &ToastyDb) -> RIE<()> {
     // 1. 创建默认管理员用户
     let password_hash = admin_domain::password::hash_password(DEFAULT_ADMIN_PASSWORD)
         .map_err(|e| anyhow::anyhow!("密码哈希失败: {}", e))?;
-    let admin_user = SysUser::create()
+    let _admin_user = SysUser::create()
         .id(1)
         .username("admin".to_string())
         .password_hash(password_hash)
@@ -115,7 +115,7 @@ async fn init_data(db: &ToastyDb) -> RIE<()> {
     info!("infra: 已创建默认管理员 admin/admin123");
 
     // 2. 创建默认角色
-    let admin_role = SysRole::create()
+    let _admin_role = SysRole::create()
         .id(1)
         .code("admin".to_string())
         .name("超级管理员".to_string())
@@ -132,7 +132,7 @@ async fn init_data(db: &ToastyDb) -> RIE<()> {
         .await
         .map_err(|e| anyhow::anyhow!("创建管理员角色失败: {}", e))?;
 
-    let normal_role = SysRole::create()
+    let _normal_role = SysRole::create()
         .id(2)
         .code("user".to_string())
         .name("普通用户".to_string())
