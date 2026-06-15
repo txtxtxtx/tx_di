@@ -41,12 +41,8 @@ async fn login(
     let user_id_str = r.user_id.to_string();
     let is_admin = r.role_ids.contains(&1);
     if is_admin {
-        // 超级管理员：设置所有权限
-        let all_perms: Vec<String> = admin_infra::seed::PERMISSIONS
-            .iter()
-            .map(|(_, code, _, _, _, _)| code.to_string())
-            .collect();
-        let _ = StpUtil::set_permissions(&user_id_str, all_perms).await;
+        // 超级管理员：设置 * 通配符权限，跳过所有权限检查
+        let _ = StpUtil::set_permissions(&user_id_str, vec!["*".to_string()]).await;
         let _ = StpUtil::set_roles(&user_id_str, vec!["admin".to_string()]).await;
     } else {
         // 普通用户：使用数据库中的权限

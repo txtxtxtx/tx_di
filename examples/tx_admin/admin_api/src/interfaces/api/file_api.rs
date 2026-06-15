@@ -7,7 +7,7 @@ use tx_di_axum::bound::DiComp;
 use admin_app::file::app_service::FileAppService;
 use admin_proto::{UploadFileRequest, ListFilesRequest, FileResponse, DownloadFileResponse, Empty};
 use tx_common::{ApiR, ApiRes, Page};
-use tx_di_sa_token::sa_check_permission;
+use crate::auth::ensure_permission;
 use crate::error::ApiErr;
 
 pub fn router() -> Router {
@@ -21,50 +21,50 @@ pub fn router() -> Router {
 
 fn map_file(f: admin_app::file::dto::FileResponse) -> FileResponse { FileResponse { id: f.id, config_id: f.config_id, name: f.name, path: f.path, url: f.url, file_type: f.file_type, size: f.size } }
 
-#[sa_check_permission("file:upload")]
 async fn upload_file(
     DiComp(file_svc): DiComp<FileAppService>,
     Json(req): Json<UploadFileRequest>,
 ) -> Result<R<FileResponse>, ApiErr> {
+    ensure_permission("file:upload").await?;
     use admin_app::empty_string::opt_filter;
     let cmd = admin_app::file::dto::UploadFileCommand { name: req.name, path: req.path, url: req.url, file_type: opt_filter(req.file_type), size: req.size, config_id: req.config_id };
     let r = file_svc.upload_file(cmd, None).await?;
     Ok(R(ApiR::success(map_file(r))))
 }
 
-#[sa_check_permission("file:view")]
 async fn get_file(
     DiComp(file_svc): DiComp<FileAppService>,
     axum::extract::Path(file_id): axum::extract::Path<u64>,
 ) -> Result<R<FileResponse>, ApiErr> {
+    ensure_permission("file:view").await?;
     let r = file_svc.get_file(file_id).await?;
     Ok(R(ApiR::success(map_file(r))))
 }
 
-#[sa_check_permission("file:delete")]
 async fn delete_file(
     DiComp(file_svc): DiComp<FileAppService>,
     axum::extract::Path(file_id): axum::extract::Path<u64>,
 ) -> Result<R<Empty>, ApiErr> {
+    ensure_permission("file:delete").await?;
     file_svc.delete_file(file_id, None).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 
-#[sa_check_permission("file:view")]
 async fn list_files(
     DiComp(file_svc): DiComp<FileAppService>,
     Json(req): Json<ListFilesRequest>,
 ) -> Result<R<Page<FileResponse>>, ApiErr> {
+    ensure_permission("file:view").await?;
     let query = admin_app::file::dto::FileQueryRequest { name: req.name, file_type: req.file_type, config_id: req.config_id, page: req.page, size: req.page_size };
     let page = file_svc.get_file_page(query).await?;
     Ok(R(ApiR::success(Page::new(page.list.into_iter().map(map_file).collect(), page.page, page.size, page.total))))
 }
 
-#[sa_check_permission("file:download")]
 async fn download_file(
     DiComp(file_svc): DiComp<FileAppService>,
     axum::extract::Path(file_id): axum::extract::Path<u64>,
 ) -> Result<R<DownloadFileResponse>, ApiErr> {
+    ensure_permission("file:download").await?;
     let r = file_svc.download_file(file_id).await?;
     Ok(R(ApiR::success(DownloadFileResponse { url: r.url, filename: r.filename, size: r.size as u64, content_type: r.content_type })))
 }

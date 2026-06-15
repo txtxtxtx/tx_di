@@ -12,7 +12,7 @@ use admin_proto::{
     ListPermissionsResponse, PermissionDetail, Empty,
 };
 use tx_common::{ApiR, ApiRes};
-use tx_di_sa_token::sa_check_permission;
+use crate::auth::ensure_permission;
 use crate::error::ApiErr;
 
 pub fn router() -> Router {
@@ -33,11 +33,11 @@ pub fn router() -> Router {
 // 原有查询 handlers
 // ============================================================
 
-#[sa_check_permission("permission:view")]
 async fn check_permission(
     DiComp(perm): DiComp<PermissionAppService>,
     Json(req): Json<PermissionCheckRequest>,
 ) -> Result<R<PermissionCheckResponse>, ApiErr> {
+    ensure_permission("permission:view").await?;
     let cmd = admin_app::permission::dto::PermissionCheckRequest {
         user_id: req.user_id,
         permission: req.permission,
@@ -46,11 +46,11 @@ async fn check_permission(
     Ok(R(ApiR::success(PermissionCheckResponse { has_permission: r.has_permission })))
 }
 
-#[sa_check_permission("permission:view")]
 async fn get_user_permissions(
     DiComp(perm): DiComp<PermissionAppService>,
     Json(req): Json<GetUserPermissionsRequest>,
 ) -> Result<R<UserPermissionsResponse>, ApiErr> {
+    ensure_permission("permission:view").await?;
     let r = perm.get_user_permissions(req.user_id).await?;
     Ok(R(ApiR::success(UserPermissionsResponse {
         user_id: r.user_id,
@@ -60,10 +60,10 @@ async fn get_user_permissions(
 }
 
 /// GET /api/permission/all
-#[sa_check_permission("permission:view")]
 async fn get_all_permissions(
     DiComp(perm): DiComp<PermissionAppService>,
 ) -> Result<R<Vec<UserPermissionItem>>, ApiErr> {
+    ensure_permission("permission:view").await?;
     let list = perm.get_all_permissions().await?;
     Ok(R(ApiR::success(list.into_iter().map(|p| UserPermissionItem {
         code: p.code,
@@ -90,11 +90,11 @@ fn map_permission_detail(r: admin_app::permission::dto::PermissionResponse) -> P
 }
 
 /// POST /api/permission/
-#[sa_check_permission("permission:create")]
 async fn create_permission(
     DiComp(perm): DiComp<PermissionAppService>,
     Json(req): Json<CreatePermissionRequest>,
 ) -> Result<R<PermissionDetail>, ApiErr> {
+    ensure_permission("permission:create").await?;
     let cmd = admin_app::permission::dto::CreatePermissionCommand {
         name: req.name,
         permission_code: req.permission_code,
@@ -108,22 +108,22 @@ async fn create_permission(
 }
 
 /// GET /api/permission/{id}
-#[sa_check_permission("permission:view")]
 async fn get_permission(
     DiComp(perm): DiComp<PermissionAppService>,
     axum::extract::Path(id): axum::extract::Path<u64>,
 ) -> Result<R<PermissionDetail>, ApiErr> {
+    ensure_permission("permission:view").await?;
     let r = perm.get_permission(id).await?;
     Ok(R(ApiR::success(map_permission_detail(r))))
 }
 
 /// PUT /api/permission/{id}
-#[sa_check_permission("permission:update")]
 async fn update_permission(
     DiComp(perm): DiComp<PermissionAppService>,
     axum::extract::Path(id): axum::extract::Path<u64>,
     Json(req): Json<UpdatePermissionRequest>,
 ) -> Result<R<PermissionDetail>, ApiErr> {
+    ensure_permission("permission:update").await?;
     let cmd = admin_app::permission::dto::UpdatePermissionCommand {
         id,
         name: req.name,
@@ -138,20 +138,20 @@ async fn update_permission(
 }
 
 /// DELETE /api/permission/{id}
-#[sa_check_permission("permission:delete")]
 async fn delete_permission(
     DiComp(perm): DiComp<PermissionAppService>,
     axum::extract::Path(id): axum::extract::Path<u64>,
 ) -> Result<R<Empty>, ApiErr> {
+    ensure_permission("permission:delete").await?;
     perm.delete_permission(id, None).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 
 /// GET /api/permission/list
-#[sa_check_permission("permission:view")]
 async fn list_permissions(
     DiComp(perm): DiComp<PermissionAppService>,
 ) -> Result<R<ListPermissionsResponse>, ApiErr> {
+    ensure_permission("permission:view").await?;
     let list = perm.get_permission_list().await?;
     Ok(R(ApiR::success(ListPermissionsResponse {
         permissions: list.into_iter().map(map_permission_detail).collect(),

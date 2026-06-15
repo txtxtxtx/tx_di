@@ -1,6 +1,7 @@
 mod plugin;
 mod interfaces;
 pub mod error;
+pub mod auth;
 
 use tx_di_core::BuildContext;
 

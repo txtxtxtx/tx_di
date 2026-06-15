@@ -4,7 +4,7 @@ use tx_di_axum::{R, Router};
 use axum::routing::get;
 use admin_proto::{ServerInfo, OnlineUser, OnlineUserListResponse};
 use tx_common::ApiR;
-use tx_di_sa_token::sa_check_permission;
+use crate::auth::ensure_permission;
 use crate::error::ApiErr;
 
 pub fn router() -> Router {
@@ -14,8 +14,8 @@ pub fn router() -> Router {
 }
 
 /// GET /api/monitor/server - 获取服务器信息
-#[sa_check_permission("system:view")]
 async fn get_server_info() -> Result<R<ServerInfo>, ApiErr> {
+    ensure_permission("system:view").await?;
     Ok(R(ApiR::success(ServerInfo {
         os_name: "Linux".to_string(),
         os_version: "5.15.0-78-generic".to_string(),
@@ -32,8 +32,8 @@ async fn get_server_info() -> Result<R<ServerInfo>, ApiErr> {
 }
 
 /// GET /api/monitor/online - 获取在线用户列表
-#[sa_check_permission("system:view")]
 async fn get_online_users() -> Result<R<OnlineUserListResponse>, ApiErr> {
+    ensure_permission("system:view").await?;
     let users = vec![
         OnlineUser {
             user_id: 1,
