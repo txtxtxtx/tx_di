@@ -4,8 +4,8 @@
 //! 1. `InfraPlugin` — 注册所有 toasty 模型（在 DB 连接之前）
 //! 2. `DbInitPlugin` — 检测首次启动，执行数据初始化（在 DB 连接之后）
 
-use tx_di_core::{tx_comp, App, CancellationToken, CompInit, RIE, async_method};
-use tx_di_toasty::{ToastyPlugin, ToastyDb};
+use tx_di_core::{tx_comp, App, CancellationToken, CompInit, RIE, async_method, get_sys_config, CONFIG_PATH};
+use tx_di_toasty::{ToastyPlugin, ToastyDb, ToastyConfig};
 use std::sync::Arc;
 use tracing::{info, debug};
 
@@ -44,16 +44,14 @@ impl CompInit for DbInitPlugin {
     async_method!(
         fn async_init_impl(ctx: Arc<App>, _token: CancellationToken) -> RIE<()> {
             let toasty_plugin = ctx.inject::<ToastyPlugin>();
+            let toasty_config = ctx.inject::<ToastyConfig>();
             let db = toasty_plugin.db();
-
-            if needs_init(db).await {
+            if toasty_config.auto_schema {
                 info!("infra: 检测到空数据库，开始初始化数据...");
                 init_data(db).await?;
-                info!("infra: 数据初始化完成");
-            } else {
+            } else{
                 debug!("infra: 数据库已有数据，跳过初始化");
             }
-
             Ok(())
         }
     );
