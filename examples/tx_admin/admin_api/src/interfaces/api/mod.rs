@@ -2,7 +2,7 @@
 //!
 //! Handler 通过 DiComp<T> 从 DI 容器注入 AppService，无需手动传递 App。
 
-mod auth_api;
+pub mod auth_api;
 mod user_api;
 mod role_api;
 mod menu_api;

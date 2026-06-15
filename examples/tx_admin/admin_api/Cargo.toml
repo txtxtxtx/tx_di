@@ -20,6 +20,7 @@ tx_common    = { path = "../../../common/crates/tx_common", features = ["axum"] 
 tx-di-core  = { path = "../../../tx-di-core" }
 tx_di_log   = { path = "../../../plugins/tx_di_log" }
 tx_di_axum  = { path = "../../../plugins/tx_di_axum" }
+tx_di_sa_token = { path = "../../../plugins/tx_di_sa_token", default-features = false, features = ["memory"] }
 
 # gRPC
 tonic  = { workspace = true }

@@ -17,7 +17,8 @@
       "Bash(cargo test *)",
       "Bash(rm -f examples/tx_admin/data/tx_admin.db)",
       "Bash(timeout 12 cargo run -p admin_api)",
-      "Bash(timeout 20 cargo run -p admin_api)"
+      "Bash(timeout 20 cargo run -p admin_api)",
+      "Bash(cargo update *)"
     ]
   }
 }

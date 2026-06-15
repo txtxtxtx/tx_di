@@ -134,7 +134,7 @@ prost = "0.13"
 prost-types = "0.13"
 tonic-build = "0.12"
 
-sa-token-plugin-axum = { version = "0.1.18", default-features = false }
+sa-token-plugin-axum = { version = "0.1.14", default-features = false, features = ["axum-08", "memory"] }
 
 # API 文档
 aide = { version = "0.14", features = ["axum", "axum-json", "redoc"] }

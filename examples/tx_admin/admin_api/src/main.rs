@@ -13,6 +13,8 @@ use admin_app;
 use admin_infra;
 #[allow(unused_imports)]
 use tx_di_toasty;
+#[allow(unused_imports)]
+use tx_di_sa_token;
 
 use tx_error::AppResult;
 

@@ -2,17 +2,25 @@
 
 use axum::Json;
 use tx_di_axum::{Router, R};
-use tx_di_axum::aide::axum::routing::{post};
 use tx_di_axum::bound::DiComp;
+use tx_di_sa_token::{StpUtil, LoginIdExtractor};
 use admin_app::auth::app_service::AuthAppService;
 use admin_proto::{LoginRequest, GetUserInfoRequest, LogoutRequest, Empty};
 use tx_common::{ApiR, ApiRes};
 
-pub fn router() -> Router {
+/// 公开路由（无需认证）
+pub fn open_router() -> Router {
+    use axum::routing::post;
     Router::new()
-        .api_route("/login", post(login))
-        .api_route("/user-info", post(user_info))
-        .api_route("/logout", post(logout))
+        .route("/api/auth/login", post(login))
+}
+
+/// 受保护路由（需要认证）
+pub fn router() -> Router {
+    use axum::routing::{get, post};
+    Router::new()
+        .route("/api/auth/user-info", get(user_info))
+        .route("/api/auth/logout", post(logout))
 }
 
 /// POST /api/auth/login
@@ -26,17 +34,29 @@ async fn login(
         login_ip: req.login_ip,
     };
     match auth.login(cmd).await {
-        Ok(r) => R(ApiR::success(r)),
+        Ok(r) => {
+            // 登录成功，设置 sa-token
+            match StpUtil::login(r.user_id.to_string()).await {
+                Ok(token) => {
+                    // token 附加在 msg 字段返回
+                    let mut resp = R(ApiR::success(r));
+                    resp.0.msg = token.to_string();
+                    resp
+                }
+                Err(e) => R(ApiRes::fail(format!("token 创建失败: {}", e)).into_typed()),
+            }
+        }
         Err(e) => R(ApiRes::from(e).into_typed()),
     }
 }
 
-/// POST /api/auth/user-info
+/// GET /api/auth/user-info
 async fn user_info(
     DiComp(auth): DiComp<AuthAppService>,
-    Json(req): Json<GetUserInfoRequest>,
+    LoginIdExtractor(login_id): LoginIdExtractor,
 ) -> R<admin_app::auth::dto::UserInfoResponse> {
-    match auth.get_user_info(req.user_id).await {
+    let user_id: u64 = login_id.parse().unwrap_or(0);
+    match auth.get_user_info(user_id).await {
         Ok(r) => R(ApiR::success(r)),
         Err(e) => R(ApiRes::from(e).into_typed()),
     }
@@ -44,14 +64,10 @@ async fn user_info(
 
 /// POST /api/auth/logout
 async fn logout(
-    DiComp(auth): DiComp<AuthAppService>,
-    Json(req): Json<LogoutRequest>,
+    DiComp(_auth): DiComp<AuthAppService>,
 ) -> R<Empty> {
-    let cmd = admin_app::auth::dto::LogoutCommand {
-        user_id: req.user_id,
-    };
-    match auth.logout(cmd).await {
-        Ok(()) => R(ApiRes::ok().into_typed()),
-        Err(e) => R(ApiRes::from(e).into_typed()),
+    match StpUtil::logout_current().await {
+        Ok(_) => R(ApiRes::ok().into_typed()),
+        Err(e) => R(ApiRes::fail(format!("登出失败: {}", e)).into_typed()),
     }
 }

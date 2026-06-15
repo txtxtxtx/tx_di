@@ -32,6 +32,7 @@ dependencies = [
  "tx_common",
  "tx_di_axum",
  "tx_di_log",
+ "tx_di_sa_token",
  "tx_di_toasty",
  "tx_error",
 ]

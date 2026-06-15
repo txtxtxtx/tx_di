@@ -2,6 +2,7 @@ use std::sync::Arc;
 use tracing::info;
 use tx_di_axum::WebPlugin;
 use tx_di_core::{App, CancellationToken, CompInit, RIE, async_method, tx_comp};
+use tx_di_sa_token::{SaTokenPlugin, SaTokenLayer, SaCheckLoginLayer};
 
 use crate::interfaces::api;
 
@@ -15,9 +16,24 @@ pub struct AdminPlugin;
 impl CompInit for AdminPlugin {
     async_method!(
         fn async_init_impl(ctx: Arc<App>, _token: CancellationToken) -> RIE<()> {
-            // 注册 HTTP 路由（通过 WebPlugin 全局注册表）
-            WebPlugin::add_router(api::router());
-            info!("admin HTTP 路由已注册");
+            // 获取 sa-token 状态
+            let sa_plugin = ctx.inject::<SaTokenPlugin>();
+            let sa_state = sa_plugin.state().clone();
+
+            // 构建路由：登录接口公开，其他接口需要认证
+            let open = api::auth_api::open_router();
+            let protected = api::router();
+
+            let router = tx_di_axum::Router::new()
+                .merge(open)
+                .merge(
+                    protected
+                        .layer(SaCheckLoginLayer::new())
+                        .layer(SaTokenLayer::new(sa_state))
+                );
+
+            WebPlugin::add_router(router);
+            info!("admin HTTP 路由已注册（含认证）");
             Ok(())
         }
     );
