@@ -36,6 +36,24 @@ async fn login(
     };
     let r = auth.login(cmd).await?;
     let token = StpUtil::login(r.user_id.to_string()).await?;
+
+    // 根据角色设置权限
+    let user_id_str = r.user_id.to_string();
+    let is_admin = r.role_ids.contains(&1);
+    if is_admin {
+        // 超级管理员：设置所有权限
+        let all_perms: Vec<String> = admin_infra::seed::PERMISSIONS
+            .iter()
+            .map(|(_, code, _, _, _, _)| code.to_string())
+            .collect();
+        let _ = StpUtil::set_permissions(&user_id_str, all_perms).await;
+        let _ = StpUtil::set_roles(&user_id_str, vec!["admin".to_string()]).await;
+    } else {
+        // 普通用户：使用数据库中的权限
+        let _ = StpUtil::set_permissions(&user_id_str, r.permissions.clone()).await;
+        let _ = StpUtil::set_roles(&user_id_str, vec!["user".to_string()]).await;
+    }
+
     let mut resp = R(ApiR::success(r));
     resp.0.msg = token.to_string();
     Ok(resp)
