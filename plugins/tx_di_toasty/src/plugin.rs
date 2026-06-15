@@ -27,11 +27,12 @@
 //! let db = app.inject::<ToastyPlugin>().db();
 //! ```
 
+use std::path::PathBuf;
 use crate::config::ToastyConfig;
 use std::sync::{Arc, OnceLock, RwLock};
 use toasty::ModelSet;
 use tokio_util::sync::CancellationToken;
-use tx_di_core::App;
+use tx_di_core::{get_sys_config, App, CONFIG_PATH};
 use tx_di_core::{CompInit, RIE, tx_comp};
 use crate::ToastyErr;
 
@@ -130,6 +131,60 @@ impl ToastyPlugin {
     pub fn try_db(&self) -> Option<&ToastyDb> {
         self.db.get()
     }
+
+    /// 将配置文件的
+    /// [toasty_config]
+    /// auto_schema = true 变为 false
+    fn change_auto_schema_closed(path: PathBuf) {
+        // 读取配置文件内容
+        let content = match std::fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::error!(path = %path.display(), error = %e, "读取配置文件失败");
+                return;
+            }
+        };
+        // 备份原始的配置文件
+        let backup_path = path.with_extension("bak");
+        if let Err(e) = std::fs::copy(&path, &backup_path) {
+            tracing::error!(path = %path.display(), error = %e, "备份配置文件失败");
+        }
+        // 解析 TOML
+        let mut toml_value: toml::Value = match toml::from_str(&content) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!(path = %path.display(), error = %e, "解析 TOML 配置文件失败");
+                return;
+            }
+        };
+
+        // 获取或创建 [toasty_config] 节，并设置 auto_schema = false
+        let table = toml_value.as_table_mut();
+        if let Some(table) = table {
+            let toasty_config = table
+                .entry("toasty_config")
+                .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+            if let Some(t) = toasty_config.as_table_mut() {
+                t.insert("auto_schema".to_string(), toml::Value::Boolean(false));
+            }
+        }
+
+        // 写回文件
+        let new_content = match toml::to_string(&toml_value) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!(path = %path.display(), error = %e, "序列化 TOML 配置失败");
+                return;
+            }
+        };
+
+        if let Err(e) = std::fs::write(&path, &new_content) {
+            tracing::error!(path = %path.display(), error = %e, "写入配置文件失败");
+            return;
+        }
+
+        tracing::info!(path = %path.display(), "已将 auto_schema 设置为 false");
+    }
 }
 
 impl CompInit for ToastyPlugin {
@@ -199,6 +254,9 @@ impl CompInit for ToastyPlugin {
                     .await
                     .map_err(|_| ToastyErr::SchemaPushFailed)?;
                 tracing::debug!("Schema 推送完成");
+                if let Some(config_path) = get_sys_config(CONFIG_PATH) {
+                    Self::change_auto_schema_closed(config_path.into());
+                }
             }
             // 写入 OnceLock
             if plugin.db.set(db).is_err() {
