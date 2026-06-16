@@ -1,5 +1,7 @@
 use toasty::Model;
 
+use crate::common::{Sex, Status, Deleted};
+
 /// 系统用户表
 #[derive(Debug, Clone, Model)]
 #[table = "sys_user"]
@@ -25,14 +27,14 @@ pub struct SysUser {
     #[default("".to_string())]
     pub mobile: String,
 
-    #[default(0)]
-    pub sex: i32,
+    #[default(Sex::Unknown)]
+    pub sex: Sex,
 
     #[default("".to_string())]
     pub avatar: String,
 
-    #[default(0)]
-    pub status: i32,
+    #[default(Status::Disabled)]
+    pub status: Status,
 
     #[default("".to_string())]
     pub login_ip: String,
@@ -55,8 +57,8 @@ pub struct SysUser {
     #[default("".to_string())]
     pub updated_at: String,
 
-    #[default(0)]
-    pub deleted: i32,
+    #[default(Deleted::No)]
+    pub deleted: Deleted,
 }
 
 /// 用户-角色关联表

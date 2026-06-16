@@ -12,6 +12,7 @@ use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
 use super::model::SysMenu;
+use crate::common::{Status, Deleted};
 
 /// Toasty 实现的 MenuRepository
 #[tx_comp(as_trait = dyn MenuRepository)]
@@ -36,7 +37,7 @@ impl ToastyMenuRepository {
             if m.icon.is_empty() { None } else { Some(m.icon.clone()) },
             if m.component.is_empty() { None } else { Some(m.component.clone()) },
             if m.component_name.is_empty() { None } else { Some(m.component_name.clone()) },
-            m.status,
+            i32::from(m.status),
             m.visible,
             m.keep_alive,
             m.tenant_id,
@@ -45,7 +46,7 @@ impl ToastyMenuRepository {
                 create_time: m.created_at.parse().unwrap_or_default(),
                 updater: if m.updater.is_empty() { None } else { Some(m.updater.clone()) },
                 update_time: m.updated_at.parse().unwrap_or_default(),
-                deleted: if m.deleted == 1 { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if m.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
     }
@@ -56,7 +57,7 @@ impl MenuRepository for ToastyMenuRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Menu>> {
         let mut db = self.plugin.db().clone();
         match SysMenu::get_by_id(&mut db, id as i64).await {
-            Ok(m) if m.deleted == 0 => Ok(Some(Self::to_domain(&m))),
+            Ok(m) if m.deleted == Deleted::No => Ok(Some(Self::to_domain(&m))),
             _ => Ok(None),
         }
     }
@@ -70,13 +71,13 @@ impl MenuRepository for ToastyMenuRepository {
 
         Ok(all
             .iter()
-            .filter(|m| m.deleted == 0)
+            .filter(|m| m.deleted == Deleted::No)
             .filter(|m| {
                 if let Some(ref name) = query.name {
                     if !m.name.contains(name.as_str()) { return false; }
                 }
                 if let Some(status) = query.status {
-                    if m.status != status { return false; }
+                    if i32::from(m.status) != status { return false; }
                 }
                 if let Some(types) = query.types {
                     if m.types != types { return false; }
@@ -96,7 +97,7 @@ impl MenuRepository for ToastyMenuRepository {
 
         Ok(all
             .iter()
-            .filter(|m| m.deleted == 0 && ids.contains(&(m.id as u64)))
+            .filter(|m| m.deleted == Deleted::No && ids.contains(&(m.id as u64)))
             .map(Self::to_domain)
             .collect())
     }
@@ -110,7 +111,7 @@ impl MenuRepository for ToastyMenuRepository {
 
         Ok(all
             .iter()
-            .filter(|m| m.deleted == 0 && m.parent_id == parent_id as i64)
+            .filter(|m| m.deleted == Deleted::No && m.parent_id == parent_id as i64)
             .map(Self::to_domain)
             .collect())
     }
@@ -129,7 +130,7 @@ impl MenuRepository for ToastyMenuRepository {
             .icon(menu.icon.clone().unwrap_or_default())
             .component(menu.component.clone().unwrap_or_default())
             .component_name(menu.component_name.clone().unwrap_or_default())
-            .status(menu.status)
+            .status(Status::from(menu.status))
             .visible(menu.visible)
             .keep_alive(menu.keep_alive)
             .tenant_id(menu.tenant_id)
@@ -137,7 +138,7 @@ impl MenuRepository for ToastyMenuRepository {
             .created_at(now.clone())
             .updater(menu.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(menu.audit.deleted as i32)
+            .deleted(Deleted::from(menu.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -162,13 +163,13 @@ impl MenuRepository for ToastyMenuRepository {
             .icon(menu.icon.clone().unwrap_or_default())
             .component(menu.component.clone().unwrap_or_default())
             .component_name(menu.component_name.clone().unwrap_or_default())
-            .status(menu.status)
+            .status(Status::from(menu.status))
             .visible(menu.visible)
             .keep_alive(menu.keep_alive)
             .tenant_id(menu.tenant_id)
             .updater(menu.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(menu.audit.deleted as i32)
+            .deleted(Deleted::from(menu.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -182,7 +183,7 @@ impl MenuRepository for ToastyMenuRepository {
             .map_err(|_| RepositoryError::NotFound)?;
 
         menu.update()
-            .deleted(1)
+            .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -196,6 +197,6 @@ impl MenuRepository for ToastyMenuRepository {
             .await
             .map_err(|_| RepositoryError::Database)?;
 
-        Ok(all.iter().any(|m| m.deleted == 0 && m.parent_id == parent_id as i64))
+        Ok(all.iter().any(|m| m.deleted == Deleted::No && m.parent_id == parent_id as i64))
     }
 }

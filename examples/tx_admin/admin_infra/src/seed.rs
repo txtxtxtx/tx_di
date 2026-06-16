@@ -3,6 +3,7 @@
 //! 定义系统初始化时的默认数据。
 //! 所有权限码在此统一管理，handler 通过 `#[sa_check_permission("code")]` 注解引用。
 
+use crate::common::{Sex, Status, Deleted};
 use crate::user::model::SysUser;
 use crate::role::model::SysRole;
 use crate::user::model::SysUserRole;
@@ -100,15 +101,15 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
         .nickname("超级管理员".to_string())
         .email("admin@example.com".to_string())
         .mobile("13800000000".to_string())
-        .sex(0)
+        .sex(Sex::Unknown)
         .avatar("".to_string())
-        .status(0)
+        .status(Status::Disabled)
         .tenant_id(0)
         .creator("system".to_string())
         .created_at(now.clone())
         .updater("system".to_string())
         .updated_at(now.clone())
-        .deleted(0)
+        .deleted(Deleted::No)
         .exec(&mut db)
         .await
         .map_err(|e| anyhow::anyhow!("创建管理员用户失败: {}", e))?;
@@ -121,13 +122,13 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
         .name("超级管理员".to_string())
         .sort(1)
         .data_scope(1)
-        .status(0)
+        .status(Status::Disabled)
         .remark("系统默认角色，拥有全部权限".to_string())
         .creator("system".to_string())
         .created_at(now.clone())
         .updater("system".to_string())
         .updated_at(now.clone())
-        .deleted(0)
+        .deleted(Deleted::No)
         .exec(&mut db)
         .await
         .map_err(|e| anyhow::anyhow!("创建管理员角色失败: {}", e))?;
@@ -138,13 +139,13 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
         .name("普通用户".to_string())
         .sort(2)
         .data_scope(5)
-        .status(0)
+        .status(Status::Disabled)
         .remark("普通用户角色".to_string())
         .creator("system".to_string())
         .created_at(now.clone())
         .updater("system".to_string())
         .updated_at(now.clone())
-        .deleted(0)
+        .deleted(Deleted::No)
         .exec(&mut db)
         .await
         .map_err(|e| anyhow::anyhow!("创建普通用户角色失败: {}", e))?;
@@ -168,13 +169,13 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
         .leader_user_id(1)
         .phone("".to_string())
         .email("".to_string())
-        .status(0)
+        .status(Status::Disabled)
         .tenant_id(0)
         .creator("system".to_string())
         .created_at(now.clone())
         .updater("system".to_string())
         .updated_at(now.clone())
-        .deleted(0)
+        .deleted(Deleted::No)
         .exec(&mut db)
         .await
         .map_err(|e| anyhow::anyhow!("创建根部门失败: {}", e))?;
@@ -190,12 +191,12 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
             .parent_id(*parent_id)
             .sort(*sort)
             .description(desc.to_string())
-            .status(0)
+            .status(Status::Disabled)
             .creator("system".to_string())
             .created_at(now.clone())
             .updater("system".to_string())
             .updated_at(now.clone())
-            .deleted(0)
+            .deleted(Deleted::No)
             .exec(&mut db)
             .await
             .map_err(|e| anyhow::anyhow!("创建权限 {} 失败: {}", code, e))?;

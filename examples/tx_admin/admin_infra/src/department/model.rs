@@ -1,5 +1,7 @@
 use toasty::Model;
 
+use crate::common::{Status, Deleted};
+
 /// 系统部门表
 #[derive(Debug, Clone, Model)]
 #[table = "sys_department"]
@@ -26,8 +28,8 @@ pub struct SysDepartment {
     #[default("".to_string())]
     pub email: String,
 
-    #[default(0)]
-    pub status: i32,
+    #[default(Status::Disabled)]
+    pub status: Status,
 
     #[default(0)]
     pub tenant_id: i32,
@@ -44,6 +46,6 @@ pub struct SysDepartment {
     #[default("".to_string())]
     pub updated_at: String,
 
-    #[default(0)]
-    pub deleted: i32,
+    #[default(Deleted::No)]
+    pub deleted: Deleted,
 }

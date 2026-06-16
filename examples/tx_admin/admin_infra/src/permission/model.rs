@@ -1,5 +1,7 @@
 use toasty::Model;
 
+use crate::common::{Status, Deleted};
+
 /// 系统权限表
 #[derive(Debug, Clone, Model)]
 #[table = "sys_permission"]
@@ -26,8 +28,8 @@ pub struct SysPermission {
     #[default("".to_string())]
     pub description: String,
 
-    #[default(0)]
-    pub status: i32,
+    #[default(Status::Disabled)]
+    pub status: Status,
 
     #[default("".to_string())]
     pub creator: String,
@@ -41,6 +43,6 @@ pub struct SysPermission {
     #[default("".to_string())]
     pub updated_at: String,
 
-    #[default(0)]
-    pub deleted: i32,
+    #[default(Deleted::No)]
+    pub deleted: Deleted,
 }

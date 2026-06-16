@@ -13,6 +13,7 @@ use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
 use super::model::{SysLoginLog, SysOperateLog};
+use crate::common::Deleted;
 
 /// Toasty 实现的 OperateLogRepository
 #[tx_comp(as_trait = dyn OperateLogRepository)]
@@ -47,7 +48,7 @@ impl ToastyOperateLogRepository {
                 create_time: l.created_at.parse().unwrap_or_default(),
                 updater: if l.updater.is_empty() { None } else { Some(l.updater.clone()) },
                 update_time: l.updated_at.parse().unwrap_or_default(),
-                deleted: if l.deleted == 1 { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if l.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
     }
@@ -58,7 +59,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<OperateLog>> {
         let mut db = self.plugin.db().clone();
         match SysOperateLog::get_by_id(&mut db, id as i64).await {
-            Ok(l) if l.deleted == 0 => Ok(Some(Self::to_domain(&l))),
+            Ok(l) if l.deleted == Deleted::No => Ok(Some(Self::to_domain(&l))),
             _ => Ok(None),
         }
     }
@@ -72,7 +73,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
 
         let filtered: Vec<&SysOperateLog> = all
             .iter()
-            .filter(|l| l.deleted == 0)
+            .filter(|l| l.deleted == Deleted::No)
             .filter(|l| {
                 if let Some(user_id) = query.user_id {
                     if l.user_id != user_id as i64 { return false; }
@@ -127,7 +128,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
             .created_at(now.clone())
             .updater(log.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(log.audit.deleted as i32)
+            .deleted(Deleted::from(log.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -193,7 +194,7 @@ impl ToastyLoginLogRepository {
                 create_time: l.created_at.parse().unwrap_or_default(),
                 updater: if l.updater.is_empty() { None } else { Some(l.updater.clone()) },
                 update_time: l.updated_at.parse().unwrap_or_default(),
-                deleted: if l.deleted == 1 { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if l.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
     }
@@ -204,7 +205,7 @@ impl LoginLogRepository for ToastyLoginLogRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<LoginLog>> {
         let mut db = self.plugin.db().clone();
         match SysLoginLog::get_by_id(&mut db, id as i64).await {
-            Ok(l) if l.deleted == 0 => Ok(Some(Self::to_domain(&l))),
+            Ok(l) if l.deleted == Deleted::No => Ok(Some(Self::to_domain(&l))),
             _ => Ok(None),
         }
     }
@@ -218,7 +219,7 @@ impl LoginLogRepository for ToastyLoginLogRepository {
 
         let filtered: Vec<&SysLoginLog> = all
             .iter()
-            .filter(|l| l.deleted == 0)
+            .filter(|l| l.deleted == Deleted::No)
             .filter(|l| {
                 if let Some(user_id) = query.user_id {
                     if l.user_id != user_id as i64 { return false; }
@@ -274,7 +275,7 @@ impl LoginLogRepository for ToastyLoginLogRepository {
             .created_at(now.clone())
             .updater(log.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(log.audit.deleted as i32)
+            .deleted(Deleted::from(log.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;

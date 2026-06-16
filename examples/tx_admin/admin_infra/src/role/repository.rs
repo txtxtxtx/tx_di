@@ -15,6 +15,7 @@ use tx_error::AppResult;
 
 use super::model::{SysRole, SysRoleMenu};
 use crate::user::model::{SysUser, SysUserRole};
+use crate::common::{Status, Deleted};
 
 /// Toasty 实现的 RoleRepository
 #[tx_comp(as_trait = dyn RoleRepository)]
@@ -35,7 +36,7 @@ impl ToastyRoleRepository {
             r.sort,
             r.data_scope,
             if r.data_scope_dept_ids.is_empty() { None } else { Some(r.data_scope_dept_ids.clone()) },
-            r.status,
+            i32::from(r.status),
             if r.remark.is_empty() { None } else { Some(r.remark.clone()) },
             r.tenant_id,
             AuditFields {
@@ -43,7 +44,7 @@ impl ToastyRoleRepository {
                 create_time: r.created_at.parse().unwrap_or_default(),
                 updater: if r.updater.is_empty() { None } else { Some(r.updater.clone()) },
                 update_time: r.updated_at.parse().unwrap_or_default(),
-                deleted: if r.deleted == 1 { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if r.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
             menu_ids,
         )
@@ -83,7 +84,7 @@ impl ToastyRoleRepository {
                 create_time: u.created_at.parse().unwrap_or_default(),
                 updater: if u.updater.is_empty() { None } else { Some(u.updater.clone()) },
                 update_time: u.updated_at.parse().unwrap_or_default(),
-                deleted: if u.deleted == 1 { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if u.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
             Vec::new(),
             Vec::new(),
@@ -96,7 +97,7 @@ impl RoleRepository for ToastyRoleRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Role>> {
         let mut db = self.plugin.db().clone();
         match SysRole::get_by_id(&mut db, id as i64).await {
-            Ok(r) if r.deleted == 0 => Ok(Some(self.to_full_domain(&r).await?)),
+            Ok(r) if r.deleted == Deleted::No => Ok(Some(self.to_full_domain(&r).await?)),
             _ => Ok(None),
         }
     }
@@ -109,7 +110,7 @@ impl RoleRepository for ToastyRoleRepository {
             .await
             .map_err(|_| RepositoryError::Database)?;
         match role {
-            Some(r) if r.deleted == 0 => Ok(Some(self.to_full_domain(&r).await?)),
+            Some(r) if r.deleted == Deleted::No => Ok(Some(self.to_full_domain(&r).await?)),
             _ => Ok(None),
         }
     }
@@ -123,7 +124,7 @@ impl RoleRepository for ToastyRoleRepository {
 
         let mut roles = Vec::new();
         for r in all {
-            if r.deleted == 0 && ids.contains(&(r.id as u64)) {
+            if r.deleted == Deleted::No && ids.contains(&(r.id as u64)) {
                 roles.push(self.to_full_domain(&r).await?);
             }
         }
@@ -139,7 +140,7 @@ impl RoleRepository for ToastyRoleRepository {
 
         let filtered: Vec<SysRole> = all
             .into_iter()
-            .filter(|r| r.deleted == 0)
+            .filter(|r| r.deleted == Deleted::No)
             .filter(|r| {
                 if let Some(ref name) = query.name {
                     if !r.name.contains(name.as_str()) { return false; }
@@ -148,7 +149,7 @@ impl RoleRepository for ToastyRoleRepository {
                     if !r.code.contains(code.as_str()) { return false; }
                 }
                 if let Some(status) = query.status {
-                    if r.status != status { return false; }
+                    if i32::from(r.status) != status { return false; }
                 }
                 true
             })
@@ -174,7 +175,7 @@ impl RoleRepository for ToastyRoleRepository {
             .map_err(|_| RepositoryError::Database)?;
 
         let mut roles = Vec::new();
-        for r in all.into_iter().filter(|r| r.deleted == 0) {
+        for r in all.into_iter().filter(|r| r.deleted == Deleted::No) {
             if let Some(ref name) = query.name {
                 if !r.name.contains(name.as_str()) { continue; }
             }
@@ -182,7 +183,7 @@ impl RoleRepository for ToastyRoleRepository {
                 if !r.code.contains(code.as_str()) { continue; }
             }
             if let Some(status) = query.status {
-                if r.status != status { continue; }
+                if i32::from(r.status) != status { continue; }
             }
             roles.push(self.to_full_domain(&r).await?);
         }
@@ -199,14 +200,14 @@ impl RoleRepository for ToastyRoleRepository {
             .sort(role.sort)
             .data_scope(role.data_scope)
             .data_scope_dept_ids(role.data_scope_dept_ids.clone().unwrap_or_default())
-            .status(role.status)
+            .status(Status::from(role.status))
             .remark(role.remark.clone().unwrap_or_default())
             .tenant_id(role.tenant_id)
             .creator(role.audit.creator.clone().unwrap_or_default())
             .created_at(now.clone())
             .updater(role.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(role.audit.deleted as i32)
+            .deleted(Deleted::from(role.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -237,12 +238,12 @@ impl RoleRepository for ToastyRoleRepository {
             .sort(role.sort)
             .data_scope(role.data_scope)
             .data_scope_dept_ids(role.data_scope_dept_ids.clone().unwrap_or_default())
-            .status(role.status)
+            .status(Status::from(role.status))
             .remark(role.remark.clone().unwrap_or_default())
             .tenant_id(role.tenant_id)
             .updater(role.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(role.audit.deleted as i32)
+            .deleted(Deleted::from(role.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -257,7 +258,7 @@ impl RoleRepository for ToastyRoleRepository {
             .map_err(|_| RepositoryError::NotFound)?;
 
         role.update()
-            .deleted(1)
+            .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -272,7 +273,7 @@ impl RoleRepository for ToastyRoleRepository {
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
-        Ok(role.map(|r| r.deleted == 0).unwrap_or(false))
+        Ok(role.map(|r| r.deleted == Deleted::No).unwrap_or(false))
     }
 
     async fn bind_menus(&self, role_id: u64, menu_ids: &[u64]) -> AppResult<()> {
@@ -323,7 +324,7 @@ impl RoleRepository for ToastyRoleRepository {
         let mut users = Vec::new();
         for ur in user_roles {
             if let Ok(u) = SysUser::get_by_id(&mut db, ur.user_id).await {
-                if u.deleted == 0 {
+                if u.deleted == Deleted::No {
                     users.push(Self::sys_user_to_domain(&u));
                 }
             }

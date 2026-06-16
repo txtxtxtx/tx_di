@@ -1,5 +1,7 @@
 use toasty::Model;
 
+use crate::common::{Status, Deleted};
+
 /// 系统角色表
 #[derive(Debug, Clone, Model)]
 #[table = "sys_role"]
@@ -23,8 +25,8 @@ pub struct SysRole {
     #[default("".to_string())]
     pub data_scope_dept_ids: String,
 
-    #[default(0)]
-    pub status: i32,
+    #[default(Status::Disabled)]
+    pub status: Status,
 
     #[default("".to_string())]
     pub remark: String,
@@ -44,8 +46,8 @@ pub struct SysRole {
     #[default("".to_string())]
     pub updated_at: String,
 
-    #[default(0)]
-    pub deleted: i32,
+    #[default(Deleted::No)]
+    pub deleted: Deleted,
 }
 
 /// 角色-菜单关联表

@@ -1,5 +1,7 @@
 use toasty::Model;
 
+use crate::common::{Status, Deleted};
+
 /// 字典类型表
 #[derive(Debug, Clone, Model)]
 #[table = "sys_dict_type"]
@@ -14,8 +16,8 @@ pub struct SysDictType {
     #[unique]
     pub dict_type: String,
 
-    #[default(0)]
-    pub status: i32,
+    #[default(Status::Disabled)]
+    pub status: Status,
 
     #[default("".to_string())]
     pub remark: String,
@@ -32,8 +34,8 @@ pub struct SysDictType {
     #[default("".to_string())]
     pub updated_at: String,
 
-    #[default(0)]
-    pub deleted: i32,
+    #[default(Deleted::No)]
+    pub deleted: Deleted,
 }
 
 /// 字典数据表
@@ -56,8 +58,8 @@ pub struct SysDictData {
     #[index]
     pub dict_type: String,
 
-    #[default(0)]
-    pub status: i32,
+    #[default(Status::Disabled)]
+    pub status: Status,
 
     #[default("".to_string())]
     pub color_type: String,
@@ -80,6 +82,6 @@ pub struct SysDictData {
     #[default("".to_string())]
     pub updated_at: String,
 
-    #[default(0)]
-    pub deleted: i32,
+    #[default(Deleted::No)]
+    pub deleted: Deleted,
 }

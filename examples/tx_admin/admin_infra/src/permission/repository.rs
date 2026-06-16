@@ -16,6 +16,7 @@ use super::model::SysPermission;
 use crate::menu::model::SysMenu;
 use crate::role::model::SysRoleMenu;
 use crate::user::model::SysUserRole;
+use crate::common::{Status, Deleted};
 
 /// Toasty 实现的 PermissionRepository
 #[tx_comp(as_trait = dyn PermissionRepository)]
@@ -37,13 +38,13 @@ impl ToastyPermissionRepository {
             p.parent_id as u64,
             p.sort,
             if p.description.is_empty() { None } else { Some(p.description.clone()) },
-            p.status,
+            i32::from(p.status),
             AuditFields {
                 creator: if p.creator.is_empty() { None } else { Some(p.creator.clone()) },
                 create_time: p.created_at.parse().unwrap_or_default(),
                 updater: if p.updater.is_empty() { None } else { Some(p.updater.clone()) },
                 update_time: p.updated_at.parse().unwrap_or_default(),
-                deleted: if p.deleted == 1 { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if p.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
     }
@@ -68,7 +69,7 @@ impl ToastyPermissionRepository {
 
             for rm in role_menus {
                 if let Ok(menu) = SysMenu::get_by_id(&mut db, rm.menu_id).await {
-                    if menu.types == 2 && menu.deleted == 0 && !menu.permission.is_empty() {
+                    if menu.types == 2 && menu.deleted == Deleted::No && !menu.permission.is_empty() {
                         codes.insert(menu.permission.clone());
                     }
                 }
@@ -105,7 +106,7 @@ impl PermissionRepository for ToastyPermissionRepository {
 
         Ok(all
             .iter()
-            .filter(|p| p.deleted == 0)
+            .filter(|p| p.deleted == Deleted::No)
             .map(Self::to_check)
             .collect())
     }
@@ -113,7 +114,7 @@ impl PermissionRepository for ToastyPermissionRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Permission>> {
         let mut db = self.plugin.db().clone();
         match SysPermission::get_by_id(&mut db, id as i64).await {
-            Ok(p) if p.deleted == 0 => Ok(Some(Self::to_domain(&p))),
+            Ok(p) if p.deleted == Deleted::No => Ok(Some(Self::to_domain(&p))),
             _ => Ok(None),
         }
     }
@@ -126,7 +127,7 @@ impl PermissionRepository for ToastyPermissionRepository {
             .await
             .map_err(|_| RepositoryError::Database)?;
         match perm {
-            Some(p) if p.deleted == 0 => Ok(Some(Self::to_domain(&p))),
+            Some(p) if p.deleted == Deleted::No => Ok(Some(Self::to_domain(&p))),
             _ => Ok(None),
         }
     }
@@ -140,7 +141,7 @@ impl PermissionRepository for ToastyPermissionRepository {
 
         Ok(all
             .iter()
-            .filter(|p| p.deleted == 0)
+            .filter(|p| p.deleted == Deleted::No)
             .map(Self::to_domain)
             .collect())
     }
@@ -156,12 +157,12 @@ impl PermissionRepository for ToastyPermissionRepository {
             .parent_id(permission.parent_id as i64)
             .sort(permission.sort)
             .description(permission.description.clone().unwrap_or_default())
-            .status(permission.status)
+            .status(Status::from(permission.status))
             .creator(permission.audit.creator.clone().unwrap_or_default())
             .created_at(now.clone())
             .updater(permission.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(permission.audit.deleted as i32)
+            .deleted(Deleted::from(permission.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -183,10 +184,10 @@ impl PermissionRepository for ToastyPermissionRepository {
             .parent_id(permission.parent_id as i64)
             .sort(permission.sort)
             .description(permission.description.clone().unwrap_or_default())
-            .status(permission.status)
+            .status(Status::from(permission.status))
             .updater(permission.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(permission.audit.deleted as i32)
+            .deleted(Deleted::from(permission.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -200,7 +201,7 @@ impl PermissionRepository for ToastyPermissionRepository {
             .map_err(|_| RepositoryError::NotFound)?;
 
         perm.update()
-            .deleted(1)
+            .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -214,6 +215,6 @@ impl PermissionRepository for ToastyPermissionRepository {
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
-        Ok(perm.map(|p| p.deleted == 0).unwrap_or(false))
+        Ok(perm.map(|p| p.deleted == Deleted::No).unwrap_or(false))
     }
 }

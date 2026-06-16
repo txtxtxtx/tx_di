@@ -1,5 +1,7 @@
 use toasty::Model;
 
+use crate::common::Deleted;
+
 /// 系统文件表
 #[derive(Debug, Clone, Model)]
 #[table = "sys_file"]
@@ -38,8 +40,8 @@ pub struct SysFile {
     #[default("".to_string())]
     pub updated_at: String,
 
-    #[default(0)]
-    pub deleted: i32,
+    #[default(Deleted::No)]
+    pub deleted: Deleted,
 }
 
 /// 文件存储配置表
@@ -77,6 +79,6 @@ pub struct SysFileConfig {
     #[default("".to_string())]
     pub updated_at: String,
 
-    #[default(0)]
-    pub deleted: i32,
+    #[default(Deleted::No)]
+    pub deleted: Deleted,
 }

@@ -1,5 +1,7 @@
 use toasty::Model;
 
+use crate::common::Deleted;
+
 /// 操作日志表
 #[derive(Debug, Clone, Model)]
 #[table = "sys_operate_log"]
@@ -62,8 +64,8 @@ pub struct SysOperateLog {
     #[default("".to_string())]
     pub updated_at: String,
 
-    #[default(0)]
-    pub deleted: i32,
+    #[default(Deleted::No)]
+    pub deleted: Deleted,
 }
 
 /// 登录日志表
@@ -122,6 +124,6 @@ pub struct SysLoginLog {
     #[default("".to_string())]
     pub updated_at: String,
 
-    #[default(0)]
-    pub deleted: i32,
+    #[default(Deleted::No)]
+    pub deleted: Deleted,
 }

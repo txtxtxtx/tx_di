@@ -13,6 +13,7 @@ use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
 use super::model::{SysFile, SysFileConfig};
+use crate::common::Deleted;
 
 /// Toasty 实现的 FileRepository
 #[tx_comp(as_trait = dyn FileRepository)]
@@ -39,7 +40,7 @@ impl ToastyFileRepository {
                 create_time: f.created_at.parse().unwrap_or_default(),
                 updater: if f.updater.is_empty() { None } else { Some(f.updater.clone()) },
                 update_time: f.updated_at.parse().unwrap_or_default(),
-                deleted: if f.deleted == 1 { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if f.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
     }
@@ -50,7 +51,7 @@ impl FileRepository for ToastyFileRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<File>> {
         let mut db = self.plugin.db().clone();
         match SysFile::get_by_id(&mut db, id as i64).await {
-            Ok(f) if f.deleted == 0 => Ok(Some(Self::to_domain(&f))),
+            Ok(f) if f.deleted == Deleted::No => Ok(Some(Self::to_domain(&f))),
             _ => Ok(None),
         }
     }
@@ -64,7 +65,7 @@ impl FileRepository for ToastyFileRepository {
 
         let filtered: Vec<&SysFile> = all
             .iter()
-            .filter(|f| f.deleted == 0)
+            .filter(|f| f.deleted == Deleted::No)
             .filter(|f| {
                 if let Some(ref name) = query.name {
                     if !f.name.contains(name.as_str()) { return false; }
@@ -108,7 +109,7 @@ impl FileRepository for ToastyFileRepository {
             .created_at(now.clone())
             .updater(file.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(file.audit.deleted as i32)
+            .deleted(Deleted::from(file.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -130,7 +131,7 @@ impl FileRepository for ToastyFileRepository {
             .size(file.size)
             .updater(file.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(file.audit.deleted as i32)
+            .deleted(Deleted::from(file.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -144,7 +145,7 @@ impl FileRepository for ToastyFileRepository {
             .map_err(|_| RepositoryError::NotFound)?;
 
         file.update()
-            .deleted(1)
+            .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -157,7 +158,7 @@ impl FileRepository for ToastyFileRepository {
             .await
             .map_err(|_| RepositoryError::NotFound)?;
 
-        if file.deleted != 0 {
+        if file.deleted != Deleted::No {
             return Err(RepositoryError::NotFound.into());
         }
         Ok(file.file_path)
@@ -188,7 +189,7 @@ impl ToastyFileConfigRepository {
                 create_time: c.created_at.parse().unwrap_or_default(),
                 updater: if c.updater.is_empty() { None } else { Some(c.updater.clone()) },
                 update_time: c.updated_at.parse().unwrap_or_default(),
-                deleted: if c.deleted == 1 { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if c.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
     }
@@ -199,7 +200,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
     async fn find_by_id(&self, id: i32) -> AppResult<Option<FileConfig>> {
         let mut db = self.plugin.db().clone();
         match SysFileConfig::get_by_id(&mut db, id).await {
-            Ok(c) if c.deleted == 0 => Ok(Some(Self::to_domain(&c))),
+            Ok(c) if c.deleted == Deleted::No => Ok(Some(Self::to_domain(&c))),
             _ => Ok(None),
         }
     }
@@ -213,7 +214,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
 
         Ok(all
             .iter()
-            .find(|c| c.deleted == 0 && c.master == 1)
+            .find(|c| c.deleted == Deleted::No && c.master == 1)
             .map(Self::to_domain))
     }
 
@@ -226,7 +227,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
 
         Ok(all
             .iter()
-            .filter(|c| c.deleted == 0)
+            .filter(|c| c.deleted == Deleted::No)
             .map(Self::to_domain)
             .collect())
     }
@@ -245,7 +246,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
             .created_at(now.clone())
             .updater(config.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(config.audit.deleted as i32)
+            .deleted(Deleted::from(config.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -268,7 +269,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
             .config(config.config.clone())
             .updater(config.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(config.audit.deleted as i32)
+            .deleted(Deleted::from(config.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -282,7 +283,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
             .map_err(|_| RepositoryError::NotFound)?;
 
         config.update()
-            .deleted(1)
+            .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;

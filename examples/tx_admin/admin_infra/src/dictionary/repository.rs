@@ -13,6 +13,7 @@ use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
 use super::model::{SysDictData, SysDictType};
+use crate::common::{Status, Deleted};
 
 /// Toasty 实现的 DictTypeRepository
 #[tx_comp(as_trait = dyn DictTypeRepository)]
@@ -30,14 +31,14 @@ impl ToastyDictTypeRepository {
             d.id as u64,
             d.name.clone(),
             d.dict_type.clone(),
-            d.status,
+            i32::from(d.status),
             if d.remark.is_empty() { None } else { Some(d.remark.clone()) },
             AuditFields {
                 creator: if d.creator.is_empty() { None } else { Some(d.creator.clone()) },
                 create_time: d.created_at.parse().unwrap_or_default(),
                 updater: if d.updater.is_empty() { None } else { Some(d.updater.clone()) },
                 update_time: d.updated_at.parse().unwrap_or_default(),
-                deleted: if d.deleted == 1 { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if d.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
     }
@@ -48,7 +49,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<DictType>> {
         let mut db = self.plugin.db().clone();
         match SysDictType::get_by_id(&mut db, id as i64).await {
-            Ok(d) if d.deleted == 0 => Ok(Some(Self::to_domain(&d))),
+            Ok(d) if d.deleted == Deleted::No => Ok(Some(Self::to_domain(&d))),
             _ => Ok(None),
         }
     }
@@ -61,7 +62,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
             .await
             .map_err(|_| RepositoryError::Database)?;
         match dt {
-            Some(d) if d.deleted == 0 => Ok(Some(Self::to_domain(&d))),
+            Some(d) if d.deleted == Deleted::No => Ok(Some(Self::to_domain(&d))),
             _ => Ok(None),
         }
     }
@@ -75,7 +76,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
 
         let filtered: Vec<&SysDictType> = all
             .iter()
-            .filter(|d| d.deleted == 0)
+            .filter(|d| d.deleted == Deleted::No)
             .filter(|d| {
                 if let Some(ref name) = query.name {
                     if !d.name.contains(name.as_str()) { return false; }
@@ -84,7 +85,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
                     if !d.dict_type.contains(dict_type.as_str()) { return false; }
                 }
                 if let Some(status) = query.status {
-                    if d.status != status { return false; }
+                    if i32::from(d.status) != status { return false; }
                 }
                 true
             })
@@ -113,7 +114,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
 
         Ok(all
             .iter()
-            .filter(|d| d.deleted == 0)
+            .filter(|d| d.deleted == Deleted::No)
             .filter(|d| {
                 if let Some(ref name) = query.name {
                     if !d.name.contains(name.as_str()) { return false; }
@@ -122,7 +123,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
                     if !d.dict_type.contains(dict_type.as_str()) { return false; }
                 }
                 if let Some(status) = query.status {
-                    if d.status != status { return false; }
+                    if i32::from(d.status) != status { return false; }
                 }
                 true
             })
@@ -137,13 +138,13 @@ impl DictTypeRepository for ToastyDictTypeRepository {
             .id(dict_type.id as i64)
             .name(dict_type.name.clone())
             .dict_type(dict_type.dict_type.clone())
-            .status(dict_type.status)
+            .status(Status::from(dict_type.status))
             .remark(dict_type.remark.clone().unwrap_or_default())
             .creator(dict_type.audit.creator.clone().unwrap_or_default())
             .created_at(now.clone())
             .updater(dict_type.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(dict_type.audit.deleted as i32)
+            .deleted(Deleted::from(dict_type.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -161,11 +162,11 @@ impl DictTypeRepository for ToastyDictTypeRepository {
             .update()
             .name(dict_type.name.clone())
             .dict_type(dict_type.dict_type.clone())
-            .status(dict_type.status)
+            .status(Status::from(dict_type.status))
             .remark(dict_type.remark.clone().unwrap_or_default())
             .updater(dict_type.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(dict_type.audit.deleted as i32)
+            .deleted(Deleted::from(dict_type.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -179,7 +180,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
             .map_err(|_| RepositoryError::NotFound)?;
 
         dict_type.update()
-            .deleted(1)
+            .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -193,7 +194,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
-        Ok(dt.map(|d| d.deleted == 0).unwrap_or(false))
+        Ok(dt.map(|d| d.deleted == Deleted::No).unwrap_or(false))
     }
 }
 
@@ -215,7 +216,7 @@ impl ToastyDictDataRepository {
             d.label.clone(),
             d.value.clone(),
             d.dict_type.clone(),
-            d.status,
+            i32::from(d.status),
             if d.color_type.is_empty() { None } else { Some(d.color_type.clone()) },
             if d.css_class.is_empty() { None } else { Some(d.css_class.clone()) },
             if d.remark.is_empty() { None } else { Some(d.remark.clone()) },
@@ -224,7 +225,7 @@ impl ToastyDictDataRepository {
                 create_time: d.created_at.parse().unwrap_or_default(),
                 updater: if d.updater.is_empty() { None } else { Some(d.updater.clone()) },
                 update_time: d.updated_at.parse().unwrap_or_default(),
-                deleted: if d.deleted == 1 { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if d.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
     }
@@ -235,7 +236,7 @@ impl DictDataRepository for ToastyDictDataRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<DictData>> {
         let mut db = self.plugin.db().clone();
         match SysDictData::get_by_id(&mut db, id as i64).await {
-            Ok(d) if d.deleted == 0 => Ok(Some(Self::to_domain(&d))),
+            Ok(d) if d.deleted == Deleted::No => Ok(Some(Self::to_domain(&d))),
             _ => Ok(None),
         }
     }
@@ -249,7 +250,7 @@ impl DictDataRepository for ToastyDictDataRepository {
 
         Ok(all
             .iter()
-            .filter(|d| d.deleted == 0)
+            .filter(|d| d.deleted == Deleted::No)
             .map(Self::to_domain)
             .collect())
     }
@@ -263,7 +264,7 @@ impl DictDataRepository for ToastyDictDataRepository {
 
         Ok(all
             .iter()
-            .filter(|d| d.deleted == 0 && dict_types.contains(&d.dict_type))
+            .filter(|d| d.deleted == Deleted::No && dict_types.contains(&d.dict_type))
             .map(Self::to_domain)
             .collect())
     }
@@ -277,7 +278,7 @@ impl DictDataRepository for ToastyDictDataRepository {
 
         let filtered: Vec<&SysDictData> = all
             .iter()
-            .filter(|d| d.deleted == 0)
+            .filter(|d| d.deleted == Deleted::No)
             .filter(|d| {
                 if let Some(ref dict_type) = query.dict_type {
                     if d.dict_type != *dict_type { return false; }
@@ -286,7 +287,7 @@ impl DictDataRepository for ToastyDictDataRepository {
                     if !d.label.contains(label.as_str()) { return false; }
                 }
                 if let Some(status) = query.status {
-                    if d.status != status { return false; }
+                    if i32::from(d.status) != status { return false; }
                 }
                 true
             })
@@ -315,7 +316,7 @@ impl DictDataRepository for ToastyDictDataRepository {
             .label(data.label.clone())
             .value(data.value.clone())
             .dict_type(data.dict_type.clone())
-            .status(data.status)
+            .status(Status::from(data.status))
             .color_type(data.color_type.clone().unwrap_or_default())
             .css_class(data.css_class.clone().unwrap_or_default())
             .remark(data.remark.clone().unwrap_or_default())
@@ -323,7 +324,7 @@ impl DictDataRepository for ToastyDictDataRepository {
             .created_at(now.clone())
             .updater(data.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(data.audit.deleted as i32)
+            .deleted(Deleted::from(data.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -343,13 +344,13 @@ impl DictDataRepository for ToastyDictDataRepository {
             .label(data.label.clone())
             .value(data.value.clone())
             .dict_type(data.dict_type.clone())
-            .status(data.status)
+            .status(Status::from(data.status))
             .color_type(data.color_type.clone().unwrap_or_default())
             .css_class(data.css_class.clone().unwrap_or_default())
             .remark(data.remark.clone().unwrap_or_default())
             .updater(data.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(data.audit.deleted as i32)
+            .deleted(Deleted::from(data.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -363,7 +364,7 @@ impl DictDataRepository for ToastyDictDataRepository {
             .map_err(|_| RepositoryError::NotFound)?;
 
         data.update()
-            .deleted(1)
+            .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;

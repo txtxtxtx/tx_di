@@ -13,6 +13,7 @@ use tx_error::AppResult;
 
 use super::model::SysDepartment;
 use crate::user::model::SysUserDept;
+use crate::common::{Status, Deleted};
 
 /// Toasty 实现的 DepartmentRepository
 #[tx_comp(as_trait = dyn DepartmentRepository)]
@@ -34,14 +35,14 @@ impl ToastyDepartmentRepository {
             if d.leader_user_id == 0 { None } else { Some(d.leader_user_id as u64) },
             if d.phone.is_empty() { None } else { Some(d.phone.clone()) },
             if d.email.is_empty() { None } else { Some(d.email.clone()) },
-            d.status,
+            i32::from(d.status),
             d.tenant_id,
             AuditFields {
                 creator: if d.creator.is_empty() { None } else { Some(d.creator.clone()) },
                 create_time: d.created_at.parse().unwrap_or_default(),
                 updater: if d.updater.is_empty() { None } else { Some(d.updater.clone()) },
                 update_time: d.updated_at.parse().unwrap_or_default(),
-                deleted: if d.deleted == 1 { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if d.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
     }
@@ -52,7 +53,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Department>> {
         let mut db = self.plugin.db().clone();
         match SysDepartment::get_by_id(&mut db, id as i64).await {
-            Ok(d) if d.deleted == 0 => Ok(Some(Self::to_domain(&d))),
+            Ok(d) if d.deleted == Deleted::No => Ok(Some(Self::to_domain(&d))),
             _ => Ok(None),
         }
     }
@@ -66,13 +67,13 @@ impl DepartmentRepository for ToastyDepartmentRepository {
 
         Ok(all
             .iter()
-            .filter(|d| d.deleted == 0)
+            .filter(|d| d.deleted == Deleted::No)
             .filter(|d| {
                 if let Some(ref name) = query.name {
                     if !d.name.contains(name.as_str()) { return false; }
                 }
                 if let Some(status) = query.status {
-                    if d.status != status { return false; }
+                    if i32::from(d.status) != status { return false; }
                 }
                 true
             })
@@ -89,7 +90,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
 
         Ok(all
             .iter()
-            .filter(|d| d.deleted == 0 && ids.contains(&(d.id as u64)))
+            .filter(|d| d.deleted == Deleted::No && ids.contains(&(d.id as u64)))
             .map(Self::to_domain)
             .collect())
     }
@@ -103,7 +104,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
 
         Ok(all
             .iter()
-            .filter(|d| d.deleted == 0 && d.parent_id == parent_id as i64)
+            .filter(|d| d.deleted == Deleted::No && d.parent_id == parent_id as i64)
             .map(Self::to_domain)
             .collect())
     }
@@ -119,13 +120,13 @@ impl DepartmentRepository for ToastyDepartmentRepository {
             .leader_user_id(dept.leader_user_id.map(|id| id as i64).unwrap_or(0))
             .phone(dept.phone.clone().unwrap_or_default())
             .email(dept.email.clone().unwrap_or_default())
-            .status(dept.status)
+            .status(Status::from(dept.status))
             .tenant_id(dept.tenant_id)
             .creator(dept.audit.creator.clone().unwrap_or_default())
             .created_at(now.clone())
             .updater(dept.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(dept.audit.deleted as i32)
+            .deleted(Deleted::from(dept.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -147,11 +148,11 @@ impl DepartmentRepository for ToastyDepartmentRepository {
             .leader_user_id(dept.leader_user_id.map(|id| id as i64).unwrap_or(0))
             .phone(dept.phone.clone().unwrap_or_default())
             .email(dept.email.clone().unwrap_or_default())
-            .status(dept.status)
+            .status(Status::from(dept.status))
             .tenant_id(dept.tenant_id)
             .updater(dept.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(dept.audit.deleted as i32)
+            .deleted(Deleted::from(dept.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -165,7 +166,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
             .map_err(|_| RepositoryError::NotFound)?;
 
         dept.update()
-            .deleted(1)
+            .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -179,7 +180,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
             .await
             .map_err(|_| RepositoryError::Database)?;
 
-        Ok(all.iter().any(|d| d.deleted == 0 && d.parent_id == parent_id as i64))
+        Ok(all.iter().any(|d| d.deleted == Deleted::No && d.parent_id == parent_id as i64))
     }
 
     async fn has_users(&self, dept_id: u64) -> AppResult<bool> {

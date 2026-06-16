@@ -13,6 +13,7 @@ use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
 use super::model::SysConfig;
+use crate::common::Deleted;
 
 /// Toasty 实现的 ConfigRepository
 #[tx_comp(as_trait = dyn ConfigRepository)]
@@ -40,7 +41,7 @@ impl ToastyConfigRepository {
                 create_time: c.created_at.parse().unwrap_or_default(),
                 updater: if c.updater.is_empty() { None } else { Some(c.updater.clone()) },
                 update_time: c.updated_at.parse().unwrap_or_default(),
-                deleted: if c.deleted == 1 { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if c.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
     }
@@ -51,7 +52,7 @@ impl ConfigRepository for ToastyConfigRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Config>> {
         let mut db = self.plugin.db().clone();
         match SysConfig::get_by_id(&mut db, id as i64).await {
-            Ok(c) if c.deleted == 0 => Ok(Some(Self::to_domain(&c))),
+            Ok(c) if c.deleted == Deleted::No => Ok(Some(Self::to_domain(&c))),
             _ => Ok(None),
         }
     }
@@ -64,7 +65,7 @@ impl ConfigRepository for ToastyConfigRepository {
             .await
             .map_err(|_| RepositoryError::Database)?;
         match config {
-            Some(c) if c.deleted == 0 => Ok(Some(Self::to_domain(&c))),
+            Some(c) if c.deleted == Deleted::No => Ok(Some(Self::to_domain(&c))),
             _ => Ok(None),
         }
     }
@@ -78,7 +79,7 @@ impl ConfigRepository for ToastyConfigRepository {
 
         Ok(all
             .iter()
-            .filter(|c| c.deleted == 0 && keys.contains(&c.config_key))
+            .filter(|c| c.deleted == Deleted::No && keys.contains(&c.config_key))
             .map(Self::to_domain)
             .collect())
     }
@@ -92,7 +93,7 @@ impl ConfigRepository for ToastyConfigRepository {
 
         let filtered: Vec<&SysConfig> = all
             .iter()
-            .filter(|c| c.deleted == 0)
+            .filter(|c| c.deleted == Deleted::No)
             .filter(|c| {
                 if let Some(ref name) = query.name {
                     if !c.name.contains(name.as_str()) { return false; }
@@ -133,7 +134,7 @@ impl ConfigRepository for ToastyConfigRepository {
 
         Ok(all
             .iter()
-            .filter(|c| c.deleted == 0)
+            .filter(|c| c.deleted == Deleted::No)
             .filter(|c| {
                 if let Some(ref category) = query.category {
                     if c.category != *category { return false; }
@@ -163,7 +164,7 @@ impl ConfigRepository for ToastyConfigRepository {
             .created_at(now.clone())
             .updater(config.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(config.audit.deleted as i32)
+            .deleted(Deleted::from(config.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -188,7 +189,7 @@ impl ConfigRepository for ToastyConfigRepository {
             .remark(config.remark.clone().unwrap_or_default())
             .updater(config.audit.updater.clone().unwrap_or_default())
             .updated_at(now)
-            .deleted(config.audit.deleted as i32)
+            .deleted(Deleted::from(config.audit.deleted))
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -202,7 +203,7 @@ impl ConfigRepository for ToastyConfigRepository {
             .map_err(|_| RepositoryError::NotFound)?;
 
         config.update()
-            .deleted(1)
+            .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
@@ -216,6 +217,6 @@ impl ConfigRepository for ToastyConfigRepository {
             .exec(&mut db)
             .await
             .map_err(|_| RepositoryError::Database)?;
-        Ok(config.map(|c| c.deleted == 0).unwrap_or(false))
+        Ok(config.map(|c| c.deleted == Deleted::No).unwrap_or(false))
     }
 }
