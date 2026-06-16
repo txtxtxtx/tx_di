@@ -40,7 +40,7 @@ pub enum Status {
 
 impl Default for Status {
     fn default() -> Self {
-        Status::Disabled
+        Status::Enabled
     }
 }
 
@@ -86,8 +86,9 @@ impl From<i32> for Sex {
 impl From<Status> for i32 {
     fn from(v: Status) -> Self {
         match v {
-            Status::Disabled => 0,
-            Status::Enabled => 1,
+            Status::Enabled => 0,
+            Status::Disabled => 1,
+            Status::Locked => 2,
         }
     }
 }
@@ -95,8 +96,10 @@ impl From<Status> for i32 {
 impl From<i32> for Status {
     fn from(v: i32) -> Self {
         match v {
-            1 => Status::Enabled,
-            _ => Status::Disabled,
+            0 => Status::Enabled,
+            1 => Status::Disabled,
+            2 => Status::Locked,
+            _ => Status::Enabled,
         }
     }
 }
@@ -146,7 +149,7 @@ impl From<admin_domain::user::model::value_object::UserStatus> for Status {
         match v {
             admin_domain::user::model::value_object::UserStatus::Active => Status::Enabled,
             admin_domain::user::model::value_object::UserStatus::Disabled => Status::Disabled,
-            admin_domain::user::model::value_object::UserStatus::Locked => Status::Disabled,
+            admin_domain::user::model::value_object::UserStatus::Locked => Status::Locked,
         }
     }
 }
@@ -156,6 +159,7 @@ impl From<Status> for admin_domain::user::model::value_object::UserStatus {
         match v {
             Status::Enabled => admin_domain::user::model::value_object::UserStatus::Active,
             Status::Disabled => admin_domain::user::model::value_object::UserStatus::Disabled,
+            Status::Locked => admin_domain::user::model::value_object::UserStatus::Locked,
         }
     }
 }
