@@ -1,46 +1,47 @@
-# admin_server DDD 后台管理系统配置
-
-[log_config]
-level = "debug"
-prefix = "tx_admin"
-dir = "./logs"
-console_output = true
-time_format = "local"
-retention_days = 7
-
-[web_config]
-host = "::" #"127.0.0.1"
-port = 8888
-enable_cors = true
-max_body_size = 10485760    # 10MB
-timeout_secs = 30
-layers = [
-    # [3,"trace"],
-    [5, "timeout"],
-    [10, "api_log"],
-    [100, "compression"],
-    [10000, "cors"],
-]
-
-# 文件存储配置
 [file_config]
+allowed_extensions = ["jpg", "jpeg", "png", "gif", "pdf", "doc", "docx", "xls", "xlsx", "txt", "zip"]
 backend = "local"
 base_path = "./uploads"
 base_url = "http://localhost:8080/files"
 max_file_size = 10485760
-allowed_extensions = ["jpg", "jpeg", "png", "gif", "pdf", "doc", "docx", "xls", "xlsx", "txt", "zip"]
 
-# S3 存储配置（可选，启用需设置 backend = "s3"）
 [file_config.s3]
-bucket = ""
-region = "ap-southeast-1"
-endpoint = ""
 access_key = ""
-secret_key = ""
+bucket = ""
+endpoint = ""
 force_path_style = false
+region = "ap-southeast-1"
+secret_key = ""
 
-# 数据库配置（Toasty ORM）
+[log_config]
+console_output = true
+dir = "./logs"
+level = "debug"
+prefix = "tx_admin"
+retention_days = 7
+time_format = "local"
+
 [toasty_config]
+auto_schema = true
 database_url = "sqlite:examples/tx_admin/data/tx_admin.db"
-auto_schema = true # true,第一次需要true 来创建表
 max_pool_size = 10
+
+[web_config]
+enable_cors = true
+enable_api_doc = true
+host = "::"
+layers = [[5, "timeout"], [10, "api_log"], [100, "compression"], [10000, "cors"]]
+max_body_size = 10485760
+port = 8888
+timeout_secs = 30
+
+[sa_token_config]
+token_name = "Authorization"
+timeout = 86400
+is_concurrent = true
+is_share = true
+token_style = "uuid"
+is_read_header = true
+is_read_cookie = false
+auto_renew = true
+active_timeout = 1800
