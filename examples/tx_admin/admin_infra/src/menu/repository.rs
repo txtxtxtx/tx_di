@@ -67,7 +67,7 @@ impl MenuRepository for ToastyMenuRepository {
         let all = SysMenu::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseMenu)?;
 
         Ok(all
             .iter()
@@ -93,7 +93,7 @@ impl MenuRepository for ToastyMenuRepository {
         let all = SysMenu::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseMenu)?;
 
         Ok(all
             .iter()
@@ -107,7 +107,7 @@ impl MenuRepository for ToastyMenuRepository {
         let all = SysMenu::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseMenu)?;
 
         Ok(all
             .iter()
@@ -141,7 +141,7 @@ impl MenuRepository for ToastyMenuRepository {
             .deleted(Deleted::from(menu.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseMenu)?;
         Ok(())
     }
 
@@ -149,7 +149,7 @@ impl MenuRepository for ToastyMenuRepository {
         let mut db = self.plugin.db().clone();
         let mut existing = SysMenu::get_by_id(&mut db, menu.id as i64)
             .await
-            .map_err(|_| RepositoryError::NotFound)?;
+            .map_err(|_| RepositoryError::NotFoundMenu)?;
 
         let now = jiff::Timestamp::now().to_string();
         existing
@@ -172,7 +172,7 @@ impl MenuRepository for ToastyMenuRepository {
             .deleted(Deleted::from(menu.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseMenu)?;
         Ok(())
     }
 
@@ -180,13 +180,13 @@ impl MenuRepository for ToastyMenuRepository {
         let mut db = self.plugin.db().clone();
         let mut menu = SysMenu::get_by_id(&mut db, id as i64)
             .await
-            .map_err(|_| RepositoryError::NotFound)?;
+            .map_err(|_| RepositoryError::NotFoundMenu)?;
 
         menu.update()
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseMenu)?;
         Ok(())
     }
 
@@ -195,7 +195,7 @@ impl MenuRepository for ToastyMenuRepository {
         let all = SysMenu::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseMenu)?;
 
         Ok(all.iter().any(|m| m.deleted == Deleted::No && m.parent_id == parent_id as i64))
     }

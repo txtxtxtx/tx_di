@@ -63,7 +63,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
         let all = SysDepartment::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseDept)?;
 
         Ok(all
             .iter()
@@ -86,7 +86,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
         let all = SysDepartment::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseDept)?;
 
         Ok(all
             .iter()
@@ -100,7 +100,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
         let all = SysDepartment::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseDept)?;
 
         Ok(all
             .iter()
@@ -129,7 +129,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
             .deleted(Deleted::from(dept.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseDept)?;
         Ok(())
     }
 
@@ -137,7 +137,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
         let mut db = self.plugin.db().clone();
         let mut existing = SysDepartment::get_by_id(&mut db, dept.id as i64)
             .await
-            .map_err(|_| RepositoryError::NotFound)?;
+            .map_err(|_| RepositoryError::NotFoundDept)?;
 
         let now = jiff::Timestamp::now().to_string();
         existing
@@ -155,7 +155,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
             .deleted(Deleted::from(dept.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseDept)?;
         Ok(())
     }
 
@@ -163,13 +163,13 @@ impl DepartmentRepository for ToastyDepartmentRepository {
         let mut db = self.plugin.db().clone();
         let mut dept = SysDepartment::get_by_id(&mut db, id as i64)
             .await
-            .map_err(|_| RepositoryError::NotFound)?;
+            .map_err(|_| RepositoryError::NotFoundDept)?;
 
         dept.update()
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseDept)?;
         Ok(())
     }
 
@@ -178,7 +178,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
         let all = SysDepartment::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseDept)?;
 
         Ok(all.iter().any(|d| d.deleted == Deleted::No && d.parent_id == parent_id as i64))
     }
@@ -188,7 +188,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
         let user_depts = SysUserDept::filter_by_dept_id(dept_id as i64)
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseDept)?;
 
         Ok(!user_depts.is_empty())
     }

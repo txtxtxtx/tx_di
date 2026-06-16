@@ -7,7 +7,6 @@ use crate::permission::model::aggregate::Permission;
 use crate::permission::model::value_object::{PermissionCheck, PermissionType};
 use crate::permission::repository::PermissionRepository;
 use crate::shared::repository::RepositoryError;
-use crate::shared::repository::RepositoryError::NotFound;
 
 /// Permission domain service
 #[tx_comp]
@@ -69,7 +68,7 @@ impl PermissionService {
         creator: Option<String>,
     ) -> AppResult<Permission> {
         if self.permission_repo.exists_by_code(&permission_code).await? {
-            return Err(RepositoryError::Duplicate)?;
+            return Err(RepositoryError::DuplicatePermCode)?;
         }
 
         let id = id::next_id();
@@ -103,12 +102,12 @@ impl PermissionService {
             .permission_repo
             .find_by_id(permission_id)
             .await?
-            .ok_or_else(|| NotFound)?;
+            .ok_or_else(|| RepositoryError::NotFoundPerm)?;
 
         // Check if code is taken by another permission
         if let Some(existing) = self.permission_repo.find_by_code(&permission_code).await? {
             if existing.id != permission_id {
-                return Err(RepositoryError::Duplicate)?;
+                return Err(RepositoryError::DuplicatePermCode)?;
             }
         }
 
@@ -135,7 +134,7 @@ impl PermissionService {
             .permission_repo
             .find_by_id(permission_id)
             .await?
-            .ok_or_else(|| NotFound)?;
+            .ok_or_else(|| RepositoryError::NotFoundPerm)?;
 
         permission.soft_delete(updater);
         self.permission_repo.update(&permission).await?;
@@ -147,7 +146,7 @@ impl PermissionService {
         Ok(self.permission_repo
             .find_by_id(permission_id)
             .await?
-            .ok_or_else(|| NotFound)?)
+            .ok_or_else(|| RepositoryError::NotFoundPerm)?)
     }
 
     /// Get all permissions (full entities)

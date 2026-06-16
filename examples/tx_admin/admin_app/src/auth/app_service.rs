@@ -37,23 +37,23 @@ impl AuthAppService {
             .user_service
             .get_by_username(&cmd.username)
             .await?
-            .ok_or_else(|| RepositoryError::NotFound)?;
+            .ok_or_else(|| RepositoryError::NotFoundUser)?;
 
         // Check if user is active
         if !user.is_active() {
-            return Err(RepositoryError::Validation)?;
+            return Err(RepositoryError::ValidationLogin)?;
         }
 
         if user.is_locked() {
-            return Err(RepositoryError::Validation)?;
+            return Err(RepositoryError::ValidationLogin)?;
         }
 
         // Verify password using Argon2id hash verification
         let is_valid = password::verify_password(&cmd.password, &user.password)
-            .map_err(|_| RepositoryError::Validation)?;
+            .map_err(|_| RepositoryError::ValidationPassword)?;
 
         if !is_valid {
-            return Err(RepositoryError::Validation)?;
+            return Err(RepositoryError::ValidationPassword)?;
         }
 
         // Build login user info

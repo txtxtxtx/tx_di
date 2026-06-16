@@ -61,7 +61,7 @@ impl FileRepository for ToastyFileRepository {
         let all = SysFile::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseFile)?;
 
         let filtered: Vec<&SysFile> = all
             .iter()
@@ -112,7 +112,7 @@ impl FileRepository for ToastyFileRepository {
             .deleted(Deleted::from(file.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseFile)?;
         Ok(())
     }
 
@@ -120,7 +120,7 @@ impl FileRepository for ToastyFileRepository {
         let mut db = self.plugin.db().clone();
         let mut existing = SysFile::get_by_id(&mut db, file.id as i64)
             .await
-            .map_err(|_| RepositoryError::NotFound)?;
+            .map_err(|_| RepositoryError::NotFoundFile)?;
         let now = jiff::Timestamp::now().to_string();
         existing
             .update()
@@ -134,7 +134,7 @@ impl FileRepository for ToastyFileRepository {
             .deleted(Deleted::from(file.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseFile)?;
         Ok(())
     }
 
@@ -142,13 +142,13 @@ impl FileRepository for ToastyFileRepository {
         let mut db = self.plugin.db().clone();
         let mut file = SysFile::get_by_id(&mut db, id as i64)
             .await
-            .map_err(|_| RepositoryError::NotFound)?;
+            .map_err(|_| RepositoryError::NotFoundFile)?;
 
         file.update()
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseFile)?;
         Ok(())
     }
 
@@ -156,10 +156,10 @@ impl FileRepository for ToastyFileRepository {
         let mut db = self.plugin.db().clone();
         let file = SysFile::get_by_id(&mut db, id as i64)
             .await
-            .map_err(|_| RepositoryError::NotFound)?;
+            .map_err(|_| RepositoryError::NotFoundFile)?;
 
         if file.deleted != Deleted::No {
-            return Err(RepositoryError::NotFound.into());
+            return Err(RepositoryError::NotFoundFile.into());
         }
         Ok(file.file_path)
     }
@@ -210,7 +210,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
         let all = SysFileConfig::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseFile)?;
 
         Ok(all
             .iter()
@@ -223,7 +223,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
         let all = SysFileConfig::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseFile)?;
 
         Ok(all
             .iter()
@@ -249,7 +249,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
             .deleted(Deleted::from(config.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseFile)?;
         Ok(())
     }
 
@@ -257,7 +257,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
         let mut db = self.plugin.db().clone();
         let mut existing = SysFileConfig::get_by_id(&mut db, config.id)
             .await
-            .map_err(|_| RepositoryError::NotFound)?;
+            .map_err(|_| RepositoryError::NotFoundFile)?;
 
         let now = jiff::Timestamp::now().to_string();
         existing
@@ -272,7 +272,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
             .deleted(Deleted::from(config.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseFile)?;
         Ok(())
     }
 
@@ -280,13 +280,13 @@ impl FileConfigRepository for ToastyFileConfigRepository {
         let mut db = self.plugin.db().clone();
         let mut config = SysFileConfig::get_by_id(&mut db, id)
             .await
-            .map_err(|_| RepositoryError::NotFound)?;
+            .map_err(|_| RepositoryError::NotFoundFile)?;
 
         config.update()
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseFile)?;
         Ok(())
     }
 }

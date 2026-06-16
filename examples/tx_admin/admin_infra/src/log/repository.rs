@@ -69,7 +69,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
         let all = SysOperateLog::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseLog)?;
 
         let filtered: Vec<&SysOperateLog> = all
             .iter()
@@ -131,7 +131,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
             .deleted(Deleted::from(log.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseLog)?;
         Ok(())
     }
 
@@ -141,7 +141,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
             if let Ok(log) = SysOperateLog::get_by_id(&mut db, id as i64).await {
                 log.delete().exec(&mut db)
                     .await
-                    .map_err(|_| RepositoryError::Database)?;
+                    .map_err(|_| RepositoryError::DatabaseLog)?;
             }
         }
         Ok(())
@@ -152,12 +152,12 @@ impl OperateLogRepository for ToastyOperateLogRepository {
         let all = SysOperateLog::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseLog)?;
 
         for log in all {
             log.delete().exec(&mut db)
                 .await
-                .map_err(|_| RepositoryError::Database)?;
+                .map_err(|_| RepositoryError::DatabaseLog)?;
         }
         Ok(())
     }
@@ -215,7 +215,7 @@ impl LoginLogRepository for ToastyLoginLogRepository {
         let all = SysLoginLog::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseLog)?;
 
         let filtered: Vec<&SysLoginLog> = all
             .iter()
@@ -278,7 +278,7 @@ impl LoginLogRepository for ToastyLoginLogRepository {
             .deleted(Deleted::from(log.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseLog)?;
         Ok(())
     }
 
@@ -288,7 +288,7 @@ impl LoginLogRepository for ToastyLoginLogRepository {
             if let Ok(log) = SysLoginLog::get_by_id(&mut db, id as i64).await {
                 log.delete().exec(&mut db)
                     .await
-                    .map_err(|_| RepositoryError::Database)?;
+                    .map_err(|_| RepositoryError::DatabaseLog)?;
             }
         }
         Ok(())
@@ -299,12 +299,12 @@ impl LoginLogRepository for ToastyLoginLogRepository {
         let all = SysLoginLog::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::Database)?;
+            .map_err(|_| RepositoryError::DatabaseLog)?;
 
         for log in all {
             log.delete().exec(&mut db)
                 .await
-                .map_err(|_| RepositoryError::Database)?;
+                .map_err(|_| RepositoryError::DatabaseLog)?;
         }
         Ok(())
     }

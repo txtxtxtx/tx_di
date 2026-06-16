@@ -5,7 +5,6 @@ use crate::config::model::aggregate::Config;
 use crate::config::model::value_object::ConfigQuery;
 use crate::config::repository::ConfigRepository;
 use crate::shared::repository::RepositoryError;
-use crate::shared::repository::RepositoryError::NotFound;
 use tx_common::page::Page;
 use tx_di_core::tx_comp;
 use tx_error::AppResult;
@@ -31,7 +30,7 @@ impl ConfigService {
         creator: Option<String>,
     ) -> AppResult<Config> {
         if self.config_repo.exists_by_key(&config_key).await? {
-            return Err(RepositoryError::Duplicate)?;
+            return Err(RepositoryError::DuplicateConfigKey)?;
         }
 
         let config_id = id::next_id();
@@ -56,7 +55,7 @@ impl ConfigService {
             .config_repo
             .find_by_id(config_id)
             .await?
-            .ok_or_else(|| NotFound)?;
+            .ok_or_else(|| RepositoryError::NotFoundConfig)?;
 
         config.update_info(category, config_type, name, config_key, value, visible, remark, updater);
         self.config_repo.update(&config).await?;
@@ -68,7 +67,7 @@ impl ConfigService {
             .config_repo
             .find_by_id(config_id)
             .await?
-            .ok_or_else(|| NotFound)?;
+            .ok_or_else(|| RepositoryError::NotFoundConfig)?;
 
         config.soft_delete(updater);
         self.config_repo.update(&config).await?;
@@ -87,14 +86,14 @@ impl ConfigService {
         Ok(self.config_repo
             .find_by_id(config_id)
             .await?
-            .ok_or_else(|| NotFound)?)
+            .ok_or_else(|| RepositoryError::NotFoundConfig)?)
     }
 
     pub async fn get_by_key(&self, key: &str) -> AppResult<Config> {
         Ok(self.config_repo
             .find_by_key(key)
             .await?
-            .ok_or_else(|| NotFound)?)
+            .ok_or_else(|| RepositoryError::NotFoundConfig)?)
     }
 
     pub async fn get_by_keys(&self, keys: &[String]) -> AppResult<HashMap<String, String>> {

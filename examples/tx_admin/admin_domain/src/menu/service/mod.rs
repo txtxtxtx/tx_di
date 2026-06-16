@@ -7,7 +7,6 @@ use crate::menu::model::aggregate::Menu;
 use crate::shared::model::value_object::DeletedStatus;
 use crate::menu::model::value_object::{MenuQuery, MenuTreeNode};
 use crate::menu::repository::MenuRepository;
-use crate::shared::repository::RepositoryError::NotFound;
 
 /// Menu domain service
 #[tx_comp]
@@ -65,11 +64,11 @@ impl MenuService {
             .menu_repo
             .find_by_id(menu_id)
             .await?
-            .ok_or_else(|| NotFound)?;
+            .ok_or_else(|| RepositoryError::NotFoundMenu)?;
 
         // Cannot set self as parent
         if parent_id == menu_id {
-            return Err(RepositoryError::Validation)?;
+            return Err(RepositoryError::ValidationDeptDisabled)?;
         }
 
         menu.update_info(
@@ -87,14 +86,14 @@ impl MenuService {
         updater: Option<String>,
     ) -> AppResult<()> {
         if self.menu_repo.has_children(menu_id).await? {
-            return Err(RepositoryError::Validation)?;
+            return Err(RepositoryError::ValidationDeptDisabled)?;
         }
 
         let mut menu = self
             .menu_repo
             .find_by_id(menu_id)
             .await?
-            .ok_or_else(|| NotFound)?;
+            .ok_or_else(|| RepositoryError::NotFoundMenu)?;
 
         menu.soft_delete(updater);
         self.menu_repo.update(&menu).await?;

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::file::model::aggregate::File;
 use crate::file::model::value_object::{FileDownloadInfo, FileQuery, FileUploadCommand};
 use crate::file::repository::{FileConfigRepository, FileRepository};
-use crate::shared::repository::RepositoryError::NotFound;
+use crate::shared::repository::RepositoryError;
 use tx_common::page::Page;
 use tx_di_core::tx_comp;
 use tx_error::AppResult;
@@ -51,7 +51,7 @@ impl FileService {
             .file_repo
             .find_by_id(file_id)
             .await?
-            .ok_or_else(|| NotFound)?;
+            .ok_or_else(|| RepositoryError::NotFoundFile)?;
 
         file.soft_delete(updater);
         self.file_repo.update(&file).await?;
@@ -70,14 +70,14 @@ impl FileService {
         Ok(self.file_repo
             .find_by_id(file_id)
             .await?
-            .ok_or_else(|| NotFound)?)
+            .ok_or_else(|| RepositoryError::NotFoundFile)?)
     }
 
     pub async fn download_file(&self, file_id: u64) -> AppResult<FileDownloadInfo> {
         let file = self.file_repo
             .find_by_id(file_id)
             .await?
-            .ok_or_else(|| NotFound)?;
+            .ok_or_else(|| RepositoryError::NotFoundFile)?;
 
         // Determine MIME type from file extension
         let content_type = match file.name.rsplit('.').next() {

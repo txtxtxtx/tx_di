@@ -5,7 +5,6 @@ use crate::dictionary::model::aggregate::{DictData, DictType};
 use crate::dictionary::model::value_object::{DictDataQuery, DictTypeQuery};
 use crate::dictionary::repository::{DictDataRepository, DictTypeRepository};
 use crate::shared::repository::RepositoryError;
-use crate::shared::repository::RepositoryError::NotFound;
 use tx_common::page::Page;
 use tx_di_core::tx_comp;
 use tx_error::AppResult;
@@ -28,7 +27,7 @@ impl DictTypeService {
         creator: Option<String>,
     ) -> AppResult<DictType> {
         if self.dict_type_repo.exists_by_type(&dict_type).await? {
-            return Err(RepositoryError::Duplicate)?;
+            return Err(RepositoryError::DuplicateDictType)?;
         }
         let id = id::next_id();
         let dt = DictType::create(id, name, dict_type, creator);
@@ -48,7 +47,7 @@ impl DictTypeService {
             .dict_type_repo
             .find_by_id(id)
             .await?
-            .ok_or_else(|| NotFound)?;
+            .ok_or_else(|| RepositoryError::NotFoundDict)?;
         dt.update_info(name, dict_type, remark, updater);
         self.dict_type_repo.update(&dt).await?;
         Ok(dt)
@@ -59,7 +58,7 @@ impl DictTypeService {
             .dict_type_repo
             .find_by_id(id)
             .await?
-            .ok_or_else(|| NotFound)?;
+            .ok_or_else(|| RepositoryError::NotFoundDict)?;
         dt.soft_delete(updater);
         self.dict_type_repo.update(&dt).await?;
         Ok(())
@@ -121,7 +120,7 @@ impl DictDataService {
             .dict_data_repo
             .find_by_id(id)
             .await?
-            .ok_or_else(|| NotFound)?;
+            .ok_or_else(|| RepositoryError::NotFoundDict)?;
         dd.update_info(sort, label, value, dict_type, color_type, css_class, remark, updater);
         self.dict_data_repo.update(&dd).await?;
         Ok(dd)
@@ -132,7 +131,7 @@ impl DictDataService {
             .dict_data_repo
             .find_by_id(id)
             .await?
-            .ok_or_else(|| NotFound)?;
+            .ok_or_else(|| RepositoryError::NotFoundDict)?;
         dd.soft_delete(updater);
         self.dict_data_repo.update(&dd).await?;
         Ok(())

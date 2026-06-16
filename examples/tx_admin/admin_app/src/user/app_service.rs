@@ -28,14 +28,14 @@ impl UserAppService {
         // Check email uniqueness
         if let Some(ref email) = cmd.email {
             if self.user_service.exists_by_email(email).await? {
-                return Err(RepositoryError::Duplicate)?;
+                return Err(RepositoryError::DuplicateUsername)?;
             }
         }
 
         // Check mobile uniqueness
         if let Some(ref mobile) = cmd.mobile {
             if self.user_service.exists_by_mobile(mobile).await? {
-                return Err(RepositoryError::Duplicate)?;
+                return Err(RepositoryError::DuplicateUsername)?;
             }
         }
 

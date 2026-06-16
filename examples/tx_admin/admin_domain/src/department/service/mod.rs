@@ -7,7 +7,6 @@ use crate::department::model::aggregate::Department;
 use crate::shared::model::value_object::DeletedStatus;
 use crate::department::model::value_object::{DeptQuery, DeptTreeNode};
 use crate::department::repository::DepartmentRepository;
-use crate::shared::repository::RepositoryError::NotFound;
 
 #[tx_comp]
 pub struct DepartmentService {
@@ -47,10 +46,10 @@ impl DepartmentService {
             .dept_repo
             .find_by_id(dept_id)
             .await?
-            .ok_or_else(|| NotFound)?;
+            .ok_or_else(|| RepositoryError::NotFoundDept)?;
 
         if parent_id == dept_id {
-            return Err(RepositoryError::Validation)?;
+            return Err(RepositoryError::ValidationDeptDisabled)?;
         }
 
         dept.update_info(name, parent_id, sort, leader_user_id, phone, email, updater);
@@ -64,17 +63,17 @@ impl DepartmentService {
         updater: Option<String>,
     ) -> AppResult<()> {
         if self.dept_repo.has_children(dept_id).await? {
-            return Err(RepositoryError::Validation)?;
+            return Err(RepositoryError::ValidationDeptDisabled)?;
         }
         if self.dept_repo.has_users(dept_id).await? {
-            return Err(RepositoryError::Validation)?;
+            return Err(RepositoryError::ValidationDeptDisabled)?;
         }
 
         let mut dept = self
             .dept_repo
             .find_by_id(dept_id)
             .await?
-            .ok_or_else(|| NotFound)?;
+            .ok_or_else(|| RepositoryError::NotFoundDept)?;
 
         dept.soft_delete(updater);
         self.dept_repo.update(&dept).await?;
@@ -94,7 +93,7 @@ impl DepartmentService {
         Ok(self.dept_repo
             .find_by_id(dept_id)
             .await?
-            .ok_or_else(|| NotFound)?)
+            .ok_or_else(|| RepositoryError::NotFoundDept)?)
     }
 
     fn build_tree(depts: &[Department], parent_id: u64) -> Vec<DeptTreeNode> {
