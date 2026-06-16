@@ -10,6 +10,7 @@ thiserror.workspace = true
 anyhow.workspace = true
 serde_json.workspace = true
 toml.workspace = true
+tracing.workspace = true
 tx_macros = { path = "../tx_macros" }
 
 # 可选依赖：axum IntoResponse 支持

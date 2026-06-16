@@ -6,7 +6,7 @@ use admin_domain::config::model::value_object::ConfigQuery;
 use admin_domain::config::repository::ConfigRepository;
 use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::model::AuditFields;
-use admin_domain::shared::repository::RepositoryError;
+use admin_domain::shared::repository::{RepositoryError, db_err};
 use tx_common::page::Page;
 use tx_di_core::tx_comp;
 use tx_di_toasty::ToastyPlugin;
@@ -63,7 +63,7 @@ impl ConfigRepository for ToastyConfigRepository {
             .first()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseConfig)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseConfig))?;
         match config {
             Some(c) if c.deleted == Deleted::No => Ok(Some(Self::to_domain(&c))),
             _ => Ok(None),
@@ -75,7 +75,7 @@ impl ConfigRepository for ToastyConfigRepository {
         let all = SysConfig::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseConfig)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseConfig))?;
 
         Ok(all
             .iter()
@@ -89,7 +89,7 @@ impl ConfigRepository for ToastyConfigRepository {
         let all = SysConfig::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseConfig)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseConfig))?;
 
         let filtered: Vec<&SysConfig> = all
             .iter()
@@ -130,7 +130,7 @@ impl ConfigRepository for ToastyConfigRepository {
         let all = SysConfig::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseConfig)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseConfig))?;
 
         Ok(all
             .iter()
@@ -167,7 +167,7 @@ impl ConfigRepository for ToastyConfigRepository {
             .deleted(Deleted::from(config.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseConfig)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseConfig))?;
         Ok(())
     }
 
@@ -192,7 +192,7 @@ impl ConfigRepository for ToastyConfigRepository {
             .deleted(Deleted::from(config.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseConfig)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseConfig))?;
         Ok(())
     }
 
@@ -206,7 +206,7 @@ impl ConfigRepository for ToastyConfigRepository {
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseConfig)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseConfig))?;
         Ok(())
     }
 
@@ -216,7 +216,7 @@ impl ConfigRepository for ToastyConfigRepository {
             .first()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseConfig)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseConfig))?;
         Ok(config.map(|c| c.deleted == Deleted::No).unwrap_or(false))
     }
 }

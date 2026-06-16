@@ -32,7 +32,7 @@ mod code;
 mod error;
 
 pub use code::{AppErrCode, CodeMsg};
-pub use error::{AppError, AppResult, DiErr};
+pub use error::{AppError, AppResult, DiErr, log_err};
 
 pub use tx_macros::CodeMsg;
 

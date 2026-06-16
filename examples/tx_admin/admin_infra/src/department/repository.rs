@@ -6,7 +6,7 @@ use admin_domain::department::model::value_object::DeptQuery;
 use admin_domain::department::repository::DepartmentRepository;
 use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::model::AuditFields;
-use admin_domain::shared::repository::RepositoryError;
+use admin_domain::shared::repository::{RepositoryError, db_err};
 use tx_di_core::tx_comp;
 use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
@@ -63,7 +63,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
         let all = SysDepartment::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDept)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDept))?;
 
         Ok(all
             .iter()
@@ -86,7 +86,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
         let all = SysDepartment::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDept)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDept))?;
 
         Ok(all
             .iter()
@@ -100,7 +100,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
         let all = SysDepartment::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDept)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDept))?;
 
         Ok(all
             .iter()
@@ -129,7 +129,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
             .deleted(Deleted::from(dept.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDept)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDept))?;
         Ok(())
     }
 
@@ -155,7 +155,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
             .deleted(Deleted::from(dept.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDept)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDept))?;
         Ok(())
     }
 
@@ -169,7 +169,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDept)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDept))?;
         Ok(())
     }
 
@@ -178,7 +178,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
         let all = SysDepartment::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDept)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDept))?;
 
         Ok(all.iter().any(|d| d.deleted == Deleted::No && d.parent_id == parent_id as i64))
     }
@@ -188,7 +188,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
         let user_depts = SysUserDept::filter_by_dept_id(dept_id as i64)
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDept)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDept))?;
 
         Ok(!user_depts.is_empty())
     }

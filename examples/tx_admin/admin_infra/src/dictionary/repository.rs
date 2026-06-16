@@ -6,7 +6,7 @@ use admin_domain::dictionary::model::value_object::{DictDataQuery, DictTypeQuery
 use admin_domain::dictionary::repository::{DictDataRepository, DictTypeRepository};
 use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::model::AuditFields;
-use admin_domain::shared::repository::RepositoryError;
+use admin_domain::shared::repository::{RepositoryError, db_err};
 use tx_common::page::Page;
 use tx_di_core::tx_comp;
 use tx_di_toasty::ToastyPlugin;
@@ -60,7 +60,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
             .first()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDict)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDict))?;
         match dt {
             Some(d) if d.deleted == Deleted::No => Ok(Some(Self::to_domain(&d))),
             _ => Ok(None),
@@ -72,7 +72,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
         let all = SysDictType::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDict)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDict))?;
 
         let filtered: Vec<&SysDictType> = all
             .iter()
@@ -110,7 +110,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
         let all = SysDictType::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDict)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDict))?;
 
         Ok(all
             .iter()
@@ -147,7 +147,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
             .deleted(Deleted::from(dict_type.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDict)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDict))?;
         Ok(())
     }
 
@@ -169,7 +169,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
             .deleted(Deleted::from(dict_type.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDict)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDict))?;
         Ok(())
     }
 
@@ -183,7 +183,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDict)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDict))?;
         Ok(())
     }
 
@@ -193,7 +193,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
             .first()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDict)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDict))?;
         Ok(dt.map(|d| d.deleted == Deleted::No).unwrap_or(false))
     }
 }
@@ -246,7 +246,7 @@ impl DictDataRepository for ToastyDictDataRepository {
         let all = SysDictData::filter_by_dict_type(dict_type)
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDict)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDict))?;
 
         Ok(all
             .iter()
@@ -260,7 +260,7 @@ impl DictDataRepository for ToastyDictDataRepository {
         let all = SysDictData::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDict)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDict))?;
 
         Ok(all
             .iter()
@@ -274,7 +274,7 @@ impl DictDataRepository for ToastyDictDataRepository {
         let all = SysDictData::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDict)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDict))?;
 
         let filtered: Vec<&SysDictData> = all
             .iter()
@@ -327,7 +327,7 @@ impl DictDataRepository for ToastyDictDataRepository {
             .deleted(Deleted::from(data.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDict)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDict))?;
         Ok(())
     }
 
@@ -353,7 +353,7 @@ impl DictDataRepository for ToastyDictDataRepository {
             .deleted(Deleted::from(data.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDict)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDict))?;
         Ok(())
     }
 
@@ -367,7 +367,7 @@ impl DictDataRepository for ToastyDictDataRepository {
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseDict)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseDict))?;
         Ok(())
     }
 }

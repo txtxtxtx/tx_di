@@ -7,7 +7,7 @@ use admin_domain::permission::model::value_object::{PermissionCheck, PermissionT
 use admin_domain::permission::repository::PermissionRepository;
 use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::model::AuditFields;
-use admin_domain::shared::repository::RepositoryError;
+use admin_domain::shared::repository::{RepositoryError, db_err};
 use tx_di_core::tx_comp;
 use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
@@ -65,7 +65,7 @@ impl ToastyPermissionRepository {
             let role_menus = SysRoleMenu::filter_by_role_id(role_id as i64)
                 .exec(&mut db)
                 .await
-                .map_err(|_| RepositoryError::DatabasePerm)?;
+                .map_err(|e| db_err(e, RepositoryError::DatabasePerm))?;
 
             for rm in role_menus {
                 if let Ok(menu) = SysMenu::get_by_id(&mut db, rm.menu_id).await {
@@ -91,7 +91,7 @@ impl PermissionRepository for ToastyPermissionRepository {
         let user_roles = SysUserRole::filter_by_user_id(user_id as i64)
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabasePerm)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabasePerm))?;
 
         let role_ids: Vec<u64> = user_roles.into_iter().map(|ur| ur.role_id as u64).collect();
         self.get_permission_codes_by_role_ids(&role_ids).await
@@ -102,7 +102,7 @@ impl PermissionRepository for ToastyPermissionRepository {
         let all = SysPermission::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabasePerm)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabasePerm))?;
 
         Ok(all
             .iter()
@@ -125,7 +125,7 @@ impl PermissionRepository for ToastyPermissionRepository {
             .first()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabasePerm)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabasePerm))?;
         match perm {
             Some(p) if p.deleted == Deleted::No => Ok(Some(Self::to_domain(&p))),
             _ => Ok(None),
@@ -137,7 +137,7 @@ impl PermissionRepository for ToastyPermissionRepository {
         let all = SysPermission::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabasePerm)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabasePerm))?;
 
         Ok(all
             .iter()
@@ -165,7 +165,7 @@ impl PermissionRepository for ToastyPermissionRepository {
             .deleted(Deleted::from(permission.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabasePerm)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabasePerm))?;
         Ok(())
     }
 
@@ -190,7 +190,7 @@ impl PermissionRepository for ToastyPermissionRepository {
             .deleted(Deleted::from(permission.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabasePerm)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabasePerm))?;
         Ok(())
     }
 
@@ -204,7 +204,7 @@ impl PermissionRepository for ToastyPermissionRepository {
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabasePerm)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabasePerm))?;
         Ok(())
     }
 
@@ -214,7 +214,7 @@ impl PermissionRepository for ToastyPermissionRepository {
             .first()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabasePerm)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabasePerm))?;
         Ok(perm.map(|p| p.deleted == Deleted::No).unwrap_or(false))
     }
 }

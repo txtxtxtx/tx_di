@@ -1,4 +1,14 @@
-use tx_error::CodeMsg;
+use tx_error::{AppError, CodeMsg};
+
+/// 重导出 `tx_error::log_err`，保持向后兼容
+///
+/// 日志格式: `[DOMAIN:CODE] MESSAGE: 原始错误信息`
+///
+/// # 用法
+/// ```ignore
+/// .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?
+/// ```
+pub use tx_error::log_err as db_err;
 
 /// Repository 层错误类型
 ///

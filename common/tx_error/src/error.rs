@@ -197,6 +197,22 @@ impl From<toml::de::Error> for AppError {
 /// 统一 Result 类型
 pub type AppResult<T> = Result<T, AppError>;
 
+/// 统一的错误日志辅助函数：记录日志 + 返回原始错误码
+///
+/// 适用于所有 `#[derive(CodeMsg)]` 的错误枚举。
+/// 日志格式: `[DOMAIN:CODE] MESSAGE: 原始错误信息`
+///
+/// # 用法
+/// ```ignore
+/// use tx_error::log_err;
+///
+/// .map_err(|e| log_err(e, MyError::DatabaseFailed))?
+/// ```
+pub fn log_err<E: CodeMsg>(e: impl fmt::Display, err: E) -> E {
+    tracing::error!("[{}:{}] {}: {}", err.domain(), err.code(), err.message(), e);
+    err
+}
+
 // ── DI 框架业务错误码 ──────────────────────────────────────
 
 /// DI 框架自身的业务错误码。

@@ -6,7 +6,7 @@ use admin_domain::menu::model::value_object::MenuQuery;
 use admin_domain::menu::repository::MenuRepository;
 use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::model::AuditFields;
-use admin_domain::shared::repository::RepositoryError;
+use admin_domain::shared::repository::{RepositoryError, db_err};
 use tx_di_core::tx_comp;
 use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
@@ -67,7 +67,7 @@ impl MenuRepository for ToastyMenuRepository {
         let all = SysMenu::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseMenu)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
 
         Ok(all
             .iter()
@@ -93,7 +93,7 @@ impl MenuRepository for ToastyMenuRepository {
         let all = SysMenu::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseMenu)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
 
         Ok(all
             .iter()
@@ -107,7 +107,7 @@ impl MenuRepository for ToastyMenuRepository {
         let all = SysMenu::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseMenu)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
 
         Ok(all
             .iter()
@@ -141,7 +141,7 @@ impl MenuRepository for ToastyMenuRepository {
             .deleted(Deleted::from(menu.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseMenu)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
         Ok(())
     }
 
@@ -172,7 +172,7 @@ impl MenuRepository for ToastyMenuRepository {
             .deleted(Deleted::from(menu.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseMenu)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
         Ok(())
     }
 
@@ -186,7 +186,7 @@ impl MenuRepository for ToastyMenuRepository {
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseMenu)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
         Ok(())
     }
 
@@ -195,7 +195,7 @@ impl MenuRepository for ToastyMenuRepository {
         let all = SysMenu::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseMenu)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
 
         Ok(all.iter().any(|m| m.deleted == Deleted::No && m.parent_id == parent_id as i64))
     }

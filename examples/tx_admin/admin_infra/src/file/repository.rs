@@ -6,7 +6,7 @@ use admin_domain::file::model::value_object::FileQuery;
 use admin_domain::file::repository::{FileConfigRepository, FileRepository};
 use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::model::AuditFields;
-use admin_domain::shared::repository::RepositoryError;
+use admin_domain::shared::repository::{RepositoryError, db_err};
 use tx_common::page::Page;
 use tx_di_core::tx_comp;
 use tx_di_toasty::ToastyPlugin;
@@ -61,7 +61,7 @@ impl FileRepository for ToastyFileRepository {
         let all = SysFile::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseFile)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseFile))?;
 
         let filtered: Vec<&SysFile> = all
             .iter()
@@ -112,7 +112,7 @@ impl FileRepository for ToastyFileRepository {
             .deleted(Deleted::from(file.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseFile)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseFile))?;
         Ok(())
     }
 
@@ -134,7 +134,7 @@ impl FileRepository for ToastyFileRepository {
             .deleted(Deleted::from(file.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseFile)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseFile))?;
         Ok(())
     }
 
@@ -148,7 +148,7 @@ impl FileRepository for ToastyFileRepository {
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseFile)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseFile))?;
         Ok(())
     }
 
@@ -210,7 +210,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
         let all = SysFileConfig::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseFile)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseFile))?;
 
         Ok(all
             .iter()
@@ -223,7 +223,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
         let all = SysFileConfig::all()
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseFile)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseFile))?;
 
         Ok(all
             .iter()
@@ -249,7 +249,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
             .deleted(Deleted::from(config.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseFile)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseFile))?;
         Ok(())
     }
 
@@ -272,7 +272,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
             .deleted(Deleted::from(config.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseFile)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseFile))?;
         Ok(())
     }
 
@@ -286,7 +286,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
-            .map_err(|_| RepositoryError::DatabaseFile)?;
+            .map_err(|e| db_err(e, RepositoryError::DatabaseFile))?;
         Ok(())
     }
 }
