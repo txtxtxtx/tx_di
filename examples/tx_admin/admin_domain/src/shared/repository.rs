@@ -1,13 +1,13 @@
 use tx_error::CodeMsg;
 
-/// Repository 锛氬眰閿欒绫诲瀷
+/// Repository 层错误类型
 ///
-/// 姣忎釜閿欒鏈夌嫭涓€缂栫爜 锛屾柟渚垮墠绔牴鎹牴鎹爜鍋氬浗闄呭寲銆€
-/// 缁勭粐: 1xxxx = 搴撳簱 锛?xxxx = 涓嶅瓨鍦 锛?xxxx = 閲嶅 锛?xxxx = 鏍  骞
+/// 每个错误有唯一编码，方便前端根据编码做国际化
+/// 编码规则: 1xxxx = 数据库, 2xxxx = 不存在, 3xxxx = 重复, 4xxxx = 校验
 #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
 #[err("REPOSITORY")]
 pub enum RepositoryError {
-    // ── 搴撳簱閿欒 (10001-10009) ──
+    // ── 数据库异常 (10001-10009) ──
     #[err(10001, "数据库异常")]
     DatabaseUser,
     #[err(10002, "数据库异常")]
@@ -27,7 +27,7 @@ pub enum RepositoryError {
     #[err(10009, "数据库异常")]
     DatabaseLog,
 
-    // ── 涓嶅瓨鍦 (10101-10109) ──
+    // ── 记录不存在 (10101-10109) ──
     #[err(10101, "记录不存在")]
     NotFoundUser,
     #[err(10102, "记录不存在")]
@@ -47,7 +47,7 @@ pub enum RepositoryError {
     #[err(10109, "记录不存在")]
     NotFoundLog,
 
-    // ── 閲嶅 棰 (10201-10205) ──
+    // ── 重复 (10201-10205) ──
     #[err(10201, "用户名已存在")]
     DuplicateUsername,
     #[err(10202, "角色编码已存在")]
@@ -59,7 +59,7 @@ pub enum RepositoryError {
     #[err(10205, "字典类型已存在")]
     DuplicateDictType,
 
-    // ── 鏍  骞 (10301-10306) ──
+    // ── 校验 (10301-10306) ──
     #[err(10301, "用户状态异常，无法操作")]
     ValidationUserStatus,
     #[err(10302, "角色已禁用，无法分配")]
