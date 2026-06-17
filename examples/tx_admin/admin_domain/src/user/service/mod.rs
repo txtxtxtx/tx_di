@@ -356,7 +356,7 @@ impl UserService {
         let depts = self.dept_repo.find_by_ids(&dept_ids).await?;
         for d in &depts {
             if d.status != 0 {
-                return Err(RepositoryError::ValidationUserStatus)?;
+                return Err(RepositoryError::ValidationDeptDisabled)?;
             }
         }
 

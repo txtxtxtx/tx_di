@@ -13,6 +13,9 @@ pub fn router() -> Router {
 }
 
 /// GET /api/tool/cache/stats - 获取缓存统计
+/// TODO: 当前返回硬编码的 mock 数据，应替换为真实的缓存统计：
+///   - 接入实际的缓存组件（如 Redis、本地 LRU 缓存）
+///   - 从缓存组件获取 total_keys、used_memory、hit_count、miss_count 等指标
 async fn get_cache_stats() -> Result<R<CacheStatsResponse>, ApiErr> {
     ensure_permission("system:view").await?;
     Ok(R(ApiR::success(CacheStatsResponse {

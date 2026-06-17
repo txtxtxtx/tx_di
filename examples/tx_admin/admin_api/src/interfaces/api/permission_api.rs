@@ -52,6 +52,9 @@ async fn get_user_permissions(
 ) -> Result<R<UserPermissionsResponse>, ApiErr> {
     ensure_permission("permission:view").await?;
     let r = perm.get_user_permissions(req.user_id).await?;
+    // TODO: items 字段当前为空，应填充完整的权限详情列表：
+    //   - 从 PermissionRepository 查询每个权限编码对应的 name 和 permission_type
+    //   - 构建 Vec<UserPermissionItem> 填入 items 字段
     Ok(R(ApiR::success(UserPermissionsResponse {
         user_id: r.user_id,
         items: vec![],

@@ -14,6 +14,9 @@ pub fn router() -> Router {
 }
 
 /// GET /api/monitor/server - 获取服务器信息
+/// TODO: 当前返回硬编码的 mock 数据，应替换为真实的系统指标采集：
+///   - 使用 sysinfo / sys-info 等 crate 获取真实的 CPU、内存、磁盘信息
+///   - 考虑添加缓存，避免每次请求都采集系统指标（采集开销较大）
 async fn get_server_info() -> Result<R<ServerInfo>, ApiErr> {
     ensure_permission("system:view").await?;
     Ok(R(ApiR::success(ServerInfo {
@@ -32,6 +35,9 @@ async fn get_server_info() -> Result<R<ServerInfo>, ApiErr> {
 }
 
 /// GET /api/monitor/online - 获取在线用户列表
+/// TODO: 当前返回硬编码的 mock 数据，应替换为真实的在线用户查询：
+///   - 从 sa-token 会话存储中获取所有活跃会话（StpUtil::get_token_list）
+///   - 或维护一个在线用户表/缓存，登录时写入、登出/过期时清除
 async fn get_online_users() -> Result<R<OnlineUserListResponse>, ApiErr> {
     ensure_permission("system:view").await?;
     let users = vec![

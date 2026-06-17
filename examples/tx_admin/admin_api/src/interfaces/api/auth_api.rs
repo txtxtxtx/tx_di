@@ -38,14 +38,16 @@ async fn login(
     let token = StpUtil::login(r.user_id.to_string()).await?;
 
     // 根据角色设置权限
+    // TODO: 当前使用硬编码逻辑判断管理员（role_ids.contains(&1)），应改为：
+    //   1. 从 RoleRepository 查询用户所有角色，使用角色的真实名称（而非硬编码 "admin"/"user"）
+    //   2. 判断管理员应基于角色编码（如 role.code == "super_admin"）而非 ID == 1
+    //   3. StpUtil::set_permissions/set_roles 的错误不应被 `let _` 静默丢弃
     let user_id_str = r.user_id.to_string();
     let is_admin = r.role_ids.contains(&1);
     if is_admin {
-        // 超级管理员：设置 * 通配符权限，跳过所有权限检查
         let _ = StpUtil::set_permissions(&user_id_str, vec!["*".to_string()]).await;
         let _ = StpUtil::set_roles(&user_id_str, vec!["admin".to_string()]).await;
     } else {
-        // 普通用户：使用数据库中的权限
         let _ = StpUtil::set_permissions(&user_id_str, r.permissions.clone()).await;
         let _ = StpUtil::set_roles(&user_id_str, vec!["user".to_string()]).await;
     }

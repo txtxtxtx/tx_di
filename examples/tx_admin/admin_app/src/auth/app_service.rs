@@ -132,18 +132,21 @@ impl AuthAppService {
         })
     }
 
-    /// TODO 用户登出
+    /// 用户登出
     ///
     /// # 参数
     /// * `_cmd` - 登出命令（当前未使用，预留用于后续扩展，如令牌失效、会话清理等）
     ///
     /// # 执行逻辑
-    /// 当前为空操作，直接返回成功。实际应用中应在此处使令牌或会话失效。
+    /// 当前为空操作，直接返回成功。
     ///
     /// # 返回
     /// 成功返回 `()`
     pub async fn logout(&self, _cmd: LogoutCommand) -> AppResult<()> {
-        // In a real app, invalidate token/session
+        // TODO: 实现实际的登出逻辑：
+        //   1. 使当前用户的 sa-token 会话失效（调用 StpUtil::logout）
+        //   2. 可选：将当前 token 加入黑名单，防止重放攻击
+        //   3. 可选：记录登出日志（LoginLog，login_type=logout）
         Ok(())
     }
 }
