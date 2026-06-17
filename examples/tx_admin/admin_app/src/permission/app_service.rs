@@ -67,6 +67,38 @@ impl PermissionAppService {
         Ok(UserPermissionsResponse { user_id, permissions: permissions.into_iter().collect() })
     }
 
+    /// 获取用户权限及详情
+    ///
+    /// # 参数
+    /// * `user_id` - 用户 ID
+    ///
+    /// # 执行逻辑
+    /// 1. 调用领域服务获取用户的权限编码集合
+    /// 2. 按编码批量查询权限详情（name、type 等）
+    /// 3. 构建 `PermissionItem` 列表
+    ///
+    /// # 返回
+    /// 成功返回 `(权限编码列表, 权限详情列表)` 元组
+    pub async fn get_user_permission_items(
+        &self,
+        user_id: u64,
+    ) -> AppResult<(Vec<String>, Vec<PermissionItem>)> {
+        let permissions_set = self.permission_service.get_user_permissions(user_id).await?;
+        let permissions: Vec<String> = permissions_set.into_iter().collect();
+
+        let details = self.permission_service.get_permissions_by_codes(&permissions).await?;
+        let items: Vec<PermissionItem> = details
+            .into_iter()
+            .map(|p| PermissionItem {
+                code: p.permission_code,
+                name: p.name,
+                permission_type: format!("{:?}", p.permission_type),
+            })
+            .collect();
+
+        Ok((permissions, items))
+    }
+
     /// 获取所有可用权限（轻量级）
     ///
     /// # 执行逻辑

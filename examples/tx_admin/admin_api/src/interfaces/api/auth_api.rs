@@ -70,7 +70,17 @@ async fn user_info(
 
 /// POST /api/auth/logout
 #[sa_check_permission("auth:logout")]
-async fn logout() -> Result<R<Empty>, ApiErr> {
+async fn logout(
+    DiComp(auth): DiComp<AuthAppService>,
+    LoginIdExtractor(login_id): LoginIdExtractor,
+) -> Result<R<Empty>, ApiErr> {
+    let user_id: u64 = login_id.parse().unwrap_or(0);
+    // 1. 使 sa-token 会话失效
     StpUtil::logout_current().await?;
+    // 2. 清除 sa-token 中该用户的权限和角色缓存
+    StpUtil::clear_permissions(&login_id).await?;
+    StpUtil::clear_roles(&login_id).await?;
+    // 3. 记录登出日志
+    let _ = auth.logout(admin_app::auth::dto::LogoutCommand { user_id }).await;
     Ok(R(ApiRes::ok().into_typed()))
 }

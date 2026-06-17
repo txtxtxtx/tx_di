@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use crate::auth::dto::*;
+use crate::log::app_service::LoginLogAppService;
+use crate::log::dto::CreateLoginLogCommand;
 use admin_domain::user::service::UserService;
 use admin_domain::role::service::RoleService;
 use admin_domain::permission::service::PermissionService;
@@ -15,6 +17,7 @@ pub struct AuthAppService {
     user_service: Arc<UserService>,
     role_service: Arc<RoleService>,
     permission_service: Arc<PermissionService>,
+    login_log_service: Arc<LoginLogAppService>,
 }
 
 impl AuthAppService {
@@ -28,11 +31,13 @@ impl AuthAppService {
         user_service: Arc<UserService>,
         role_service: Arc<RoleService>,
         permission_service: Arc<PermissionService>,
+        login_log_service: Arc<LoginLogAppService>,
     ) -> Self {
         Self {
             user_service,
             role_service,
             permission_service,
+            login_log_service,
         }
     }
 
@@ -140,18 +145,33 @@ impl AuthAppService {
     /// 用户登出
     ///
     /// # 参数
-    /// * `_cmd` - 登出命令（当前未使用，预留用于后续扩展，如令牌失效、会话清理等）
+    /// * `cmd` - 登出命令，包含用户 ID
     ///
     /// # 执行逻辑
-    /// 当前为空操作，直接返回成功。
+    /// 1. 根据用户 ID 查询用户信息（用于记录日志的用户名）
+    /// 2. 记录登出类型的登录日志（login_type = "logout"，result = 0 表示成功）
     ///
     /// # 返回
     /// 成功返回 `()`
-    pub async fn logout(&self, _cmd: LogoutCommand) -> AppResult<()> {
-        // TODO: 实现实际的登出逻辑：
-        //   1. 使当前用户的 sa-token 会话失效（调用 StpUtil::logout）
-        //   2. 可选：将当前 token 加入黑名单，防止重放攻击
-        //   3. 可选：记录登出日志（LoginLog，login_type=logout）
+    ///
+    /// # 错误
+    /// - `NotFoundUser` - 用户 ID 对应的用户不存在
+    /// - 日志写入异常
+    pub async fn logout(&self, cmd: LogoutCommand) -> AppResult<()> {
+        // 查询用户信息用于日志记录
+        let user = self.user_service.get_user(cmd.user_id).await?;
+
+        // 记录登出日志
+        let log_cmd = CreateLoginLogCommand {
+            user_id: cmd.user_id,
+            user_type: 0,
+            username: user.username,
+            login_ip: String::new(),
+            login_type: "logout".to_string(),
+            result: 0, // 成功
+        };
+        let _ = self.login_log_service.create_log(log_cmd).await;
+
         Ok(())
     }
 }
