@@ -15,11 +15,35 @@ pub struct UserAppService {
 }
 
 impl UserAppService {
+    /// 创建用户应用服务实例
+    ///
+    /// # 参数
+    /// * `user_service` - 用户领域服务，用于执行用户相关的业务逻辑
     pub fn new(user_service: Arc<UserService>) -> Self {
         Self { user_service }
     }
 
-    /// Create a new user
+    /// 创建新用户
+    ///
+    /// # 参数
+    /// * `cmd` - 创建用户命令，包含用户名、密码、昵称、邮箱、手机号、性别、备注、角色ID列表、部门ID列表
+    /// * `creator` - 创建者标识（可选）
+    ///
+    /// # 执行逻辑
+    /// 1. 校验邮箱唯一性，若已存在则返回 `DuplicateEmail` 错误
+    /// 2. 校验手机号唯一性，若已存在则返回 `DuplicateMobile` 错误
+    /// 3. 调用用户服务创建用户（含密码哈希处理）
+    /// 4. 若提供了可选字段（邮箱、手机号、性别、备注），则更新用户信息并持久化
+    /// 5. 若提供了角色ID列表，则为用户分配角色
+    /// 6. 若提供了部门ID列表，则为用户分配部门
+    ///
+    /// # 返回
+    /// 成功返回 `UserResponse`，包含完整的用户信息
+    ///
+    /// # 错误
+    /// - `DuplicateEmail` - 邮箱已被其他用户使用
+    /// - `DuplicateMobile` - 手机号已被其他用户使用
+    /// - 数据库写入异常
     pub async fn create_user(
         &self,
         cmd: CreateUserCommand,
@@ -28,14 +52,14 @@ impl UserAppService {
         // Check email uniqueness
         if let Some(ref email) = cmd.email {
             if self.user_service.exists_by_email(email).await? {
-                return Err(RepositoryError::DuplicateUsername)?;
+                return Err(RepositoryError::DuplicateEmail)?;
             }
         }
 
         // Check mobile uniqueness
         if let Some(ref mobile) = cmd.mobile {
             if self.user_service.exists_by_mobile(mobile).await? {
-                return Err(RepositoryError::DuplicateUsername)?;
+                return Err(RepositoryError::DuplicateMobile)?;
             }
         }
 
@@ -79,7 +103,21 @@ impl UserAppService {
         Ok(user_to_response(user))
     }
 
-    /// Update user
+    /// 更新用户信息
+    ///
+    /// # 参数
+    /// * `cmd` - 更新用户命令，包含用户ID、昵称、邮箱、手机号、性别、备注
+    /// * `updater` - 更新者标识（可选）
+    ///
+    /// # 执行逻辑
+    /// 委托给用户领域服务执行更新操作，逻辑详见 `UserService::update_user`
+    ///
+    /// # 返回
+    /// 成功返回更新后的 `UserResponse`
+    ///
+    /// # 错误
+    /// - `NotFoundUser` - 用户ID对应的用户不存在
+    /// - 数据库更新异常
     pub async fn update_user(
         &self,
         cmd: UpdateUserCommand,
@@ -100,7 +138,21 @@ impl UserAppService {
         Ok(user_to_response(user))
     }
 
-    /// Delete user
+    /// 删除用户
+    ///
+    /// # 参数
+    /// * `user_id` - 要删除的用户ID
+    /// * `updater` - 操作者标识（可选）
+    ///
+    /// # 执行逻辑
+    /// 委托给用户领域服务执行删除操作，逻辑详见 `UserService::delete_user`
+    ///
+    /// # 返回
+    /// 成功返回 `()`
+    ///
+    /// # 错误
+    /// - `NotFoundUser` - 用户ID对应的用户不存在
+    /// - 数据库删除异常
     pub async fn delete_user(
         &self,
         user_id: u64,
@@ -109,7 +161,22 @@ impl UserAppService {
         self.user_service.delete_user(user_id, updater).await
     }
 
-    /// Change user status
+    /// 变更用户状态（启用/禁用）
+    ///
+    /// # 参数
+    /// * `user_id` - 目标用户ID
+    /// * `status` - 目标状态（`UserStatus` 枚举值）
+    /// * `updater` - 操作者标识（可选）
+    ///
+    /// # 执行逻辑
+    /// 委托给用户领域服务执行状态变更，逻辑详见 `UserService::change_status`
+    ///
+    /// # 返回
+    /// 成功返回变更后的 `UserResponse`
+    ///
+    /// # 错误
+    /// - `NotFoundUser` - 用户ID对应的用户不存在
+    /// - 数据库更新异常
     pub async fn change_status(
         &self,
         user_id: u64,
@@ -120,7 +187,21 @@ impl UserAppService {
         Ok(user_to_response(user))
     }
 
-    /// Change password
+    /// 修改用户密码
+    ///
+    /// # 参数
+    /// * `cmd` - 修改密码命令，包含用户ID和新密码
+    /// * `updater` - 操作者标识（可选）
+    ///
+    /// # 执行逻辑
+    /// 委托给用户领域服务执行密码修改，逻辑详见 `UserService::change_password`
+    ///
+    /// # 返回
+    /// 成功返回 `()`
+    ///
+    /// # 错误
+    /// - `NotFoundUser` - 用户ID对应的用户不存在
+    /// - 密码哈希计算异常
     pub async fn change_password(
         &self,
         cmd: ChangePasswordCommand,
@@ -132,23 +213,76 @@ impl UserAppService {
         Ok(())
     }
 
-    /// Assign roles to user
+    /// 为用户分配角色
+    ///
+    /// # 参数
+    /// * `cmd` - 分配角色命令，包含用户ID和角色ID列表
+    ///
+    /// # 执行逻辑
+    /// 委托给用户领域服务执行角色分配，逻辑详见 `UserService::assign_roles`
+    ///
+    /// # 返回
+    /// 成功返回 `()`
+    ///
+    /// # 错误
+    /// - `NotFoundUser` - 用户ID对应的用户不存在
+    /// - 角色ID不存在
     pub async fn assign_roles(&self, cmd: AssignRolesCommand) -> AppResult<()> {
         self.user_service.assign_roles(cmd.user_id, cmd.role_ids).await
     }
 
-    /// Assign departments to user
+    /// 为用户分配部门
+    ///
+    /// # 参数
+    /// * `cmd` - 分配部门命令，包含用户ID和部门ID列表
+    ///
+    /// # 执行逻辑
+    /// 委托给用户领域服务执行部门分配，逻辑详见 `UserService::assign_departments`
+    ///
+    /// # 返回
+    /// 成功返回 `()`
+    ///
+    /// # 错误
+    /// - `NotFoundUser` - 用户ID对应的用户不存在
+    /// - 部门ID不存在
     pub async fn assign_departments(&self, cmd: AssignDeptsCommand) -> AppResult<()> {
         self.user_service.assign_departments(cmd.user_id, cmd.dept_ids).await
     }
 
-    /// Get user by ID
+    /// 根据ID获取用户信息
+    ///
+    /// # 参数
+    /// * `user_id` - 用户ID
+    ///
+    /// # 执行逻辑
+    /// 委托给用户领域服务查询用户，逻辑详见 `UserService::get_user`
+    ///
+    /// # 返回
+    /// 成功返回 `UserResponse`
+    ///
+    /// # 错误
+    /// - `NotFoundUser` - 用户ID对应的用户不存在
     pub async fn get_user(&self, user_id: u64) -> AppResult<UserResponse> {
         let user = self.user_service.get_user(user_id).await?;
         Ok(user_to_response(user))
     }
 
-    /// Get user page
+    /// 分页查询用户列表
+    ///
+    /// # 参数
+    /// * `request` - 分页查询请求，包含用户名、昵称、手机号、状态、部门ID等筛选条件，以及页码和每页大小
+    ///
+    /// # 执行逻辑
+    /// 1. 将请求参数转换为领域查询对象 `UserQuery`
+    /// 2. 构建分页参数 `Page`
+    /// 3. 委托给用户领域服务执行分页查询
+    /// 4. 将领域模型列表转换为响应DTO列表
+    ///
+    /// # 返回
+    /// 成功返回 `Page<UserResponse>`，包含用户列表、页码、每页大小和总记录数
+    ///
+    /// # 错误
+    /// - 数据库查询异常
     pub async fn get_user_page(
         &self,
         request: UserQueryRequest,

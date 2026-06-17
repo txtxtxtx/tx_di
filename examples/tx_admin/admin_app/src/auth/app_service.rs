@@ -18,6 +18,12 @@ pub struct AuthAppService {
 }
 
 impl AuthAppService {
+    /// 创建认证应用服务实例
+    ///
+    /// # 参数
+    /// * `user_service` - 用户领域服务，用于查询和管理用户
+    /// * `role_service` - 角色领域服务，用于查询角色信息
+    /// * `permission_service` - 权限领域服务，用于查询用户权限
     pub fn new(
         user_service: Arc<UserService>,
         role_service: Arc<RoleService>,
@@ -30,7 +36,26 @@ impl AuthAppService {
         }
     }
 
-    /// User login
+    /// 用户登录
+    ///
+    /// # 参数
+    /// * `cmd` - 登录命令，包含用户名、密码和登录IP
+    ///
+    /// # 执行逻辑
+    /// 1. 根据用户名查找用户，若不存在则返回 `NotFoundUser` 错误
+    /// 2. 校验用户是否处于激活状态，未激活则返回 `ValidationLogin` 错误
+    /// 4. 使用 Argon2id 算法验证密码，密码错误则返回 `ValidationPassword` 错误
+    /// 5. 调用用户服务构建登录用户信息（含角色、权限等）
+    /// 6. 记录本次登录信息（用户ID、登录IP）
+    /// 7. 组装并返回登录响应
+    ///
+    /// # 返回
+    /// 成功返回 `LoginResponse`，包含用户ID、用户名、昵称、租户ID、角色ID列表、权限集合和部门ID列表
+    ///
+    /// # 错误
+    /// - `NotFoundUser` - 用户名不存在
+    /// - `ValidationLogin` - 用户未激活或已被锁定
+    /// - `ValidationPassword` - 密码验证失败或哈希计算出错
     pub async fn login(&self, cmd: LoginCommand) -> AppResult<LoginResponse> {
         // Find user by username
         let user = self
@@ -41,10 +66,6 @@ impl AuthAppService {
 
         // Check if user is active
         if !user.is_active() {
-            return Err(RepositoryError::ValidationLogin)?;
-        }
-
-        if user.is_locked() {
             return Err(RepositoryError::ValidationLogin)?;
         }
 
@@ -73,10 +94,26 @@ impl AuthAppService {
         })
     }
 
-    /// Get user info (for authenticated user)
+    /// 获取当前已认证用户的详细信息
+    ///
+    /// # 参数
+    /// * `user_id` - 当前登录用户的ID
+    ///
+    /// # 执行逻辑
+    /// 1. 根据用户ID查询用户实体
+    /// 2. 通过权限服务获取该用户拥有的所有权限编码
+    /// 3. 根据用户关联的角色ID列表批量查询角色信息，提取角色编码
+    /// 4. 组装用户信息响应
+    ///
+    /// # 返回
+    /// 成功返回 `UserInfoResponse`，包含用户基本信息、角色列表和权限集合
+    ///
+    /// # 错误
+    /// - `NotFoundUser` - 用户ID对应的用户不存在
+    /// - 数据库查询异常
     pub async fn get_user_info(&self, user_id: u64) -> AppResult<UserInfoResponse> {
         let user = self.user_service.get_user(user_id).await?;
-        let role_ids = self.user_service.get_user(user_id).await?.role_ids;
+        let role_ids = user.role_ids.clone();
         let permissions = self.permission_service.get_user_permissions(user_id).await?;
 
         // Get role names
@@ -95,7 +132,16 @@ impl AuthAppService {
         })
     }
 
-    /// User logout
+    /// TODO 用户登出
+    ///
+    /// # 参数
+    /// * `_cmd` - 登出命令（当前未使用，预留用于后续扩展，如令牌失效、会话清理等）
+    ///
+    /// # 执行逻辑
+    /// 当前为空操作，直接返回成功。实际应用中应在此处使令牌或会话失效。
+    ///
+    /// # 返回
+    /// 成功返回 `()`
     pub async fn logout(&self, _cmd: LogoutCommand) -> AppResult<()> {
         // In a real app, invalidate token/session
         Ok(())

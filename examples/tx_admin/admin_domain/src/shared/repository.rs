@@ -57,7 +57,7 @@ pub enum RepositoryError {
     #[err(10109, "记录不存在")]
     NotFoundLog,
 
-    // ── 重复 (10201-10205) ──
+    // ── 重复 (10201-10207) ──
     #[err(10201, "用户名已存在")]
     DuplicateUsername,
     #[err(10202, "角色编码已存在")]
@@ -68,8 +68,12 @@ pub enum RepositoryError {
     DuplicateConfigKey,
     #[err(10205, "字典类型已存在")]
     DuplicateDictType,
+    #[err(10206, "邮箱已存在")]
+    DuplicateEmail,
+    #[err(10207, "手机号已存在")]
+    DuplicateMobile,
 
-    // ── 校验 (10301-10306) ──
+    // ── 校验 (10301-10312) ──
     #[err(10301, "用户状态异常，无法操作")]
     ValidationUserStatus,
     #[err(10302, "角色已禁用，无法分配")]
@@ -82,4 +86,14 @@ pub enum RepositoryError {
     ValidationLogin,
     #[err(10306, "登录状态已过期")]
     ValidationToken,
+    #[err(10307, "菜单下存在子菜单，无法删除")]
+    ValidationMenuHasChildren,
+    #[err(10308, "菜单不能将自身设为上级菜单")]
+    ValidationMenuSelfParent,
+    #[err(10309, "部门下存在子部门，无法删除")]
+    ValidationDeptHasChildren,
+    #[err(10310, "部门下存在用户，无法删除")]
+    ValidationDeptHasUsers,
+    #[err(10311, "部门不能将自身设为上级部门")]
+    ValidationDeptSelfParent,
 }

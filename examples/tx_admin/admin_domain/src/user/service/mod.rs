@@ -43,17 +43,61 @@ impl UserService {
         }
     }
 
-    /// Check if email already exists
+    /// 检查邮箱是否已被注册
+    ///
+    /// # 参数
+    /// * `email` - 待检查的邮箱地址
+    ///
+    /// # 执行逻辑
+    /// 1. 调用用户仓库查询该邮箱是否已存在于数据库中
+    ///
+    /// # 返回
+    /// 邮箱已存在返回 `true`，不存在返回 `false`
+    ///
+    /// # 错误
+    /// - 数据库查询异常时返回错误
     pub async fn exists_by_email(&self, email: &str) -> AppResult<bool> {
         self.user_repo.exists_by_email(email).await
     }
 
-    /// Check if mobile already exists
+    /// 检查手机号是否已被注册
+    ///
+    /// # 参数
+    /// * `mobile` - 待检查的手机号
+    ///
+    /// # 执行逻辑
+    /// 1. 调用用户仓库查询该手机号是否已存在于数据库中
+    ///
+    /// # 返回
+    /// 手机号已存在返回 `true`，不存在返回 `false`
+    ///
+    /// # 错误
+    /// - 数据库查询异常时返回错误
     pub async fn exists_by_mobile(&self, mobile: &str) -> AppResult<bool> {
         self.user_repo.exists_by_mobile(mobile).await
     }
 
-    /// Create a new user
+    /// 创建新用户
+    ///
+    /// # 参数
+    /// * `username` - 用户名，必须全局唯一
+    /// * `password` - 明文密码，将使用 Argon2id 算法进行哈希加密
+    /// * `nickname` - 用户昵称
+    /// * `creator` - 创建者标识，可选
+    ///
+    /// # 执行逻辑
+    /// 1. 检查用户名是否已存在，若存在则返回重复错误
+    /// 2. 使用 Argon2id 算法对明文密码进行哈希加密
+    /// 3. 生成全局唯一用户 ID
+    /// 4. 构建用户聚合并持久化到数据库
+    ///
+    /// # 返回
+    /// 成功返回新创建的 `User` 聚合根
+    ///
+    /// # 错误
+    /// - `DuplicateUsername` - 用户名已被占用
+    /// - 密码哈希处理失败时返回错误
+    /// - 数据库插入失败时返回错误
     pub async fn create_user(
         &self,
         username: String,
@@ -75,7 +119,28 @@ impl UserService {
         Ok(user)
     }
 
-    /// Update user basic info
+    /// 更新用户基本信息
+    ///
+    /// # 参数
+    /// * `user_id` - 用户 ID
+    /// * `nickname` - 新昵称
+    /// * `email` - 新邮箱，可选
+    /// * `mobile` - 新手机号，可选
+    /// * `sex` - 性别
+    /// * `remark` - 备注，可选
+    /// * `updater` - 更新者标识，可选
+    ///
+    /// # 执行逻辑
+    /// 1. 根据用户 ID 查询用户，若不存在则返回未找到错误
+    /// 2. 调用用户聚合根的 `set_basic_info` 方法更新基本信息字段
+    /// 3. 将更新后的用户持久化到数据库
+    ///
+    /// # 返回
+    /// 成功返回更新后的 `User` 聚合根
+    ///
+    /// # 错误
+    /// - `NotFoundUser` - 指定用户不存在
+    /// - 数据库更新失败时返回错误
     pub async fn update_user(
         &self,
         user_id: u64,
@@ -97,7 +162,23 @@ impl UserService {
         Ok(user)
     }
 
-    /// Delete user
+    /// 软删除用户
+    ///
+    /// # 参数
+    /// * `user_id` - 用户 ID
+    /// * `updater` - 操作者标识，可选
+    ///
+    /// # 执行逻辑
+    /// 1. 根据用户 ID 查询用户，若不存在则返回未找到错误
+    /// 2. 调用用户聚合根的 `soft_delete` 方法标记为已删除状态
+    /// 3. 将更新后的用户持久化到数据库
+    ///
+    /// # 返回
+    /// 成功返回 `()`
+    ///
+    /// # 错误
+    /// - `NotFoundUser` - 指定用户不存在
+    /// - 数据库更新失败时返回错误
     pub async fn delete_user(
         &self,
         user_id: u64,
@@ -114,7 +195,24 @@ impl UserService {
         Ok(())
     }
 
-    /// Change user status
+    /// 变更用户状态（启用/禁用）
+    ///
+    /// # 参数
+    /// * `user_id` - 用户 ID
+    /// * `status` - 目标状态（`UserStatus::Active` 或 `UserStatus::Disabled`）
+    /// * `updater` - 操作者标识，可选
+    ///
+    /// # 执行逻辑
+    /// 1. 根据用户 ID 查询用户，若不存在则返回未找到错误
+    /// 2. 调用用户聚合根的 `change_status` 方法变更状态
+    /// 3. 将更新后的用户持久化到数据库
+    ///
+    /// # 返回
+    /// 成功返回更新后的 `User` 聚合根
+    ///
+    /// # 错误
+    /// - `NotFoundUser` - 指定用户不存在
+    /// - 数据库更新失败时返回错误
     pub async fn change_status(
         &self,
         user_id: u64,
@@ -132,7 +230,26 @@ impl UserService {
         Ok(user)
     }
 
-    /// Change user password
+    /// 修改用户密码
+    ///
+    /// # 参数
+    /// * `user_id` - 用户 ID
+    /// * `password` - 新密码明文，将使用 Argon2id 算法进行哈希加密
+    /// * `updater` - 操作者标识，可选
+    ///
+    /// # 执行逻辑
+    /// 1. 根据用户 ID 查询用户，若不存在则返回未找到错误
+    /// 2. 使用 Argon2id 算法对新密码进行哈希加密
+    /// 3. 调用用户聚合根的 `change_password` 方法更新密码哈希值
+    /// 4. 将更新后的用户持久化到数据库
+    ///
+    /// # 返回
+    /// 成功返回更新后的 `User` 聚合根
+    ///
+    /// # 错误
+    /// - `NotFoundUser` - 指定用户不存在
+    /// - 密码哈希处理失败时返回错误
+    /// - 数据库更新失败时返回错误
     pub async fn change_password(
         &self,
         user_id: u64,
@@ -153,9 +270,25 @@ impl UserService {
         Ok(user)
     }
 
-    /// Assign roles to user
+    /// 为用户分配角色
     ///
-    /// 校验：用户必须为 Active 状态，且每个角色必须存在且为启用状态
+    /// # 参数
+    /// * `user_id` - 用户 ID
+    /// * `role_ids` - 要分配的角色 ID 列表
+    ///
+    /// # 执行逻辑
+    /// 1. 根据用户 ID 查询用户，若不存在则返回未找到错误
+    /// 2. 校验用户状态必须为 Active，否则返回状态校验错误
+    /// 3. 批量查询角色列表，逐个校验每个角色必须存在且为启用状态（status == 0）
+    /// 4. 调用用户仓库绑定用户与角色的关联关系
+    ///
+    /// # 返回
+    /// 成功返回 `()`
+    ///
+    /// # 错误
+    /// - `NotFoundUser` - 指定用户不存在
+    /// - `ValidationUserStatus` - 用户状态非 Active 或角色状态非启用
+    /// - 数据库操作失败时返回错误
     pub async fn assign_roles(
         &self,
         user_id: u64,
@@ -184,9 +317,25 @@ impl UserService {
         Ok(())
     }
 
-    /// Assign departments to user
+    /// 为用户分配部门
     ///
-    /// 校验：用户必须为 Active 状态，且每个部门必须存在且为启用状态
+    /// # 参数
+    /// * `user_id` - 用户 ID
+    /// * `dept_ids` - 要分配的部门 ID 列表
+    ///
+    /// # 执行逻辑
+    /// 1. 根据用户 ID 查询用户，若不存在则返回未找到错误
+    /// 2. 校验用户状态必须为 Active，否则返回状态校验错误
+    /// 3. 批量查询部门列表，逐个校验每个部门必须存在且为启用状态（status == 0）
+    /// 4. 调用用户仓库绑定用户与部门的关联关系
+    ///
+    /// # 返回
+    /// 成功返回 `()`
+    ///
+    /// # 错误
+    /// - `NotFoundUser` - 指定用户不存在
+    /// - `ValidationUserStatus` - 用户状态非 Active 或部门状态非启用
+    /// - 数据库操作失败时返回错误
     pub async fn assign_departments(
         &self,
         user_id: u64,
@@ -215,7 +364,20 @@ impl UserService {
         Ok(())
     }
 
-    /// Get user page
+    /// 分页查询用户列表
+    ///
+    /// # 参数
+    /// * `query` - 查询条件，包含用户名、状态等筛选项
+    /// * `page` - 分页参数，包含页码和每页数量
+    ///
+    /// # 执行逻辑
+    /// 1. 调用用户仓库的分页查询方法，根据条件筛选并返回分页结果
+    ///
+    /// # 返回
+    /// 成功返回分页结果 `Page<User>`，包含用户列表和分页元数据
+    ///
+    /// # 错误
+    /// - 数据库查询异常时返回错误
     pub async fn get_user_page(
         &self,
         query: &UserQuery,
@@ -224,7 +386,22 @@ impl UserService {
         self.user_repo.find_page(query, page).await
     }
 
-    /// Get user by ID (includes role and department associations)
+    /// 根据 ID 获取用户详情（包含角色和部门关联信息）
+    ///
+    /// # 参数
+    /// * `user_id` - 用户 ID
+    ///
+    /// # 执行逻辑
+    /// 1. 根据用户 ID 查询用户，若不存在则返回未找到错误
+    /// 2. 查询用户关联的角色 ID 列表并填充到用户对象
+    /// 3. 查询用户关联的部门 ID 列表并填充到用户对象
+    ///
+    /// # 返回
+    /// 成功返回包含角色和部门关联信息的 `User` 聚合根
+    ///
+    /// # 错误
+    /// - `NotFoundUser` - 指定用户不存在
+    /// - 数据库查询异常时返回错误
     pub async fn get_user(&self, user_id: u64) -> AppResult<User> {
         let mut user = self
             .user_repo
@@ -236,7 +413,22 @@ impl UserService {
         Ok(user)
     }
 
-    /// Build login user info (for auth)
+    /// 构建登录用户信息（用于身份认证）
+    ///
+    /// # 参数
+    /// * `user` - 用户聚合根引用
+    ///
+    /// # 执行逻辑
+    /// 1. 查询用户关联的角色 ID 列表
+    /// 2. 查询用户关联的部门 ID 列表
+    /// 3. 查询用户拥有的权限列表
+    /// 4. 组装 `LoginUser` 对象，包含用户 ID、用户名、昵称、租户 ID、角色、权限和部门信息
+    ///
+    /// # 返回
+    /// 成功返回 `LoginUser` 对象，用于登录认证和权限校验
+    ///
+    /// # 错误
+    /// - 数据库查询异常时返回错误
     pub async fn build_login_user(&self, user: &User) -> AppResult<LoginUser> {
         let role_ids = self.user_repo.get_role_ids(user.id).await?;
         let dept_ids = self.user_repo.get_dept_ids(user.id).await?;
@@ -253,12 +445,40 @@ impl UserService {
         })
     }
 
-    /// Get user by username (for login)
+    /// 根据用户名查询用户（用于登录验证）
+    ///
+    /// # 参数
+    /// * `username` - 用户名
+    ///
+    /// # 执行逻辑
+    /// 1. 调用用户仓库根据用户名查询用户记录
+    ///
+    /// # 返回
+    /// 成功返回 `Option<User>`，用户存在返回 `Some(User)`，不存在返回 `None`
+    ///
+    /// # 错误
+    /// - 数据库查询异常时返回错误
     pub async fn get_by_username(&self, username: &str) -> AppResult<Option<User>> {
         self.user_repo.find_by_username(username).await
     }
 
-    /// Record login
+    /// 记录用户登录信息
+    ///
+    /// # 参数
+    /// * `user_id` - 用户 ID
+    /// * `ip` - 登录 IP 地址
+    ///
+    /// # 执行逻辑
+    /// 1. 根据用户 ID 查询用户，若不存在则返回未找到错误
+    /// 2. 调用用户聚合根的 `record_login` 方法记录登录时间和 IP 地址
+    /// 3. 将更新后的用户持久化到数据库
+    ///
+    /// # 返回
+    /// 成功返回更新后的 `User` 聚合根
+    ///
+    /// # 错误
+    /// - `NotFoundUser` - 指定用户不存在
+    /// - 数据库更新失败时返回错误
     pub async fn record_login(
         &self,
         user_id: u64,
