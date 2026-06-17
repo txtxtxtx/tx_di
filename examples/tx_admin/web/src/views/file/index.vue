@@ -57,7 +57,7 @@
           <el-input v-model="uploadForm.url" />
         </el-form-item>
         <el-form-item label="文件类型">
-          <el-input v-model="uploadForm.file_type" />
+          <el-input v-model="uploadForm.fileType" />
         </el-form-item>
         <el-form-item label="大小" prop="size">
           <el-input-number v-model="uploadForm.size" :min="0" />
@@ -89,7 +89,7 @@ const query = reactive({ name: '', fileType: '' })
 
 const uploadDialogVisible = ref(false)
 const uploadFormRef = ref<FormInstance>()
-const uploadForm = reactive({ name: '', path: '', url: '', file_type: '', size: 0 })
+const uploadForm = reactive({ name: '', path: '', url: '', fileType: '', size: 0 })
 const uploadRules: FormRules = {
   name: [{ required: true, message: '请输入文件名', trigger: 'blur' }],
   path: [{ required: true, message: '请输入路径', trigger: 'blur' }],
@@ -116,7 +116,7 @@ async function handleUpload() {
     await uploadFile(uploadForm)
     ElMessage.success('上传成功')
     uploadDialogVisible.value = false
-    Object.assign(uploadForm, { name: '', path: '', url: '', file_type: '', size: 0 })
+    Object.assign(uploadForm, { name: '', path: '', url: '', fileType: '', size: 0 })
     loadData()
   } catch {} finally { submitLoading.value = false }
 }

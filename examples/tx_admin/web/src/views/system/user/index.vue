@@ -252,8 +252,8 @@ async function handleSubmit() {
         mobile: form.mobile || undefined,
         sex: form.sex,
         remark: form.remark || undefined,
-        role_ids: [],
-        dept_ids: [],
+        roleIds: [],
+        deptIds: [],
       })
       ElMessage.success('创建成功')
     }
@@ -285,7 +285,7 @@ async function openAssignRoles(row: UserResponse) {
 async function handleAssignRoles() {
   submitLoading.value = true
   try {
-    await assignRoles({ user_id: currentUserId.value, role_ids: selectedRoleIds.value })
+    await assignRoles({ userId: currentUserId.value, roleIds: selectedRoleIds.value })
     ElMessage.success('分配角色成功')
     rolesDialogVisible.value = false
     loadData()
@@ -307,7 +307,7 @@ async function handleAssignDepts() {
   const checkedKeys = deptTreeRef.value?.getCheckedKeys(false) || []
   submitLoading.value = true
   try {
-    await assignDepts({ user_id: currentUserId.value, dept_ids: checkedKeys })
+    await assignDepts({ userId: currentUserId.value, deptIds: checkedKeys })
     ElMessage.success('分配部门成功')
     deptsDialogVisible.value = false
     loadData()

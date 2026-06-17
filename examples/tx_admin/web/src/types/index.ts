@@ -13,10 +13,11 @@ export interface PageData<T> {
 }
 
 // ==================== 认证 ====================
+// proto, camelCase
 export interface LoginRequest {
   username: string
   password: string
-  login_ip: string
+  loginIp: string
 }
 
 // LoginResponse 来自 admin_app (snake_case)
@@ -26,6 +27,7 @@ export interface LoginResponse {
   nickname: string
   tenant_id: number
   role_ids: number[]
+  role_codes: string[]
   permissions: string[]
   dept_ids: number[]
 }
@@ -62,6 +64,7 @@ export interface UserResponse {
   updateTime: number
 }
 
+// proto, camelCase
 export interface CreateUserRequest {
   username: string
   password: string
@@ -70,8 +73,8 @@ export interface CreateUserRequest {
   mobile?: string
   sex?: number
   remark?: string
-  role_ids: number[]
-  dept_ids: number[]
+  roleIds: number[]
+  deptIds: number[]
 }
 
 export interface UpdateUserRequest {
@@ -92,23 +95,27 @@ export interface ListUsersRequest {
   pageInfo?: { page: number; size: number }
 }
 
+// proto, camelCase
 export interface ChangePasswordRequest {
-  user_id: number
-  new_password: string
+  userId: number
+  newPassword: string
 }
 
+// proto, camelCase
 export interface AssignRolesRequest {
-  user_id: number
-  role_ids: number[]
+  userId: number
+  roleIds: number[]
 }
 
+// proto, camelCase
 export interface AssignDeptsRequest {
-  user_id: number
-  dept_ids: number[]
+  userId: number
+  deptIds: number[]
 }
 
+// proto, camelCase
 export interface UserIdRequest {
-  user_id: number
+  userId: number
 }
 
 // ==================== 角色 (proto, camelCase) ====================
@@ -123,19 +130,21 @@ export interface RoleResponse {
   menuIds: number[]
 }
 
+// proto, camelCase
 export interface CreateRoleRequest {
   name: string
   code: string
   sort: number
   remark?: string
-  menu_ids: number[]
+  menuIds: number[]
 }
 
+// proto, camelCase
 export interface UpdateRoleRequest {
   name: string
   code: string
   sort: number
-  data_scope: number
+  dataScope: number
   remark?: string
 }
 
@@ -147,9 +156,10 @@ export interface ListRolesRequest {
   pageSize: number
 }
 
+// proto, camelCase
 export interface AssignMenusRequest {
-  role_id: number
-  menu_ids: number[]
+  roleId: number
+  menuIds: number[]
 }
 
 // ==================== 菜单 (domain, snake_case) ====================
@@ -247,26 +257,29 @@ export interface PermissionDetail {
   status: number
 }
 
+// proto, camelCase
 export interface CreatePermissionRequest {
   name: string
-  permission_code: string
+  permissionCode: string
   type: number
-  parent_id: number
+  parentId: number
   sort: number
   description: string
 }
 
+// proto, camelCase
 export interface UpdatePermissionRequest {
   name: string
-  permission_code: string
+  permissionCode: string
   type: number
-  parent_id: number
+  parentId: number
   sort: number
   description: string
 }
 
+// proto, camelCase
 export interface PermissionCheckRequest {
-  user_id: number
+  userId: number
   permission: string
 }
 
@@ -274,9 +287,16 @@ export interface PermissionCheckResponse {
   hasPermission: boolean
 }
 
+export interface UserPermissionItem {
+  code: string
+  name: string
+  permissionType: string
+}
+
 export interface UserPermissionsResponse {
   userId: number
   permissions: string[]
+  items: UserPermissionItem[]
 }
 
 // ==================== 配置 (proto, camelCase) ====================
@@ -291,20 +311,22 @@ export interface ConfigResponse {
   remark: string | null
 }
 
+// proto, camelCase
 export interface CreateConfigRequest {
   category: string
-  config_type: number
+  configType: number
   name: string
-  config_key: string
+  configKey: string
   value: string
   remark?: string
 }
 
+// proto, camelCase
 export interface UpdateConfigRequest {
   category: string
-  config_type: number
+  configType: number
   name: string
-  config_key: string
+  configKey: string
   value: string
   visible: number
   remark?: string
@@ -328,15 +350,17 @@ export interface DictTypeResponse {
   remark: string | null
 }
 
+// proto, camelCase
 export interface CreateDictTypeRequest {
   name: string
-  dict_type: string
+  dictType: string
   remark?: string
 }
 
+// proto, camelCase
 export interface UpdateDictTypeRequest {
   name: string
-  dict_type: string
+  dictType: string
   remark?: string
 }
 
@@ -360,23 +384,25 @@ export interface DictDataResponse {
   remark: string | null
 }
 
+// proto, camelCase
 export interface CreateDictDataRequest {
   sort: number
   label: string
   value: string
-  dict_type: string
-  color_type?: string
-  css_class?: string
+  dictType: string
+  colorType?: string
+  cssClass?: string
   remark?: string
 }
 
+// proto, camelCase
 export interface UpdateDictDataRequest {
   sort: number
   label: string
   value: string
-  dict_type: string
-  color_type?: string
-  css_class?: string
+  dictType: string
+  colorType?: string
+  cssClass?: string
   remark?: string
 }
 
@@ -454,13 +480,14 @@ export interface FileResponse {
   size: number
 }
 
+// proto, camelCase
 export interface UploadFileRequest {
   name: string
   path: string
   url: string
-  file_type?: string
+  fileType?: string
   size: number
-  config_id?: number
+  configId?: number
 }
 
 export interface ListFilesRequest {

@@ -189,10 +189,10 @@ async function handleSubmit() {
   submitLoading.value = true
   try {
     if (isEdit.value) {
-      await updateRole(form.id, { name: form.name, code: form.code, sort: form.sort, data_scope: form.data_scope, remark: form.remark || undefined })
+      await updateRole(form.id, { name: form.name, code: form.code, sort: form.sort, dataScope: form.data_scope, remark: form.remark || undefined })
       ElMessage.success('更新成功')
     } else {
-      await createRole({ name: form.name, code: form.code, sort: form.sort, remark: form.remark || undefined, menu_ids: [] })
+      await createRole({ name: form.name, code: form.code, sort: form.sort, remark: form.remark || undefined, menuIds: [] })
       ElMessage.success('创建成功')
     }
     dialogVisible.value = false; loadData()
@@ -217,7 +217,7 @@ async function handleAssignMenus() {
   const halfCheckedKeys = menuTreeRef.value?.getHalfCheckedKeys() || []
   submitLoading.value = true
   try {
-    await assignMenus({ role_id: currentRoleId.value, menu_ids: [...checkedKeys, ...halfCheckedKeys] })
+    await assignMenus({ roleId: currentRoleId.value, menuIds: [...checkedKeys, ...halfCheckedKeys] })
     ElMessage.success('分配菜单成功')
     menuDialogVisible.value = false; loadData()
   } catch {} finally { submitLoading.value = false }

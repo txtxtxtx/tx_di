@@ -55,8 +55,8 @@
 
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑字典数据' : '新增字典数据'" width="500px" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="80px">
-        <el-form-item label="字典类型" prop="dict_type">
-          <el-input v-model="form.dict_type" />
+        <el-form-item label="字典类型" prop="dictType">
+          <el-input v-model="form.dictType" />
         </el-form-item>
         <el-form-item label="标签" prop="label">
           <el-input v-model="form.label" />
@@ -100,9 +100,9 @@ const query = reactive({ dictType: (route.query.dictType as string) || '', label
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref<FormInstance>()
-const form = reactive({ id: 0, dict_type: '', label: '', value: '', sort: 0, remark: '' })
+const form = reactive({ id: 0, dictType: '', label: '', value: '', sort: 0, remark: '' })
 const formRules: FormRules = {
-  dict_type: [{ required: true, message: '请输入字典类型', trigger: 'blur' }],
+  dictType: [{ required: true, message: '请输入字典类型', trigger: 'blur' }],
   label: [{ required: true, message: '请输入标签', trigger: 'blur' }],
   value: [{ required: true, message: '请输入值', trigger: 'blur' }],
 }
@@ -121,9 +121,9 @@ function resetQuery() { query.dictType = ''; query.label = ''; query.status = un
 function openDialog(row?: DictDataResponse) {
   isEdit.value = !!row
   if (row) {
-    Object.assign(form, { id: row.id, dict_type: row.dictType, label: row.label, value: row.value, sort: row.sort, remark: row.remark || '' })
+    Object.assign(form, { id: row.id, dictType: row.dictType, label: row.label, value: row.value, sort: row.sort, remark: row.remark || '' })
   } else {
-    Object.assign(form, { id: 0, dict_type: query.dictType || '', label: '', value: '', sort: 0, remark: '' })
+    Object.assign(form, { id: 0, dictType: query.dictType || '', label: '', value: '', sort: 0, remark: '' })
   }
   dialogVisible.value = true
 }
@@ -133,7 +133,7 @@ async function handleSubmit() {
   if (!valid) return
   submitLoading.value = true
   try {
-    const data = { dict_type: form.dict_type, label: form.label, value: form.value, sort: form.sort, remark: form.remark || undefined }
+    const data = { dictType: form.dictType, label: form.label, value: form.value, sort: form.sort, remark: form.remark || undefined }
     if (isEdit.value) {
       await updateDictData(form.id, data)
       ElMessage.success('更新成功')

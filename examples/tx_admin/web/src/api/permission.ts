@@ -30,5 +30,5 @@ export function checkPermission(data: PermissionCheckRequest) {
 }
 
 export function getUserPermissions(userId: number) {
-  return request.post<ApiRes<UserPermissionsResponse>>('/api/permission/user-permissions', { user_id: userId }).then(r => r.data)
+  return request.post<ApiRes<UserPermissionsResponse>>('/api/permission/user-permissions', { userId }).then(r => r.data)
 }

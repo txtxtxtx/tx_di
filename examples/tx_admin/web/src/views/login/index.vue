@@ -52,7 +52,7 @@ async function handleLogin() {
     await userStore.login({
       username: form.username,
       password: form.password,
-      login_ip: loginIp,
+      loginIp: loginIp,
     })
     ElMessage.success('登录成功')
     router.push('/')

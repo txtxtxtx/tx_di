@@ -57,8 +57,8 @@
         <el-form-item label="字典名称" prop="name">
           <el-input v-model="form.name" />
         </el-form-item>
-        <el-form-item label="字典类型" prop="dict_type">
-          <el-input v-model="form.dict_type" :disabled="isEdit" />
+        <el-form-item label="字典类型" prop="dictType">
+          <el-input v-model="form.dictType" :disabled="isEdit" />
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="form.remark" type="textarea" />
@@ -93,10 +93,10 @@ const query = reactive({ name: '', dictType: '' as string, status: undefined as 
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref<FormInstance>()
-const form = reactive({ id: 0, name: '', dict_type: '', remark: '' })
+const form = reactive({ id: 0, name: '', dictType: '', remark: '' })
 const formRules: FormRules = {
   name: [{ required: true, message: '请输入字典名称', trigger: 'blur' }],
-  dict_type: [{ required: true, message: '请输入字典类型', trigger: 'blur' }],
+  dictType: [{ required: true, message: '请输入字典类型', trigger: 'blur' }],
 }
 
 async function loadData() {
@@ -113,9 +113,9 @@ function resetQuery() { query.name = ''; query.dictType = ''; query.status = und
 function openDialog(row?: DictTypeResponse) {
   isEdit.value = !!row
   if (row) {
-    Object.assign(form, { id: row.id, name: row.name, dict_type: row.dictType, remark: row.remark || '' })
+    Object.assign(form, { id: row.id, name: row.name, dictType: row.dictType, remark: row.remark || '' })
   } else {
-    Object.assign(form, { id: 0, name: '', dict_type: '', remark: '' })
+    Object.assign(form, { id: 0, name: '', dictType: '', remark: '' })
   }
   dialogVisible.value = true
 }
@@ -125,7 +125,7 @@ async function handleSubmit() {
   if (!valid) return
   submitLoading.value = true
   try {
-    const data = { name: form.name, dict_type: form.dict_type, remark: form.remark || undefined }
+    const data = { name: form.name, dictType: form.dictType, remark: form.remark || undefined }
     if (isEdit.value) {
       await updateDictType(form.id, data)
       ElMessage.success('更新成功')

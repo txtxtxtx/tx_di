@@ -35,8 +35,8 @@
         <el-form-item label="权限名称" prop="name">
           <el-input v-model="form.name" />
         </el-form-item>
-        <el-form-item label="权限编码" prop="permission_code">
-          <el-input v-model="form.permission_code" placeholder="如: user:create" />
+        <el-form-item label="权限编码" prop="permissionCode">
+          <el-input v-model="form.permissionCode" placeholder="如: user:create" />
         </el-form-item>
         <el-form-item label="类型" prop="type">
           <el-select v-model="form.type">
@@ -44,7 +44,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="上级权限">
-          <el-select v-model="form.parent_id" clearable placeholder="顶级">
+          <el-select v-model="form.parentId" clearable placeholder="顶级">
             <el-option :key="0" label="顶级" :value="0" />
             <el-option v-for="p in allPermissions" :key="p.id" :label="p.name" :value="p.id" />
           </el-select>
@@ -80,10 +80,10 @@ const allPermissions = ref<PermissionDetail[]>([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref<FormInstance>()
-const form = reactive({ id: 0, name: '', permission_code: '', type: 0, parent_id: 0, sort: 0, description: '' })
+const form = reactive({ id: 0, name: '', permissionCode: '', type: 0, parentId: 0, sort: 0, description: '' })
 const formRules: FormRules = {
   name: [{ required: true, message: '请输入权限名称', trigger: 'blur' }],
-  permission_code: [{ required: true, message: '请输入权限编码', trigger: 'blur' }],
+  permissionCode: [{ required: true, message: '请输入权限编码', trigger: 'blur' }],
 }
 
 async function loadData() {
@@ -98,9 +98,9 @@ async function loadData() {
 function openDialog(row?: PermissionDetail) {
   isEdit.value = !!row
   if (row) {
-    Object.assign(form, { id: row.id, name: row.name, permission_code: row.permissionCode, type: row.type, parent_id: row.parentId, sort: row.sort, description: row.description })
+    Object.assign(form, { id: row.id, name: row.name, permissionCode: row.permissionCode, type: row.type, parentId: row.parentId, sort: row.sort, description: row.description })
   } else {
-    Object.assign(form, { id: 0, name: '', permission_code: '', type: 0, parent_id: 0, sort: 0, description: '' })
+    Object.assign(form, { id: 0, name: '', permissionCode: '', type: 0, parentId: 0, sort: 0, description: '' })
   }
   dialogVisible.value = true
 }
@@ -110,7 +110,7 @@ async function handleSubmit() {
   if (!valid) return
   submitLoading.value = true
   try {
-    const data = { name: form.name, permission_code: form.permission_code, type: form.type, parent_id: form.parent_id, sort: form.sort, description: form.description }
+    const data = { name: form.name, permissionCode: form.permissionCode, type: form.type, parentId: form.parentId, sort: form.sort, description: form.description }
     if (isEdit.value) {
       await updatePermission(form.id, data)
       ElMessage.success('更新成功')

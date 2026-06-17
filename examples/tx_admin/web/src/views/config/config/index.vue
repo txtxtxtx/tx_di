@@ -54,8 +54,8 @@
         <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" />
         </el-form-item>
-        <el-form-item label="键名" prop="config_key">
-          <el-input v-model="form.config_key" />
+        <el-form-item label="键名" prop="configKey">
+          <el-input v-model="form.configKey" />
         </el-form-item>
         <el-form-item label="值" prop="value">
           <el-input v-model="form.value" type="textarea" />
@@ -64,7 +64,7 @@
           <el-input v-model="form.category" />
         </el-form-item>
         <el-form-item label="类型">
-          <el-select v-model="form.config_type">
+          <el-select v-model="form.configType">
             <el-option v-for="o in configTypeOptions" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </el-form-item>
@@ -105,10 +105,10 @@ const query = reactive({ name: '', category: '', configKey: '' })
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref<FormInstance>()
-const form = reactive({ id: 0, name: '', config_key: '', value: '', category: '', config_type: 1, visible: 0, remark: '' })
+const form = reactive({ id: 0, name: '', configKey: '', value: '', category: '', configType: 1, visible: 0, remark: '' })
 const formRules: FormRules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-  config_key: [{ required: true, message: '请输入键名', trigger: 'blur' }],
+  configKey: [{ required: true, message: '请输入键名', trigger: 'blur' }],
   value: [{ required: true, message: '请输入值', trigger: 'blur' }],
   category: [{ required: true, message: '请输入分类', trigger: 'blur' }],
 }
@@ -127,9 +127,9 @@ function resetQuery() { query.name = ''; query.category = ''; query.configKey = 
 function openDialog(row?: ConfigResponse) {
   isEdit.value = !!row
   if (row) {
-    Object.assign(form, { id: row.id, name: row.name, config_key: row.configKey, value: row.value, category: row.category, config_type: row.configType, visible: row.visible, remark: row.remark || '' })
+    Object.assign(form, { id: row.id, name: row.name, configKey: row.configKey, value: row.value, category: row.category, configType: row.configType, visible: row.visible, remark: row.remark || '' })
   } else {
-    Object.assign(form, { id: 0, name: '', config_key: '', value: '', category: '', config_type: 1, visible: 0, remark: '' })
+    Object.assign(form, { id: 0, name: '', configKey: '', value: '', category: '', configType: 1, visible: 0, remark: '' })
   }
   dialogVisible.value = true
 }
@@ -140,10 +140,10 @@ async function handleSubmit() {
   submitLoading.value = true
   try {
     if (isEdit.value) {
-      await updateConfig(form.id, { name: form.name, config_key: form.config_key, value: form.value, category: form.category, config_type: form.config_type, visible: form.visible, remark: form.remark || undefined })
+      await updateConfig(form.id, { name: form.name, configKey: form.configKey, value: form.value, category: form.category, configType: form.configType, visible: form.visible, remark: form.remark || undefined })
       ElMessage.success('更新成功')
     } else {
-      await createConfig({ name: form.name, config_key: form.config_key, value: form.value, category: form.category, config_type: form.config_type, remark: form.remark || undefined })
+      await createConfig({ name: form.name, configKey: form.configKey, value: form.value, category: form.category, configType: form.configType, remark: form.remark || undefined })
       ElMessage.success('创建成功')
     }
     dialogVisible.value = false; loadData()
