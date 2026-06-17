@@ -289,6 +289,17 @@ impl PermissionService {
     pub async fn get_all_permission_details(&self) -> AppResult<Vec<Permission>> {
         self.permission_repo.find_all_permissions().await
     }
+
+    /// 按权限编码批量查询权限详情
+    ///
+    /// # 参数
+    /// * `codes` - 权限编码列表
+    ///
+    /// # 返回
+    /// 成功返回匹配的 `Permission` 完整实体列表（仅包含存在的、未删除的权限）
+    pub async fn get_permissions_by_codes(&self, codes: &[String]) -> AppResult<Vec<Permission>> {
+        self.permission_repo.find_by_codes(codes).await
+    }
 }
 
 #[cfg(test)]

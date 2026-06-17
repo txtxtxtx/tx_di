@@ -51,14 +51,18 @@ async fn get_user_permissions(
     Json(req): Json<GetUserPermissionsRequest>,
 ) -> Result<R<UserPermissionsResponse>, ApiErr> {
     ensure_permission("permission:view").await?;
-    let r = perm.get_user_permissions(req.user_id).await?;
-    // TODO: items 字段当前为空，应填充完整的权限详情列表：
-    //   - 从 PermissionRepository 查询每个权限编码对应的 name 和 permission_type
-    //   - 构建 Vec<UserPermissionItem> 填入 items 字段
+
+    // 从数据库按用户 ID 查询权限编码，再按编码批量查询权限详情
+    let (permissions, items) = perm.get_user_permission_items(req.user_id).await?;
+
     Ok(R(ApiR::success(UserPermissionsResponse {
-        user_id: r.user_id,
-        items: vec![],
-        permissions: r.permissions,
+        user_id: req.user_id,
+        items: items.into_iter().map(|p| UserPermissionItem {
+            code: p.code,
+            name: p.name,
+            permission_type: p.permission_type,
+        }).collect(),
+        permissions,
     })))
 }
 

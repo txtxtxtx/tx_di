@@ -217,4 +217,14 @@ impl PermissionRepository for ToastyPermissionRepository {
             .map_err(|e| db_err(e, RepositoryError::DatabasePerm))?;
         Ok(perm.map(|p| p.deleted == Deleted::No).unwrap_or(false))
     }
+
+    async fn find_by_codes(&self, codes: &[String]) -> AppResult<Vec<Permission>> {
+        let mut results = Vec::with_capacity(codes.len());
+        for code in codes {
+            if let Some(p) = self.find_by_code(code).await? {
+                results.push(p);
+            }
+        }
+        Ok(results)
+    }
 }

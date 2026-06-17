@@ -41,4 +41,7 @@ pub trait PermissionRepository: Any + Send + Sync {
 
     /// Check if a permission code already exists
     async fn exists_by_code(&self, code: &str) -> AppResult<bool>;
+
+    /// Batch find permissions by codes
+    async fn find_by_codes(&self, codes: &[String]) -> AppResult<Vec<Permission>>;
 }
