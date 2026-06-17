@@ -9,6 +9,7 @@ use admin_proto::{UploadFileRequest, ListFilesRequest, FileResponse, DownloadFil
 use tx_common::{ApiR, ApiRes, Page};
 use crate::auth::ensure_permission;
 use crate::error::ApiErr;
+use tx_di_sa_token::StpUtil;
 
 pub fn router() -> Router {
     Router::new()
@@ -26,9 +27,10 @@ async fn upload_file(
     Json(req): Json<UploadFileRequest>,
 ) -> Result<R<FileResponse>, ApiErr> {
     ensure_permission("file:upload").await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
     use admin_app::empty_string::opt_filter;
     let cmd = admin_app::file::dto::UploadFileCommand { name: req.name, path: req.path, url: req.url, file_type: opt_filter(req.file_type), size: req.size, config_id: req.config_id };
-    let r = file_svc.upload_file(cmd, None).await?;
+    let r = file_svc.upload_file(cmd, Some(login_id)).await?;
     Ok(R(ApiR::success(map_file(r))))
 }
 
@@ -46,7 +48,8 @@ async fn delete_file(
     axum::extract::Path(file_id): axum::extract::Path<u64>,
 ) -> Result<R<Empty>, ApiErr> {
     ensure_permission("file:delete").await?;
-    file_svc.delete_file(file_id, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    file_svc.delete_file(file_id, Some(login_id)).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 

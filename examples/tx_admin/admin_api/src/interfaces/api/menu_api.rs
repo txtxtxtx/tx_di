@@ -1,6 +1,7 @@
 //! 菜单管理 HTTP API
 
 use axum::Json;
+use tx_di_sa_token::StpUtil;
 use tx_di_axum::{R, Router};
 use axum::routing::{get, post, put, delete};
 use tx_di_axum::bound::DiComp;
@@ -29,7 +30,8 @@ async fn create_menu(
     ensure_permission("menu:create").await?;
     use admin_app::empty_string::opt_filter;
     let cmd = admin_app::menu::dto::CreateMenuCommand { name: req.name, permission: req.permission, types: req.types, sort: req.sort, parent_id: req.parent_id, path: opt_filter(req.path), icon: opt_filter(req.icon), component: opt_filter(req.component), component_name: opt_filter(req.component_name) };
-    let r = menu.create_menu(cmd, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    let r = menu.create_menu(cmd, Some(login_id)).await?;
     Ok(R(ApiR::success(map_menu(r))))
 }
 
@@ -53,7 +55,8 @@ async fn update_menu(
     ensure_permission("menu:update").await?;
     use admin_app::empty_string::opt_filter;
     let cmd = admin_app::menu::dto::UpdateMenuCommand { menu_id, name: req.name, permission: req.permission, types: req.types, sort: req.sort, parent_id: req.parent_id, path: opt_filter(req.path), icon: opt_filter(req.icon), component: opt_filter(req.component), component_name: opt_filter(req.component_name), visible: req.visible, keep_alive: req.keep_alive };
-    let r = menu.update_menu(cmd, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    let r = menu.update_menu(cmd, Some(login_id)).await?;
     Ok(R(ApiR::success(map_menu(r))))
 }
 
@@ -62,7 +65,8 @@ async fn delete_menu(
     axum::extract::Path(menu_id): axum::extract::Path<u64>,
 ) -> Result<R<Empty>, ApiErr> {
     ensure_permission("menu:delete").await?;
-    menu.delete_menu(menu_id, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    menu.delete_menu(menu_id, Some(login_id)).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 

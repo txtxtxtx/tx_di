@@ -9,6 +9,7 @@ use admin_proto::{CreateConfigRequest, UpdateConfigRequest, ListConfigsRequest, 
 use tx_common::{ApiR, ApiRes, Page};
 use crate::auth::ensure_permission;
 use crate::error::ApiErr;
+use tx_di_sa_token::StpUtil;
 
 pub fn router() -> Router {
     Router::new()
@@ -29,7 +30,8 @@ async fn create_config(
     ensure_permission("config:create").await?;
     use admin_app::empty_string::opt_filter;
     let cmd = admin_app::config::dto::CreateConfigCommand { category: req.category, config_type: req.config_type, name: req.name, config_key: req.config_key, value: req.value, remark: opt_filter(req.remark) };
-    let r = config.create_config(cmd, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    let r = config.create_config(cmd, Some(login_id)).await?;
     Ok(R(ApiR::success(map_config(r))))
 }
 
@@ -50,7 +52,8 @@ async fn update_config(
     ensure_permission("config:update").await?;
     use admin_app::empty_string::opt_filter;
     let cmd = admin_app::config::dto::UpdateConfigCommand { config_id, category: req.category, config_type: req.config_type, name: req.name, config_key: req.config_key, value: req.value, visible: req.visible, remark: opt_filter(req.remark) };
-    let r = config.update_config(cmd, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    let r = config.update_config(cmd, Some(login_id)).await?;
     Ok(R(ApiR::success(map_config(r))))
 }
 
@@ -59,7 +62,8 @@ async fn delete_config(
     axum::extract::Path(config_id): axum::extract::Path<u64>,
 ) -> Result<R<Empty>, ApiErr> {
     ensure_permission("config:delete").await?;
-    config.delete_config(config_id, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    config.delete_config(config_id, Some(login_id)).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 

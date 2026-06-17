@@ -1,6 +1,7 @@
 //! 角色管理 HTTP API
 
 use axum::Json;
+use tx_di_sa_token::StpUtil;
 use tx_di_axum::{R, Router};
 use axum::routing::{get, post, put, delete};
 use tx_di_axum::bound::DiComp;
@@ -36,7 +37,8 @@ async fn create_role(
     ensure_permission("role:create").await?;
     use admin_app::empty_string::opt_filter;
     let cmd = admin_app::role::dto::CreateRoleCommand { name: req.name, code: req.code, sort: req.sort, remark: opt_filter(req.remark), menu_ids: if req.menu_ids.is_empty() { None } else { Some(req.menu_ids) } };
-    let r = role.create_role(cmd, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    let r = role.create_role(cmd, Some(login_id)).await?;
     Ok(R(ApiR::success(map_role(r))))
 }
 
@@ -57,7 +59,8 @@ async fn update_role(
     ensure_permission("role:update").await?;
     use admin_app::empty_string::opt_filter;
     let cmd = admin_app::role::dto::UpdateRoleCommand { role_id, name: req.name, code: req.code, sort: req.sort, data_scope: req.data_scope, remark: opt_filter(req.remark) };
-    let r = role.update_role(cmd, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    let r = role.update_role(cmd, Some(login_id)).await?;
     Ok(R(ApiR::success(map_role(r))))
 }
 
@@ -66,7 +69,8 @@ async fn delete_role(
     axum::extract::Path(role_id): axum::extract::Path<u64>,
 ) -> Result<R<Empty>, ApiErr> {
     ensure_permission("role:delete").await?;
-    role.delete_role(role_id, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    role.delete_role(role_id, Some(login_id)).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 

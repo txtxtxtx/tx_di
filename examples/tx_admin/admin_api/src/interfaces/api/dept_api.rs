@@ -11,6 +11,7 @@ use tx_di_axum::bound::DiComp;
 use tx_di_axum::{R, Router};
 use crate::auth::ensure_permission;
 use crate::error::ApiErr;
+use tx_di_sa_token::StpUtil;
 
 pub fn router() -> Router {
     Router::new()
@@ -48,7 +49,8 @@ async fn create_dept(
         phone: opt_filter(req.phone),
         email: opt_filter(req.email),
     };
-    let r = dept.create_dept(cmd, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    let r = dept.create_dept(cmd, Some(login_id)).await?;
     Ok(R(ApiR::success(map_dept(r))))
 }
 
@@ -77,7 +79,8 @@ async fn update_dept(
         phone: opt_filter(req.phone),
         email: opt_filter(req.email),
     };
-    let r = dept.update_dept(cmd, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    let r = dept.update_dept(cmd, Some(login_id)).await?;
     Ok(R(ApiR::success(map_dept(r))))
 }
 
@@ -86,7 +89,8 @@ async fn delete_dept(
     axum::extract::Path(dept_id): axum::extract::Path<u64>,
 ) -> Result<R<Empty>, ApiErr> {
     ensure_permission("dept:delete").await?;
-    dept.delete_dept(dept_id, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    dept.delete_dept(dept_id, Some(login_id)).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 

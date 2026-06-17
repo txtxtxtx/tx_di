@@ -1,6 +1,7 @@
 //! 用户管理 HTTP API
 
 use axum::Json;
+use tx_di_sa_token::StpUtil;
 use tx_di_axum::{R, Router};
 use axum::routing::{get, post, put, delete};
 use tx_di_axum::bound::DiComp;
@@ -51,7 +52,8 @@ async fn create_user(
         role_ids: if req.role_ids.is_empty() { None } else { Some(req.role_ids) },
         dept_ids: if req.dept_ids.is_empty() { None } else { Some(req.dept_ids) },
     };
-    let r = user_svc.create_user(cmd, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    let r = user_svc.create_user(cmd, Some(login_id)).await?;
     Ok(R(ApiR::success(r)))
 }
 
@@ -82,7 +84,8 @@ async fn update_user(
         status: req.status.and_then(|s| UserStatus::try_from_i32(s).ok()),
         remark: opt_filter(req.remark),
     };
-    let r = user_svc.update_user(cmd, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    let r = user_svc.update_user(cmd, Some(login_id)).await?;
     Ok(R(ApiR::success(r)))
 }
 
@@ -92,7 +95,8 @@ async fn delete_user(
     axum::extract::Path(user_id): axum::extract::Path<u64>,
 ) -> Result<R<Empty>, ApiErr> {
     ensure_permission("user:delete").await?;
-    user_svc.delete_user(user_id, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    user_svc.delete_user(user_id, Some(login_id)).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 
@@ -130,7 +134,8 @@ async fn change_password(
         user_id: req.user_id,
         new_password: req.new_password,
     };
-    user_svc.change_password(cmd, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    user_svc.change_password(cmd, Some(login_id)).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 
@@ -170,7 +175,8 @@ async fn change_user_status(
     ensure_permission("user:status").await?;
     let status = UserStatus::try_from_i32(req.status)
         .map_err(|_| anyhow::anyhow!("invalid status"))?;
-    let r = user_svc.change_status(req.user_id, status, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    let r = user_svc.change_status(req.user_id, status, Some(login_id)).await?;
     Ok(R(ApiR::success(r)))
 }
 
@@ -180,7 +186,8 @@ async fn enable_user(
     Json(req): Json<UserIdRequest>,
 ) -> Result<R<Empty>, ApiErr> {
     ensure_permission("user:status").await?;
-    user_svc.change_status(req.user_id, UserStatus::Active, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    user_svc.change_status(req.user_id, UserStatus::Active, Some(login_id)).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 
@@ -190,7 +197,8 @@ async fn disable_user(
     Json(req): Json<UserIdRequest>,
 ) -> Result<R<Empty>, ApiErr> {
     ensure_permission("user:status").await?;
-    user_svc.change_status(req.user_id, UserStatus::Disabled, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    user_svc.change_status(req.user_id, UserStatus::Disabled, Some(login_id)).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 
@@ -200,7 +208,8 @@ async fn lock_user(
     Json(req): Json<UserIdRequest>,
 ) -> Result<R<Empty>, ApiErr> {
     ensure_permission("user:status").await?;
-    user_svc.change_status(req.user_id, UserStatus::Locked, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    user_svc.change_status(req.user_id, UserStatus::Locked, Some(login_id)).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 
@@ -210,6 +219,7 @@ async fn unlock_user(
     Json(req): Json<UserIdRequest>,
 ) -> Result<R<Empty>, ApiErr> {
     ensure_permission("user:status").await?;
-    user_svc.change_status(req.user_id, UserStatus::Active, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    user_svc.change_status(req.user_id, UserStatus::Active, Some(login_id)).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }

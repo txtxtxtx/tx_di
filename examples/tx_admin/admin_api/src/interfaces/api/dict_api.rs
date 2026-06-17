@@ -9,6 +9,7 @@ use admin_proto::{CreateDictTypeRequest, UpdateDictTypeRequest, ListDictTypesReq
 use tx_common::{ApiR, ApiRes, Page};
 use crate::auth::ensure_permission;
 use crate::error::ApiErr;
+use tx_di_sa_token::StpUtil;
 
 pub fn router() -> Router {
     Router::new()
@@ -34,9 +35,10 @@ async fn create_dict_type(
     Json(req): Json<CreateDictTypeRequest>,
 ) -> Result<R<DictTypeResponse>, ApiErr> {
     ensure_permission("dict:create").await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
     use admin_app::empty_string::opt_filter;
     let cmd = admin_app::dictionary::dto::CreateDictTypeCommand { name: req.name, dict_type: req.dict_type, remark: opt_filter(req.remark) };
-    let r = dict_type.create_dict_type(cmd, None).await?;
+    let r = dict_type.create_dict_type(cmd, Some(login_id)).await?;
     Ok(R(ApiR::success(map_type(r))))
 }
 
@@ -58,9 +60,10 @@ async fn update_dict_type(
     Json(req): Json<UpdateDictTypeRequest>,
 ) -> Result<R<DictTypeResponse>, ApiErr> {
     ensure_permission("dict:update").await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
     use admin_app::empty_string::opt_filter;
     let cmd = admin_app::dictionary::dto::UpdateDictTypeCommand { id, name: req.name, dict_type: req.dict_type, remark: opt_filter(req.remark) };
-    let r = dict_type.update_dict_type(cmd, None).await?;
+    let r = dict_type.update_dict_type(cmd, Some(login_id)).await?;
     Ok(R(ApiR::success(map_type(r))))
 }
 
@@ -69,7 +72,8 @@ async fn delete_dict_type(
     axum::extract::Path(id): axum::extract::Path<u64>,
 ) -> Result<R<Empty>, ApiErr> {
     ensure_permission("dict:delete").await?;
-    dict_type.delete_dict_type(id, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    dict_type.delete_dict_type(id, Some(login_id)).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 
@@ -88,9 +92,10 @@ async fn create_dict_data(
     Json(req): Json<CreateDictDataRequest>,
 ) -> Result<R<DictDataResponse>, ApiErr> {
     ensure_permission("dict:create").await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
     use admin_app::empty_string::opt_filter;
     let cmd = admin_app::dictionary::dto::CreateDictDataCommand { sort: req.sort, label: req.label, value: req.value, dict_type: req.dict_type, color_type: opt_filter(req.color_type), css_class: opt_filter(req.css_class), remark: opt_filter(req.remark) };
-    let r = dict_data.create_dict_data(cmd, None).await?;
+    let r = dict_data.create_dict_data(cmd, Some(login_id)).await?;
     Ok(R(ApiR::success(map_data(r))))
 }
 
@@ -112,9 +117,10 @@ async fn update_dict_data(
     Json(req): Json<UpdateDictDataRequest>,
 ) -> Result<R<DictDataResponse>, ApiErr> {
     ensure_permission("dict:update").await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
     use admin_app::empty_string::opt_filter;
     let cmd = admin_app::dictionary::dto::UpdateDictDataCommand { id, sort: req.sort, label: req.label, value: req.value, dict_type: req.dict_type, color_type: opt_filter(req.color_type), css_class: opt_filter(req.css_class), remark: opt_filter(req.remark) };
-    let r = dict_data.update_dict_data(cmd, None).await?;
+    let r = dict_data.update_dict_data(cmd, Some(login_id)).await?;
     Ok(R(ApiR::success(map_data(r))))
 }
 
@@ -123,7 +129,8 @@ async fn delete_dict_data(
     axum::extract::Path(id): axum::extract::Path<u64>,
 ) -> Result<R<Empty>, ApiErr> {
     ensure_permission("dict:delete").await?;
-    dict_data.delete_dict_data(id, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    dict_data.delete_dict_data(id, Some(login_id)).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 

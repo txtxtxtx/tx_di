@@ -14,6 +14,7 @@ use admin_proto::{
 use tx_common::{ApiR, ApiRes};
 use crate::auth::ensure_permission;
 use crate::error::ApiErr;
+use tx_di_sa_token::StpUtil;
 
 pub fn router() -> Router {
     Router::new()
@@ -110,7 +111,8 @@ async fn create_permission(
         sort: req.sort,
         description: if req.description.is_empty() { None } else { Some(req.description) },
     };
-    let r = perm.create_permission(cmd, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    let r = perm.create_permission(cmd, Some(login_id)).await?;
     Ok(R(ApiR::success(map_permission_detail(r))))
 }
 
@@ -140,7 +142,8 @@ async fn update_permission(
         sort: req.sort,
         description: if req.description.is_empty() { None } else { Some(req.description) },
     };
-    let r = perm.update_permission(cmd, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    let r = perm.update_permission(cmd, Some(login_id)).await?;
     Ok(R(ApiR::success(map_permission_detail(r))))
 }
 
@@ -150,7 +153,8 @@ async fn delete_permission(
     axum::extract::Path(id): axum::extract::Path<u64>,
 ) -> Result<R<Empty>, ApiErr> {
     ensure_permission("permission:delete").await?;
-    perm.delete_permission(id, None).await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    perm.delete_permission(id, Some(login_id)).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 
