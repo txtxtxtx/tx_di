@@ -15,6 +15,8 @@ pub struct LoginResponse {
     pub nickname: String,
     pub tenant_id: TenantId,
     pub role_ids: Vec<u64>,
+    /// 角色编码列表，用于 sa-token 角色校验（如 "super_admin", "user"）
+    pub role_codes: Vec<String>,
     pub permissions: Vec<String>,
     pub dept_ids: Vec<u64>,
 }

@@ -29,6 +29,7 @@ async fn login(
     DiComp(auth): DiComp<AuthAppService>,
     Json(req): Json<LoginRequest>,
 ) -> Result<R<admin_app::auth::dto::LoginResponse>, ApiErr> {
+    let login_ip = req.login_ip.clone();
     let cmd = admin_app::auth::dto::LoginCommand {
         username: req.username,
         password: req.password,
@@ -37,20 +38,19 @@ async fn login(
     let r = auth.login(cmd).await?;
     let token = StpUtil::login(r.user_id.to_string()).await?;
 
-    // 根据角色设置权限
-    // TODO: 当前使用硬编码逻辑判断管理员（role_ids.contains(&1)），应改为：
-    //   1. 从 RoleRepository 查询用户所有角色，使用角色的真实名称（而非硬编码 "admin"/"user"）
-    //   2. 判断管理员应基于角色编码（如 role.code == "super_admin"）而非 ID == 1
-    //   3. StpUtil::set_permissions/set_roles 的错误不应被 `let _` 静默丢弃
+    // 将登录 IP 存入 token 的 extra_data，供在线用户查询使用
+    let extra = serde_json::json!({ "login_ip": login_ip });
+    let _ = StpUtil::set_extra_data(&token, extra).await;
+
+    // 根据角色设置 sa-token 权限和角色
     let user_id_str = r.user_id.to_string();
-    let is_admin = r.role_ids.contains(&1);
+    let is_admin = r.role_codes.iter().any(|c| c == "super_admin" || c == "admin");
     if is_admin {
-        let _ = StpUtil::set_permissions(&user_id_str, vec!["*".to_string()]).await;
-        let _ = StpUtil::set_roles(&user_id_str, vec!["admin".to_string()]).await;
+        StpUtil::set_permissions(&user_id_str, vec!["*".to_string()]).await?;
     } else {
-        let _ = StpUtil::set_permissions(&user_id_str, r.permissions.clone()).await;
-        let _ = StpUtil::set_roles(&user_id_str, vec!["user".to_string()]).await;
+        StpUtil::set_permissions(&user_id_str, r.permissions.clone()).await?;
     }
+    StpUtil::set_roles(&user_id_str, r.role_codes.clone()).await?;
 
     let mut resp = R(ApiR::success(r));
     resp.0.msg = token.to_string();

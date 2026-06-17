@@ -83,12 +83,17 @@ impl AuthAppService {
         // Record login
         self.user_service.record_login(user.id, cmd.login_ip).await?;
 
+        // 查询角色编码列表
+        let roles = self.role_service.get_roles_by_ids(&login_user.role_ids).await?;
+        let role_codes: Vec<String> = roles.into_iter().map(|r| r.code).collect();
+
         Ok(LoginResponse {
             user_id: login_user.user_id,
             username: login_user.username,
             nickname: login_user.nickname,
             tenant_id: login_user.tenant_id,
             role_ids: login_user.role_ids,
+            role_codes,
             permissions: login_user.permissions.into_iter().collect(),
             dept_ids: login_user.dept_ids,
         })

@@ -43,3 +43,7 @@ async-trait = { workspace = true }
 # 工具
 anyhow  = { workspace = true }
 tracing = { workspace = true }
+
+# 系统信息采集
+sysinfo = "0.33"
+ringbuf = "0.5.0"
