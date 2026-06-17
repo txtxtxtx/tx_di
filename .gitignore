@@ -11,3 +11,5 @@ examples/gb_cams/public/qj.jpg
 examples/gb28181_admin/ui/dist
 examples/gb28181_admin/ui/node_modules
 examples/tx_admin/data/tx_admin.db
+examples/tx_admin/web/dist
+examples/tx_admin/web/node_modules
