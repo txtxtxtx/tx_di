@@ -34,7 +34,7 @@ tower  = { workspace = true, features = ["full"] }
 # 序列化
 serde       = { workspace = true }
 serde_json  = { workspace = true }
-
+serde_with.workspace = true
 # 异步运行时
 tokio       = { workspace = true }
 tokio-util  = { workspace = true }

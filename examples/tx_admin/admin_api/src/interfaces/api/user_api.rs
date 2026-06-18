@@ -27,7 +27,7 @@ pub fn router() -> Router {
         .route("/change_password", post(change_password))
         .route("/assign_roles", post(assign_roles))
         .route("/assign_depts", post(assign_depts))
-        .route("/change-status", post(change_user_status))
+        .route("/change_status", post(change_user_status))
         .route("/enable", post(enable_user))
         .route("/disable", post(disable_user))
         .route("/lock", post(lock_user))

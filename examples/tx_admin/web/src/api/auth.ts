@@ -6,7 +6,7 @@ export function loginApi(data: LoginRequest) {
 }
 
 export function getUserInfoApi() {
-  return request.get<ApiRes<UserInfoResponse>>('/api/auth/user-info').then(r => r.data)
+  return request.get<ApiRes<UserInfoResponse>>('/api/auth/user_info').then(r => r.data)
 }
 
 export function logoutApi() {

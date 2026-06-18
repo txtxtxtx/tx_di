@@ -22,15 +22,15 @@ export function listUsers(data: ListUsersRequest) {
 }
 
 export function changePassword(data: ChangePasswordRequest) {
-  return request.post<ApiRes<null>>('/api/user/change-password', data).then(r => r.data)
+  return request.post<ApiRes<null>>('/api/user/change_password', data).then(r => r.data)
 }
 
 export function assignRoles(data: AssignRolesRequest) {
-  return request.post<ApiRes<null>>('/api/user/assign-roles', data).then(r => r.data)
+  return request.post<ApiRes<null>>('/api/user/assign_roles', data).then(r => r.data)
 }
 
 export function assignDepts(data: AssignDeptsRequest) {
-  return request.post<ApiRes<null>>('/api/user/assign-depts', data).then(r => r.data)
+  return request.post<ApiRes<null>>('/api/user/assign_depts', data).then(r => r.data)
 }
 
 export function enableUser(data: UserIdRequest) {

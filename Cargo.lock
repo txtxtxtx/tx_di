@@ -24,6 +24,7 @@ dependencies = [
  "sa-token-core",
  "serde",
  "serde_json",
+ "serde_with",
  "sysinfo",
  "toasty",
  "tokio",

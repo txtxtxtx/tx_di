@@ -21,7 +21,7 @@ pub fn open_router() -> Router {
 pub fn router() -> Router {
     use axum::routing::{get, post};
     Router::new()
-        .route("/user-info", get(user_info))
+        .route("/user_info", get(user_info))
         .route("/logout", post(logout))
 }
 

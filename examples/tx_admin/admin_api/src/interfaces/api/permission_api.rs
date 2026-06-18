@@ -20,7 +20,7 @@ pub fn router() -> Router {
     Router::new()
         // 原有查询接口
         .route("/check", post(check_permission))
-        .route("/user-permissions", post(get_user_permissions))
+        .route("/user_permissions", post(get_user_permissions))
         .route("/all", get(get_all_permissions))
         // 新增 CRUD 接口
         .route("/", post(create_permission))
