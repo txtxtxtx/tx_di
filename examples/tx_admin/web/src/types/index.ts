@@ -528,6 +528,13 @@ export interface ListFilesRequest {
 }
 
 // ==================== 监控 (proto, camelCase) ====================
+export interface DiskInfo {
+  name: string
+  totalSpace: number
+  availableSpace: number
+  usage: number
+}
+
 export interface ServerInfo {
   osName: string
   osVersion: string
@@ -540,6 +547,7 @@ export interface ServerInfo {
   totalDisk: number
   usedDisk: number
   diskUsage: number
+  disks: DiskInfo[]
 }
 
 // u64 fields: userId

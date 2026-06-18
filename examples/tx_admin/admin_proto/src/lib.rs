@@ -146,6 +146,6 @@ pub use admin::file::{
     DownloadFileRequest, DownloadFileResponse,
 };
 // --- Monitor ---
-pub use admin::monitor::{ServerInfo, OnlineUser, OnlineUserListResponse};
+pub use admin::monitor::{ServerInfo, DiskInfo, OnlineUser, OnlineUserListResponse};
 // --- Tool ---
 pub use admin::tool::{CacheInfo, CacheStatsResponse};

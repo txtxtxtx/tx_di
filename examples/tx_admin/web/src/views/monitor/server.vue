@@ -52,7 +52,7 @@
       </el-row>
 
       <!-- 磁盘使用 -->
-      <el-row :gutter="20">
+      <el-row :gutter="20" class="mb-4">
         <el-col :span="24">
           <el-descriptions title="磁盘信息" :column="3" border size="small">
             <el-descriptions-item label="总容量">{{ fmtBytes(server.totalDisk) }}</el-descriptions-item>
@@ -63,10 +63,35 @@
                 :color="getColor(server.diskUsage)"
                 :stroke-width="15"
                 striped
-                striped-flow
               />
             </el-descriptions-item>
           </el-descriptions>
+        </el-col>
+      </el-row>
+
+      <!-- 各磁盘明细 -->
+      <el-row :gutter="20">
+        <el-col :span="24">
+          <div class="chart-title">磁盘明细</div>
+          <el-table :data="server.disks" border size="small" stripe>
+            <el-table-column prop="name" label="名称" min-width="120" />
+            <el-table-column label="总容量" min-width="100">
+              <template #default="{ row }">{{ fmtBytes(row.totalSpace) }}</template>
+            </el-table-column>
+            <el-table-column label="可用空间" min-width="100">
+              <template #default="{ row }">{{ fmtBytes(row.availableSpace) }}</template>
+            </el-table-column>
+            <el-table-column label="使用率" min-width="160">
+              <template #default="{ row }">
+                <el-progress
+                  :percentage="round2(row.usage)"
+                  :color="getColor(row.usage)"
+                  :stroke-width="14"
+                  striped
+                />
+              </template>
+            </el-table-column>
+          </el-table>
         </el-col>
       </el-row>
     </el-card>

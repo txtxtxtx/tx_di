@@ -16,7 +16,7 @@ use tx_di_axum::bound::DiComp;
 use tx_di_axum::Router;
 
 use admin_app::user::app_service::UserAppService;
-use admin_proto::{OnlineUser, OnlineUserListResponse, ServerInfo};
+use admin_proto::{DiskInfo, OnlineUser, OnlineUserListResponse, ServerInfo};
 use tx_di_sa_token::StpUtil;
 
 use crate::auth::ensure_permission;
@@ -75,9 +75,20 @@ fn collect_server_info() -> ServerInfo {
     let disks = Disks::new_with_refreshed_list();
     let mut total_disk: u64 = 0;
     let mut used_disk: u64 = 0;
+    let mut disk_infos: Vec<DiskInfo> = Vec::new();
     for disk in &disks {
-        total_disk += disk.total_space();
-        used_disk += disk.total_space() - disk.available_space();
+        let total = disk.total_space();
+        let available = disk.available_space();
+        let used = total - available;
+        total_disk += total;
+        used_disk += used;
+        let usage = if total > 0 { (used as f64 / total as f64) * 100.0 } else { 0.0 };
+        disk_infos.push(DiskInfo {
+            name: disk.name().to_string_lossy().to_string(),
+            total_space: total,
+            available_space: available,
+            usage,
+        });
     }
     let disk_usage = if total_disk > 0 {
         (used_disk as f64 / total_disk as f64) * 100.0
@@ -97,6 +108,7 @@ fn collect_server_info() -> ServerInfo {
         total_disk,
         used_disk,
         disk_usage,
+        disks: disk_infos,
     }
 }
 
@@ -146,6 +158,7 @@ async fn get_server_info(
             total_disk: 0,
             used_disk: 0,
             disk_usage: 0.0,
+            disks: vec![],
         });
         Ok(ApiR::success(serde_json::json!(latest)))
     }

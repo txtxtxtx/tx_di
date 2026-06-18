@@ -4,6 +4,13 @@ package admin.monitor;
 
 import "google/protobuf/empty.proto";
 
+message DiskInfo {
+  string name = 1;            // 磁盘名称
+  uint64 total_space = 2;     // 字节
+  uint64 available_space = 3; // 字节
+  double usage = 4;           // 百分比
+}
+
 message ServerInfo {
   string os_name = 1;
   string os_version = 2;
@@ -16,6 +23,7 @@ message ServerInfo {
   uint64 total_disk = 9;      // 字节
   uint64 used_disk = 10;      // 字节
   double disk_usage = 11;     // 百分比
+  repeated DiskInfo disks = 12;
 }
 
 message OnlineUser {

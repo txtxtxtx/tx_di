@@ -16,6 +16,7 @@ export const useMonitorStore = defineStore('monitor', () => {
     totalDisk: 0,
     usedDisk: 0,
     diskUsage: 0,
+    disks: [],
   })
 
   async function fetchServer(all?: boolean): Promise<ServerInfo[]> {
