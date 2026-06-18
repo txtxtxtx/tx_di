@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 
 /// Menu query filters
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -19,9 +20,11 @@ pub struct MenuQuery {
 ///
 /// 该结构体实现了 Debug、Clone、Serialize 和 Deserialize 特性，
 /// 支持调试输出、克隆、序列化和反序列化操作
+#[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct MenuTreeNode {
     /// 菜单节点的唯一标识符
+    #[serde_as(as = "serde_with::DisplayFromStr")]
     pub id: u64,
     /// 菜单节点的名称
     pub name: String,
@@ -32,6 +35,7 @@ pub struct MenuTreeNode {
     /// 菜单的排序顺序，数值越小排序越靠前
     pub sort: i32,
     /// 父级菜单节点的ID，根节点的parent_id通常为0
+    #[serde_as(as = "serde_with::DisplayFromStr")]
     pub parent_id: u64,
     /// 菜单的路由路径，前端路由使用
     pub path: Option<String>,

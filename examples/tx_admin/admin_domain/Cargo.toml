@@ -17,6 +17,7 @@ tx-di-core = {path = "../../..//tx-di-core"}
 tracing.workspace = true
 async-trait.workspace = true
 serde.workspace = true
+serde_with.workspace = true
 serde_repr.workspace = true
 serde_json.workspace = true
 jiff.workspace = true
