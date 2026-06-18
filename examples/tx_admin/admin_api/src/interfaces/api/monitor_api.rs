@@ -170,16 +170,15 @@ async fn get_online_users(
     let mut page_num: i64 = 1;
 
     loop {
-        let query = admin_app::user::dto::UserQueryRequest {
+        let req = admin_proto::ListUsersRequest {
             username: None,
             nickname: None,
             mobile: None,
-            status: status.clone(),
+            status: status.map(|s| s as i32),
             dept_id: None,
-            page: page_num,
-            size: ONLINE_BATCH_SIZE,
+            page_info: Some(admin_proto::PageRequest { page: page_num, size: ONLINE_BATCH_SIZE }),
         };
-        let page_result = user_svc.get_user_page(query).await?;
+        let page_result = user_svc.get_user_page(req).await?;
         let is_last = page_result.list.len() < ONLINE_BATCH_SIZE as usize;
 
         for user in page_result.list {

@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
-use crate::auth::dto::*;
+use admin_proto::{LoginRequest, LoginResponse, LogoutRequest, UserInfoResponse, CreateLoginLogRequest};
 use crate::log::app_service::LoginLogAppService;
-use crate::log::dto::CreateLoginLogCommand;
 use admin_domain::user::service::UserService;
 use admin_domain::role::service::RoleService;
 use admin_domain::permission::service::PermissionService;
@@ -44,7 +43,7 @@ impl AuthAppService {
     /// 用户登录
     ///
     /// # 参数
-    /// * `cmd` - 登录命令，包含用户名、密码和登录IP
+    /// * `req` - 登录请求，包含用户名、密码和登录IP
     ///
     /// # 执行逻辑
     /// 1. 根据用户名查找用户，若不存在则返回 `NotFoundUser` 错误
@@ -61,11 +60,11 @@ impl AuthAppService {
     /// - `NotFoundUser` - 用户名不存在
     /// - `ValidationLogin` - 用户未激活或已被锁定
     /// - `ValidationPassword` - 密码验证失败或哈希计算出错
-    pub async fn login(&self, cmd: LoginCommand) -> AppResult<LoginResponse> {
+    pub async fn login(&self, req: LoginRequest) -> AppResult<LoginResponse> {
         // Find user by username
         let user = self
             .user_service
-            .get_by_username(&cmd.username)
+            .get_by_username(&req.username)
             .await?
             .ok_or_else(|| RepositoryError::NotFoundUser)?;
 
@@ -75,7 +74,7 @@ impl AuthAppService {
         }
 
         // Verify password using Argon2id hash verification
-        let is_valid = password::verify_password(&cmd.password, &user.password)
+        let is_valid = password::verify_password(&req.password, &user.password)
             .map_err(|_| RepositoryError::ValidationPassword)?;
 
         if !is_valid {
@@ -86,7 +85,7 @@ impl AuthAppService {
         let login_user = self.user_service.build_login_user(&user).await?;
 
         // Record login
-        self.user_service.record_login(user.id, cmd.login_ip).await?;
+        self.user_service.record_login(user.id, req.login_ip).await?;
 
         // 查询角色编码列表
         let roles = self.role_service.get_roles_by_ids(&login_user.role_ids).await?;
@@ -96,11 +95,12 @@ impl AuthAppService {
             user_id: login_user.user_id,
             username: login_user.username,
             nickname: login_user.nickname,
-            tenant_id: login_user.tenant_id,
+            tenant_id: login_user.tenant_id.into(),
             role_ids: login_user.role_ids,
             role_codes,
             permissions: login_user.permissions.into_iter().collect(),
             dept_ids: login_user.dept_ids,
+            token: String::new(), // API handler fills token
         })
     }
 
@@ -139,13 +139,14 @@ impl AuthAppService {
             avatar: user.avatar,
             roles: role_names,
             permissions: permissions.into_iter().collect(),
+            tenant_id: user.tenant_id.into(),
         })
     }
 
     /// 用户登出
     ///
     /// # 参数
-    /// * `cmd` - 登出命令，包含用户 ID
+    /// * `req` - 登出请求，包含用户 ID
     ///
     /// # 执行逻辑
     /// 1. 根据用户 ID 查询用户信息（用于记录日志的用户名）
@@ -157,13 +158,13 @@ impl AuthAppService {
     /// # 错误
     /// - `NotFoundUser` - 用户 ID 对应的用户不存在
     /// - 日志写入异常
-    pub async fn logout(&self, cmd: LogoutCommand) -> AppResult<()> {
+    pub async fn logout(&self, req: LogoutRequest) -> AppResult<()> {
         // 查询用户信息用于日志记录
-        let user = self.user_service.get_user(cmd.user_id).await?;
+        let user = self.user_service.get_user(req.user_id).await?;
 
         // 记录登出日志
-        let log_cmd = CreateLoginLogCommand {
-            user_id: cmd.user_id,
+        let log_cmd = CreateLoginLogRequest {
+            user_id: req.user_id,
             user_type: 0,
             username: user.username,
             login_ip: String::new(),

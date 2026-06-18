@@ -6,11 +6,11 @@
 mod common;
 
 use std::sync::Arc;
-use admin_app::permission::dto::*;
+use admin_proto::{PermissionCheckRequest, CreatePermissionRequest};
 use admin_app::permission::app_service::PermissionAppService;
 use admin_app::user::dto::CreateUserCommand;
-use admin_app::role::dto::CreateRoleCommand;
-use admin_app::menu::dto::CreateMenuCommand;
+use admin_proto::CreateRoleRequest;
+use admin_proto::CreateMenuRequest;
 use admin_domain::permission::service::PermissionService;
 use admin_domain::user::service::UserService;
 use admin_domain::role::service::RoleService;
@@ -60,22 +60,22 @@ async fn get_all_permissions_should_return_list() {
     let (perm_app, _, _, _, _, _) = create_permission_test_env().await;
 
     // 在 SysPermission 表中插入权限数据
-    perm_app.create_permission(CreatePermissionCommand {
+    perm_app.create_permission(CreatePermissionRequest {
         name: "用户列表".into(),
         permission_code: "system:user:list".into(),
-        permission_type: 1,
+        r#type: 1,
         parent_id: 0,
         sort: 1,
-        description: None,
+        description: "".into(),
     }, Some("admin".into())).await.unwrap();
 
-    perm_app.create_permission(CreatePermissionCommand {
+    perm_app.create_permission(CreatePermissionRequest {
         name: "角色创建".into(),
         permission_code: "system:role:create".into(),
-        permission_type: 1,
+        r#type: 1,
         parent_id: 0,
         sort: 2,
-        description: None,
+        description: "".into(),
     }, Some("admin".into())).await.unwrap();
 
     let perms = perm_app.get_all_permissions().await.unwrap();
@@ -101,13 +101,13 @@ async fn check_permission_has_permission() {
     }, Some("admin".into())).await.unwrap();
 
     // 创建角色
-    let role = role_app.create_role(CreateRoleCommand {
+    let role = role_app.create_role(CreateRoleRequest {
         name: "测试角色".into(), code: "test_role".into(), sort: 1,
-        remark: None, menu_ids: None,
+        remark: None, menu_ids: vec![],
     }, Some("admin".into())).await.unwrap();
 
     // 创建权限菜单 (types=2 = 按钮/权限)
-    let menu = menu_app.create_menu(CreateMenuCommand {
+    let menu = menu_app.create_menu(CreateMenuRequest {
         name: "用户列表".into(), permission: "system:user:list".into(),
         types: 2, sort: 1, parent_id: 0,
         path: None, icon: None, component: None, component_name: None,
@@ -137,13 +137,13 @@ async fn check_permission_no_permission() {
         role_ids: None, dept_ids: None,
     }, Some("admin".into())).await.unwrap();
 
-    let role = role_app.create_role(CreateRoleCommand {
+    let role = role_app.create_role(CreateRoleRequest {
         name: "测试角色".into(), code: "test_role".into(), sort: 1,
-        remark: None, menu_ids: None,
+        remark: None, menu_ids: vec![],
     }, Some("admin".into())).await.unwrap();
 
     // 创建一个权限菜单（只有 system:user:list）
-    let menu = menu_app.create_menu(CreateMenuCommand {
+    let menu = menu_app.create_menu(CreateMenuRequest {
         name: "用户列表".into(), permission: "system:user:list".into(),
         types: 2, sort: 1, parent_id: 0,
         path: None, icon: None, component: None, component_name: None,
@@ -184,22 +184,22 @@ async fn get_user_permissions_aggregate_from_roles() {
     }, Some("admin".into())).await.unwrap();
 
     // 创建两个角色
-    let role1 = role_app.create_role(CreateRoleCommand {
+    let role1 = role_app.create_role(CreateRoleRequest {
         name: "角色1".into(), code: "role1".into(), sort: 1,
-        remark: None, menu_ids: None,
+        remark: None, menu_ids: vec![],
     }, Some("admin".into())).await.unwrap();
-    let role2 = role_app.create_role(CreateRoleCommand {
+    let role2 = role_app.create_role(CreateRoleRequest {
         name: "角色2".into(), code: "role2".into(), sort: 2,
-        remark: None, menu_ids: None,
+        remark: None, menu_ids: vec![],
     }, Some("admin".into())).await.unwrap();
 
     // 创建权限菜单
-    let menu1 = menu_app.create_menu(CreateMenuCommand {
+    let menu1 = menu_app.create_menu(CreateMenuRequest {
         name: "用户列表".into(), permission: "system:user:list".into(),
         types: 2, sort: 1, parent_id: 0,
         path: None, icon: None, component: None, component_name: None,
     }, Some("admin".into())).await.unwrap();
-    let menu2 = menu_app.create_menu(CreateMenuCommand {
+    let menu2 = menu_app.create_menu(CreateMenuRequest {
         name: "角色列表".into(), permission: "system:role:list".into(),
         types: 2, sort: 2, parent_id: 0,
         path: None, icon: None, component: None, component_name: None,
@@ -230,17 +230,17 @@ async fn get_user_permissions_deduplicate_same_permission() {
         role_ids: None, dept_ids: None,
     }, Some("admin".into())).await.unwrap();
 
-    let role1 = role_app.create_role(CreateRoleCommand {
+    let role1 = role_app.create_role(CreateRoleRequest {
         name: "角色1".into(), code: "role1".into(), sort: 1,
-        remark: None, menu_ids: None,
+        remark: None, menu_ids: vec![],
     }, Some("admin".into())).await.unwrap();
-    let role2 = role_app.create_role(CreateRoleCommand {
+    let role2 = role_app.create_role(CreateRoleRequest {
         name: "角色2".into(), code: "role2".into(), sort: 2,
-        remark: None, menu_ids: None,
+        remark: None, menu_ids: vec![],
     }, Some("admin".into())).await.unwrap();
 
     // 同一个权限菜单绑定到两个角色
-    let menu = menu_app.create_menu(CreateMenuCommand {
+    let menu = menu_app.create_menu(CreateMenuRequest {
         name: "用户列表".into(), permission: "system:user:list".into(),
         types: 2, sort: 1, parent_id: 0,
         path: None, icon: None, component: None, component_name: None,

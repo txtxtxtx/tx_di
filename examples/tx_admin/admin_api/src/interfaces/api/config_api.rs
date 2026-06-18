@@ -21,18 +21,14 @@ pub fn router() -> Router {
         .route("/key/{key}", get(get_config_by_key))
 }
 
-fn map_config(c: admin_app::config::dto::ConfigResponse) -> ConfigResponse { ConfigResponse { id: c.id, category: c.category, config_type: c.config_type, name: c.name, config_key: c.config_key, value: c.value, visible: c.visible, remark: c.remark } }
-
 async fn create_config(
     DiComp(config): DiComp<ConfigAppService>,
     Json(req): Json<CreateConfigRequest>,
 ) -> Result<R<ConfigResponse>, ApiErr> {
     ensure_permission("config:create").await?;
-    use admin_app::empty_string::opt_filter;
-    let cmd = admin_app::config::dto::CreateConfigCommand { category: req.category, config_type: req.config_type, name: req.name, config_key: req.config_key, value: req.value, remark: opt_filter(req.remark) };
     let login_id = StpUtil::get_login_id_as_string().await?;
-    let r = config.create_config(cmd, Some(login_id)).await?;
-    Ok(R(ApiR::success(map_config(r))))
+    let r = config.create_config(req, Some(login_id)).await?;
+    Ok(R(ApiR::success(r)))
 }
 
 async fn get_config(
@@ -41,7 +37,7 @@ async fn get_config(
 ) -> Result<R<ConfigResponse>, ApiErr> {
     ensure_permission("config:view").await?;
     let r = config.get_config(config_id).await?;
-    Ok(R(ApiR::success(map_config(r))))
+    Ok(R(ApiR::success(r)))
 }
 
 async fn update_config(
@@ -51,10 +47,12 @@ async fn update_config(
 ) -> Result<R<ConfigResponse>, ApiErr> {
     ensure_permission("config:update").await?;
     use admin_app::empty_string::opt_filter;
-    let cmd = admin_app::config::dto::UpdateConfigCommand { config_id, category: req.category, config_type: req.config_type, name: req.name, config_key: req.config_key, value: req.value, visible: req.visible, remark: opt_filter(req.remark) };
+    let mut req = req;
+    req.config_id = config_id;
+    req.remark = opt_filter(req.remark);
     let login_id = StpUtil::get_login_id_as_string().await?;
-    let r = config.update_config(cmd, Some(login_id)).await?;
-    Ok(R(ApiR::success(map_config(r))))
+    let r = config.update_config(req, Some(login_id)).await?;
+    Ok(R(ApiR::success(r)))
 }
 
 async fn delete_config(
@@ -72,9 +70,8 @@ async fn list_configs(
     Json(req): Json<ListConfigsRequest>,
 ) -> Result<R<Page<ConfigResponse>>, ApiErr> {
     ensure_permission("config:view").await?;
-    let query = admin_app::config::dto::ConfigQueryRequest { name: req.name, category: req.category, config_key: req.config_key, config_type: req.config_type, page: req.page, size: req.page_size };
-    let page = config.get_config_page(query).await?;
-    Ok(R(ApiR::success(Page::new(page.list.into_iter().map(map_config).collect(), page.page, page.size, page.total))))
+    let page = config.get_config_page(req).await?;
+    Ok(R(ApiR::success(page)))
 }
 
 /// GET /api/config/key/{key}
@@ -84,5 +81,5 @@ async fn get_config_by_key(
 ) -> Result<R<ConfigResponse>, ApiErr> {
     ensure_permission("config:view").await?;
     let r = config.get_by_key(&key).await?;
-    Ok(R(ApiR::success(map_config(r))))
+    Ok(R(ApiR::success(r)))
 }

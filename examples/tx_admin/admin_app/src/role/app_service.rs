@@ -25,7 +25,7 @@ impl RoleAppService {
     /// 创建新角色
     ///
     /// # 参数
-    /// * `cmd` - 创建角色命令，包含角色名称、角色编码、排序号、菜单ID列表
+    /// * `req` - 创建角色请求，包含角色名称、角色编码、排序号、菜单ID列表
     /// * `creator` - 创建者标识（可选）
     ///
     /// # 执行逻辑
@@ -41,25 +41,25 @@ impl RoleAppService {
     /// - 数据库写入异常
     pub async fn create_role(
         &self,
-        cmd: CreateRoleCommand,
+        req: CreateRoleRequest,
         creator: Option<String>,
     ) -> AppResult<RoleResponse> {
         let mut role = self
             .role_service
-            .create_role(cmd.name, cmd.code, cmd.sort, creator)
+            .create_role(req.name, req.code, req.sort, creator)
             .await?;
 
-        if let Some(menu_ids) = cmd.menu_ids {
-            role = self.role_service.assign_menus(role.id, menu_ids).await?;
+        if !req.menu_ids.is_empty() {
+            role = self.role_service.assign_menus(role.id, req.menu_ids).await?;
         }
 
-        Ok(RoleResponse::from(role))
+        Ok(role_to_response(role))
     }
 
     /// 更新角色信息
     ///
     /// # 参数
-    /// * `cmd` - 更新角色命令，包含角色ID、名称、编码、排序号、数据范围、备注
+    /// * `req` - 更新角色请求，包含角色ID、名称、编码、排序号、数据范围、备注
     /// * `updater` - 更新者标识（可选）
     ///
     /// # 执行逻辑
@@ -74,14 +74,14 @@ impl RoleAppService {
     /// - 数据库更新异常
     pub async fn update_role(
         &self,
-        cmd: UpdateRoleCommand,
+        req: UpdateRoleRequest,
         updater: Option<String>,
     ) -> AppResult<RoleResponse> {
         let role = self
             .role_service
-            .update_role(cmd.role_id, cmd.name, cmd.code, cmd.sort, cmd.data_scope, cmd.remark, updater)
+            .update_role(req.role_id, req.name, req.code, req.sort, req.data_scope, req.remark, updater)
             .await?;
-        Ok(RoleResponse::from(role))
+        Ok(role_to_response(role))
     }
 
     /// 删除角色
@@ -126,13 +126,13 @@ impl RoleAppService {
         updater: Option<String>,
     ) -> AppResult<RoleResponse> {
         let role = self.role_service.change_status(role_id, status, updater).await?;
-        Ok(RoleResponse::from(role))
+        Ok(role_to_response(role))
     }
 
     /// 为角色分配菜单权限
     ///
     /// # 参数
-    /// * `cmd` - 分配菜单命令，包含角色ID和菜单ID列表
+    /// * `req` - 分配菜单请求，包含角色ID和菜单ID列表
     ///
     /// # 执行逻辑
     /// 委托给角色领域服务执行菜单分配，逻辑详见 `RoleService::assign_menus`
@@ -143,9 +143,9 @@ impl RoleAppService {
     /// # 错误
     /// - `NotFoundRole` - 角色ID对应的角色不存在
     /// - 菜单ID不存在
-    pub async fn assign_menus(&self, cmd: AssignMenusCommand) -> AppResult<RoleResponse> {
-        let role = self.role_service.assign_menus(cmd.role_id, cmd.menu_ids).await?;
-        Ok(RoleResponse::from(role))
+    pub async fn assign_menus(&self, req: AssignMenusRequest) -> AppResult<RoleResponse> {
+        let role = self.role_service.assign_menus(req.role_id, req.menu_ids).await?;
+        Ok(role_to_response(role))
     }
 
     /// 根据ID获取角色信息
@@ -163,7 +163,7 @@ impl RoleAppService {
     /// - `NotFoundRole` - 角色ID对应的角色不存在
     pub async fn get_role(&self, role_id: u64) -> AppResult<RoleResponse> {
         let role = self.role_service.get_role(role_id).await?;
-        Ok(RoleResponse::from(role))
+        Ok(role_to_response(role))
     }
 
     /// 分页查询角色列表
@@ -184,18 +184,18 @@ impl RoleAppService {
     /// - 数据库查询异常
     pub async fn get_role_page(
         &self,
-        request: RoleQueryRequest,
+        request: ListRolesRequest,
     ) -> AppResult<Page<RoleResponse>> {
         let query = RoleQuery {
             name: request.name,
             code: request.code,
             status: request.status,
         };
-        let page = Page::request(request.page, request.size);
+        let page = Page::request(request.page, request.page_size);
         let result = self.role_service.get_role_page(&query, page).await?;
 
         Ok(Page::new(
-            result.list.into_iter().map(RoleResponse::from).collect(),
+            result.list.into_iter().map(role_to_response).collect(),
             result.page,
             result.size,
             result.total,
@@ -214,7 +214,7 @@ impl RoleAppService {
     /// - 数据库查询异常
     pub async fn get_all_roles(&self) -> AppResult<Vec<RoleResponse>> {
         let roles = self.role_service.get_all_roles(&RoleQuery::default()).await?;
-        Ok(roles.into_iter().map(RoleResponse::from).collect())
+        Ok(roles.into_iter().map(role_to_response).collect())
     }
 
     /// 获取角色关联的用户列表

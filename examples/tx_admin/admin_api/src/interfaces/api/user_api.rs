@@ -13,7 +13,7 @@ use admin_proto::{
     AssignRolesRequest, AssignDeptsRequest, ListUsersRequest,
     ChangeUserStatusRequest, UserResponse, Empty, UserIdRequest,
 };
-use admin_domain::user::model::value_object::{Sex, UserStatus};
+use admin_domain::user::model::value_object::UserStatus;
 use tx_common::{ApiR, ApiRes, Page};
 use crate::error::ApiErr;
 
@@ -40,20 +40,8 @@ async fn create_user(
     Json(req): Json<CreateUserRequest>,
 ) -> Result<R<UserResponse>, ApiErr> {
     ensure_permission("user:create").await?;
-    use admin_app::empty_string::opt_filter;
-    let cmd = admin_app::user::dto::CreateUserCommand {
-        username: req.username,
-        password: req.password,
-        nickname: req.nickname,
-        email: opt_filter(req.email),
-        mobile: opt_filter(req.mobile),
-        sex: req.sex.map(Sex::from),
-        remark: opt_filter(req.remark),
-        role_ids: if req.role_ids.is_empty() { None } else { Some(req.role_ids) },
-        dept_ids: if req.dept_ids.is_empty() { None } else { Some(req.dept_ids) },
-    };
     let login_id = StpUtil::get_login_id_as_string().await?;
-    let r = user_svc.create_user(cmd, Some(login_id)).await?;
+    let r = user_svc.create_user(req, Some(login_id)).await?;
     Ok(R(ApiR::success(r)))
 }
 
@@ -71,21 +59,12 @@ async fn get_user(
 async fn update_user(
     DiComp(user_svc): DiComp<UserAppService>,
     axum::extract::Path(user_id): axum::extract::Path<u64>,
-    Json(req): Json<UpdateUserRequest>,
+    Json(mut req): Json<UpdateUserRequest>,
 ) -> Result<R<UserResponse>, ApiErr> {
     ensure_permission("user:update").await?;
-    use admin_app::empty_string::opt_filter;
-    let cmd = admin_app::user::dto::UpdateUserCommand {
-        user_id,
-        nickname: opt_filter(req.nickname),
-        email: opt_filter(req.email),
-        mobile: opt_filter(req.mobile),
-        sex: req.sex.map(Sex::from),
-        status: req.status.and_then(|s| UserStatus::try_from_i32(s).ok()),
-        remark: opt_filter(req.remark),
-    };
+    req.user_id = user_id;
     let login_id = StpUtil::get_login_id_as_string().await?;
-    let r = user_svc.update_user(cmd, Some(login_id)).await?;
+    let r = user_svc.update_user(req, Some(login_id)).await?;
     Ok(R(ApiR::success(r)))
 }
 
@@ -106,21 +85,7 @@ async fn list_users(
     Json(req): Json<ListUsersRequest>,
 ) -> Result<R<Page<UserResponse>>, ApiErr> {
     ensure_permission("user:view").await?;
-    let status = match req.status {
-        Some(s) => UserStatus::try_from_i32(s).ok(),
-        None => None,
-    };
-    let page_info = req.page_info.unwrap_or_default();
-    let query = admin_app::user::dto::UserQueryRequest {
-        username: req.username,
-        nickname: req.nickname,
-        mobile: req.mobile,
-        status,
-        dept_id: req.dept_id,
-        page: page_info.page,
-        size: page_info.size,
-    };
-    let page = user_svc.get_user_page(query).await?;
+    let page = user_svc.get_user_page(req).await?;
     Ok(R(ApiR::success(page)))
 }
 
@@ -130,12 +95,8 @@ async fn change_password(
     Json(req): Json<ChangePasswordRequest>,
 ) -> Result<R<Empty>, ApiErr> {
     ensure_permission("user:password").await?;
-    let cmd = admin_app::user::dto::ChangePasswordCommand {
-        user_id: req.user_id,
-        new_password: req.new_password,
-    };
     let login_id = StpUtil::get_login_id_as_string().await?;
-    user_svc.change_password(cmd, Some(login_id)).await?;
+    user_svc.change_password(req, Some(login_id)).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 
@@ -145,11 +106,7 @@ async fn assign_roles(
     Json(req): Json<AssignRolesRequest>,
 ) -> Result<R<Empty>, ApiErr> {
     ensure_permission("user:assign_role").await?;
-    let cmd = admin_app::user::dto::AssignRolesCommand {
-        user_id: req.user_id,
-        role_ids: req.role_ids,
-    };
-    user_svc.assign_roles(cmd).await?;
+    user_svc.assign_roles(req).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 
@@ -159,11 +116,7 @@ async fn assign_depts(
     Json(req): Json<AssignDeptsRequest>,
 ) -> Result<R<Empty>, ApiErr> {
     ensure_permission("user:assign_dept").await?;
-    let cmd = admin_app::user::dto::AssignDeptsCommand {
-        user_id: req.user_id,
-        dept_ids: req.dept_ids,
-    };
-    user_svc.assign_departments(cmd).await?;
+    user_svc.assign_departments(req).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 

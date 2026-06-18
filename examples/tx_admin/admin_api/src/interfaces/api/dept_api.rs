@@ -22,36 +22,16 @@ pub fn router() -> Router {
         .route("/list", post(list_depts))
 }
 
-fn map_dept(d: admin_app::department::dto::DeptResponse) -> DeptResponse {
-    DeptResponse {
-        id: d.id,
-        name: d.name,
-        parent_id: d.parent_id,
-        sort: d.sort,
-        leader_user_id: d.leader_user_id,
-        phone: d.phone,
-        email: d.email,
-        status: d.status,
-    }
-}
-
 async fn create_dept(
     DiComp(dept): DiComp<DepartmentAppService>,
-    Json(req): Json<CreateDeptRequest>,
+    Json(mut req): Json<CreateDeptRequest>,
 ) -> Result<R<DeptResponse>, ApiErr> {
     ensure_permission("dept:create").await?;
-    use admin_app::empty_string::opt_filter;
-    let cmd = admin_app::department::dto::CreateDeptCommand {
-        name: req.name,
-        parent_id: req.parent_id,
-        sort: req.sort,
-        leader_user_id: req.leader_user_id,
-        phone: opt_filter(req.phone),
-        email: opt_filter(req.email),
-    };
+    req.phone = opt_filter(req.phone);
+    req.email = opt_filter(req.email);
     let login_id = StpUtil::get_login_id_as_string().await?;
-    let r = dept.create_dept(cmd, Some(login_id)).await?;
-    Ok(R(ApiR::success(map_dept(r))))
+    let r = dept.create_dept(req, Some(login_id)).await?;
+    Ok(R(ApiR::success(r)))
 }
 
 async fn get_dept(
@@ -60,28 +40,21 @@ async fn get_dept(
 ) -> Result<R<DeptResponse>, ApiErr> {
     ensure_permission("dept:view").await?;
     let r = dept.get_dept(dept_id).await?;
-    Ok(R(ApiR::success(map_dept(r))))
+    Ok(R(ApiR::success(r)))
 }
 
 async fn update_dept(
     DiComp(dept): DiComp<DepartmentAppService>,
     axum::extract::Path(dept_id): axum::extract::Path<u64>,
-    Json(req): Json<UpdateDeptRequest>,
+    Json(mut req): Json<UpdateDeptRequest>,
 ) -> Result<R<DeptResponse>, ApiErr> {
     ensure_permission("dept:update").await?;
-    use admin_app::empty_string::opt_filter;
-    let cmd = admin_app::department::dto::UpdateDeptCommand {
-        dept_id,
-        name: req.name,
-        parent_id: req.parent_id,
-        sort: req.sort,
-        leader_user_id: req.leader_user_id,
-        phone: opt_filter(req.phone),
-        email: opt_filter(req.email),
-    };
+    req.dept_id = dept_id;
+    req.phone = opt_filter(req.phone);
+    req.email = opt_filter(req.email);
     let login_id = StpUtil::get_login_id_as_string().await?;
-    let r = dept.update_dept(cmd, Some(login_id)).await?;
-    Ok(R(ApiR::success(map_dept(r))))
+    let r = dept.update_dept(req, Some(login_id)).await?;
+    Ok(R(ApiR::success(r)))
 }
 
 async fn delete_dept(
@@ -96,13 +69,10 @@ async fn delete_dept(
 
 async fn list_depts(
     DiComp(dept): DiComp<DepartmentAppService>,
-    Json(req): Json<ListDeptsRequest>,
+    Json(mut req): Json<ListDeptsRequest>,
 ) -> Result<R<Vec<DeptTreeNode>>, ApiErr> {
     ensure_permission("dept:view").await?;
-    let q = admin_app::department::dto::DeptQueryRequest {
-        name: opt_filter(req.name),
-        status: req.status,
-    };
-    let tree = dept.get_dept_tree(q).await?;
+    req.name = opt_filter(req.name);
+    let tree = dept.get_dept_tree(req).await?;
     Ok(R(ApiR::success(tree)))
 }

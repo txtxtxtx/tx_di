@@ -26,20 +26,16 @@ pub fn router() -> Router {
         .route("/{role_id}/users", delete(remove_users_from_role))
 }
 
-fn map_role(r: admin_app::role::dto::RoleResponse) -> RoleResponse {
-    RoleResponse { id: r.id, name: r.name, code: r.code, sort: r.sort, data_scope: r.data_scope, status: r.status, remark: r.remark, menu_ids: r.menu_ids }
-}
-
 async fn create_role(
     DiComp(role): DiComp<RoleAppService>,
-    Json(req): Json<CreateRoleRequest>,
+    Json(mut req): Json<CreateRoleRequest>,
 ) -> Result<R<RoleResponse>, ApiErr> {
     ensure_permission("role:create").await?;
     use admin_app::empty_string::opt_filter;
-    let cmd = admin_app::role::dto::CreateRoleCommand { name: req.name, code: req.code, sort: req.sort, remark: opt_filter(req.remark), menu_ids: if req.menu_ids.is_empty() { None } else { Some(req.menu_ids) } };
+    req.remark = opt_filter(req.remark);
     let login_id = StpUtil::get_login_id_as_string().await?;
-    let r = role.create_role(cmd, Some(login_id)).await?;
-    Ok(R(ApiR::success(map_role(r))))
+    let r = role.create_role(req, Some(login_id)).await?;
+    Ok(R(ApiR::success(r)))
 }
 
 async fn get_role(
@@ -48,20 +44,21 @@ async fn get_role(
 ) -> Result<R<RoleResponse>, ApiErr> {
     ensure_permission("role:view").await?;
     let r = role.get_role(role_id).await?;
-    Ok(R(ApiR::success(map_role(r))))
+    Ok(R(ApiR::success(r)))
 }
 
 async fn update_role(
     DiComp(role): DiComp<RoleAppService>,
     axum::extract::Path(role_id): axum::extract::Path<u64>,
-    Json(req): Json<UpdateRoleRequest>,
+    Json(mut req): Json<UpdateRoleRequest>,
 ) -> Result<R<RoleResponse>, ApiErr> {
     ensure_permission("role:update").await?;
     use admin_app::empty_string::opt_filter;
-    let cmd = admin_app::role::dto::UpdateRoleCommand { role_id, name: req.name, code: req.code, sort: req.sort, data_scope: req.data_scope, remark: opt_filter(req.remark) };
+    req.role_id = role_id;
+    req.remark = opt_filter(req.remark);
     let login_id = StpUtil::get_login_id_as_string().await?;
-    let r = role.update_role(cmd, Some(login_id)).await?;
-    Ok(R(ApiR::success(map_role(r))))
+    let r = role.update_role(req, Some(login_id)).await?;
+    Ok(R(ApiR::success(r)))
 }
 
 async fn delete_role(
@@ -79,9 +76,8 @@ async fn list_roles(
     Json(req): Json<ListRolesRequest>,
 ) -> Result<R<Page<RoleResponse>>, ApiErr> {
     ensure_permission("role:view").await?;
-    let query = admin_app::role::dto::RoleQueryRequest { name: req.name, code: req.code, status: req.status, page: req.page, size: req.page_size };
-    let page = role.get_role_page(query).await?;
-    Ok(R(ApiR::success(Page::new(page.list.into_iter().map(map_role).collect(), page.page, page.size, page.total))))
+    let page = role.get_role_page(req).await?;
+    Ok(R(ApiR::success(page)))
 }
 
 async fn assign_menus(
@@ -89,8 +85,7 @@ async fn assign_menus(
     Json(req): Json<AssignMenusRequest>,
 ) -> Result<R<Empty>, ApiErr> {
     ensure_permission("role:assign_menu").await?;
-    let cmd = admin_app::role::dto::AssignMenusCommand { role_id: req.role_id, menu_ids: req.menu_ids };
-    role.assign_menus(cmd).await?;
+    role.assign_menus(req).await?;
     Ok(R(ApiRes::ok().into_typed()))
 }
 
@@ -100,7 +95,7 @@ async fn get_all_roles(
 ) -> Result<R<Vec<RoleResponse>>, ApiErr> {
     ensure_permission("role:view").await?;
     let list = role.get_all_roles().await?;
-    Ok(R(ApiR::success(list.into_iter().map(map_role).collect())))
+    Ok(R(ApiR::success(list)))
 }
 
 /// GET /api/role/{role_id}/users

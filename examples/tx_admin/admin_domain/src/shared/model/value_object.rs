@@ -44,6 +44,12 @@ impl From<TenantId> for u64 {
     }
 }
 
+impl From<TenantId> for i64 {
+    fn from(id: TenantId) -> Self {
+        id.0 as i64
+    }
+}
+
 impl FromStr for TenantId {
     type Err = std::num::ParseIntError;
 

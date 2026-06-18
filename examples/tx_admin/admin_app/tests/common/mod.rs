@@ -77,8 +77,10 @@ pub async fn create_db_plugin() -> Arc<ToastyPlugin> {
 pub async fn create_user_service() -> (Arc<UserService>, Arc<ToastyUserRepository>) {
     let plugin = create_db_plugin().await;
     let user_repo = Arc::new(ToastyUserRepository::new(plugin.clone()));
+    let role_repo = Arc::new(ToastyRoleRepository::new(plugin.clone()));
+    let dept_repo = Arc::new(ToastyDepartmentRepository::new(plugin.clone()));
     let permission_repo = Arc::new(ToastyPermissionRepository::new(plugin));
-    let user_service = Arc::new(UserService::new(user_repo.clone(), permission_repo));
+    let user_service = Arc::new(UserService::new(user_repo.clone(), role_repo, dept_repo, permission_repo));
     (user_service, user_repo)
 }
 
@@ -92,8 +94,9 @@ pub async fn create_user_app() -> (UserAppService, Arc<UserService>, Arc<ToastyU
 
 pub async fn create_role_service() -> (Arc<RoleService>, Arc<ToastyRoleRepository>) {
     let plugin = create_db_plugin().await;
-    let role_repo = Arc::new(ToastyRoleRepository::new(plugin));
-    let role_service = Arc::new(RoleService::new(role_repo.clone()));
+    let role_repo = Arc::new(ToastyRoleRepository::new(plugin.clone()));
+    let user_repo = Arc::new(ToastyUserRepository::new(plugin));
+    let role_service = Arc::new(RoleService::new(role_repo.clone(), user_repo));
     (role_service, role_repo)
 }
 

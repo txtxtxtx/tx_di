@@ -32,6 +32,7 @@ message LoginResponse {
   repeated string permissions = 6;
   repeated uint64 dept_ids = 7;
   string token = 8;
+  repeated string role_codes = 9;
 }
 
 message GetUserInfoRequest {

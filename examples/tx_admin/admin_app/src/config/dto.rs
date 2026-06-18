@@ -1,60 +1,16 @@
-use serde::{Deserialize, Serialize};
+use admin_domain::config::model::aggregate::Config;
+use admin_proto::ConfigResponse;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateConfigCommand {
-    pub category: String,
-    pub config_type: i32,
-    pub name: String,
-    pub config_key: String,
-    pub value: String,
-    pub remark: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateConfigCommand {
-    pub config_id: u64,
-    pub category: String,
-    pub config_type: i32,
-    pub name: String,
-    pub config_key: String,
-    pub value: String,
-    pub visible: i32,
-    pub remark: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConfigQueryRequest {
-    pub name: Option<String>,
-    pub category: Option<String>,
-    pub config_key: Option<String>,
-    pub config_type: Option<i32>,
-    pub page: i64,
-    pub size: i64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-pub struct ConfigResponse {
-    pub id: u64,
-    pub category: String,
-    pub config_type: i32,
-    pub name: String,
-    pub config_key: String,
-    pub value: String,
-    pub visible: i32,
-    pub remark: Option<String>,
-}
-
-impl From<admin_domain::config::model::aggregate::Config> for ConfigResponse {
-    fn from(config: admin_domain::config::model::aggregate::Config) -> Self {
-        Self {
-            id: config.id,
-            category: config.category,
-            config_type: config.config_type,
-            name: config.name,
-            config_key: config.config_key,
-            value: config.value,
-            visible: config.visible,
-            remark: config.remark,
-        }
+/// Convert a domain Config aggregate into a proto ConfigResponse
+pub fn config_to_response(c: Config) -> ConfigResponse {
+    ConfigResponse {
+        id: c.id,
+        category: c.category,
+        config_type: c.config_type,
+        name: c.name,
+        config_key: c.config_key,
+        value: c.value,
+        visible: c.visible,
+        remark: c.remark,
     }
 }

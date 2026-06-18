@@ -39,12 +39,8 @@ async fn check_permission(
     Json(req): Json<PermissionCheckRequest>,
 ) -> Result<R<PermissionCheckResponse>, ApiErr> {
     ensure_permission("permission:view").await?;
-    let cmd = admin_app::permission::dto::PermissionCheckRequest {
-        user_id: req.user_id,
-        permission: req.permission,
-    };
-    let r = perm.check_permission(cmd).await?;
-    Ok(R(ApiR::success(PermissionCheckResponse { has_permission: r.has_permission })))
+    let r = perm.check_permission(req).await?;
+    Ok(R(ApiR::success(r)))
 }
 
 async fn get_user_permissions(
@@ -52,19 +48,8 @@ async fn get_user_permissions(
     Json(req): Json<GetUserPermissionsRequest>,
 ) -> Result<R<UserPermissionsResponse>, ApiErr> {
     ensure_permission("permission:view").await?;
-
-    // 从数据库按用户 ID 查询权限编码，再按编码批量查询权限详情
-    let (permissions, items) = perm.get_user_permission_items(req.user_id).await?;
-
-    Ok(R(ApiR::success(UserPermissionsResponse {
-        user_id: req.user_id,
-        items: items.into_iter().map(|p| UserPermissionItem {
-            code: p.code,
-            name: p.name,
-            permission_type: p.permission_type,
-        }).collect(),
-        permissions,
-    })))
+    let r = perm.get_user_permissions(req.user_id).await?;
+    Ok(R(ApiR::success(r)))
 }
 
 /// GET /api/permission/all
@@ -73,29 +58,12 @@ async fn get_all_permissions(
 ) -> Result<R<Vec<UserPermissionItem>>, ApiErr> {
     ensure_permission("permission:view").await?;
     let list = perm.get_all_permissions().await?;
-    Ok(R(ApiR::success(list.into_iter().map(|p| UserPermissionItem {
-        code: p.code,
-        name: p.name,
-        permission_type: p.permission_type,
-    }).collect())))
+    Ok(R(ApiR::success(list)))
 }
 
 // ============================================================
 // 新增 CRUD handlers
 // ============================================================
-
-fn map_permission_detail(r: admin_app::permission::dto::PermissionResponse) -> PermissionDetail {
-    PermissionDetail {
-        id: r.id,
-        name: r.name,
-        permission_code: r.permission_code,
-        r#type: r.permission_type,
-        parent_id: r.parent_id,
-        sort: r.sort,
-        description: r.description.unwrap_or_default(),
-        status: r.status,
-    }
-}
 
 /// POST /api/permission/
 async fn create_permission(
@@ -103,17 +71,9 @@ async fn create_permission(
     Json(req): Json<CreatePermissionRequest>,
 ) -> Result<R<PermissionDetail>, ApiErr> {
     ensure_permission("permission:create").await?;
-    let cmd = admin_app::permission::dto::CreatePermissionCommand {
-        name: req.name,
-        permission_code: req.permission_code,
-        permission_type: req.r#type,
-        parent_id: req.parent_id,
-        sort: req.sort,
-        description: if req.description.is_empty() { None } else { Some(req.description) },
-    };
     let login_id = StpUtil::get_login_id_as_string().await?;
-    let r = perm.create_permission(cmd, Some(login_id)).await?;
-    Ok(R(ApiR::success(map_permission_detail(r))))
+    let r = perm.create_permission(req, Some(login_id)).await?;
+    Ok(R(ApiR::success(r)))
 }
 
 /// GET /api/permission/{id}
@@ -123,7 +83,7 @@ async fn get_permission(
 ) -> Result<R<PermissionDetail>, ApiErr> {
     ensure_permission("permission:view").await?;
     let r = perm.get_permission(id).await?;
-    Ok(R(ApiR::success(map_permission_detail(r))))
+    Ok(R(ApiR::success(r)))
 }
 
 /// PUT /api/permission/{id}
@@ -133,18 +93,11 @@ async fn update_permission(
     Json(req): Json<UpdatePermissionRequest>,
 ) -> Result<R<PermissionDetail>, ApiErr> {
     ensure_permission("permission:update").await?;
-    let cmd = admin_app::permission::dto::UpdatePermissionCommand {
-        id,
-        name: req.name,
-        permission_code: req.permission_code,
-        permission_type: req.r#type,
-        parent_id: req.parent_id,
-        sort: req.sort,
-        description: if req.description.is_empty() { None } else { Some(req.description) },
-    };
+    let mut req = req;
+    req.id = id;
     let login_id = StpUtil::get_login_id_as_string().await?;
-    let r = perm.update_permission(cmd, Some(login_id)).await?;
-    Ok(R(ApiR::success(map_permission_detail(r))))
+    let r = perm.update_permission(req, Some(login_id)).await?;
+    Ok(R(ApiR::success(r)))
 }
 
 /// DELETE /api/permission/{id}
@@ -165,6 +118,6 @@ async fn list_permissions(
     ensure_permission("permission:view").await?;
     let list = perm.get_permission_list().await?;
     Ok(R(ApiR::success(ListPermissionsResponse {
-        permissions: list.into_iter().map(map_permission_detail).collect(),
+        permissions: list,
     })))
 }

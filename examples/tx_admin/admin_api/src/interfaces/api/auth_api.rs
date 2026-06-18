@@ -5,7 +5,7 @@ use tx_di_axum::{Router, R};
 use tx_di_axum::bound::DiComp;
 use tx_di_sa_token::{StpUtil, LoginIdExtractor, sa_check_permission};
 use admin_app::auth::app_service::AuthAppService;
-use admin_proto::{LoginRequest, Empty};
+use admin_proto::{LoginRequest, LoginResponse, UserInfoResponse, LogoutRequest, Empty};
 use tx_common::{ApiR, ApiRes};
 use crate::error::ApiErr;
 
@@ -28,14 +28,9 @@ pub fn router() -> Router {
 async fn login(
     DiComp(auth): DiComp<AuthAppService>,
     Json(req): Json<LoginRequest>,
-) -> Result<R<admin_app::auth::dto::LoginResponse>, ApiErr> {
+) -> Result<R<LoginResponse>, ApiErr> {
     let login_ip = req.login_ip.clone();
-    let cmd = admin_app::auth::dto::LoginCommand {
-        username: req.username,
-        password: req.password,
-        login_ip: req.login_ip,
-    };
-    let r = auth.login(cmd).await?;
+    let r = auth.login(req).await?;
     let token = StpUtil::login(r.user_id.to_string()).await?;
 
     // 将登录 IP 存入 token 的 extra_data，供在线用户查询使用
@@ -62,7 +57,7 @@ async fn login(
 async fn user_info(
     DiComp(auth): DiComp<AuthAppService>,
     LoginIdExtractor(login_id): LoginIdExtractor,
-) -> Result<R<admin_app::auth::dto::UserInfoResponse>, ApiErr> {
+) -> Result<R<UserInfoResponse>, ApiErr> {
     let user_id: u64 = login_id.parse().unwrap_or(0);
     let r = auth.get_user_info(user_id).await?;
     Ok(R(ApiR::success(r)))
@@ -81,6 +76,6 @@ async fn logout(
     StpUtil::clear_permissions(&login_id).await?;
     StpUtil::clear_roles(&login_id).await?;
     // 3. 记录登出日志
-    let _ = auth.logout(admin_app::auth::dto::LogoutCommand { user_id }).await;
+    let _ = auth.logout(LogoutRequest { user_id }).await;
     Ok(R(ApiRes::ok().into_typed()))
 }

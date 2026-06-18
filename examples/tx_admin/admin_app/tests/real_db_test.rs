@@ -7,11 +7,9 @@ mod common;
 
 use std::sync::Arc;
 
-use admin_app::config::dto::CreateConfigCommand;
-use admin_app::dictionary::dto::{CreateDictDataCommand, CreateDictTypeCommand};
+use admin_proto::{CreateConfigRequest, CreateDictTypeRequest, CreateDictDataRequest, CreatePermissionRequest, UpdatePermissionRequest};
 use admin_app::file::dto::UploadFileCommand;
-use admin_app::permission::dto::{CreatePermissionCommand, UpdatePermissionCommand};
-use admin_app::role::dto::CreateRoleCommand;
+use admin_proto::CreateRoleRequest;
 use admin_app::user::dto::{ChangePasswordCommand, CreateUserCommand};
 use admin_domain::user::model::value_object::Sex;
 use admin_domain::user::repository::UserRepository;
@@ -76,12 +74,12 @@ async fn test_role_change_status() {
 
     let role = app
         .create_role(
-            CreateRoleCommand {
+            CreateRoleRequest {
                 name: "Test Role".into(),
                 code: "test_role".into(),
                 sort: 0,
                 remark: None,
-                menu_ids: None,
+                menu_ids: vec![],
             },
             Some("admin".into()),
         )
@@ -116,12 +114,12 @@ async fn test_get_all_roles() {
     // Create multiple roles
     for i in 0..3 {
         app.create_role(
-            CreateRoleCommand {
+            CreateRoleRequest {
                 name: format!("Role {}", i),
                 code: format!("role_{}", i),
                 sort: i,
                 remark: None,
-                menu_ids: None,
+                menu_ids: vec![],
             },
             Some("admin".into()),
         )
@@ -158,12 +156,12 @@ async fn test_add_users_to_role_and_get_role_users() {
     // Create a role
     let role = role_app
         .create_role(
-            CreateRoleCommand {
+            CreateRoleRequest {
                 name: "Shared Role".into(),
                 code: "shared_role".into(),
                 sort: 0,
                 remark: None,
-                menu_ids: None,
+                menu_ids: vec![],
             },
             Some("admin".into()),
         )
@@ -240,12 +238,12 @@ async fn test_remove_users_from_role() {
     // Create role and users
     let role = role_app
         .create_role(
-            CreateRoleCommand {
+            CreateRoleRequest {
                 name: "Remove Test Role".into(),
                 code: "remove_role".into(),
                 sort: 0,
                 remark: None,
-                menu_ids: None,
+                menu_ids: vec![],
             },
             Some("admin".into()),
         )
@@ -318,13 +316,13 @@ async fn test_create_permission() {
 
     let perm = app
         .create_permission(
-            CreatePermissionCommand {
+            CreatePermissionRequest {
                 name: "User List".into(),
                 permission_code: "system:user:list".into(),
-                permission_type: 1,
+                r#type: 1,
                 parent_id: 0,
                 sort: 1,
-                description: Some("View user list".into()),
+                description: "View user list".into(),
             },
             Some("admin".into()),
         )
@@ -334,22 +332,22 @@ async fn test_create_permission() {
     assert!(perm.id > 0);
     assert_eq!(perm.name, "User List");
     assert_eq!(perm.permission_code, "system:user:list");
-    assert_eq!(perm.permission_type, 1);
+    assert_eq!(perm.r#type, 1);
     assert_eq!(perm.parent_id, 0);
     assert_eq!(perm.sort, 1);
-    assert_eq!(perm.description, Some("View user list".into()));
+    assert_eq!(perm.description, "View user list");
     assert_eq!(perm.status, 0);
 
     // Duplicate code should fail
     let result = app
         .create_permission(
-            CreatePermissionCommand {
+            CreatePermissionRequest {
                 name: "User List 2".into(),
                 permission_code: "system:user:list".into(),
-                permission_type: 1,
+                r#type: 1,
                 parent_id: 0,
                 sort: 2,
-                description: None,
+                description: "".into(),
             },
             Some("admin".into()),
         )
@@ -367,13 +365,13 @@ async fn test_update_permission() {
 
     let perm = app
         .create_permission(
-            CreatePermissionCommand {
+            CreatePermissionRequest {
                 name: "Old Name".into(),
                 permission_code: "system:old:code".into(),
-                permission_type: 1,
+                r#type: 1,
                 parent_id: 0,
                 sort: 1,
-                description: None,
+                description: "".into(),
             },
             Some("admin".into()),
         )
@@ -382,14 +380,14 @@ async fn test_update_permission() {
 
     let updated = app
         .update_permission(
-            UpdatePermissionCommand {
+            UpdatePermissionRequest {
                 id: perm.id,
                 name: "New Name".into(),
                 permission_code: "system:new:code".into(),
-                permission_type: 2,
+                r#type: 2,
                 parent_id: 10,
                 sort: 5,
-                description: Some("Updated description".into()),
+                description: "Updated description".into(),
             },
             Some("admin".into()),
         )
@@ -399,10 +397,10 @@ async fn test_update_permission() {
     assert_eq!(updated.id, perm.id);
     assert_eq!(updated.name, "New Name");
     assert_eq!(updated.permission_code, "system:new:code");
-    assert_eq!(updated.permission_type, 2);
+    assert_eq!(updated.r#type, 2);
     assert_eq!(updated.parent_id, 10);
     assert_eq!(updated.sort, 5);
-    assert_eq!(updated.description, Some("Updated description".into()));
+    assert_eq!(updated.description, "Updated description");
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -415,13 +413,13 @@ async fn test_delete_permission() {
 
     let perm = app
         .create_permission(
-            CreatePermissionCommand {
+            CreatePermissionRequest {
                 name: "To Delete".into(),
                 permission_code: "system:delete:me".into(),
-                permission_type: 1,
+                r#type: 1,
                 parent_id: 0,
                 sort: 1,
-                description: None,
+                description: "".into(),
             },
             Some("admin".into()),
         )
@@ -452,13 +450,13 @@ async fn test_get_permission() {
 
     let created = app
         .create_permission(
-            CreatePermissionCommand {
+            CreatePermissionRequest {
                 name: "Get Me".into(),
                 permission_code: "system:get:me".into(),
-                permission_type: 2, // Api
+                r#type: 2, // Api
                 parent_id: 5,
                 sort: 7,
-                description: Some("Find me".into()),
+                description: "Find me".into(),
             },
             Some("admin".into()),
         )
@@ -469,10 +467,10 @@ async fn test_get_permission() {
     assert_eq!(found.id, created.id);
     assert_eq!(found.name, "Get Me");
     assert_eq!(found.permission_code, "system:get:me");
-    assert_eq!(found.permission_type, 2, "Api permission type should be 2");
+    assert_eq!(found.r#type, 2, "Api permission type should be 2");
     assert_eq!(found.parent_id, 5);
     assert_eq!(found.sort, 7);
-    assert_eq!(found.description, Some("Find me".into()));
+    assert_eq!(found.description, "Find me");
 
     // Non-existent ID should fail
     let result = app.get_permission(999999).await;
@@ -490,13 +488,13 @@ async fn test_get_permission_list() {
     // Create multiple permissions
     for i in 0..4 {
         app.create_permission(
-            CreatePermissionCommand {
+            CreatePermissionRequest {
                 name: format!("Perm {}", i),
                 permission_code: format!("system:perm:{}", i),
-                permission_type: 1,
+                r#type: 1,
                 parent_id: 0,
                 sort: i,
-                description: None,
+                description: "".into(),
             },
             Some("admin".into()),
         )
@@ -530,7 +528,7 @@ async fn test_config_get_by_keys() {
 
     // Create configs
     app.create_config(
-        CreateConfigCommand {
+        CreateConfigRequest {
             category: "sys".into(),
             config_type: 0,
             name: "Site Name".into(),
@@ -544,7 +542,7 @@ async fn test_config_get_by_keys() {
     .unwrap();
 
     app.create_config(
-        CreateConfigCommand {
+        CreateConfigRequest {
             category: "sys".into(),
             config_type: 0,
             name: "Site URL".into(),
@@ -558,7 +556,7 @@ async fn test_config_get_by_keys() {
     .unwrap();
 
     app.create_config(
-        CreateConfigCommand {
+        CreateConfigRequest {
             category: "mail".into(),
             config_type: 1,
             name: "SMTP Host".into(),
@@ -607,7 +605,7 @@ async fn test_dict_data_get_by_dict_types() {
     // Create dict types
     dict_type_app
         .create_dict_type(
-            CreateDictTypeCommand {
+            CreateDictTypeRequest {
                 name: "Gender".into(),
                 dict_type: "sys_gender".into(),
                 remark: None,
@@ -619,7 +617,7 @@ async fn test_dict_data_get_by_dict_types() {
 
     dict_type_app
         .create_dict_type(
-            CreateDictTypeCommand {
+            CreateDictTypeRequest {
                 name: "Status".into(),
                 dict_type: "sys_status".into(),
                 remark: None,
@@ -632,7 +630,7 @@ async fn test_dict_data_get_by_dict_types() {
     // Create dict data entries
     dict_data_app
         .create_dict_data(
-            CreateDictDataCommand {
+            CreateDictDataRequest {
                 sort: 1,
                 label: "Male".into(),
                 value: "0".into(),
@@ -648,7 +646,7 @@ async fn test_dict_data_get_by_dict_types() {
 
     dict_data_app
         .create_dict_data(
-            CreateDictDataCommand {
+            CreateDictDataRequest {
                 sort: 2,
                 label: "Female".into(),
                 value: "1".into(),
@@ -664,7 +662,7 @@ async fn test_dict_data_get_by_dict_types() {
 
     dict_data_app
         .create_dict_data(
-            CreateDictDataCommand {
+            CreateDictDataRequest {
                 sort: 1,
                 label: "Active".into(),
                 value: "0".into(),

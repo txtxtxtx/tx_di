@@ -20,21 +20,22 @@ export interface LoginRequest {
   loginIp: string
 }
 
-// LoginResponse 来自 admin_app (snake_case)
+// proto, camelCase
 export interface LoginResponse {
-  user_id: number
+  userId: number
   username: string
   nickname: string
-  tenant_id: number
-  role_ids: number[]
-  role_codes: string[]
+  tenantId: number
+  roleIds: number[]
   permissions: string[]
-  dept_ids: number[]
+  deptIds: number[]
+  token: string
+  roleCodes: string[]
 }
 
-// UserInfoResponse 来自 admin_app (snake_case)
+// proto, camelCase
 export interface UserInfoResponse {
-  user_id: number
+  userId: number
   username: string
   nickname: string
   email: string | null
@@ -42,6 +43,7 @@ export interface UserInfoResponse {
   avatar: string | null
   roles: string[]
   permissions: string[]
+  tenantId: number
 }
 
 // ==================== 用户 (proto, camelCase) ====================

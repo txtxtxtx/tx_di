@@ -21,18 +21,19 @@ pub fn router() -> Router {
         .route("/list", post(list_menus))
 }
 
-fn map_menu(m: admin_app::menu::dto::MenuResponse) -> MenuResponse { MenuResponse { id: m.id, name: m.name, permission: m.permission, types: m.types, sort: m.sort, parent_id: m.parent_id, path: m.path, icon: m.icon, component: m.component, component_name: m.component_name, status: m.status, visible: m.visible, keep_alive: m.keep_alive } }
-
 async fn create_menu(
     DiComp(menu): DiComp<MenuAppService>,
-    Json(req): Json<CreateMenuRequest>,
+    Json(mut req): Json<CreateMenuRequest>,
 ) -> Result<R<MenuResponse>, ApiErr> {
     ensure_permission("menu:create").await?;
     use admin_app::empty_string::opt_filter;
-    let cmd = admin_app::menu::dto::CreateMenuCommand { name: req.name, permission: req.permission, types: req.types, sort: req.sort, parent_id: req.parent_id, path: opt_filter(req.path), icon: opt_filter(req.icon), component: opt_filter(req.component), component_name: opt_filter(req.component_name) };
+    req.path = opt_filter(req.path);
+    req.icon = opt_filter(req.icon);
+    req.component = opt_filter(req.component);
+    req.component_name = opt_filter(req.component_name);
     let login_id = StpUtil::get_login_id_as_string().await?;
-    let r = menu.create_menu(cmd, Some(login_id)).await?;
-    Ok(R(ApiR::success(map_menu(r))))
+    let r = menu.create_menu(req, Some(login_id)).await?;
+    Ok(R(ApiR::success(r)))
 }
 
 async fn get_menu(
@@ -40,24 +41,28 @@ async fn get_menu(
     axum::extract::Path(menu_id): axum::extract::Path<u64>,
 ) -> Result<R<MenuResponse>, ApiErr> {
     ensure_permission("menu:view").await?;
-    let query = admin_app::menu::dto::MenuQueryRequest { name: None, status: None, types: None };
+    let query = ListMenusRequest { name: None, status: None, types: None };
     let list = menu.get_menu_list(query).await?;
     let r = list.into_iter().find(|m| m.id == menu_id)
         .ok_or_else(|| anyhow::anyhow!("not found"))?;
-    Ok(R(ApiR::success(map_menu(r))))
+    Ok(R(ApiR::success(r)))
 }
 
 async fn update_menu(
     DiComp(menu): DiComp<MenuAppService>,
     axum::extract::Path(menu_id): axum::extract::Path<u64>,
-    Json(req): Json<UpdateMenuRequest>,
+    Json(mut req): Json<UpdateMenuRequest>,
 ) -> Result<R<MenuResponse>, ApiErr> {
     ensure_permission("menu:update").await?;
     use admin_app::empty_string::opt_filter;
-    let cmd = admin_app::menu::dto::UpdateMenuCommand { menu_id, name: req.name, permission: req.permission, types: req.types, sort: req.sort, parent_id: req.parent_id, path: opt_filter(req.path), icon: opt_filter(req.icon), component: opt_filter(req.component), component_name: opt_filter(req.component_name), visible: req.visible, keep_alive: req.keep_alive };
+    req.menu_id = menu_id;
+    req.path = opt_filter(req.path);
+    req.icon = opt_filter(req.icon);
+    req.component = opt_filter(req.component);
+    req.component_name = opt_filter(req.component_name);
     let login_id = StpUtil::get_login_id_as_string().await?;
-    let r = menu.update_menu(cmd, Some(login_id)).await?;
-    Ok(R(ApiR::success(map_menu(r))))
+    let r = menu.update_menu(req, Some(login_id)).await?;
+    Ok(R(ApiR::success(r)))
 }
 
 async fn delete_menu(
@@ -72,10 +77,10 @@ async fn delete_menu(
 
 async fn list_menus(
     DiComp(menu): DiComp<MenuAppService>,
-    Json(req): Json<ListMenusRequest>,
+    Json(mut req): Json<ListMenusRequest>,
 ) -> Result<R<Vec<MenuTreeNode>>, ApiErr> {
     ensure_permission("menu:view").await?;
-    let query = admin_app::menu::dto::MenuQueryRequest { name: req.name, status: req.status, types: None };
-    let tree = menu.get_menu_tree(query).await?;
+    req.types = None;
+    let tree = menu.get_menu_tree(req).await?;
     Ok(R(ApiR::success(tree)))
 }

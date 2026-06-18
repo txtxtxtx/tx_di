@@ -5,14 +5,14 @@
 //!   5.3 层级管理     ✅ (树/父子关系)
 
 mod common;
-use admin_app::department::dto::*;
+use admin_proto::{CreateDeptRequest, UpdateDeptRequest, ListDeptsRequest};
 
 // ── 5.1 部门 CRUD ──────────────────────────────────────────────────────────
 
 #[tokio::test]
 async fn create_department_root() {
     let (app, _, _) = common::create_dept_app().await;
-    let dept = app.create_dept(CreateDeptCommand {
+    let dept = app.create_dept(CreateDeptRequest {
         name: "总公司".into(), parent_id: 0, sort: 1,
         leader_user_id: None, phone: None, email: None,
     }, Some("admin".into())).await.unwrap();
@@ -23,12 +23,12 @@ async fn create_department_root() {
 #[tokio::test]
 async fn create_department_with_leader() {
     let (app, _, _) = common::create_dept_app().await;
-    let dept = app.create_dept(CreateDeptCommand {
+    let dept = app.create_dept(CreateDeptRequest {
         name: "技术部".into(), parent_id: 0, sort: 1,
         leader_user_id: None, phone: None, email: None,
     }, Some("admin".into())).await.unwrap();
     // leader_user_id 在 update 时设置
-    let updated = app.update_dept(UpdateDeptCommand {
+    let updated = app.update_dept(UpdateDeptRequest {
         dept_id: dept.id, name: "技术部".into(), parent_id: 0, sort: 1,
         leader_user_id: Some(1), phone: Some("010-12345678".into()), email: Some("tech@example.com".into()),
     }, Some("admin".into())).await.unwrap();
@@ -39,11 +39,11 @@ async fn create_department_with_leader() {
 #[tokio::test]
 async fn create_dept_hierarchy() {
     let (app, _, _) = common::create_dept_app().await;
-    let parent = app.create_dept(CreateDeptCommand {
+    let parent = app.create_dept(CreateDeptRequest {
         name: "总公司".into(), parent_id: 0, sort: 1,
         leader_user_id: None, phone: None, email: None,
     }, Some("admin".into())).await.unwrap();
-    let child = app.create_dept(CreateDeptCommand {
+    let child = app.create_dept(CreateDeptRequest {
         name: "技术部".into(), parent_id: parent.id, sort: 1,
         leader_user_id: None, phone: None, email: None,
     }, Some("admin".into())).await.unwrap();
@@ -53,12 +53,12 @@ async fn create_dept_hierarchy() {
 #[tokio::test]
 async fn update_department() {
     let (app, _, _) = common::create_dept_app().await;
-    let dept = app.create_dept(CreateDeptCommand {
+    let dept = app.create_dept(CreateDeptRequest {
         name: "旧部门".into(), parent_id: 0, sort: 1,
         leader_user_id: None, phone: None, email: None,
     }, Some("admin".into())).await.unwrap();
 
-    let updated = app.update_dept(UpdateDeptCommand {
+    let updated = app.update_dept(UpdateDeptRequest {
         dept_id: dept.id, name: "新部门".into(), parent_id: 10, sort: 20,
         leader_user_id: Some(5), phone: Some("010-999".into()), email: Some("new@example.com".into()),
     }, Some("admin".into())).await.unwrap();
@@ -71,7 +71,7 @@ async fn update_department() {
 #[tokio::test]
 async fn delete_department() {
     let (app, _, _) = common::create_dept_app().await;
-    let dept = app.create_dept(CreateDeptCommand {
+    let dept = app.create_dept(CreateDeptRequest {
         name: "待删除部门".into(), parent_id: 0, sort: 99,
         leader_user_id: None, phone: None, email: None,
     }, Some("admin".into())).await.unwrap();
@@ -82,12 +82,12 @@ async fn delete_department() {
 #[tokio::test]
 async fn get_department_detail() {
     let (app, _, _) = common::create_dept_app().await;
-    let dept = app.create_dept(CreateDeptCommand {
+    let dept = app.create_dept(CreateDeptRequest {
         name: "详情部门".into(), parent_id: 0, sort: 1,
         leader_user_id: None, phone: None, email: None,
     }, Some("admin".into())).await.unwrap();
     // 通过 update 设置 leader_user_id
-    app.update_dept(UpdateDeptCommand {
+    app.update_dept(UpdateDeptRequest {
         dept_id: dept.id, name: "详情部门".into(), parent_id: 0, sort: 1,
         leader_user_id: Some(10), phone: None, email: None,
     }, Some("admin".into())).await.unwrap();
@@ -102,20 +102,20 @@ async fn get_department_detail() {
 #[tokio::test]
 async fn get_dept_tree() {
     let (app, _, _) = common::create_dept_app().await;
-    let root = app.create_dept(CreateDeptCommand {
+    let root = app.create_dept(CreateDeptRequest {
         name: "总公司".into(), parent_id: 0, sort: 1,
         leader_user_id: None, phone: None, email: None,
     }, Some("admin".into())).await.unwrap();
-    app.create_dept(CreateDeptCommand {
+    app.create_dept(CreateDeptRequest {
         name: "技术部".into(), parent_id: root.id, sort: 1,
         leader_user_id: None, phone: None, email: None,
     }, Some("admin".into())).await.unwrap();
-    app.create_dept(CreateDeptCommand {
+    app.create_dept(CreateDeptRequest {
         name: "产品部".into(), parent_id: root.id, sort: 2,
         leader_user_id: None, phone: None, email: None,
     }, Some("admin".into())).await.unwrap();
 
-    let tree = app.get_dept_tree(DeptQueryRequest { name: None, status: None }).await.unwrap();
+    let tree = app.get_dept_tree(ListDeptsRequest { name: None, status: None }).await.unwrap();
     assert_eq!(tree.len(), 1);
     assert_eq!(tree[0].children.len(), 2);
 }
@@ -124,33 +124,33 @@ async fn get_dept_tree() {
 async fn get_dept_list_flat() {
     let (app, _, _) = common::create_dept_app().await;
     for i in 0..3 {
-        app.create_dept(CreateDeptCommand {
+        app.create_dept(CreateDeptRequest {
             name: format!("部门{}", i), parent_id: 0, sort: i,
             leader_user_id: None, phone: None, email: None,
         }, Some("admin".into())).await.unwrap();
     }
-    let list = app.get_dept_list(DeptQueryRequest { name: None, status: None }).await.unwrap();
+    let list = app.get_dept_list(ListDeptsRequest { name: None, status: None }).await.unwrap();
     assert_eq!(list.len(), 3);
 }
 
 #[tokio::test]
 async fn get_child_dept_ids_via_tree() {
     let (app, _, _) = common::create_dept_app().await;
-    let parent = app.create_dept(CreateDeptCommand {
+    let parent = app.create_dept(CreateDeptRequest {
         name: "总公司".into(), parent_id: 0, sort: 1,
         leader_user_id: None, phone: None, email: None,
     }, Some("admin".into())).await.unwrap();
-    app.create_dept(CreateDeptCommand {
+    app.create_dept(CreateDeptRequest {
         name: "技术部".into(), parent_id: parent.id, sort: 1,
         leader_user_id: None, phone: None, email: None,
     }, Some("admin".into())).await.unwrap();
-    app.create_dept(CreateDeptCommand {
+    app.create_dept(CreateDeptRequest {
         name: "产品部".into(), parent_id: parent.id, sort: 2,
         leader_user_id: None, phone: None, email: None,
     }, Some("admin".into())).await.unwrap();
 
     // 通过树形查询验证子部门
-    let tree = app.get_dept_tree(DeptQueryRequest { name: None, status: None }).await.unwrap();
+    let tree = app.get_dept_tree(ListDeptsRequest { name: None, status: None }).await.unwrap();
     assert_eq!(tree.len(), 1);
     assert_eq!(tree[0].children.len(), 2);
 }

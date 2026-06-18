@@ -46,6 +46,7 @@ fn main() -> Result<()> {
         .field_attribute("optional", "#[serde(skip_serializing_if = \"Option::is_none\")]")
         // uint64 在 JSON 中应序列化为字符串（JS 精度问题）
         .field_attribute("uint64", "#[serde(with = \"crate::serde_u64\")]")
+        .field_attribute("int64", "#[serde(with = \"crate::serde_i64\")]")
         // proto 文件所在目录，用于 import 解析
         .compile_protos(&proto_paths, &[proto_dir])?;
 

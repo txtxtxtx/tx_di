@@ -13,23 +13,12 @@ use admin_proto::Empty;
 #[derive(Debug, Default)]
 pub struct FileGrpcService;
 
-fn map_file(f: admin_app::file::dto::FileResponse) -> FileResponse {
-    FileResponse {
-        id: f.id, config_id: f.config_id, name: f.name,
-        path: f.path, url: f.url, file_type: f.file_type, size: f.size,
-    }
-}
-
 #[tonic::async_trait]
 impl FileService for FileGrpcService {
     async fn upload_file(&self, request: Request<UploadFileRequest>) -> Result<Response<FileResponse>, Status> {
         let req = request.into_inner();
-        let cmd = admin_app::file::dto::UploadFileCommand {
-            name: req.name, path: req.path, url: req.url,
-            file_type: req.file_type, size: req.size, config_id: req.config_id,
-        };
-        services::get().file.upload_file(cmd, None).await
-            .map(|r| Response::new(map_file(r)))
+        services::get().file.upload_file(req, None).await
+            .map(|r| Response::new(r))
             .map_err(|e| Status::internal(e.to_string()))
     }
 
@@ -43,20 +32,16 @@ impl FileService for FileGrpcService {
     async fn get_file(&self, request: Request<GetFileRequest>) -> Result<Response<FileResponse>, Status> {
         let req = request.into_inner();
         services::get().file.get_file(req.file_id).await
-            .map(|r| Response::new(map_file(r)))
+            .map(|r| Response::new(r))
             .map_err(|e| Status::internal(e.to_string()))
     }
 
     async fn list_files(&self, request: Request<ListFilesRequest>) -> Result<Response<ListFilesResponse>, Status> {
         let req = request.into_inner();
-        let query = admin_app::file::dto::FileQueryRequest {
-            name: req.name, file_type: req.file_type,
-            config_id: req.config_id, page: req.page, size: req.page_size,
-        };
-        services::get().file.get_file_page(query).await
+        services::get().file.get_file_page(req).await
             .map(|p| {
                 let total = p.total; let page = p.page; let size = p.size;
-                let items = p.list.into_iter().map(map_file).collect();
+                let items = p.list;
                 Response::new(ListFilesResponse { items, page_info: Some(PageResponse { total, page, size }) })
             })
             .map_err(|e| Status::internal(e.to_string()))

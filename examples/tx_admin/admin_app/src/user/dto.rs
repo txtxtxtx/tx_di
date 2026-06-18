@@ -1,62 +1,7 @@
-use serde::{Deserialize, Serialize};
 use admin_domain::user::model::aggregate::User;
-use admin_domain::user::model::value_object::{Sex, UserStatus};
 
 // 统一使用 proto 定义的 UserResponse，无需中间层转换
 pub type UserResponse = admin_proto::admin::user::UserResponse;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateUserCommand {
-    pub username: String,
-    pub password: String,
-    pub nickname: String,
-    pub email: Option<String>,
-    pub mobile: Option<String>,
-    pub sex: Option<Sex>,
-    pub remark: Option<String>,
-    pub role_ids: Option<Vec<u64>>,
-    pub dept_ids: Option<Vec<u64>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateUserCommand {
-    pub user_id: u64,
-    pub nickname: Option<String>,
-    pub email: Option<String>,
-    pub mobile: Option<String>,
-    pub sex: Option<Sex>,
-    pub status: Option<UserStatus>,
-    pub remark: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChangePasswordCommand {
-    pub user_id: u64,
-    pub new_password: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssignRolesCommand {
-    pub user_id: u64,
-    pub role_ids: Vec<u64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssignDeptsCommand {
-    pub user_id: u64,
-    pub dept_ids: Vec<u64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UserQueryRequest {
-    pub username: Option<String>,
-    pub nickname: Option<String>,
-    pub mobile: Option<String>,
-    pub status: Option<UserStatus>,
-    pub dept_id: Option<u64>,
-    pub page: i64,
-    pub size: i64,
-}
 
 /// 将领域层的 User 聚合根转换为 proto 的 UserResponse
 pub fn user_to_response(user: User) -> UserResponse {

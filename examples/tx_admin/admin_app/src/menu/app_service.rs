@@ -23,7 +23,7 @@ impl MenuAppService {
     /// 创建新菜单
     ///
     /// # 参数
-    /// * `cmd` - 创建菜单命令，包含菜单名称、权限标识、菜单类型、排序号、父菜单ID、路由路径、图标、组件路径、组件名称
+    /// * `req` - 创建菜单请求，包含菜单名称、权限标识、菜单类型、排序号、父菜单ID、路由路径、图标、组件路径、组件名称
     /// * `creator` - 创建者标识（可选）
     ///
     /// # 执行逻辑
@@ -37,31 +37,31 @@ impl MenuAppService {
     /// - 数据库写入异常
     pub async fn create_menu(
         &self,
-        cmd: CreateMenuCommand,
+        req: CreateMenuRequest,
         creator: Option<String>,
     ) -> AppResult<MenuResponse> {
         let menu = self
             .menu_service
             .create_menu(
-                cmd.name,
-                cmd.permission,
-                cmd.types,
-                cmd.sort,
-                cmd.parent_id,
-                cmd.path,
-                cmd.icon,
-                cmd.component,
-                cmd.component_name,
+                req.name,
+                req.permission,
+                req.types,
+                req.sort,
+                req.parent_id,
+                req.path,
+                req.icon,
+                req.component,
+                req.component_name,
                 creator,
             )
             .await?;
-        Ok(MenuResponse::from(menu))
+        Ok(menu_to_response(menu))
     }
 
     /// 更新菜单信息
     ///
     /// # 参数
-    /// * `cmd` - 更新菜单命令，包含菜单ID、名称、权限标识、菜单类型、排序号、父菜单ID、路由路径、图标、组件路径、组件名称、是否可见、是否缓存
+    /// * `req` - 更新菜单请求，包含菜单ID、名称、权限标识、菜单类型、排序号、父菜单ID、路由路径、图标、组件路径、组件名称、是否可见、是否缓存
     /// * `updater` - 更新者标识（可选）
     ///
     /// # 执行逻辑
@@ -75,28 +75,28 @@ impl MenuAppService {
     /// - 数据库更新异常
     pub async fn update_menu(
         &self,
-        cmd: UpdateMenuCommand,
+        req: UpdateMenuRequest,
         updater: Option<String>,
     ) -> AppResult<MenuResponse> {
         let menu = self
             .menu_service
             .update_menu(
-                cmd.menu_id,
-                cmd.name,
-                cmd.permission,
-                cmd.types,
-                cmd.sort,
-                cmd.parent_id,
-                cmd.path,
-                cmd.icon,
-                cmd.component,
-                cmd.component_name,
-                cmd.visible,
-                cmd.keep_alive,
+                req.menu_id,
+                req.name,
+                req.permission,
+                req.types,
+                req.sort,
+                req.parent_id,
+                req.path,
+                req.icon,
+                req.component,
+                req.component_name,
+                req.visible,
+                req.keep_alive,
                 updater,
             )
             .await?;
-        Ok(MenuResponse::from(menu))
+        Ok(menu_to_response(menu))
     }
 
     /// 删除菜单
@@ -136,7 +136,7 @@ impl MenuAppService {
     /// - 数据库查询异常
     pub async fn get_menu_list(
         &self,
-        request: MenuQueryRequest,
+        request: ListMenusRequest,
     ) -> AppResult<Vec<MenuResponse>> {
         let query = MenuQuery {
             name: request.name,
@@ -144,7 +144,7 @@ impl MenuAppService {
             types: request.types,
         };
         let menus = self.menu_service.get_all_menus(&query).await?;
-        Ok(menus.into_iter().map(MenuResponse::from).collect())
+        Ok(menus.into_iter().map(menu_to_response).collect())
     }
 
     /// 获取菜单树结构
@@ -163,7 +163,7 @@ impl MenuAppService {
     /// - 数据库查询异常
     pub async fn get_menu_tree(
         &self,
-        request: MenuQueryRequest,
+        request: ListMenusRequest,
     ) -> AppResult<Vec<MenuTreeNode>> {
         let query = MenuQuery {
             name: request.name,
