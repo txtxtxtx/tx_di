@@ -10,7 +10,6 @@ use admin_proto::{LoginRequest, LogoutRequest, CreateRoleRequest, CreateMenuRequ
 use admin_app::auth::app_service::AuthAppService;
 use admin_domain::user::service::UserService;
 use admin_domain::role::service::RoleService;
-use admin_domain::permission::service::PermissionService;
 use admin_domain::menu::service::MenuService;
 use admin_domain::user::repository::UserRepository;
 use admin_domain::role::repository::RoleRepository;
@@ -18,7 +17,6 @@ use admin_domain::user::model::value_object::UserStatus;
 use admin_infra::user::repository::ToastyUserRepository;
 use admin_infra::role::repository::ToastyRoleRepository;
 use admin_infra::menu::repository::ToastyMenuRepository;
-use admin_infra::permission::repository::ToastyPermissionRepository;
 use admin_infra::department::repository::ToastyDepartmentRepository;
 use admin_infra::log::repository::ToastyLoginLogRepository;
 use admin_domain::log::service::LoginLogService;
@@ -40,21 +38,19 @@ async fn create_auth_test_env() -> (
     let user_repo = Arc::new(ToastyUserRepository::new(plugin.clone()));
     let role_repo = Arc::new(ToastyRoleRepository::new(plugin.clone()));
     let menu_repo = Arc::new(ToastyMenuRepository::new(plugin.clone()));
-    let permission_repo = Arc::new(ToastyPermissionRepository::new(plugin.clone()));
     let dept_repo = Arc::new(ToastyDepartmentRepository::new(plugin.clone()));
     let login_log_repo = Arc::new(ToastyLoginLogRepository::new(plugin));
 
-    let user_svc = Arc::new(UserService::new(user_repo.clone(), role_repo.clone(), dept_repo, permission_repo.clone()));
+    let user_svc = Arc::new(UserService::new(user_repo.clone(), role_repo.clone(), dept_repo, menu_repo.clone()));
     let role_svc = Arc::new(RoleService::new(role_repo.clone(), user_repo.clone()));
-    let menu_svc = Arc::new(MenuService::new(menu_repo.clone()));
-    let perm_svc = Arc::new(PermissionService::new(permission_repo));
+    let menu_svc = Arc::new(MenuService::new(menu_repo));
     let login_log_svc = Arc::new(LoginLogService::new(login_log_repo));
     let login_log_app = Arc::new(LoginLogAppService::new(login_log_svc));
 
     let user_app = admin_app::user::app_service::UserAppService::new(user_svc.clone());
     let role_app = admin_app::role::app_service::RoleAppService::new(role_svc.clone());
     let menu_app = admin_app::menu::app_service::MenuAppService::new(menu_svc);
-    let auth_app = AuthAppService::new(user_svc, role_svc, perm_svc, login_log_app);
+    let auth_app = AuthAppService::new(user_svc, role_svc, menu_svc, login_log_app);
 
     (auth_app, user_app, role_app, menu_app, user_repo, role_repo)
 }

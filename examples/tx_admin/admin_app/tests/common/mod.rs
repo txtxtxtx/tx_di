@@ -14,7 +14,6 @@ use admin_app::dictionary::app_service::{DictDataAppService, DictTypeAppService}
 use admin_app::file::app_service::FileAppService;
 use admin_app::log::app_service::{LoginLogAppService, OperateLogAppService};
 use admin_app::menu::app_service::MenuAppService;
-use admin_app::permission::app_service::PermissionAppService;
 use admin_app::role::app_service::RoleAppService;
 use admin_app::user::app_service::UserAppService;
 
@@ -24,13 +23,11 @@ use admin_domain::dictionary::service::{DictDataService, DictTypeService};
 use admin_domain::file::service::FileService;
 use admin_domain::log::service::{LoginLogService, OperateLogService};
 use admin_domain::menu::service::MenuService;
-use admin_domain::permission::service::PermissionService;
 use admin_domain::role::service::RoleService;
 use admin_domain::user::service::UserService;
 
 use admin_infra::user::repository::ToastyUserRepository;
 use admin_infra::role::repository::ToastyRoleRepository;
-use admin_infra::permission::repository::ToastyPermissionRepository;
 use admin_infra::menu::repository::ToastyMenuRepository;
 use admin_infra::department::repository::ToastyDepartmentRepository;
 use admin_infra::config::repository::ToastyConfigRepository;
@@ -40,7 +37,6 @@ use admin_infra::log::repository::{ToastyOperateLogRepository, ToastyLoginLogRep
 
 use admin_infra::user::model::{SysUser, SysUserRole, SysUserDept};
 use admin_infra::role::model::{SysRole, SysRoleMenu};
-use admin_infra::permission::model::SysPermission;
 use admin_infra::menu::model::SysMenu;
 use admin_infra::department::model::SysDepartment;
 use admin_infra::file::model::{SysFile, SysFileConfig};
@@ -54,7 +50,6 @@ pub async fn create_db_plugin() -> Arc<ToastyPlugin> {
     builder.models(toasty::models!(
         SysUser, SysUserRole, SysUserDept,
         SysRole, SysRoleMenu,
-        SysPermission,
         SysMenu,
         SysDepartment,
         SysFile, SysFileConfig,
@@ -79,8 +74,8 @@ pub async fn create_user_service() -> (Arc<UserService>, Arc<ToastyUserRepositor
     let user_repo = Arc::new(ToastyUserRepository::new(plugin.clone()));
     let role_repo = Arc::new(ToastyRoleRepository::new(plugin.clone()));
     let dept_repo = Arc::new(ToastyDepartmentRepository::new(plugin.clone()));
-    let permission_repo = Arc::new(ToastyPermissionRepository::new(plugin));
-    let user_service = Arc::new(UserService::new(user_repo.clone(), role_repo, dept_repo, permission_repo));
+    let menu_repo = Arc::new(ToastyMenuRepository::new(plugin));
+    let user_service = Arc::new(UserService::new(user_repo.clone(), role_repo, dept_repo, menu_repo));
     (user_service, user_repo)
 }
 
@@ -176,21 +171,6 @@ pub async fn create_dict_data_service() -> (Arc<DictDataService>, Arc<ToastyDict
 pub async fn create_dict_data_app() -> (DictDataAppService, Arc<DictDataService>, Arc<ToastyDictDataRepository>) {
     let (svc, repo) = create_dict_data_service().await;
     let app = DictDataAppService::new(svc.clone());
-    (app, svc, repo)
-}
-
-// ── Permission helpers ─────────────────────────────────────────────────────
-
-pub async fn create_permission_service() -> (Arc<PermissionService>, Arc<ToastyPermissionRepository>) {
-    let plugin = create_db_plugin().await;
-    let permission_repo = Arc::new(ToastyPermissionRepository::new(plugin));
-    let permission_service = Arc::new(PermissionService::new(permission_repo.clone()));
-    (permission_service, permission_repo)
-}
-
-pub async fn create_permission_app() -> (PermissionAppService, Arc<PermissionService>, Arc<ToastyPermissionRepository>) {
-    let (svc, repo) = create_permission_service().await;
-    let app = PermissionAppService::new(svc.clone());
     (app, svc, repo)
 }
 

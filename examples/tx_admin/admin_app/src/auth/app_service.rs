@@ -5,7 +5,6 @@ use admin_domain::menu::model::value_object::MenuTreeNode;
 use crate::log::app_service::LoginLogAppService;
 use admin_domain::user::service::UserService;
 use admin_domain::role::service::RoleService;
-use admin_domain::permission::service::PermissionService;
 use admin_domain::menu::service::MenuService;
 use admin_domain::menu::model::value_object::MenuQuery;
 use admin_domain::shared::repository::RepositoryError;
@@ -18,7 +17,6 @@ use tx_error::AppResult;
 pub struct AuthAppService {
     user_service: Arc<UserService>,
     role_service: Arc<RoleService>,
-    permission_service: Arc<PermissionService>,
     menu_service: Arc<MenuService>,
     login_log_service: Arc<LoginLogAppService>,
 }
@@ -29,19 +27,16 @@ impl AuthAppService {
     /// # 参数
     /// * `user_service` - 用户领域服务，用于查询和管理用户
     /// * `role_service` - 角色领域服务，用于查询角色信息
-    /// * `permission_service` - 权限领域服务，用于查询用户权限
-    /// * `menu_service` - 菜单领域服务，用于查询菜单树
+    /// * `menu_service` - 菜单领域服务，用于查询菜单树和权限码
     pub fn new(
         user_service: Arc<UserService>,
         role_service: Arc<RoleService>,
-        permission_service: Arc<PermissionService>,
         menu_service: Arc<MenuService>,
         login_log_service: Arc<LoginLogAppService>,
     ) -> Self {
         Self {
             user_service,
             role_service,
-            permission_service,
             menu_service,
             login_log_service,
         }
@@ -131,7 +126,7 @@ impl AuthAppService {
     pub async fn get_user_info(&self, user_id: u64) -> AppResult<UserInfoResponse> {
         let user = self.user_service.get_user(user_id).await?;
         let role_ids = user.role_ids.clone();
-        let permissions = self.permission_service.get_user_permissions(user_id).await?;
+        let permissions = self.menu_service.get_user_permission_codes(user_id).await?;
 
         // Get role names
         let roles = self.role_service.get_roles_by_ids(&role_ids).await?;

@@ -259,63 +259,6 @@ export interface ListDeptsRequest {
   status?: number
 }
 
-// ==================== 权限 (proto, camelCase) ====================
-// u64 fields: id, parentId
-export interface PermissionDetail {
-  id: string
-  name: string
-  permissionCode: string
-  type: number
-  parentId: string
-  sort: number
-  description: string
-  status: number
-}
-
-// proto, camelCase, u64 fields as string
-export interface CreatePermissionRequest {
-  name: string
-  permissionCode: string
-  type: number
-  parentId: string
-  sort: number
-  description: string
-}
-
-// proto, camelCase, u64 fields as string
-export interface UpdatePermissionRequest {
-  id: string
-  name: string
-  permissionCode: string
-  type: number
-  parentId: string
-  sort: number
-  description: string
-}
-
-// proto, camelCase, u64 fields as string
-export interface PermissionCheckRequest {
-  userId: string
-  permission: string
-}
-
-export interface PermissionCheckResponse {
-  hasPermission: boolean
-}
-
-export interface UserPermissionItem {
-  code: string
-  name: string
-  permissionType: string
-}
-
-// u64 fields as string
-export interface UserPermissionsResponse {
-  userId: string
-  permissions: string[]
-  items: UserPermissionItem[]
-}
-
 // ==================== 配置 (proto, camelCase) ====================
 // u64 fields: id
 export interface ConfigResponse {

@@ -7,7 +7,6 @@ mod user_api;
 mod role_api;
 mod menu_api;
 mod dept_api;
-mod permission_api;
 mod config_api;
 mod dict_api;
 mod log_api;
@@ -25,7 +24,6 @@ pub fn router() -> Router {
         .nest("/api/role", role_api::router())
         .nest("/api/menu", menu_api::router())
         .nest("/api/dept", dept_api::router())
-        .nest("/api/permission", permission_api::router())
         .nest("/api/config", config_api::router())
         .nest("/api/dict", dict_api::router())
         .nest("/api/log", log_api::router())

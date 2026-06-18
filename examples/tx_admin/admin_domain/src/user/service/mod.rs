@@ -9,7 +9,7 @@ use crate::user::model::value_object::{LoginUser, Sex, UserQuery, UserStatus};
 use crate::user::repository::UserRepository;
 use crate::role::repository::RoleRepository;
 use crate::department::repository::DepartmentRepository;
-use crate::permission::repository::PermissionRepository;
+use crate::menu::repository::MenuRepository;
 use crate::password;
 
 /// User domain service
@@ -18,7 +18,7 @@ pub struct UserService {
     user_repo: Arc<dyn UserRepository>,
     role_repo: Arc<dyn RoleRepository>,
     dept_repo: Arc<dyn DepartmentRepository>,
-    permission_repo: Arc<dyn PermissionRepository>,
+    menu_repo: Arc<dyn MenuRepository>,
 }
 
 impl UserService {
@@ -28,18 +28,18 @@ impl UserService {
     /// * `user_repo` - 用户仓库，用于用户相关的数据库操作
     /// * `role_repo` - 角色仓库，用于角色状态校验
     /// * `dept_repo` - 部门仓库，用于部门状态校验
-    /// * `permission_repo` - 权限仓库，用于权限相关的数据库操作
+    /// * `menu_repo` - 菜单仓库，用于从菜单中提取权限码
     pub fn new(
         user_repo: Arc<dyn UserRepository>,
         role_repo: Arc<dyn RoleRepository>,
         dept_repo: Arc<dyn DepartmentRepository>,
-        permission_repo: Arc<dyn PermissionRepository>,
+        menu_repo: Arc<dyn MenuRepository>,
     ) -> Self {
         Self {
             user_repo,
             role_repo,
             dept_repo,
-            permission_repo,
+            menu_repo,
         }
     }
 
@@ -432,7 +432,7 @@ impl UserService {
     pub async fn build_login_user(&self, user: &User) -> AppResult<LoginUser> {
         let role_ids = self.user_repo.get_role_ids(user.id).await?;
         let dept_ids = self.user_repo.get_dept_ids(user.id).await?;
-        let permissions = self.permission_repo.find_by_user_id(user.id).await?;
+        let permissions = self.menu_repo.find_permission_codes_by_user_id(user.id).await?;
 
         Ok(LoginUser {
             user_id: user.id,

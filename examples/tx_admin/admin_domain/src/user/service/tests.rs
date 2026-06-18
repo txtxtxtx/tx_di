@@ -21,7 +21,9 @@ mod user_service_tests {
     use crate::department::repository::DepartmentRepository;
     use crate::department::model::aggregate::Department;
     use crate::department::model::value_object::DeptQuery;
-    use crate::permission::repository::PermissionRepository;
+    use crate::menu::repository::MenuRepository;
+    use crate::menu::model::aggregate::Menu;
+    use crate::menu::model::value_object::MenuQuery;
 
     struct TestUserRepo {
         find_by_id_fn: Box<dyn Fn(u64) -> AppResult<Option<User>> + Send + Sync>,
@@ -136,29 +138,23 @@ mod user_service_tests {
         async fn has_users(&self, _: u64) -> AppResult<bool> { Ok(false) }
     }
 
-    struct TestPermRepo {}
+    struct TestMenuRepo {}
 
     #[async_trait]
-    impl PermissionRepository for TestPermRepo {
-        async fn find_by_role_ids(&self, _: &[u64]) -> AppResult<std::collections::HashSet<String>> {
-            Ok(std::collections::HashSet::new())
-        }
-        async fn find_by_user_id(&self, _: u64) -> AppResult<std::collections::HashSet<String>> {
+    impl MenuRepository for TestMenuRepo {
+        async fn find_by_id(&self, _: u64) -> AppResult<Option<Menu>> { Ok(None) }
+        async fn find_all(&self, _: &MenuQuery) -> AppResult<Vec<Menu>> { Ok(vec![]) }
+        async fn find_by_ids(&self, _: &[u64]) -> AppResult<Vec<Menu>> { Ok(vec![]) }
+        async fn find_by_parent_id(&self, _: u64) -> AppResult<Vec<Menu>> { Ok(vec![]) }
+        async fn insert(&self, _: &Menu) -> AppResult<()> { Ok(()) }
+        async fn update(&self, _: &Menu) -> AppResult<()> { Ok(()) }
+        async fn soft_delete(&self, _: u64) -> AppResult<()> { Ok(()) }
+        async fn has_children(&self, _: u64) -> AppResult<bool> { Ok(false) }
+        async fn find_permission_codes_by_user_id(&self, _: u64) -> AppResult<std::collections::HashSet<String>> {
             let mut s = std::collections::HashSet::new();
             s.insert("read".into());
             Ok(s)
         }
-        async fn find_all(&self) -> AppResult<std::collections::HashSet<crate::permission::model::value_object::PermissionCheck>> {
-            Ok(std::collections::HashSet::new())
-        }
-        async fn find_by_id(&self, _: u64) -> AppResult<Option<crate::permission::model::aggregate::Permission>> { Ok(None) }
-        async fn find_by_code(&self, _: &str) -> AppResult<Option<crate::permission::model::aggregate::Permission>> { Ok(None) }
-        async fn find_all_permissions(&self) -> AppResult<Vec<crate::permission::model::aggregate::Permission>> { Ok(vec![]) }
-        async fn insert(&self, _: &crate::permission::model::aggregate::Permission) -> AppResult<()> { Ok(()) }
-        async fn update(&self, _: &crate::permission::model::aggregate::Permission) -> AppResult<()> { Ok(()) }
-        async fn soft_delete(&self, _: u64) -> AppResult<()> { Ok(()) }
-        async fn exists_by_code(&self, _: &str) -> AppResult<bool> { Ok(false) }
-        async fn find_by_codes(&self, _: &[String]) -> AppResult<Vec<crate::permission::model::aggregate::Permission>> { Ok(vec![]) }
     }
 
     fn make_user() -> User {
@@ -177,7 +173,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         assert!(svc.create_user("new".into(), "p".into(), "N".into(), None).await.is_ok());
     }
@@ -191,7 +187,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         assert!(svc.create_user("dup".into(), "p".into(), "N".into(), None).await.is_err());
     }
@@ -208,7 +204,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         let r = svc.update_user(1, "New".into(), None, None, crate::user::model::value_object::Sex::Unknown, None, None).await;
         assert!(r.is_ok());
@@ -224,7 +220,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         assert!(svc.update_user(999, "X".into(), None, None, crate::user::model::value_object::Sex::Unknown, None, None).await.is_err());
     }
@@ -241,7 +237,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         assert!(svc.delete_user(1, None).await.is_ok());
     }
@@ -255,7 +251,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         assert!(svc.delete_user(999, None).await.is_err());
     }
@@ -272,7 +268,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         let r = svc.change_status(1, UserStatus::Locked, None).await;
         assert!(r.is_ok());
@@ -291,7 +287,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         assert!(svc.assign_roles(1, vec![10, 20]).await.is_ok());
     }
@@ -305,7 +301,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         assert!(svc.assign_roles(999, vec![1]).await.is_err());
     }
@@ -321,7 +317,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         assert!(svc.assign_roles(1, vec![10]).await.is_err());
     }
@@ -338,7 +334,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         assert!(svc.assign_departments(1, vec![10, 20]).await.is_ok());
     }
@@ -352,7 +348,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         assert!(svc.assign_departments(999, vec![1]).await.is_err());
     }
@@ -370,7 +366,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         let u = svc.get_user(1).await.unwrap();
         assert_eq!(u.role_ids, vec![1, 2]);
@@ -386,7 +382,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         assert!(svc.get_user(999).await.is_err());
     }
@@ -403,7 +399,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         let lu = svc.build_login_user(&make_user()).await.unwrap();
         assert_eq!(lu.role_ids, vec![1]);
@@ -422,7 +418,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         let u = svc.record_login(1, "10.0.0.1".into()).await.unwrap();
         assert_eq!(u.login_ip.as_deref(), Some("10.0.0.1"));
@@ -438,7 +434,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         assert!(svc.exists_by_email("x@y.com").await.unwrap());
     }
@@ -455,7 +451,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         let result = svc.get_by_username("testuser").await.unwrap();
         assert!(result.is_some());
@@ -471,7 +467,7 @@ mod user_service_tests {
             Arc::new(repo),
             Arc::new(TestRoleRepo::new()),
             Arc::new(TestDeptRepo::new()),
-            Arc::new(TestPermRepo {}),
+            Arc::new(TestMenuRepo {}),
         );
         let result = svc.get_by_username("nobody").await.unwrap();
         assert!(result.is_none());

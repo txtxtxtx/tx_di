@@ -19,7 +19,6 @@ fn main() -> Result<()> {
         "role",
         "menu",
         "department",
-        "permission",
         "config",
         "dictionary",
         "log",

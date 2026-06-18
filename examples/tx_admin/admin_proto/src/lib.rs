@@ -42,11 +42,6 @@ pub mod admin {
         include!("pb/admin.dept.rs");
     }
 
-    /// 权限
-    pub mod permission {
-        include!("pb/admin.permission.rs");
-    }
-
     /// 配置
     pub mod config {
         include!("pb/admin.config.rs");
@@ -110,14 +105,6 @@ pub use admin::menu::{
 pub use admin::dept::{
     CreateDeptRequest, UpdateDeptRequest, DeleteDeptRequest, GetDeptRequest,
     ListDeptsRequest, DeptResponse, ListDeptsResponse,
-};
-// --- Permission ---
-pub use admin::permission::{
-    PermissionCheckRequest, PermissionCheckResponse,
-    GetUserPermissionsRequest, UserPermissionsResponse, UserPermissionItem,
-    CreatePermissionRequest, UpdatePermissionRequest, DeletePermissionRequest,
-    GetPermissionRequest, ListPermissionsRequest, ListPermissionsResponse,
-    PermissionDetail,
 };
 // --- Config ---
 pub use admin::config::{

@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 use async_trait::async_trait;
 
@@ -13,6 +14,8 @@ use tx_error::AppResult;
 
 use super::model::SysMenu;
 use crate::common::{Status, Deleted};
+use crate::role::model::SysRoleMenu;
+use crate::user::model::SysUserRole;
 
 /// Toasty 实现的 MenuRepository
 #[tx_comp(as_trait = dyn MenuRepository)]
@@ -198,5 +201,35 @@ impl MenuRepository for ToastyMenuRepository {
             .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
 
         Ok(all.iter().any(|m| m.deleted == Deleted::No && m.parent_id == parent_id as i64))
+    }
+
+    async fn find_permission_codes_by_user_id(&self, user_id: u64) -> AppResult<HashSet<String>> {
+        let mut db = self.plugin.db().clone();
+        let mut codes = HashSet::new();
+
+        // 1. 获取用户的角色 ID 列表
+        let user_roles = SysUserRole::filter_by_user_id(user_id as i64)
+            .exec(&mut db)
+            .await
+            .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
+        let role_ids: Vec<i64> = user_roles.into_iter().map(|ur| ur.role_id).collect();
+
+        // 2. 遍历角色，从关联菜单中提取 types==2 的 permission 字段
+        for role_id in role_ids {
+            let role_menus = SysRoleMenu::filter_by_role_id(role_id)
+                .exec(&mut db)
+                .await
+                .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
+
+            for rm in role_menus {
+                if let Ok(menu) = SysMenu::get_by_id(&mut db, rm.menu_id).await {
+                    if menu.types == 2 && menu.deleted == Deleted::No && !menu.permission.is_empty() {
+                        codes.insert(menu.permission.clone());
+                    }
+                }
+            }
+        }
+
+        Ok(codes)
     }
 }

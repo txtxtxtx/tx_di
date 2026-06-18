@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 use tx_common::id;
 use tx_di_core::tx_comp;
@@ -226,6 +227,13 @@ impl MenuService {
     pub async fn get_menu_tree(&self, query: &MenuQuery) -> AppResult<Vec<MenuTreeNode>> {
         let menus = self.menu_repo.find_all(query).await?;
         Ok(Self::build_tree(&menus, 0))
+    }
+
+    /// 获取用户的权限码集合
+    ///
+    /// 通过用户关联的角色，从菜单中 types==2 的记录提取 permission 字段
+    pub async fn get_user_permission_codes(&self, user_id: u64) -> AppResult<HashSet<String>> {
+        self.menu_repo.find_permission_codes_by_user_id(user_id).await
     }
 
     /// 递归构建菜单树（内部方法）

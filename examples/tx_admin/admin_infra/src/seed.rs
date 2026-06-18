@@ -111,12 +111,6 @@ const MENU_SEEDS: &[(i64, &str, &str, i32, i32, i64, &str, &str, &str, &str, i32
     (116, "编辑部门", "dept:update", 2, 2, 6, "", "", "", "", 0, 0),
     (117, "删除部门", "dept:delete", 2, 3, 6, "", "", "", "", 0, 0),
 
-    // 权限管理
-    (7, "权限管理", "permission:view", 1, 5, 2, "permission", "Lock", "system/permission/index", "Permission", 0, 1),
-    (118, "创建权限", "permission:create", 2, 1, 7, "", "", "", "", 0, 0),
-    (119, "编辑权限", "permission:update", 2, 2, 7, "", "", "", "", 0, 0),
-    (120, "删除权限", "permission:delete", 2, 3, 7, "", "", "", "", 0, 0),
-
     // ── 系统配置 ──
     (8, "系统配置", "config:view", 0, 2, 0, "config", "Tools", "", "", 0, 0),
     (9, "参数设置", "config:view", 1, 1, 8, "index", "Document", "config/config/index", "Config", 0, 1),

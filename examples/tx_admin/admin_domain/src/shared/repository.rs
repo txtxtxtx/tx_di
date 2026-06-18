@@ -26,8 +26,6 @@ pub enum RepositoryError {
     DatabaseDept,
     #[err(10004, "数据库异常")]
     DatabaseMenu,
-    #[err(10005, "数据库异常")]
-    DatabasePerm,
     #[err(10006, "数据库异常")]
     DatabaseConfig,
     #[err(10007, "数据库异常")]
@@ -46,8 +44,6 @@ pub enum RepositoryError {
     NotFoundDept,
     #[err(10104, "记录不存在")]
     NotFoundMenu,
-    #[err(10105, "记录不存在")]
-    NotFoundPerm,
     #[err(10106, "记录不存在")]
     NotFoundConfig,
     #[err(10107, "记录不存在")]
@@ -62,8 +58,6 @@ pub enum RepositoryError {
     DuplicateUsername,
     #[err(10202, "角色编码已存在")]
     DuplicateRoleCode,
-    #[err(10203, "权限编码已存在")]
-    DuplicatePermCode,
     #[err(10204, "配置键已存在")]
     DuplicateConfigKey,
     #[err(10205, "字典类型已存在")]
