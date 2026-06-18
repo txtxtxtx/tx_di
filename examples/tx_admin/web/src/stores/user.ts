@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { loginApi, getUserInfoApi, logoutApi } from '@/api/auth'
+import { useMenuStore } from './menu'
+import { resetDynamicRoutes } from '@/router'
 import type { LoginRequest, UserInfoResponse } from '@/types'
 
 export const useUserStore = defineStore('user', () => {
@@ -30,6 +32,10 @@ export const useUserStore = defineStore('user', () => {
       userInfo.value = null
       permissions.value = []
       localStorage.removeItem('token')
+      // 清除菜单和动态路由
+      const menuStore = useMenuStore()
+      menuStore.clearMenus()
+      resetDynamicRoutes()
     }
   }
 

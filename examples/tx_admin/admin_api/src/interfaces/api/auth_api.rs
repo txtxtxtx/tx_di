@@ -4,7 +4,7 @@ use crate::auth::{ADMIN_ROLE, ensure_permission};
 use crate::error::ApiErr;
 use admin_app::auth::app_service::AuthAppService;
 use admin_domain::shared::model::value_object::SessionEctData;
-use admin_proto::{Empty, LoginRequest, LoginResponse, LogoutRequest, UserInfoResponse};
+use admin_proto::{Empty, LoginRequest, LoginResponse, LogoutRequest, UserInfoResponse, MenuTreeNode};
 use axum::Json;
 use tx_common::{ApiR, ApiRes};
 use tx_di_axum::Router;
@@ -22,6 +22,7 @@ pub fn router() -> Router {
     use axum::routing::{get, post};
     Router::new()
         .route("/user_info", get(user_info))
+        .route("/menus", get(user_menus))
         .route("/logout", post(logout))
 }
 
@@ -63,6 +64,16 @@ async fn user_info(
     let user_id: u64 = login_id.parse().unwrap_or(0);
     let r = auth.get_user_info(user_id).await?;
     Ok(ApiR::success(r))
+}
+
+/// GET /api/auth/menus - 获取当前用户的菜单树
+async fn user_menus(
+    DiComp(auth): DiComp<AuthAppService>,
+    LoginIdExtractor(login_id): LoginIdExtractor,
+) -> Result<ApiR<Vec<MenuTreeNode>>, ApiErr> {
+    let user_id: u64 = login_id.parse().unwrap_or(0);
+    let menus = auth.get_user_menus(user_id).await?;
+    Ok(ApiR::success(menus))
 }
 
 /// POST /api/auth/logout

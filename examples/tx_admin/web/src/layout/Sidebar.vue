@@ -14,35 +14,42 @@
         active-text-color="#409EFF"
         router
       >
-        <template v-for="item in menuList" :key="item.path">
-          <!-- 单个菜单项（无子菜单或只有一个子菜单） -->
+        <!-- 仪表盘（始终显示） -->
+        <el-menu-item index="/dashboard">
+          <el-icon><Odometer /></el-icon>
+          <template #title>仪表盘</template>
+        </el-menu-item>
+
+        <!-- 后端菜单树 -->
+        <template v-for="item in menuTree" :key="item.fullPath">
+          <!-- 叶子节点（无子菜单或只有一个子菜单） -->
           <el-menu-item
-            v-if="!item.children || item.children.length === 1"
-            :index="resolveMenuPath(item)"
+            v-if="!item.children || item.children.length <= 1"
+            :index="getLeafPath(item)"
           >
-            <el-icon v-if="item.children ? item.children[0].meta?.icon : item.meta?.icon">
-              <component :is="item.children ? item.children[0].meta?.icon : item.meta?.icon" />
+            <el-icon v-if="getLeafIcon(item)">
+              <component :is="getLeafIcon(item)" />
             </el-icon>
-            <template #title>{{ item.children ? item.children[0].meta?.title : item.meta?.title }}</template>
+            <template #title>{{ getLeafTitle(item) }}</template>
           </el-menu-item>
 
           <!-- 有多个子菜单 -->
-          <el-sub-menu v-else :index="item.path">
+          <el-sub-menu v-else :index="item.fullPath">
             <template #title>
-              <el-icon v-if="item.meta?.icon">
-                <component :is="item.meta.icon" />
+              <el-icon v-if="item.icon">
+                <component :is="item.icon" />
               </el-icon>
-              <span>{{ item.meta?.title }}</span>
+              <span>{{ item.name }}</span>
             </template>
             <el-menu-item
               v-for="child in item.children"
-              :key="child.path"
-              :index="`${item.path}/${child.path}`"
+              :key="child.fullPath"
+              :index="child.fullPath"
             >
-              <el-icon v-if="child.meta?.icon">
-                <component :is="child.meta.icon" />
+              <el-icon v-if="child.icon">
+                <component :is="child.icon" />
               </el-icon>
-              <template #title>{{ child.meta?.title }}</template>
+              <template #title>{{ child.name }}</template>
             </el-menu-item>
           </el-sub-menu>
         </template>
@@ -53,27 +60,59 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import { useMenuStore } from '@/stores/menu'
+import type { MenuTreeNode } from '@/types'
+
+interface MenuNodeWithPath extends MenuTreeNode {
+  fullPath: string
+  children: MenuNodeWithPath[]
+}
 
 const route = useRoute()
-const router = useRouter()
 const appStore = useAppStore()
+const menuStore = useMenuStore()
 
-const menuList = computed(() => {
-  return router.options.routes.filter(r => r.path !== '/login' && r.path !== '/')
-    .concat(router.options.routes.filter(r => r.path === '/'))
-    .filter(r => r.children)
+const menuTree = computed<MenuNodeWithPath[]>(() => {
+  return buildMenuTree(menuStore.menus, '')
 })
 
-/** 拼接出绝对路径，避免 el-menu router 模式下相对路径拼错 */
-function resolveMenuPath(item: any): string {
-  if (!item.children || item.children.length === 0) return item.path
-  const child = item.children[0]
-  // child.path 为空字符串时直接用父路径（如 /file）
-  if (!child.path) return item.path
-  // 父路径为 '/' 时避免双斜杠
-  return item.path === '/' ? `/${child.path}` : `${item.path}/${child.path}`
+function buildMenuTree(nodes: MenuTreeNode[], parentPath: string): MenuNodeWithPath[] {
+  return nodes
+    .filter(n => n.types !== 2 && n.status === 0 && n.visible === 0)
+    .sort((a, b) => a.sort - b.sort)
+    .map(node => {
+      const fullPath = parentPath
+        ? `${parentPath}/${node.path || ''}`
+        : `/${node.path || ''}`
+      return {
+        ...node,
+        fullPath,
+        children: node.children ? buildMenuTree(node.children, fullPath) : [],
+      }
+    })
+}
+
+function getLeafPath(item: MenuNodeWithPath): string {
+  if (item.children && item.children.length === 1) {
+    return item.children[0].fullPath
+  }
+  return item.fullPath
+}
+
+function getLeafIcon(item: MenuNodeWithPath): string | null {
+  if (item.children && item.children.length === 1) {
+    return item.children[0].icon || null
+  }
+  return item.icon || null
+}
+
+function getLeafTitle(item: MenuNodeWithPath): string {
+  if (item.children && item.children.length === 1) {
+    return item.children[0].name
+  }
+  return item.name
 }
 </script>
 

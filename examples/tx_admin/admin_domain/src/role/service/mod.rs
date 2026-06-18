@@ -366,6 +366,11 @@ impl RoleService {
         self.role_repo.bind_users(role_id, &user_ids).await
     }
 
+    /// 获取角色关联的菜单 ID 列表
+    pub async fn get_menu_ids(&self, role_id: u64) -> AppResult<Vec<u64>> {
+        self.role_repo.get_menu_ids(role_id).await
+    }
+
     /// 从角色移除用户
     ///
     /// # 参数

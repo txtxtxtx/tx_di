@@ -1,8 +1,10 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import Layout from '@/layout/index.vue'
+import type { MenuTreeNode } from '@/types'
 
-const routes: RouteRecordRaw[] = [
+// 静态路由：登录页和 Layout 壳子（仪表盘始终可见）
+const staticRoutes: RouteRecordRaw[] = [
   {
     path: '/login',
     name: 'Login',
@@ -22,139 +24,148 @@ const routes: RouteRecordRaw[] = [
       },
     ],
   },
-  {
-    path: '/system',
-    component: Layout,
-    redirect: '/system/user',
-    meta: { title: '系统管理', icon: 'Setting' },
-    children: [
-      {
-        path: 'user',
-        name: 'User',
-        component: () => import('@/views/system/user/index.vue'),
-        meta: { title: '用户管理', icon: 'User' },
-      },
-      {
-        path: 'role',
-        name: 'Role',
-        component: () => import('@/views/system/role/index.vue'),
-        meta: { title: '角色管理', icon: 'UserFilled' },
-      },
-      {
-        path: 'menu',
-        name: 'Menu',
-        component: () => import('@/views/system/menu/index.vue'),
-        meta: { title: '菜单管理', icon: 'Menu' },
-      },
-      {
-        path: 'dept',
-        name: 'Dept',
-        component: () => import('@/views/system/dept/index.vue'),
-        meta: { title: '部门管理', icon: 'OfficeBuilding' },
-      },
-      {
-        path: 'permission',
-        name: 'Permission',
-        component: () => import('@/views/system/permission/index.vue'),
-        meta: { title: '权限管理', icon: 'Lock' },
-      },
-    ],
-  },
-  {
-    path: '/config',
-    component: Layout,
-    redirect: '/config/index',
-    meta: { title: '系统配置', icon: 'Tools' },
-    children: [
-      {
-        path: 'index',
-        name: 'Config',
-        component: () => import('@/views/config/config/index.vue'),
-        meta: { title: '参数设置', icon: 'Document' },
-      },
-      {
-        path: 'dict-type',
-        name: 'DictType',
-        component: () => import('@/views/config/dict/type.vue'),
-        meta: { title: '字典类型', icon: 'Collection' },
-      },
-      {
-        path: 'dict-data',
-        name: 'DictData',
-        component: () => import('@/views/config/dict/data.vue'),
-        meta: { title: '字典数据', icon: 'Tickets' },
-      },
-    ],
-  },
-  {
-    path: '/log',
-    component: Layout,
-    redirect: '/log/operate',
-    meta: { title: '日志管理', icon: 'Notebook' },
-    children: [
-      {
-        path: 'operate',
-        name: 'OperateLog',
-        component: () => import('@/views/log/operate.vue'),
-        meta: { title: '操作日志', icon: 'List' },
-      },
-      {
-        path: 'login',
-        name: 'LoginLog',
-        component: () => import('@/views/log/login.vue'),
-        meta: { title: '登录日志', icon: 'Promotion' },
-      },
-    ],
-  },
-  {
-    path: '/file',
-    component: Layout,
-    children: [
-      {
-        path: '',
-        name: 'File',
-        component: () => import('@/views/file/index.vue'),
-        meta: { title: '文件管理', icon: 'FolderOpened' },
-      },
-    ],
-  },
-  {
-    path: '/monitor',
-    component: Layout,
-    redirect: '/monitor/server',
-    meta: { title: '系统监控', icon: 'Monitor' },
-    children: [
-      {
-        path: 'server',
-        name: 'Server',
-        component: () => import('@/views/monitor/server.vue'),
-        meta: { title: '服务器信息', icon: 'Cpu' },
-      },
-      {
-        path: 'online',
-        name: 'Online',
-        component: () => import('@/views/monitor/online.vue'),
-        meta: { title: '在线用户', icon: 'Connection' },
-      },
-    ],
-  },
 ]
 
 const router = createRouter({
   history: createWebHashHistory(),
-  routes,
+  routes: staticRoutes,
 })
 
-// 路由守卫
-router.beforeEach((to, _from, next) => {
-  const token = localStorage.getItem('token')
-  if (to.path === '/login') {
-    next()
-  } else if (!token) {
-    next('/login')
-  } else {
-    next()
+// ── 动态路由 ──────────────────────────────────────────────────────
+
+// Vite glob import：按需加载所有 views 下的 .vue 文件
+const viewModules = import.meta.glob('@/views/**/*.vue')
+
+// 记录动态添加的路由名称，用于登出时移除
+const dynamicRouteNames: string[] = []
+
+/**
+ * 将后端菜单树转为 Vue Router 路由并动态注册
+ *
+ * 菜单树结构：目录节点（types=0）作为父路由，菜单节点（types=1）作为子路由。
+ * component 字段存储相对路径，如 "system/user/index"，映射到 @/views/system/user/index.vue。
+ */
+export function addDynamicRoutes(menus: MenuTreeNode[]) {
+  for (const menu of menus) {
+    if (menu.types === 2) continue // 按钮不生成路由
+
+    // 目录节点：作为 Layout 子路由的父级
+    const parentPath = `/${menu.path || menu.id}`
+    const children: RouteRecordRaw[] = []
+
+    if (menu.children && menu.children.length > 0) {
+      for (const child of menu.children) {
+        if (child.types === 2) continue // 跳过按钮
+
+        const childPath = child.path || child.id
+        const componentPath = child.component
+          ? `/src/views/${child.component}.vue`
+          : undefined
+
+        if (componentPath && viewModules[componentPath]) {
+          children.push({
+            path: childPath,
+            name: child.componentName || `menu_${child.id}`,
+            component: viewModules[componentPath] as () => Promise<any>,
+            meta: {
+              title: child.name,
+              icon: child.icon || undefined,
+              menuId: child.id,
+              keepAlive: child.keepAlive === 1,
+            },
+          } as RouteRecordRaw)
+        }
+      }
+    }
+
+    // 如果目录自身也是菜单（有 component），也加入
+    if (menu.types === 1 && menu.component) {
+      const componentPath = `/src/views/${menu.component}.vue`
+      if (viewModules[componentPath]) {
+        children.unshift({
+          path: '',
+          name: menu.componentName || `menu_${menu.id}`,
+          component: viewModules[componentPath] as () => Promise<any>,
+          meta: {
+            title: menu.name,
+            icon: menu.icon || undefined,
+            menuId: menu.id,
+            keepAlive: menu.keepAlive === 1,
+          },
+        } as RouteRecordRaw)
+      }
+    }
+
+    if (children.length === 0) continue
+
+    const route: RouteRecordRaw = {
+      path: parentPath,
+      component: Layout,
+      redirect: children[0] ? `${parentPath}/${children[0].path}` : undefined,
+      meta: { title: menu.name, icon: menu.icon || undefined, menuId: menu.id },
+      children,
+    }
+
+    router.addRoute(route)
+    dynamicRouteNames.push(route.name as string)
   }
+}
+
+/**
+ * 移除所有动态路由（登出时调用）
+ */
+export function resetDynamicRoutes() {
+  for (const name of dynamicRouteNames) {
+    router.removeRoute(name)
+  }
+  dynamicRouteNames.length = 0
+}
+
+// ── 路由守卫 ──────────────────────────────────────────────────────
+
+// 白名单路径：不需要登录即可访问
+const whiteList = ['/login']
+
+router.beforeEach(async (to, _from, next) => {
+  const token = localStorage.getItem('token')
+
+  if (!token) {
+    // 未登录：白名单放行，否则跳登录
+    if (whiteList.includes(to.path)) {
+      next()
+    } else {
+      next('/login')
+    }
+    return
+  }
+
+  // 已登录访问登录页 → 跳首页
+  if (to.path === '/login') {
+    next('/')
+    return
+  }
+
+  // 动态路由是否已加载（通过 menuStore.loaded 判断）
+  const { useMenuStore } = await import('@/stores/menu')
+  const menuStore = useMenuStore()
+
+  if (!menuStore.loaded) {
+    try {
+      const menus = await menuStore.fetchMenus()
+      addDynamicRoutes(menus)
+      // 重新导航以匹配刚注册的路由（replace 避免历史堆叠）
+      next({ ...to, replace: true })
+    } catch {
+      // 获取菜单失败（token 过期等），清空状态跳登录
+      const { useUserStore } = await import('@/stores/user')
+      const userStore = useUserStore()
+      userStore.logout()
+      next('/login')
+    }
+    return
+  }
+
+  next()
 })
 
 export default router
