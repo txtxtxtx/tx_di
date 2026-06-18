@@ -5,11 +5,12 @@
 
 use crate::common::{Sex, Status, Deleted};
 use crate::user::model::SysUser;
-use crate::role::model::SysRole;
+use crate::role::model::{SysRole, SysRoleMenu};
 use crate::user::model::SysUserRole;
 use crate::department::model::SysDepartment;
 use crate::permission::model::SysPermission;
 use crate::dictionary::model::{SysDictType, SysDictData};
+use crate::menu::model::SysMenu;
 use tx_di_toasty::ToastyDb;
 use tx_error::AppResult;
 use tracing::info;
@@ -138,6 +139,44 @@ const DICT_SEEDS: &[(&str, &str, &[(i32, &str, &str, &str)])] = &[
         (1, "不缓存", "0", ""),
         (2, "缓存", "1", ""),
     ]),
+];
+
+/// 菜单种子数据
+/// (id, name, permission, types, sort, parent_id, route_path, icon, component, component_name, visible, keep_alive)
+///
+/// types: 0=目录, 1=菜单, 2=按钮
+/// visible: 0=显示, 1=隐藏
+/// keep_alive: 0=不缓存, 1=缓存
+const MENU_SEEDS: &[(i64, &str, &str, i32, i32, i64, &str, &str, &str, &str, i32, i32)] = &[
+    // 仪表盘
+    (1, "仪表盘", "", 1, 0, 0, "dashboard", "Odometer", "dashboard/index", "Dashboard", 0, 0),
+
+    // 系统管理
+    (2, "系统管理", "system:view", 0, 1, 0, "system", "Setting", "", "", 0, 0),
+    (3, "用户管理", "user:view", 1, 1, 2, "user", "User", "system/user/index", "User", 0, 1),
+    (4, "角色管理", "role:view", 1, 2, 2, "role", "UserFilled", "system/role/index", "Role", 0, 1),
+    (5, "菜单管理", "menu:view", 1, 3, 2, "menu", "Menu", "system/menu/index", "Menu", 0, 1),
+    (6, "部门管理", "dept:view", 1, 4, 2, "dept", "OfficeBuilding", "system/dept/index", "Dept", 0, 1),
+    (7, "权限管理", "permission:view", 1, 5, 2, "permission", "Lock", "system/permission/index", "Permission", 0, 1),
+
+    // 系统配置
+    (8, "系统配置", "config:view", 0, 2, 0, "config", "Tools", "", "", 0, 0),
+    (9, "参数设置", "config:view", 1, 1, 8, "index", "Document", "config/config/index", "Config", 0, 1),
+    (10, "字典类型", "dict:view", 1, 2, 8, "dict-type", "Collection", "config/dict/type", "DictType", 0, 1),
+    (11, "字典数据", "dict:view", 1, 3, 8, "dict-data", "Tickets", "config/dict/data", "DictData", 0, 1),
+
+    // 日志管理
+    (12, "日志管理", "log:view", 0, 3, 0, "log", "Notebook", "", "", 0, 0),
+    (13, "操作日志", "log:view", 1, 1, 12, "operate", "List", "log/operate", "OperateLog", 0, 1),
+    (14, "登录日志", "log:view", 1, 2, 12, "login", "Promotion", "log/login", "LoginLog", 0, 1),
+
+    // 文件管理
+    (15, "文件管理", "file:view", 1, 4, 0, "file", "FolderOpened", "file/index", "File", 0, 0),
+
+    // 系统监控
+    (16, "系统监控", "", 0, 5, 0, "monitor", "Monitor", "", "", 0, 0),
+    (17, "服务器信息", "", 1, 1, 16, "server", "Cpu", "monitor/server", "Server", 0, 1),
+    (18, "在线用户", "", 1, 2, 16, "online", "Connection", "monitor/online", "Online", 0, 1),
 ];
 
 /// 执行种子数据初始化
@@ -296,6 +335,47 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
         }
     }
     info!("已创建 {} 个字典类型", DICT_SEEDS.len());
+
+    // 7. 创建菜单
+    for &(id, name, permission, types, sort, parent_id, route_path, icon, component, component_name, visible, keep_alive) in MENU_SEEDS {
+        SysMenu::create()
+            .id(id)
+            .name(name.to_string())
+            .permission(permission.to_string())
+            .types(types)
+            .sort(sort)
+            .parent_id(parent_id)
+            .route_path(route_path.to_string())
+            .icon(icon.to_string())
+            .component(component.to_string())
+            .component_name(component_name.to_string())
+            .status(Status::Enabled)
+            .visible(visible)
+            .keep_alive(keep_alive)
+            .tenant_id(0)
+            .creator("system".to_string())
+            .created_at(now.clone())
+            .updater("system".to_string())
+            .updated_at(now.clone())
+            .deleted(Deleted::No)
+            .exec(&mut db)
+            .await
+            .map_err(|e| anyhow::anyhow!("创建菜单 {} 失败: {}", name, e))?;
+    }
+    info!("已创建 {} 个菜单", MENU_SEEDS.len());
+
+    // 8. 超级管理员关联所有菜单
+    let all_menu_ids: Vec<u64> = MENU_SEEDS.iter().map(|&(id, ..)| id as u64).collect();
+    for &menu_id in &all_menu_ids {
+        crate::role::model::SysRoleMenu::create()
+            .id(menu_id as i64)
+            .role_id(1)
+            .menu_id(menu_id as i64)
+            .exec(&mut db)
+            .await
+            .map_err(|e| anyhow::anyhow!("关联管理员菜单 {} 失败: {}", menu_id, e))?;
+    }
+    info!("已为超级管理员关联 {} 个菜单", all_menu_ids.len());
 
     Ok(())
 }
