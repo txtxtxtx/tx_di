@@ -153,9 +153,9 @@ router.beforeEach(async (to, _from, next) => {
     try {
       const menus = await menuStore.fetchMenus()
       addDynamicRoutes(menus)
-      // 先放行当前导航到静态路由，再 replace 到目标路径
-      next()
-      await router.replace(to.fullPath)
+      // 动态路由已注册，用 replace 重新导航到目标路径
+      // 使用 fullPath 确保完整路径匹配（to.path 可能缺少子路径）
+      next({ path: to.fullPath, replace: true })
     } catch {
       // 获取菜单失败（token 过期等），清空状态跳登录
       const { useUserStore } = await import('@/stores/user')
@@ -163,6 +163,13 @@ router.beforeEach(async (to, _from, next) => {
       userStore.logout()
       next('/login')
     }
+    return
+  }
+
+  // 动态路由已加载，检查目标路由是否存在
+  if (to.matched.length === 0) {
+    // 路由不存在（可能是旧的书签/链接），跳首页
+    next('/')
     return
   }
 
