@@ -32,9 +32,14 @@ export function formatDate(dateStr: string | null | undefined): string {
 
 /**
  * 将字典数据列表转为 el-select/el-radio 选项格式
+ * value 为纯数字字符串时自动转为 number，避免后端 i32 反序列化失败
  */
 export function dictToOptions(list: DictDataResponse[]) {
-  return list.map(d => ({ label: d.label, value: d.value, colorType: d.colorType || '' }))
+  return list.map(d => ({
+    label: d.label,
+    value: /^\d+$/.test(d.value) ? Number(d.value) : d.value,
+    colorType: d.colorType || '',
+  }))
 }
 
 /**

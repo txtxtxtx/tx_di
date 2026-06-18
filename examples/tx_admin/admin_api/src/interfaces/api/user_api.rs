@@ -61,9 +61,12 @@ async fn update_user(
     axum::extract::Path(user_id): axum::extract::Path<u64>,
     Json(mut req): Json<UpdateUserRequest>,
 ) -> Result<ApiR<UserResponse>, ApiErr> {
-    ensure_permission("user:update").await?;
-    req.user_id = user_id;
     let login_id = StpUtil::get_login_id_as_string().await?;
+    if login_id != user_id.to_string() {
+        ensure_permission("user:update").await?;
+    }
+    req.user_id = user_id;
+
     let r = user_svc.update_user(req, Some(login_id)).await?;
     Ok(ApiR::success(r))
 }
@@ -94,8 +97,10 @@ async fn change_password(
     DiComp(user_svc): DiComp<UserAppService>,
     Json(req): Json<ChangePasswordRequest>,
 ) -> Result<ApiR<Empty>, ApiErr> {
-    ensure_permission("user:password").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
+    if req.user_id.to_string() != login_id {
+        ensure_permission("user:password").await?;
+    }
     user_svc.change_password(req, Some(login_id)).await?;
     Ok(ApiRes::ok().into_typed())
 }

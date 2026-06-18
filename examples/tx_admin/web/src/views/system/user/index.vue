@@ -50,11 +50,14 @@
         <el-table-column prop="createTime" label="创建时间" width="170">
           <template #default="{ row }">{{ formatTimestamp(row.createTime) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column label="操作" width="360" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openDialog(row)">编辑</el-button>
-            <el-button link type="primary" size="small" @click="openAssignRoles(row)">分配角色</el-button>
-            <el-button link type="primary" size="small" @click="openAssignDepts(row)">分配部门</el-button>
+            <el-button link type="warning" size="small" @click="openResetPwd(row)">重置密码</el-button>
+            <el-button v-if="row.status === 0" link type="danger" size="small" @click="handleDisable(row)">禁用</el-button>
+            <el-button v-else link type="success" size="small" @click="handleEnable(row)">启用</el-button>
+            <el-button link type="primary" size="small" @click="openAssignRoles(row)">角色</el-button>
+            <el-button link type="primary" size="small" @click="openAssignDepts(row)">部门</el-button>
             <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -115,6 +118,22 @@
       </template>
     </el-dialog>
 
+    <!-- 重置密码对话框 -->
+    <el-dialog v-model="resetPwdVisible" title="重置密码" width="400px" destroy-on-close>
+      <el-form ref="resetPwdFormRef" :model="resetPwdForm" :rules="resetPwdRules" label-width="80px">
+        <el-form-item label="用户">
+          <el-input :model-value="resetPwdUsername" disabled />
+        </el-form-item>
+        <el-form-item label="新密码" prop="newPassword">
+          <el-input v-model="resetPwdForm.newPassword" type="password" show-password />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="resetPwdVisible = false">取消</el-button>
+        <el-button type="primary" :loading="submitLoading" @click="handleResetPwd">确定</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 分配部门对话框 -->
     <el-dialog v-model="deptsDialogVisible" title="分配部门" width="500px" destroy-on-close>
       <el-tree
@@ -138,7 +157,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { listUsers, createUser, updateUser, deleteUser, assignRoles, assignDepts } from '@/api/user'
+import { listUsers, createUser, updateUser, deleteUser, assignRoles, assignDepts, changePassword, enableUser, disableUser } from '@/api/user'
 import { getAllRoles } from '@/api/role'
 import { listDepts } from '@/api/dept'
 import { formatTimestamp, toPageData, dictToOptions, dictLabel, dictColorType } from '@/utils'
@@ -172,6 +191,16 @@ const formRules: FormRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
   nickname: [{ required: true, message: '请输入昵称', trigger: 'blur' }],
+}
+
+// 重置密码
+const resetPwdVisible = ref(false)
+const resetPwdUsername = ref('')
+const resetPwdUserId = ref('')
+const resetPwdFormRef = ref<FormInstance>()
+const resetPwdForm = reactive({ newPassword: '' })
+const resetPwdRules: FormRules = {
+  newPassword: [{ required: true, message: '请输入新密码', trigger: 'blur' }],
 }
 
 // 角色分配
@@ -271,6 +300,40 @@ async function handleDelete(row: UserResponse) {
   await ElMessageBox.confirm(`确认删除用户 "${row.username}" 吗？`, '提示', { type: 'warning' })
   await deleteUser(row.id)
   ElMessage.success('删除成功')
+  loadData()
+}
+
+function openResetPwd(row: UserResponse) {
+  resetPwdUserId.value = row.id
+  resetPwdUsername.value = row.username
+  resetPwdForm.newPassword = ''
+  resetPwdVisible.value = true
+}
+
+async function handleResetPwd() {
+  const valid = await resetPwdFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+  submitLoading.value = true
+  try {
+    await changePassword({ userId: resetPwdUserId.value, newPassword: resetPwdForm.newPassword })
+    resetPwdVisible.value = false
+    ElMessage.success('密码重置成功')
+  } catch {} finally {
+    submitLoading.value = false
+  }
+}
+
+async function handleEnable(row: UserResponse) {
+  await ElMessageBox.confirm(`确认启用用户 "${row.username}" 吗？`, '提示', { type: 'warning' })
+  await enableUser({ userId: row.id })
+  ElMessage.success('启用成功')
+  loadData()
+}
+
+async function handleDisable(row: UserResponse) {
+  await ElMessageBox.confirm(`确认禁用用户 "${row.username}" 吗？`, '提示', { type: 'warning' })
+  await disableUser({ userId: row.id })
+  ElMessage.success('禁用成功')
   loadData()
 }
 

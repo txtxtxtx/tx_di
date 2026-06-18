@@ -35,7 +35,7 @@ token_name = "Authorization"
 token_style = "simple-uuid"
 
 [toasty_config]
-auto_schema = true
+auto_schema = false
 database_url = "sqlite:examples/tx_admin/data/tx_admin.db"
 max_pool_size = 10
 

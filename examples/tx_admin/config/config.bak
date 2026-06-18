@@ -36,7 +36,7 @@ token_style = "simple-uuid"
 
 [toasty_config]
 auto_schema = true
-#database_url = "sqlite:examples/tx_admin/data/tx_admin.db"
+database_url = "sqlite:examples/tx_admin/data/tx_admin.db"
 max_pool_size = 10
 
 [web_config]
