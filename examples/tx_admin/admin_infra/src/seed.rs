@@ -8,7 +8,6 @@ use crate::user::model::SysUser;
 use crate::role::model::{SysRole, SysRoleMenu};
 use crate::user::model::SysUserRole;
 use crate::department::model::SysDepartment;
-use crate::permission::model::SysPermission;
 use crate::dictionary::model::{SysDictType, SysDictData};
 use crate::menu::model::SysMenu;
 use tx_di_toasty::ToastyDb;
@@ -17,77 +16,6 @@ use tracing::info;
 
 /// 默认管理员密码（明文，由调用方负责哈希）
 pub const DEFAULT_ADMIN_PASSWORD: &str = "admin123";
-
-/// 权限定义：(name, permission_code, type, parent_id, sort, description)
-///
-/// type: 0=目录, 1=菜单, 2=按钮/接口
-pub const PERMISSIONS: &[(&str, &str, i32, i64, i32, &str)] = &[
-    // ── 系统管理 ──
-    ("系统管理",     "system:view",       0, 0, 1,  "系统管理模块"),
-
-    // ── 用户管理 ──
-    ("用户管理",     "user:view",         1, 1, 1,  "查看用户列表"),
-    ("创建用户",     "user:create",       2, 2, 1,  "创建新用户"),
-    ("编辑用户",     "user:update",       2, 2, 2,  "编辑用户信息"),
-    ("删除用户",     "user:delete",       2, 2, 3,  "删除用户"),
-    ("用户状态",     "user:status",       2, 2, 4,  "启用/禁用/锁定用户"),
-    ("重置密码",     "user:password",     2, 2, 5,  "修改用户密码"),
-    ("分配角色",     "user:assign_role",  2, 2, 6,  "分配用户角色"),
-    ("分配部门",     "user:assign_dept",  2, 2, 7,  "分配用户部门"),
-
-    // ── 角色管理 ──
-    ("角色管理",     "role:view",         1, 1, 2,  "查看角色列表"),
-    ("创建角色",     "role:create",       2, 10, 1, "创建新角色"),
-    ("编辑角色",     "role:update",       2, 10, 2, "编辑角色信息"),
-    ("删除角色",     "role:delete",       2, 10, 3, "删除角色"),
-    ("分配菜单",     "role:assign_menu",  2, 10, 4, "分配角色菜单"),
-
-    // ── 菜单管理 ──
-    ("菜单管理",     "menu:view",         1, 1, 3,  "查看菜单列表"),
-    ("创建菜单",     "menu:create",       2, 15, 1, "创建新菜单"),
-    ("编辑菜单",     "menu:update",       2, 15, 2, "编辑菜单信息"),
-    ("删除菜单",     "menu:delete",       2, 15, 3, "删除菜单"),
-
-    // ── 部门管理 ──
-    ("部门管理",     "dept:view",         1, 1, 4,  "查看部门列表"),
-    ("创建部门",     "dept:create",       2, 19, 1, "创建新部门"),
-    ("编辑部门",     "dept:update",       2, 19, 2, "编辑部门信息"),
-    ("删除部门",     "dept:delete",       2, 19, 3, "删除部门"),
-
-    // ── 权限管理 ──
-    ("权限管理",     "permission:view",   1, 1, 5,  "查看权限列表"),
-    ("创建权限",     "permission:create", 2, 22, 1, "创建新权限"),
-    ("编辑权限",     "permission:update", 2, 22, 2, "编辑权限信息"),
-    ("删除权限",     "permission:delete", 2, 22, 3, "删除权限"),
-
-    // ── 配置管理 ──
-    ("配置管理",     "config:view",       1, 1, 6,  "查看配置列表"),
-    ("创建配置",     "config:create",     2, 25, 1, "创建新配置"),
-    ("编辑配置",     "config:update",     2, 25, 2, "编辑配置信息"),
-    ("删除配置",     "config:delete",     2, 25, 3, "删除配置"),
-
-    // ── 字典管理 ──
-    ("字典管理",     "dict:view",         1, 1, 7,  "查看字典列表"),
-    ("创建字典",     "dict:create",       2, 28, 1, "创建字典类型/数据"),
-    ("编辑字典",     "dict:update",       2, 28, 2, "编辑字典信息"),
-    ("删除字典",     "dict:delete",       2, 28, 3, "删除字典"),
-
-    // ── 文件管理 ──
-    ("文件管理",     "file:view",         1, 1, 8,  "查看文件列表"),
-    ("上传文件",     "file:upload",       2, 32, 1, "上传文件"),
-    ("删除文件",     "file:delete",       2, 32, 2, "删除文件"),
-    ("下载文件",     "file:download",     2, 32, 3, "下载文件"),
-
-    // ── 日志管理 ──
-    ("日志管理",     "log:view",          1, 1, 9,  "查看日志"),
-    ("删除日志",     "log:delete",        2, 36, 1, "删除日志"),
-    ("清空日志",     "log:clean",         2, 36, 2, "清空日志"),
-
-    // ── 认证 ──
-    ("认证管理",     "auth:view",         1, 1, 10, "认证相关"),
-    ("用户信息",     "auth:info",         2, 40, 1, "查看当前用户信息"),
-    ("登出",         "auth:logout",       2, 40, 2, "退出登录"),
-];
 
 /// 字典种子数据：(dict_type, type_name, data_items)
 /// data_items: (sort, label, value, color_type)
@@ -144,39 +72,91 @@ const DICT_SEEDS: &[(&str, &str, &[(i32, &str, &str, &str)])] = &[
 /// 菜单种子数据
 /// (id, name, permission, types, sort, parent_id, route_path, icon, component, component_name, visible, keep_alive)
 ///
-/// types: 0=目录, 1=菜单, 2=按钮
+/// types: 0=目录, 1=菜单, 2=按钮/权限
 /// visible: 0=显示, 1=隐藏
 /// keep_alive: 0=不缓存, 1=缓存
 const MENU_SEEDS: &[(i64, &str, &str, i32, i32, i64, &str, &str, &str, &str, i32, i32)] = &[
-    // 仪表盘
+    // ── 仪表盘 ──
     (1, "仪表盘", "", 1, 0, 0, "dashboard", "Odometer", "dashboard/index", "Dashboard", 0, 0),
 
-    // 系统管理
+    // ── 系统管理 ──
     (2, "系统管理", "system:view", 0, 1, 0, "system", "Setting", "", "", 0, 0),
-    (3, "用户管理", "user:view", 1, 1, 2, "user", "User", "system/user/index", "User", 0, 1),
-    (4, "角色管理", "role:view", 1, 2, 2, "role", "UserFilled", "system/role/index", "Role", 0, 1),
-    (5, "菜单管理", "menu:view", 1, 3, 2, "menu", "Menu", "system/menu/index", "Menu", 0, 1),
-    (6, "部门管理", "dept:view", 1, 4, 2, "dept", "OfficeBuilding", "system/dept/index", "Dept", 0, 1),
-    (7, "权限管理", "permission:view", 1, 5, 2, "permission", "Lock", "system/permission/index", "Permission", 0, 1),
 
-    // 系统配置
+    // 用户管理
+    (3, "用户管理", "user:view", 1, 1, 2, "user", "User", "system/user/index", "User", 0, 1),
+    (101, "创建用户", "user:create", 2, 1, 3, "", "", "", "", 0, 0),
+    (102, "编辑用户", "user:update", 2, 2, 3, "", "", "", "", 0, 0),
+    (103, "删除用户", "user:delete", 2, 3, 3, "", "", "", "", 0, 0),
+    (104, "用户状态", "user:status", 2, 4, 3, "", "", "", "", 0, 0),
+    (105, "重置密码", "user:password", 2, 5, 3, "", "", "", "", 0, 0),
+    (106, "分配角色", "user:assign_role", 2, 6, 3, "", "", "", "", 0, 0),
+    (107, "分配部门", "user:assign_dept", 2, 7, 3, "", "", "", "", 0, 0),
+
+    // 角色管理
+    (4, "角色管理", "role:view", 1, 2, 2, "role", "UserFilled", "system/role/index", "Role", 0, 1),
+    (108, "创建角色", "role:create", 2, 1, 4, "", "", "", "", 0, 0),
+    (109, "编辑角色", "role:update", 2, 2, 4, "", "", "", "", 0, 0),
+    (110, "删除角色", "role:delete", 2, 3, 4, "", "", "", "", 0, 0),
+    (111, "分配菜单", "role:assign_menu", 2, 4, 4, "", "", "", "", 0, 0),
+
+    // 菜单管理
+    (5, "菜单管理", "menu:view", 1, 3, 2, "menu", "Menu", "system/menu/index", "Menu", 0, 1),
+    (112, "创建菜单", "menu:create", 2, 1, 5, "", "", "", "", 0, 0),
+    (113, "编辑菜单", "menu:update", 2, 2, 5, "", "", "", "", 0, 0),
+    (114, "删除菜单", "menu:delete", 2, 3, 5, "", "", "", "", 0, 0),
+
+    // 部门管理
+    (6, "部门管理", "dept:view", 1, 4, 2, "dept", "OfficeBuilding", "system/dept/index", "Dept", 0, 1),
+    (115, "创建部门", "dept:create", 2, 1, 6, "", "", "", "", 0, 0),
+    (116, "编辑部门", "dept:update", 2, 2, 6, "", "", "", "", 0, 0),
+    (117, "删除部门", "dept:delete", 2, 3, 6, "", "", "", "", 0, 0),
+
+    // 权限管理
+    (7, "权限管理", "permission:view", 1, 5, 2, "permission", "Lock", "system/permission/index", "Permission", 0, 1),
+    (118, "创建权限", "permission:create", 2, 1, 7, "", "", "", "", 0, 0),
+    (119, "编辑权限", "permission:update", 2, 2, 7, "", "", "", "", 0, 0),
+    (120, "删除权限", "permission:delete", 2, 3, 7, "", "", "", "", 0, 0),
+
+    // ── 系统配置 ──
     (8, "系统配置", "config:view", 0, 2, 0, "config", "Tools", "", "", 0, 0),
     (9, "参数设置", "config:view", 1, 1, 8, "index", "Document", "config/config/index", "Config", 0, 1),
-    (10, "字典类型", "dict:view", 1, 2, 8, "dict-type", "Collection", "config/dict/type", "DictType", 0, 1),
-    (11, "字典数据", "dict:view", 1, 3, 8, "dict-data", "Tickets", "config/dict/data", "DictData", 0, 1),
+    (121, "创建配置", "config:create", 2, 1, 9, "", "", "", "", 0, 0),
+    (122, "编辑配置", "config:update", 2, 2, 9, "", "", "", "", 0, 0),
+    (123, "删除配置", "config:delete", 2, 3, 9, "", "", "", "", 0, 0),
 
-    // 日志管理
+    (10, "字典类型", "dict:view", 1, 2, 8, "dict-type", "Collection", "config/dict/type", "DictType", 0, 1),
+    (124, "创建字典类型", "dict:create", 2, 1, 10, "", "", "", "", 0, 0),
+    (125, "编辑字典类型", "dict:update", 2, 2, 10, "", "", "", "", 0, 0),
+    (126, "删除字典类型", "dict:delete", 2, 3, 10, "", "", "", "", 0, 0),
+
+    (11, "字典数据", "dict:view", 1, 3, 8, "dict-data", "Tickets", "config/dict/data", "DictData", 0, 1),
+    (127, "创建字典数据", "dict:create", 2, 1, 11, "", "", "", "", 0, 0),
+    (128, "编辑字典数据", "dict:update", 2, 2, 11, "", "", "", "", 0, 0),
+    (129, "删除字典数据", "dict:delete", 2, 3, 11, "", "", "", "", 0, 0),
+
+    // ── 日志管理 ──
     (12, "日志管理", "log:view", 0, 3, 0, "log", "Notebook", "", "", 0, 0),
     (13, "操作日志", "log:view", 1, 1, 12, "operate", "List", "log/operate", "OperateLog", 0, 1),
+    (130, "删除操作日志", "log:delete", 2, 1, 13, "", "", "", "", 0, 0),
+    (131, "清空操作日志", "log:clean", 2, 2, 13, "", "", "", "", 0, 0),
     (14, "登录日志", "log:view", 1, 2, 12, "login", "Promotion", "log/login", "LoginLog", 0, 1),
+    (132, "删除登录日志", "log:delete", 2, 1, 14, "", "", "", "", 0, 0),
+    (133, "清空登录日志", "log:clean", 2, 2, 14, "", "", "", "", 0, 0),
 
-    // 文件管理
+    // ── 文件管理 ──
     (15, "文件管理", "file:view", 1, 4, 0, "file", "FolderOpened", "file/index", "File", 0, 0),
+    (134, "上传文件", "file:upload", 2, 1, 15, "", "", "", "", 0, 0),
+    (135, "删除文件", "file:delete", 2, 2, 15, "", "", "", "", 0, 0),
+    (136, "下载文件", "file:download", 2, 3, 15, "", "", "", "", 0, 0),
 
-    // 系统监控
+    // ── 系统监控 ──
     (16, "系统监控", "", 0, 5, 0, "monitor", "Monitor", "", "", 0, 0),
     (17, "服务器信息", "", 1, 1, 16, "server", "Cpu", "monitor/server", "Server", 0, 1),
     (18, "在线用户", "", 1, 2, 16, "online", "Connection", "monitor/online", "Online", 0, 1),
+
+    // ── 认证 ──
+    (137, "用户信息", "auth:info", 2, 1, 1, "", "", "", "", 0, 0),
+    (138, "登出", "auth:logout", 2, 2, 1, "", "", "", "", 0, 0),
 ];
 
 /// 执行种子数据初始化
@@ -273,29 +253,7 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
         .map_err(|e| anyhow::anyhow!("创建根部门失败: {}", e))?;
     info!("已创建根部门: 总公司");
 
-    // 5. 创建所有权限
-    for (id, (name, code, perm_type, parent_id, sort, desc)) in PERMISSIONS.iter().enumerate() {
-        SysPermission::create()
-            .id((id + 1) as i64)
-            .name(name.to_string())
-            .permission_code(code.to_string())
-            .permission_type(*perm_type)
-            .parent_id(*parent_id)
-            .sort(*sort)
-            .description(desc.to_string())
-            .status(Status::Enabled)
-            .creator("system".to_string())
-            .created_at(now.clone())
-            .updater("system".to_string())
-            .updated_at(now.clone())
-            .deleted(Deleted::No)
-            .exec(&mut db)
-            .await
-            .map_err(|e| anyhow::anyhow!("创建权限 {} 失败: {}", code, e))?;
-    }
-    info!("已创建 {} 个权限", PERMISSIONS.len());
-
-    // 6. 创建字典类型和字典数据
+    // 5. 创建字典数据
     for (type_id, (dict_type, type_name, items)) in DICT_SEEDS.iter().enumerate() {
         SysDictType::create()
             .id((type_id + 1) as i64)
@@ -336,7 +294,7 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
     }
     info!("已创建 {} 个字典类型", DICT_SEEDS.len());
 
-    // 7. 创建菜单
+    // 6. 创建菜单
     for &(id, name, permission, types, sort, parent_id, route_path, icon, component, component_name, visible, keep_alive) in MENU_SEEDS {
         SysMenu::create()
             .id(id)
@@ -364,7 +322,7 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
     }
     info!("已创建 {} 个菜单", MENU_SEEDS.len());
 
-    // 8. 超级管理员关联所有菜单
+    // 7. 超级管理员关联所有菜单
     let all_menu_ids: Vec<u64> = MENU_SEEDS.iter().map(|&(id, ..)| id as u64).collect();
     for &menu_id in &all_menu_ids {
         crate::role::model::SysRoleMenu::create()

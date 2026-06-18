@@ -11,19 +11,19 @@ const staticRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/login/index.vue'),
     meta: { title: '登录' },
   },
-  {
-    path: '/',
-    component: Layout,
-    redirect: '/dashboard',
-    children: [
-      {
-        path: 'dashboard',
-        name: 'Dashboard',
-        component: () => import('@/views/dashboard/index.vue'),
-        meta: { title: '仪表盘', icon: 'Odometer' },
-      },
-    ],
-  },
+  // {
+  //   path: '/',
+  //   component: Layout,
+  //   redirect: '/dashboard',
+  //   children: [
+  //     {
+  //       path: 'dashboard',
+  //       name: 'Dashboard',
+  //       component: () => import('@/views/dashboard/index.vue'),
+  //       meta: { title: '仪表盘', icon: 'Odometer' },
+  //     },
+  //   ],
+  // },
 ]
 
 const router = createRouter({
