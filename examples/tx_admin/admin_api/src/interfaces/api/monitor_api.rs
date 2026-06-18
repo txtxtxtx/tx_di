@@ -84,7 +84,12 @@ fn collect_server_info() -> ServerInfo {
         used_disk += used;
         let usage = if total > 0 { (used as f64 / total as f64) * 100.0 } else { 0.0 };
         disk_infos.push(DiskInfo {
-            name: disk.name().to_string_lossy().to_string(),
+            name: format!(
+                "{}\n{}\n{}",
+                disk.name().to_string_lossy(),
+                disk.mount_point().to_string_lossy(),
+                disk.file_system().to_string_lossy()
+            ),
             total_space: total,
             available_space: available,
             usage,
