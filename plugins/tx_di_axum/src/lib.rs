@@ -3,7 +3,6 @@ mod comp;
 pub mod bound;
 pub mod e;
 pub mod err;
-mod r;
 mod layers;
 
 pub use config::*;
@@ -11,7 +10,6 @@ pub use comp::*;
 pub use bound::DiComp;
 pub use e::WebErr;
 pub use err::WebErrCode;
-pub use r::R;
 pub use layers::{add_arc_layer, add_layer};
 
 /// aide 重新导出，方便用户使用 `JsonSchema` 等派生宏

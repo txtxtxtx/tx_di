@@ -1,6 +1,6 @@
 use std::net::{SocketAddr, TcpListener};
 use crate::bound::AppStatus;
-use crate::{WebConfig, R};
+use crate::{WebConfig};
 use axum::http::Request;
 use axum::routing::get;
 use std::sync::{Arc, LazyLock, Mutex, OnceLock};
@@ -344,8 +344,8 @@ fn create_tcp_listener(addr: SocketAddr) -> RIE<TokioTcpListener> {
 /// 健康检查端点
 ///
 /// 返回简单的 OK 响应，用于负载均衡器或监控系统的健康检查
-async fn health_check() -> R<FormattedDateTime> {
-    ApiR::success(FormattedDateTime::now()).into()
+async fn health_check() -> ApiR<FormattedDateTime> {
+    ApiR::success(FormattedDateTime::now())
 }
 
 /// 启动 web 服务器
