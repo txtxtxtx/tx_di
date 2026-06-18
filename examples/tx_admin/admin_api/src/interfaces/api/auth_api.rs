@@ -1,6 +1,6 @@
 //! 认证 HTTP API
 
-use admin_domain::shared::model::value_object::{SessionEctData, TenantId};
+use admin_domain::shared::model::value_object::{SessionEctData};
 use axum::Json;
 use tx_di_axum::Router;
 use tx_di_axum::bound::DiComp;

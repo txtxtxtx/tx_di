@@ -1,4 +1,4 @@
-use tx_error::{AppError, CodeMsg};
+use tx_error::{ CodeMsg};
 
 /// 重导出 `tx_error::log_err`，保持向后兼容
 ///
