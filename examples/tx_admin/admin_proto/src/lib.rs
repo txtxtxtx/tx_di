@@ -9,6 +9,8 @@
 //! 所有 i64/u64 字段通过 serde_with 的 DisplayFromStr 序列化为 JSON 字符串，
 //! 避免 JavaScript 数值精度丢失。
 
+pub mod flexible_serde;
+
 pub mod admin {
     /// 通用类型（PageRequest, Empty, PageResponse 等）
     pub mod common {

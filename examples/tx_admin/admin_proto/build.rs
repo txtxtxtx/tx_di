@@ -61,9 +61,12 @@ fn main() -> Result<()> {
 }
 
 /// 后处理：为 i64/u64 字段添加 serde_as 注解
-/// - repeated i64/u64 字段 → #[serde_as(as = "Vec<serde_with::DisplayFromStr>")]
-/// - optional i64/u64 字段 → #[serde_as(as = "Option<serde_with::DisplayFromStr>")]
-/// - 普通 i64/u64 字段 → #[serde_as(as = "serde_with::DisplayFromStr")]
+/// - repeated → FlexibleVec（序列化为字符串数组，反序列化接受数字/字符串）
+/// - optional → Option<FlexibleDisplayFromStr>
+/// - 普通    → FlexibleDisplayFromStr
+///
+/// 使用 flexible_serde 模块的类型，序列化输出字符串（JS 安全），
+/// 反序列化同时接受数字和字符串（前端兼容）。
 fn post_process_serde_as(path: &Path) -> Result<()> {
     let mut content = String::new();
     std::fs::File::open(path)?.read_to_string(&mut content)?;
@@ -74,7 +77,7 @@ fn post_process_serde_as(path: &Path) -> Result<()> {
         result.push('\n');
 
         let is_i64 = line.contains("#[prost(int64,");
-        let is_u64 = line.contains("#[prost(uint64,") || line.contains("#[prost(uint64)]");
+        let is_u64 = line.contains("#[prost(uint64,");
 
         if is_i64 || is_u64 {
             let indent = &line[..line.len() - line.trim_start().len()];
@@ -82,11 +85,11 @@ fn post_process_serde_as(path: &Path) -> Result<()> {
             let is_optional = line.contains("optional");
 
             let as_type = if is_repeated {
-                "Vec<serde_with::DisplayFromStr>"
+                "crate::flexible_serde::FlexibleVec"
             } else if is_optional {
-                "Option<serde_with::DisplayFromStr>"
+                "Option<crate::flexible_serde::FlexibleDisplayFromStr>"
             } else {
-                "serde_with::DisplayFromStr"
+                "crate::flexible_serde::FlexibleDisplayFromStr"
             };
             result.push_str(&format!(
                 "{}#[serde_as(as = \"{}\")]\n",
