@@ -3,6 +3,7 @@ import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 import type { ApiRes } from '@/types'
+import {useUserStore} from "@/stores/user";
 
 const request = axios.create({
   baseURL: '',
@@ -29,7 +30,7 @@ request.interceptors.response.use(
       ElMessage.error(res.msg || '请求失败')
       // 认证失败
       if (res.code === 401) {
-        localStorage.removeItem('token')
+        useUserStore().clearAuthData()
         router.push('/login')
       }
       return Promise.reject(new Error(res.msg || '请求失败'))
@@ -38,7 +39,7 @@ request.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token')
+      useUserStore().clearAuthData()
       router.push('/login')
     }
     const msg = error.response?.data?.msg || error.message || '网络错误'

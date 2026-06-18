@@ -24,18 +24,22 @@ export const useUserStore = defineStore('user', () => {
     return res.data
   }
 
+  /** 清除所有认证数据（不调接口，供 401 拦截器复用） */
+  function clearAuthData() {
+    token.value = ''
+    userInfo.value = null
+    permissions.value = []
+    localStorage.removeItem('token')
+    const menuStore = useMenuStore()
+    menuStore.clearMenus()
+    resetDynamicRoutes()
+  }
+
   async function logout() {
     try {
       await logoutApi()
     } finally {
-      token.value = ''
-      userInfo.value = null
-      permissions.value = []
-      localStorage.removeItem('token')
-      // 清除菜单和动态路由
-      const menuStore = useMenuStore()
-      menuStore.clearMenus()
-      resetDynamicRoutes()
+      clearAuthData()
     }
   }
 
@@ -44,5 +48,5 @@ export const useUserStore = defineStore('user', () => {
     return permissions.value.includes(perm)
   }
 
-  return { token, userInfo, permissions, login, fetchUserInfo, logout, hasPermission }
+  return { token, userInfo, permissions, login, fetchUserInfo, logout, clearAuthData, hasPermission }
 })
