@@ -46,3 +46,9 @@ export function listDictData(data: ListDictDataRequest) {
 export function getDictDataByType(dictType: string) {
   return request.get<ApiRes<DictDataResponse[]>>(`/api/dict/data/type/${dictType}`).then(r => r.data)
 }
+
+export function getDictDataByTypes(dictTypes: string[]) {
+  return request.get<ApiRes<Record<string, DictDataResponse[]>>>('/api/dict/data/batch', {
+    params: { types: dictTypes.join(',') },
+  }).then(r => r.data)
+}

@@ -10,8 +10,7 @@
         </el-form-item>
         <el-form-item label="登录结果">
           <el-select v-model="query.result" placeholder="全部" clearable>
-            <el-option label="成功" :value="0" />
-            <el-option label="失败" :value="1" />
+            <el-option v-for="opt in dictToOptions(dictStore.dictMap['sys_operate_result'] || [])" :key="opt.value" :label="opt.label" :value="opt.value" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -41,7 +40,7 @@
         <el-table-column prop="loginType" label="登录方式" width="100" />
         <el-table-column prop="result" label="结果" width="80">
           <template #default="{ row }">
-            <el-tag :type="row.result === 0 ? 'success' : 'danger'">{{ row.result === 0 ? '成功' : '失败' }}</el-tag>
+            <el-tag :type="dictColorType(dictStore.dictMap['sys_operate_result'] || [], row.result)">{{ dictLabel(dictStore.dictMap['sys_operate_result'] || [], row.result) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="msg" label="消息" min-width="200" show-overflow-tooltip />
@@ -58,9 +57,11 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listLoginLogs, deleteLoginLogs, cleanLoginLogs } from '@/api/log'
-import { toPageData } from '@/utils'
+import { toPageData, dictLabel, dictColorType, dictToOptions } from '@/utils'
+import { useDictStore } from '@/stores/dict'
 import type { LoginLogResponse } from '@/types'
 
+const dictStore = useDictStore()
 const loading = ref(false)
 const tableData = ref<LoginLogResponse[]>([])
 const page = ref(1)
@@ -97,7 +98,10 @@ async function handleClean() {
   ElMessage.success('清空成功'); loadData()
 }
 
-onMounted(loadData)
+onMounted(async () => {
+  await dictStore.getDictData('sys_operate_result')
+  loadData()
+})
 </script>
 
 <style scoped>

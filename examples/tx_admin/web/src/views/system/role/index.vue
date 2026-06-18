@@ -10,7 +10,7 @@
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="query.status" placeholder="全部" clearable>
-            <el-option v-for="o in statusOptions" :key="o.value" :label="o.label" :value="o.value" />
+            <el-option v-for="o in dictToOptions(dictStore.dictMap['sys_status'] || [])" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -35,7 +35,7 @@
         <el-table-column prop="sort" label="排序" width="80" />
         <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
-            <el-tag :type="row.status === 0 ? 'success' : 'danger'">{{ statusLabel(row.status) }}</el-tag>
+            <el-tag :type="dictColorType(dictStore.dictMap['sys_status'] || [], row.status)">{{ dictLabel(dictStore.dictMap['sys_status'] || [], row.status) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="remark" label="备注" min-width="150" show-overflow-tooltip />
@@ -76,7 +76,7 @@
         </el-form-item>
         <el-form-item v-if="isEdit" label="数据范围">
           <el-select v-model="form.dataScope">
-            <el-option v-for="o in dataScopeOptions" :key="o.value" :label="o.label" :value="o.value" />
+            <el-option v-for="o in dictToOptions(dictStore.dictMap['sys_data_scope'] || [])" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="备注">
@@ -122,7 +122,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { listRoles, createRole, updateRole, deleteRole, assignMenus, getRoleUsers } from '@/api/role'
 import { listMenus } from '@/api/menu'
-import { statusOptions, statusLabel, dataScopeOptions, toPageData } from '@/utils'
+import { toPageData, dictToOptions, dictLabel, dictColorType } from '@/utils'
+import { useDictStore } from '@/stores/dict'
 import type { RoleResponse, MenuTreeNode, UserResponse } from '@/types'
 
 const loading = ref(false)
@@ -132,6 +133,7 @@ const page = ref(1)
 const size = ref(10)
 const total = ref(0)
 const query = reactive({ name: '', code: '', status: undefined as number | undefined })
+const dictStore = useDictStore()
 
 const dialogVisible = ref(false)
 const isEdit = ref(false)
@@ -232,7 +234,13 @@ async function openRoleUsers(row: RoleResponse) {
   roleUsersVisible.value = true
 }
 
-onMounted(loadData)
+onMounted(async () => {
+  await Promise.all([
+    dictStore.getDictData('sys_status'),
+    dictStore.getDictData('sys_data_scope'),
+  ])
+  loadData()
+})
 </script>
 
 <style scoped>

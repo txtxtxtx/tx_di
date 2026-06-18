@@ -10,8 +10,7 @@
         </el-form-item>
         <el-form-item label="是否成功">
           <el-select v-model="query.success" placeholder="全部" clearable>
-            <el-option label="成功" :value="0" />
-            <el-option label="失败" :value="1" />
+            <el-option v-for="opt in dictToOptions(dictStore.dictMap['sys_operate_result'] || [])" :key="opt.value" :label="opt.label" :value="opt.value" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -42,7 +41,7 @@
         <el-table-column prop="action" label="操作" min-width="150" show-overflow-tooltip />
         <el-table-column prop="success" label="结果" width="80">
           <template #default="{ row }">
-            <el-tag :type="row.success === 0 ? 'success' : 'danger'">{{ row.success === 0 ? '成功' : '失败' }}</el-tag>
+            <el-tag :type="dictColorType(dictStore.dictMap['sys_operate_result'] || [], row.success)">{{ dictLabel(dictStore.dictMap['sys_operate_result'] || [], row.success) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="requestMethod" label="请求方法" width="80" />
@@ -61,9 +60,11 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listOperateLogs, deleteOperateLogs, cleanOperateLogs } from '@/api/log'
-import { toPageData } from '@/utils'
+import { toPageData, dictLabel, dictColorType, dictToOptions } from '@/utils'
+import { useDictStore } from '@/stores/dict'
 import type { OperateLogResponse } from '@/types'
 
+const dictStore = useDictStore()
 const loading = ref(false)
 const tableData = ref<OperateLogResponse[]>([])
 const page = ref(1)
@@ -100,7 +101,10 @@ async function handleClean() {
   ElMessage.success('清空成功'); loadData()
 }
 
-onMounted(loadData)
+onMounted(async () => {
+  await dictStore.getDictData('sys_operate_result')
+  loadData()
+})
 </script>
 
 <style scoped>

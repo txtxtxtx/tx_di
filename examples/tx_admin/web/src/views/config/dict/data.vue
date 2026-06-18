@@ -10,7 +10,7 @@
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="query.status" placeholder="全部" clearable>
-            <el-option v-for="o in statusOptions" :key="o.value" :label="o.label" :value="o.value" />
+            <el-option v-for="o in dictToOptions(dictStore.dictMap['sys_status'] || [])" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -36,7 +36,7 @@
         <el-table-column prop="sort" label="排序" width="80" />
         <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
-            <el-tag :type="row.status === 0 ? 'success' : 'danger'">{{ statusLabel(row.status) }}</el-tag>
+            <el-tag :type="row.status === 0 ? 'success' : 'danger'">{{ dictLabel(dictStore.dictMap['sys_status'] || [], row.status) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="remark" label="备注" min-width="150" show-overflow-tooltip />
@@ -85,10 +85,12 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { listDictData, createDictData, updateDictData, deleteDictData } from '@/api/dict'
-import { statusLabel, statusOptions, toPageData } from '@/utils'
+import { toPageData, dictToOptions, dictLabel } from '@/utils'
+import { useDictStore } from '@/stores/dict'
 import type { DictDataResponse } from '@/types'
 
 const route = useRoute()
+const dictStore = useDictStore()
 const loading = ref(false)
 const submitLoading = ref(false)
 const tableData = ref<DictDataResponse[]>([])
@@ -152,7 +154,10 @@ async function handleDelete(row: DictDataResponse) {
   ElMessage.success('删除成功'); loadData()
 }
 
-onMounted(loadData)
+onMounted(async () => {
+  await dictStore.getDictData('sys_status')
+  loadData()
+})
 </script>
 
 <style scoped>

@@ -7,7 +7,7 @@
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="query.status" placeholder="全部" clearable>
-            <el-option v-for="o in statusOptions" :key="o.value" :label="o.label" :value="o.value" />
+            <el-option v-for="o in dictToOptions(dictStore.dictMap['sys_status'] || [])" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -30,17 +30,17 @@
         <el-table-column prop="permission" label="权限标识" width="180" show-overflow-tooltip />
         <el-table-column prop="types" label="类型" width="80">
           <template #default="{ row }">
-            <el-tag :type="row.types === 0 ? '' : row.types === 1 ? 'success' : 'warning'">{{ menuTypeLabel(row.types) }}</el-tag>
+            <el-tag :type="row.types === 0 ? '' : row.types === 1 ? 'success' : 'warning'">{{ dictLabel(dictStore.dictMap['sys_menu_type'] || [], row.types) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="path" label="路由路径" width="180" show-overflow-tooltip />
         <el-table-column prop="component" label="组件路径" width="200" show-overflow-tooltip />
         <el-table-column prop="visible" label="可见" width="70">
-          <template #default="{ row }">{{ visibleLabel(row.visible) }}</template>
+          <template #default="{ row }">{{ dictLabel(dictStore.dictMap['sys_visible'] || [], row.visible) }}</template>
         </el-table-column>
         <el-table-column prop="status" label="状态" width="70">
           <template #default="{ row }">
-            <el-tag :type="row.status === 0 ? 'success' : 'danger'">{{ statusLabel(row.status) }}</el-tag>
+            <el-tag :type="row.status === 0 ? 'success' : 'danger'">{{ dictLabel(dictStore.dictMap['sys_status'] || [], row.status) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="200" fixed="right">
@@ -61,7 +61,7 @@
         </el-form-item>
         <el-form-item label="菜单类型" prop="types">
           <el-radio-group v-model="form.types">
-            <el-radio v-for="o in menuTypeOptions" :key="o.value" :value="o.value">{{ o.label }}</el-radio>
+            <el-radio v-for="o in dictToOptions(dictStore.dictMap['sys_menu_type'] || [])" :key="o.value" :value="o.value">{{ o.label }}</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="菜单名称" prop="name">
@@ -87,14 +87,12 @@
         </el-form-item>
         <el-form-item v-if="isEdit" label="是否可见">
           <el-radio-group v-model="form.visible">
-            <el-radio :value="0">显示</el-radio>
-            <el-radio :value="1">隐藏</el-radio>
+            <el-radio v-for="o in dictToOptions(dictStore.dictMap['sys_visible'] || [])" :key="o.value" :value="o.value">{{ o.label }}</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item v-if="isEdit" label="是否缓存">
           <el-radio-group v-model="form.keepAlive">
-            <el-radio :value="0">不缓存</el-radio>
-            <el-radio :value="1">缓存</el-radio>
+            <el-radio v-for="o in dictToOptions(dictStore.dictMap['sys_keep_alive'] || [])" :key="o.value" :value="o.value">{{ o.label }}</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
@@ -111,13 +109,15 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { listMenus, createMenu, updateMenu, deleteMenu } from '@/api/menu'
-import { statusOptions, statusLabel, menuTypeOptions, menuTypeLabel, visibleLabel } from '@/utils'
+import { dictToOptions, dictLabel, dictColorType } from '@/utils'
+import { useDictStore } from '@/stores/dict'
 import type { MenuTreeNode } from '@/types'
 
 const loading = ref(false)
 const submitLoading = ref(false)
 const treeData = ref<MenuTreeNode[]>([])
 const query = reactive({ name: '', status: undefined as number | undefined })
+const dictStore = useDictStore()
 
 const dialogVisible = ref(false)
 const isEdit = ref(false)
@@ -204,7 +204,15 @@ async function handleDelete(row: MenuTreeNode) {
   ElMessage.success('删除成功'); loadData()
 }
 
-onMounted(loadData)
+onMounted(async () => {
+  await Promise.all([
+    dictStore.getDictData('sys_status'),
+    dictStore.getDictData('sys_menu_type'),
+    dictStore.getDictData('sys_visible'),
+    dictStore.getDictData('sys_keep_alive'),
+  ])
+  loadData()
+})
 </script>
 
 <style scoped>

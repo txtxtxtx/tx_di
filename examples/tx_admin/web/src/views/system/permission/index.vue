@@ -12,12 +12,12 @@
         <el-table-column prop="name" label="权限名称" min-width="180" />
         <el-table-column prop="permissionCode" label="权限编码" width="200" show-overflow-tooltip />
         <el-table-column prop="type" label="类型" width="80">
-          <template #default="{ row }">{{ permissionTypeLabel(row.type) }}</template>
+          <template #default="{ row }">{{ dictLabel(dictStore.dictMap['sys_permission_type'] || [], row.type) }}</template>
         </el-table-column>
         <el-table-column prop="sort" label="排序" width="80" />
         <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
-            <el-tag :type="row.status === 0 ? 'success' : 'danger'">{{ statusLabel(row.status) }}</el-tag>
+            <el-tag :type="row.status === 0 ? 'success' : 'danger'">{{ dictLabel(dictStore.dictMap['sys_status'] || [], row.status) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" min-width="150" show-overflow-tooltip />
@@ -40,7 +40,7 @@
         </el-form-item>
         <el-form-item label="类型" prop="type">
           <el-select v-model="form.type">
-            <el-option v-for="o in permissionTypeOptions" :key="o.value" :label="o.label" :value="o.value" />
+            <el-option v-for="o in dictToOptions(dictStore.dictMap['sys_permission_type'] || [])" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="上级权限">
@@ -69,9 +69,11 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { listPermissions, createPermission, updatePermission, deletePermission } from '@/api/permission'
-import { statusLabel, permissionTypeOptions, permissionTypeLabel } from '@/utils'
+import { dictToOptions, dictLabel } from '@/utils'
+import { useDictStore } from '@/stores/dict'
 import type { PermissionDetail } from '@/types'
 
+const dictStore = useDictStore()
 const loading = ref(false)
 const submitLoading = ref(false)
 const tableData = ref<PermissionDetail[]>([])
@@ -128,7 +130,13 @@ async function handleDelete(row: PermissionDetail) {
   ElMessage.success('删除成功'); loadData()
 }
 
-onMounted(loadData)
+onMounted(async () => {
+  await Promise.all([
+    dictStore.getDictData('sys_status'),
+    dictStore.getDictData('sys_permission_type'),
+  ])
+  loadData()
+})
 </script>
 
 <style scoped>

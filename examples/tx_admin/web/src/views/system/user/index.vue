@@ -14,7 +14,7 @@
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="query.status" placeholder="全部" clearable>
-            <el-option v-for="o in userStatusOptions" :key="o.value" :label="o.label" :value="o.value" />
+            <el-option v-for="o in dictToOptions(dictStore.dictMap['sys_user_status'] || [])" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -40,11 +40,11 @@
         <el-table-column prop="email" label="邮箱" min-width="160" show-overflow-tooltip />
         <el-table-column prop="mobile" label="手机号" width="130" />
         <el-table-column prop="sex" label="性别" width="70">
-          <template #default="{ row }">{{ sexLabel(row.sex) }}</template>
+          <template #default="{ row }">{{ dictLabel(dictStore.dictMap['sys_sex'] || [], row.sex) }}</template>
         </el-table-column>
         <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
-            <el-tag :type="userStatusType(row.status) as any">{{ userStatusLabel(row.status) }}</el-tag>
+            <el-tag :type="dictColorType(dictStore.dictMap['sys_user_status'] || [], row.status) as any">{{ dictLabel(dictStore.dictMap['sys_user_status'] || [], row.status) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="创建时间" width="170">
@@ -93,7 +93,7 @@
         </el-form-item>
         <el-form-item label="性别">
           <el-select v-model="form.sex" placeholder="请选择">
-            <el-option v-for="o in sexOptions" :key="o.value" :label="o.label" :value="o.value" />
+            <el-option v-for="o in dictToOptions(dictStore.dictMap['sys_sex'] || [])" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="备注">
@@ -141,7 +141,8 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { listUsers, createUser, updateUser, deleteUser, assignRoles, assignDepts } from '@/api/user'
 import { getAllRoles } from '@/api/role'
 import { listDepts } from '@/api/dept'
-import { formatTimestamp, toPageData, sexOptions, sexLabel, userStatusOptions, userStatusLabel, userStatusType } from '@/utils'
+import { formatTimestamp, toPageData, dictToOptions, dictLabel, dictColorType } from '@/utils'
+import { useDictStore } from '@/stores/dict'
 import type { UserResponse, RoleResponse, DeptTreeNode } from '@/types'
 
 const loading = ref(false)
@@ -151,6 +152,7 @@ const page = ref(1)
 const size = ref(10)
 const total = ref(0)
 const query = reactive({ username: '', nickname: '', mobile: '', status: undefined as number | undefined })
+const dictStore = useDictStore()
 
 // 用户表单
 const dialogVisible = ref(false)
@@ -317,7 +319,13 @@ async function handleAssignDepts() {
   }
 }
 
-onMounted(loadData)
+onMounted(async () => {
+  await Promise.all([
+    dictStore.getDictData('sys_user_status'),
+    dictStore.getDictData('sys_sex'),
+  ])
+  loadData()
+})
 </script>
 
 <style scoped>

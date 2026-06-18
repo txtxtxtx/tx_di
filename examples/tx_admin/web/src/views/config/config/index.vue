@@ -33,7 +33,7 @@
         <el-table-column prop="value" label="值" min-width="200" show-overflow-tooltip />
         <el-table-column prop="category" label="分类" width="100" />
         <el-table-column prop="configType" label="类型" width="80">
-          <template #default="{ row }">{{ configTypeLabel(row.configType) }}</template>
+          <template #default="{ row }">{{ dictLabel(dictStore.dictMap['sys_config_type'] || [], row.configType) }}</template>
         </el-table-column>
         <el-table-column prop="remark" label="备注" width="150" show-overflow-tooltip />
         <el-table-column label="操作" width="150" fixed="right">
@@ -65,7 +65,7 @@
         </el-form-item>
         <el-form-item label="类型">
           <el-select v-model="form.configType">
-            <el-option v-for="o in configTypeOptions" :key="o.value" :label="o.label" :value="o.value" />
+            <el-option v-for="o in dictToOptions(dictStore.dictMap['sys_config_type'] || [])" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </el-form-item>
         <el-form-item v-if="isEdit" label="是否可见">
@@ -91,9 +91,11 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { listConfigs, createConfig, updateConfig, deleteConfig } from '@/api/config'
-import { configTypeLabel, configTypeOptions, toPageData } from '@/utils'
+import { toPageData, dictToOptions, dictLabel } from '@/utils'
+import { useDictStore } from '@/stores/dict'
 import type { ConfigResponse } from '@/types'
 
+const dictStore = useDictStore()
 const loading = ref(false)
 const submitLoading = ref(false)
 const tableData = ref<ConfigResponse[]>([])
@@ -157,7 +159,10 @@ async function handleDelete(row: ConfigResponse) {
   ElMessage.success('删除成功'); loadData()
 }
 
-onMounted(loadData)
+onMounted(async () => {
+  await dictStore.getDictData('sys_config_type')
+  loadData()
+})
 </script>
 
 <style scoped>
