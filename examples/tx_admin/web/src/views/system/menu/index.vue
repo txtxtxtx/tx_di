@@ -157,6 +157,7 @@ function resetQuery() { query.name = ''; query.status = undefined; loadData() }
 
 function openDialog(row?: MenuTreeNode | null, parentId?: string) {
   isEdit.value = !!row
+  console.log(row, parentId)
   if (row) {
     Object.assign(form, {
       id: row.id, name: row.name, permission: row.permission, types: row.types, sort: row.sort,
