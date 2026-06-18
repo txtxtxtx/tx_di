@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
+use admin_proto::{UploadFileRequest, ListFilesRequest, FileResponse, DownloadFileResponse};
 use admin_domain::file::model::value_object::{FileQuery, FileUploadCommand};
 use admin_domain::file::service::FileService;
-use admin_proto::{FileResponse, DownloadFileResponse};
 use tx_di_core::tx_comp;
 use tx_error::AppResult;
 use tx_common::page::Page;
 
-use crate::file::dto::{file_to_response, file_download_to_response, UploadFileCommand, FileQueryRequest};
+use crate::file::dto::{file_to_response, file_download_to_response};
 
 #[tx_comp]
 pub struct FileAppService {
@@ -15,7 +15,6 @@ pub struct FileAppService {
 }
 
 impl FileAppService {
-    /// 创建文件应用服务实例
     pub fn new(file_service: Arc<FileService>) -> Self {
         Self { file_service }
     }
@@ -23,16 +22,16 @@ impl FileAppService {
     /// 上传文件记录
     pub async fn upload_file(
         &self,
-        cmd: UploadFileCommand,
+        req: UploadFileRequest,
         creator: Option<String>,
     ) -> AppResult<FileResponse> {
         let upload_cmd = FileUploadCommand {
-            name: cmd.name,
-            path: cmd.path,
-            url: cmd.url,
-            file_type: cmd.file_type.filter(|s| !s.is_empty()),
-            size: cmd.size,
-            config_id: cmd.config_id,
+            name: req.name,
+            path: req.path,
+            url: req.url,
+            file_type: req.file_type.filter(|s| !s.is_empty()),
+            size: req.size,
+            config_id: req.config_id,
         };
         let file = self.file_service.upload_file(upload_cmd, creator).await?;
         Ok(file_to_response(file))
@@ -46,14 +45,14 @@ impl FileAppService {
     /// 分页查询文件列表
     pub async fn get_file_page(
         &self,
-        req: FileQueryRequest,
+        req: ListFilesRequest,
     ) -> AppResult<Page<FileResponse>> {
         let query = FileQuery {
             name: req.name,
             file_type: req.file_type,
             config_id: req.config_id,
         };
-        let page = Page::request(req.page, req.size);
+        let page = Page::request(req.page, req.page_size);
         let result = self.file_service.get_file_page(&query, page).await?;
 
         Ok(Page::new(

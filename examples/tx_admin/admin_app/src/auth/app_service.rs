@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
-use admin_proto::{LoginRequest, LoginResponse, LogoutRequest, UserInfoResponse};
-use crate::log::dto::CreateLoginLogCommand;
+use admin_proto::{LoginRequest, LoginResponse, LogoutRequest, UserInfoResponse, CreateLoginLogRequest};
 use crate::log::app_service::LoginLogAppService;
 use admin_domain::user::service::UserService;
 use admin_domain::role::service::RoleService;
@@ -164,7 +163,7 @@ impl AuthAppService {
         let user = self.user_service.get_user(req.user_id).await?;
 
         // 记录登出日志
-        let log_cmd = CreateLoginLogCommand {
+        let log_cmd = CreateLoginLogRequest {
             user_id: req.user_id,
             user_type: 0,
             username: user.username,

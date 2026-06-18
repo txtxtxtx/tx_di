@@ -8,7 +8,7 @@
 //!   1.7 用户查询         ✅
 
 mod common;
-use admin_app::user::dto::*;
+use admin_proto::{CreateUserRequest, UpdateUserRequest, AssignRolesRequest, AssignDeptsRequest, ListUsersRequest, PageRequest};
 use admin_domain::shared::model::value_object::DeletedStatus;
 use jiff::Timestamp;
 use admin_domain::user::model::value_object::{Sex, UserStatus};
@@ -34,16 +34,16 @@ async fn create_user_success() {
     // ── Act ──────────────────────────────────────────────────────────────
     let user = app
         .create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: "testuser".into(),
                 password: "password123".into(),
                 nickname: "测试用户".into(),
                 email: Some("test@example.com".into()),
                 mobile: Some("13800138000".into()),
-                sex: Some(Sex::Male),
+                sex: Some(Sex::Male as i32),
                 remark: None,
-                role_ids: None,
-                dept_ids: None,
+                role_ids: vec![],
+                dept_ids: vec![],
             },
             Some("admin".into()),
         )
@@ -125,7 +125,7 @@ async fn create_user_with_roles_and_depts() {
     let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: "staff".into(),
                 password: "pwd".into(),
                 nickname: "员工".into(),
@@ -133,8 +133,8 @@ async fn create_user_with_roles_and_depts() {
                 mobile: None,
                 sex: None,
                 remark: None,
-                role_ids: Some(vec![1, 2]),
-                dept_ids: Some(vec![100]),
+                role_ids: vec![1, 2],
+                dept_ids: vec![100],
             },
             Some("admin".into()),
         )
@@ -154,7 +154,7 @@ async fn create_user_with_roles_and_depts() {
 #[tokio::test]
 async fn create_duplicate_username_should_fail() {
     let (app, _, _) = common::create_user_app().await;
-    let cmd = |name: &str| CreateUserCommand {
+    let cmd = |name: &str| CreateUserRequest {
         username: name.into(),
         password: "pwd".into(),
         nickname: "x".into(),
@@ -162,8 +162,8 @@ async fn create_duplicate_username_should_fail() {
         mobile: None,
         sex: None,
         remark: None,
-        role_ids: None,
-        dept_ids: None,
+        role_ids: vec![],
+        dept_ids: vec![],
     };
     app.create_user(cmd("dup"), Some("admin".into()))
         .await
@@ -178,7 +178,7 @@ async fn create_duplicate_username_should_fail() {
 #[tokio::test]
 async fn create_duplicate_email_should_fail() {
     let (app, _, _) = common::create_user_app().await;
-    let cmd = |name: &str, email: &str| CreateUserCommand {
+    let cmd = |name: &str, email: &str| CreateUserRequest {
         username: name.into(),
         password: "pwd".into(),
         nickname: "x".into(),
@@ -186,8 +186,8 @@ async fn create_duplicate_email_should_fail() {
         mobile: None,
         sex: None,
         remark: None,
-        role_ids: None,
-        dept_ids: None,
+        role_ids: vec![],
+        dept_ids: vec![],
     };
     app.create_user(cmd("u1", "dup@test.com"), Some("admin".into()))
         .await
@@ -202,7 +202,7 @@ async fn create_duplicate_email_should_fail() {
 #[tokio::test]
 async fn create_duplicate_mobile_should_fail() {
     let (app, _, _) = common::create_user_app().await;
-    let cmd = |name: &str, mobile: &str| CreateUserCommand {
+    let cmd = |name: &str, mobile: &str| CreateUserRequest {
         username: name.into(),
         password: "pwd".into(),
         nickname: "x".into(),
@@ -210,8 +210,8 @@ async fn create_duplicate_mobile_should_fail() {
         mobile: Some(mobile.into()),
         sex: None,
         remark: None,
-        role_ids: None,
-        dept_ids: None,
+        role_ids: vec![],
+        dept_ids: vec![],
     };
     app.create_user(cmd("u1", "13900000001"), Some("admin".into()))
         .await
@@ -228,7 +228,7 @@ async fn update_user_success() {
     let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: "old".into(),
                 password: "pwd".into(),
                 nickname: "Old".into(),
@@ -236,8 +236,8 @@ async fn update_user_success() {
                 mobile: None,
                 sex: None,
                 remark: None,
-                role_ids: None,
-                dept_ids: None,
+                role_ids: vec![],
+                dept_ids: vec![],
             },
             Some("admin".into()),
         )
@@ -245,12 +245,12 @@ async fn update_user_success() {
         .unwrap();
 
     app.update_user(
-        UpdateUserCommand {
+        UpdateUserRequest {
             user_id: user.id,
             nickname: Some("NewName".into()),
             email: Some("new@example.com".into()),
             mobile: Some("13800000000".into()),
-            sex: Some(Sex::Female),
+            sex: Some(Sex::Female as i32),
             status: None,
             remark: Some("已更新".into()),
         },
@@ -273,7 +273,7 @@ async fn delete_user_soft_delete() {
     let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: "todelete".into(),
                 password: "pwd".into(),
                 nickname: "Del".into(),
@@ -281,8 +281,8 @@ async fn delete_user_soft_delete() {
                 mobile: None,
                 sex: None,
                 remark: None,
-                role_ids: None,
-                dept_ids: None,
+                role_ids: vec![],
+                dept_ids: vec![],
             },
             Some("admin".into()),
         )
@@ -300,16 +300,16 @@ async fn get_user_detail() {
     let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: "detail".into(),
                 password: "pwd".into(),
                 nickname: "详情".into(),
                 email: Some("detail@test.com".into()),
                 mobile: None,
-                sex: Some(Sex::Male),
+                sex: Some(Sex::Male as i32),
                 remark: Some("备注".into()),
-                role_ids: None,
-                dept_ids: None,
+                role_ids: vec![],
+                dept_ids: vec![],
             },
             Some("admin".into()),
         )
@@ -330,7 +330,7 @@ async fn change_status_to_disabled() {
     let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: "disableme".into(),
                 password: "pwd".into(),
                 nickname: "禁用".into(),
@@ -338,8 +338,8 @@ async fn change_status_to_disabled() {
                 mobile: None,
                 sex: None,
                 remark: None,
-                role_ids: None,
-                dept_ids: None,
+                role_ids: vec![],
+                dept_ids: vec![],
             },
             Some("admin".into()),
         )
@@ -360,7 +360,7 @@ async fn change_status_to_active_reenable() {
     let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: "reenable".into(),
                 password: "pwd".into(),
                 nickname: "重启用".into(),
@@ -368,8 +368,8 @@ async fn change_status_to_active_reenable() {
                 mobile: None,
                 sex: None,
                 remark: None,
-                role_ids: None,
-                dept_ids: None,
+                role_ids: vec![],
+                dept_ids: vec![],
             },
             Some("admin".into()),
         )
@@ -392,7 +392,7 @@ async fn change_status_to_locked() {
     let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: "lockme".into(),
                 password: "pwd".into(),
                 nickname: "锁定".into(),
@@ -400,8 +400,8 @@ async fn change_status_to_locked() {
                 mobile: None,
                 sex: None,
                 remark: None,
-                role_ids: None,
-                dept_ids: None,
+                role_ids: vec![],
+                dept_ids: vec![],
             },
             Some("admin".into()),
         )
@@ -423,7 +423,7 @@ async fn assign_roles_to_user() {
     let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: "multi_role".into(),
                 password: "pwd".into(),
                 nickname: "多角色".into(),
@@ -431,15 +431,15 @@ async fn assign_roles_to_user() {
                 mobile: None,
                 sex: None,
                 remark: None,
-                role_ids: None,
-                dept_ids: None,
+                role_ids: vec![],
+                dept_ids: vec![],
             },
             Some("admin".into()),
         )
         .await
         .unwrap();
 
-    app.assign_roles(AssignRolesCommand {
+    app.assign_roles(AssignRolesRequest {
         user_id: user.id,
         role_ids: vec![1, 2, 3],
     })
@@ -459,7 +459,7 @@ async fn assign_roles_empty_should_clear() {
     let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: "clear_roles".into(),
                 password: "pwd".into(),
                 nickname: "清空角色".into(),
@@ -467,15 +467,15 @@ async fn assign_roles_empty_should_clear() {
                 mobile: None,
                 sex: None,
                 remark: None,
-                role_ids: Some(vec![1, 2]),
-                dept_ids: None,
+                role_ids: vec![1, 2],
+                dept_ids: vec![],
             },
             Some("admin".into()),
         )
         .await
         .unwrap();
 
-    app.assign_roles(AssignRolesCommand {
+    app.assign_roles(AssignRolesRequest {
         user_id: user.id,
         role_ids: vec![],
     })
@@ -494,7 +494,7 @@ async fn assign_departments_to_user() {
     let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: "multi_dept".into(),
                 password: "pwd".into(),
                 nickname: "多部门".into(),
@@ -502,15 +502,15 @@ async fn assign_departments_to_user() {
                 mobile: None,
                 sex: None,
                 remark: None,
-                role_ids: None,
-                dept_ids: None,
+                role_ids: vec![],
+                dept_ids: vec![],
             },
             Some("admin".into()),
         )
         .await
         .unwrap();
 
-    app.assign_departments(AssignDeptsCommand {
+    app.assign_departments(AssignDeptsRequest {
         user_id: user.id,
         dept_ids: vec![100, 200],
     })
@@ -529,7 +529,7 @@ async fn assign_departments_empty_should_clear() {
     let (app, _, _) = common::create_user_app().await;
     let user = app
         .create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: "clear_dept".into(),
                 password: "pwd".into(),
                 nickname: "清空部门".into(),
@@ -537,15 +537,15 @@ async fn assign_departments_empty_should_clear() {
                 mobile: None,
                 sex: None,
                 remark: None,
-                role_ids: None,
-                dept_ids: Some(vec![100]),
+                role_ids: vec![],
+                dept_ids: vec![100],
             },
             Some("admin".into()),
         )
         .await
         .unwrap();
 
-    app.assign_departments(AssignDeptsCommand {
+    app.assign_departments(AssignDeptsRequest {
         user_id: user.id,
         dept_ids: vec![],
     })
@@ -564,7 +564,7 @@ async fn paginate_users() {
     let (app, _, _) = common::create_user_app().await;
     for i in 0..7 {
         app.create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: format!("u{}", i),
                 password: "pwd".into(),
                 nickname: format!("U{}", i),
@@ -572,8 +572,8 @@ async fn paginate_users() {
                 mobile: None,
                 sex: None,
                 remark: None,
-                role_ids: None,
-                dept_ids: None,
+                role_ids: vec![],
+                dept_ids: vec![],
             },
             Some("admin".into()),
         )
@@ -581,14 +581,13 @@ async fn paginate_users() {
         .unwrap();
     }
     let page = app
-        .get_user_page(UserQueryRequest {
+        .get_user_page(ListUsersRequest {
             username: None,
             nickname: None,
             mobile: None,
             status: None,
             dept_id: None,
-            page: 1,
-            size: 3,
+            page_info: Some(PageRequest { page: 1, size: 3 }),
         })
         .await
         .unwrap();
@@ -600,7 +599,7 @@ async fn paginate_users() {
 async fn query_user_by_username_fuzzy() {
     let (app, _, _) = common::create_user_app().await;
     app.create_user(
-        CreateUserCommand {
+        CreateUserRequest {
             username: "zhangsan".into(),
             password: "pwd".into(),
             nickname: "张三".into(),
@@ -608,15 +607,15 @@ async fn query_user_by_username_fuzzy() {
             mobile: None,
             sex: None,
             remark: None,
-            role_ids: None,
-            dept_ids: None,
+            role_ids: vec![],
+            dept_ids: vec![],
         },
         Some("admin".into()),
     )
     .await
     .unwrap();
     app.create_user(
-        CreateUserCommand {
+        CreateUserRequest {
             username: "lisi".into(),
             password: "pwd".into(),
             nickname: "李四".into(),
@@ -624,8 +623,8 @@ async fn query_user_by_username_fuzzy() {
             mobile: None,
             sex: None,
             remark: None,
-            role_ids: None,
-            dept_ids: None,
+            role_ids: vec![],
+            dept_ids: vec![],
         },
         Some("admin".into()),
     )
@@ -633,14 +632,13 @@ async fn query_user_by_username_fuzzy() {
     .unwrap();
 
     let page = app
-        .get_user_page(UserQueryRequest {
+        .get_user_page(ListUsersRequest {
             username: Some("zhang".into()),
             nickname: None,
             mobile: None,
             status: None,
             dept_id: None,
-            page: 1,
-            size: 10,
+            page_info: Some(PageRequest { page: 1, size: 10 }),
         })
         .await
         .unwrap();
@@ -653,7 +651,7 @@ async fn query_user_by_status() {
     let (app, _, _) = common::create_user_app().await;
     let u = app
         .create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: "active_user".into(),
                 password: "pwd".into(),
                 nickname: "活跃".into(),
@@ -661,8 +659,8 @@ async fn query_user_by_status() {
                 mobile: None,
                 sex: None,
                 remark: None,
-                role_ids: None,
-                dept_ids: None,
+                role_ids: vec![],
+                dept_ids: vec![],
             },
             Some("admin".into()),
         )
@@ -673,14 +671,13 @@ async fn query_user_by_status() {
         .unwrap();
 
     let page = app
-        .get_user_page(UserQueryRequest {
+        .get_user_page(ListUsersRequest {
             username: None,
             nickname: None,
             mobile: None,
-            status: Some(UserStatus::Disabled),
+            status: Some(UserStatus::Disabled as i32),
             dept_id: None,
-            page: 1,
-            size: 10,
+            page_info: Some(PageRequest { page: 1, size: 10 }),
         })
         .await
         .unwrap();
@@ -695,7 +692,7 @@ async fn query_user_by_status() {
 async fn query_user_by_nickname() {
     let (app, _, _) = common::create_user_app().await;
     app.create_user(
-        CreateUserCommand {
+        CreateUserRequest {
             username: "nick1".into(),
             password: "pwd".into(),
             nickname: "王小明".into(),
@@ -703,15 +700,15 @@ async fn query_user_by_nickname() {
             mobile: None,
             sex: None,
             remark: None,
-            role_ids: None,
-            dept_ids: None,
+            role_ids: vec![],
+            dept_ids: vec![],
         },
         Some("admin".into()),
     )
     .await
     .unwrap();
     app.create_user(
-        CreateUserCommand {
+        CreateUserRequest {
             username: "nick2".into(),
             password: "pwd".into(),
             nickname: "李大刚".into(),
@@ -719,8 +716,8 @@ async fn query_user_by_nickname() {
             mobile: None,
             sex: None,
             remark: None,
-            role_ids: None,
-            dept_ids: None,
+            role_ids: vec![],
+            dept_ids: vec![],
         },
         Some("admin".into()),
     )
@@ -728,14 +725,13 @@ async fn query_user_by_nickname() {
     .unwrap();
 
     let page = app
-        .get_user_page(UserQueryRequest {
+        .get_user_page(ListUsersRequest {
             username: None,
             nickname: Some("小明".into()),
             mobile: None,
             status: None,
             dept_id: None,
-            page: 1,
-            size: 10,
+            page_info: Some(PageRequest { page: 1, size: 10 }),
         })
         .await
         .unwrap();

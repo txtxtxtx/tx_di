@@ -1,17 +1,14 @@
 use std::sync::Arc;
 
+use admin_proto::{CreateOperateLogRequest, ListOperateLogsRequest, OperateLogResponse,
+                  CreateLoginLogRequest, ListLoginLogsRequest, LoginLogResponse};
 use admin_domain::log::model::value_object::{LoginLogQuery, OperateLogQuery};
 use admin_domain::log::service::{LoginLogService, OperateLogService};
-use admin_proto::{OperateLogResponse, LoginLogResponse};
 use tx_di_core::tx_comp;
 use tx_error::AppResult;
 use tx_common::page::Page;
 
-use crate::log::dto::{
-    operate_log_to_response, login_log_to_response,
-    CreateOperateLogCommand, CreateLoginLogCommand,
-    OperateLogQueryRequest, LoginLogQueryRequest,
-};
+use crate::log::dto::{operate_log_to_response, login_log_to_response};
 
 #[tx_comp]
 pub struct OperateLogAppService {
@@ -19,7 +16,6 @@ pub struct OperateLogAppService {
 }
 
 impl OperateLogAppService {
-    /// 创建操作日志应用服务实例
     pub fn new(log_service: Arc<OperateLogService>) -> Self {
         Self { log_service }
     }
@@ -27,20 +23,20 @@ impl OperateLogAppService {
     /// 创建操作日志记录
     pub async fn create_log(
         &self,
-        cmd: CreateOperateLogCommand,
+        req: CreateOperateLogRequest,
     ) -> AppResult<OperateLogResponse> {
         let log = self
             .log_service
             .create_log(
-                cmd.trace_id,
-                cmd.user_id,
-                cmd.user_type,
-                cmd.log_type,
-                cmd.sub_type,
-                cmd.biz_id,
-                cmd.action,
-                cmd.success,
-                cmd.extra,
+                req.trace_id,
+                req.user_id,
+                req.user_type,
+                req.log_type,
+                req.sub_type,
+                req.biz_id,
+                req.action,
+                req.success,
+                req.extra,
             )
             .await?;
         Ok(operate_log_to_response(log))
@@ -49,7 +45,7 @@ impl OperateLogAppService {
     /// 分页查询操作日志列表
     pub async fn get_log_page(
         &self,
-        req: OperateLogQueryRequest,
+        req: ListOperateLogsRequest,
     ) -> AppResult<Page<OperateLogResponse>> {
         let query = OperateLogQuery {
             user_id: req.user_id,
@@ -59,7 +55,7 @@ impl OperateLogAppService {
             begin_time: req.begin_time,
             end_time: req.end_time,
         };
-        let page = Page::request(req.page, req.size);
+        let page = Page::request(req.page, req.page_size);
         let result = self.log_service.get_log_page(&query, page).await?;
 
         Ok(Page::new(
@@ -87,7 +83,6 @@ pub struct LoginLogAppService {
 }
 
 impl LoginLogAppService {
-    /// 创建登录日志应用服务实例
     pub fn new(log_service: Arc<LoginLogService>) -> Self {
         Self { log_service }
     }
@@ -95,17 +90,17 @@ impl LoginLogAppService {
     /// 创建登录日志记录
     pub async fn create_log(
         &self,
-        cmd: CreateLoginLogCommand,
+        req: CreateLoginLogRequest,
     ) -> AppResult<LoginLogResponse> {
         let log = self
             .log_service
             .create_log(
-                cmd.user_id,
-                cmd.user_type,
-                cmd.username,
-                cmd.login_ip,
-                cmd.login_type,
-                cmd.result,
+                req.user_id,
+                req.user_type,
+                req.username,
+                req.login_ip,
+                req.login_type,
+                req.result,
             )
             .await?;
         Ok(login_log_to_response(log))
@@ -114,7 +109,7 @@ impl LoginLogAppService {
     /// 分页查询登录日志列表
     pub async fn get_log_page(
         &self,
-        req: LoginLogQueryRequest,
+        req: ListLoginLogsRequest,
     ) -> AppResult<Page<LoginLogResponse>> {
         let query = LoginLogQuery {
             user_id: req.user_id,
@@ -125,7 +120,7 @@ impl LoginLogAppService {
             begin_time: req.begin_time,
             end_time: req.end_time,
         };
-        let page = Page::request(req.page, req.size);
+        let page = Page::request(req.page, req.page_size);
         let result = self.log_service.get_log_page(&query, page).await?;
 
         Ok(Page::new(

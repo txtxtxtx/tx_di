@@ -8,9 +8,8 @@ mod common;
 use std::sync::Arc;
 
 use admin_proto::{CreateConfigRequest, CreateDictTypeRequest, CreateDictDataRequest, CreatePermissionRequest, UpdatePermissionRequest};
-use admin_app::file::dto::UploadFileCommand;
+use admin_proto::{CreateUserRequest, ChangePasswordRequest, UploadFileRequest};
 use admin_proto::CreateRoleRequest;
-use admin_app::user::dto::{ChangePasswordCommand, CreateUserCommand};
 use admin_domain::user::model::value_object::Sex;
 use admin_domain::user::repository::UserRepository;
 
@@ -26,7 +25,7 @@ async fn test_change_password() {
     // Create a user with an initial password
     let user = app
         .create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: "pwd_user".into(),
                 password: "old_password".into(),
                 nickname: "Pwd User".into(),
@@ -34,8 +33,8 @@ async fn test_change_password() {
                 mobile: None,
                 sex: None,
                 remark: None,
-                role_ids: None,
-                dept_ids: None,
+                role_ids: vec![],
+                dept_ids: vec![],
             },
             Some("admin".into()),
         )
@@ -49,7 +48,7 @@ async fn test_change_password() {
 
     // Change the password
     app.change_password(
-        ChangePasswordCommand {
+        ChangePasswordRequest {
             user_id: user.id,
             new_password: "new_password".into(),
         },
@@ -171,7 +170,7 @@ async fn test_add_users_to_role_and_get_role_users() {
     // Create users
     let user1 = user_app
         .create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: "user_a".into(),
                 password: "pwd".into(),
                 nickname: "User A".into(),
@@ -179,8 +178,8 @@ async fn test_add_users_to_role_and_get_role_users() {
                 mobile: None,
                 sex: None,
                 remark: None,
-                role_ids: None,
-                dept_ids: None,
+                role_ids: vec![],
+                dept_ids: vec![],
             },
             Some("admin".into()),
         )
@@ -189,7 +188,7 @@ async fn test_add_users_to_role_and_get_role_users() {
 
     let user2 = user_app
         .create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: "user_b".into(),
                 password: "pwd".into(),
                 nickname: "User B".into(),
@@ -197,8 +196,8 @@ async fn test_add_users_to_role_and_get_role_users() {
                 mobile: None,
                 sex: None,
                 remark: None,
-                role_ids: None,
-                dept_ids: None,
+                role_ids: vec![],
+                dept_ids: vec![],
             },
             Some("admin".into()),
         )
@@ -252,7 +251,7 @@ async fn test_remove_users_from_role() {
 
     let user1 = user_app
         .create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: "rem_user1".into(),
                 password: "pwd".into(),
                 nickname: "Rem1".into(),
@@ -260,8 +259,8 @@ async fn test_remove_users_from_role() {
                 mobile: None,
                 sex: None,
                 remark: None,
-                role_ids: None,
-                dept_ids: None,
+                role_ids: vec![],
+                dept_ids: vec![],
             },
             Some("admin".into()),
         )
@@ -270,7 +269,7 @@ async fn test_remove_users_from_role() {
 
     let user2 = user_app
         .create_user(
-            CreateUserCommand {
+            CreateUserRequest {
                 username: "rem_user2".into(),
                 password: "pwd".into(),
                 nickname: "Rem2".into(),
@@ -278,8 +277,8 @@ async fn test_remove_users_from_role() {
                 mobile: None,
                 sex: None,
                 remark: None,
-                role_ids: None,
-                dept_ids: None,
+                role_ids: vec![],
+                dept_ids: vec![],
             },
             Some("admin".into()),
         )
@@ -710,7 +709,7 @@ async fn test_download_file() {
     // Upload a file first
     let file = app
         .upload_file(
-            UploadFileCommand {
+            UploadFileRequest {
                 name: "report.pdf".into(),
                 path: "/uploads/report.pdf".into(),
                 url: "https://cdn.example.com/report.pdf".into(),
@@ -733,7 +732,7 @@ async fn test_download_file() {
     // Upload a PNG file and verify content type
     let png_file = app
         .upload_file(
-            UploadFileCommand {
+            UploadFileRequest {
                 name: "image.png".into(),
                 path: "/uploads/image.png".into(),
                 url: "https://cdn.example.com/image.png".into(),

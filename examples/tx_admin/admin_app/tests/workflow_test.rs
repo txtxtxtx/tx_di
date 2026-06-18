@@ -6,12 +6,10 @@
 mod common;
 use admin_app::auth::dto::*;
 use admin_proto::{CreateConfigRequest, ListConfigsRequest, CreateDictTypeRequest, CreateDictDataRequest};
+use admin_proto::{CreateUserRequest, UploadFileRequest, CreateOperateLogRequest};
 use admin_app::department::dto::*;
-use admin_app::file::dto::*;
-use admin_app::log::dto::*;
 use admin_app::menu::dto::*;
 use admin_app::role::dto::*;
-use admin_app::user::dto::*;
 use admin_domain::user::model::value_object::Sex;
 
 #[tokio::test]
@@ -40,12 +38,12 @@ async fn full_crud_workflow() {
 
     // 3. 创建用户（含角色和部门）
     let (user_app, _, _) = common::create_user_app().await;
-    let user = user_app.create_user(CreateUserCommand {
+    let user = user_app.create_user(CreateUserRequest {
         username: "zhangsan".into(), password: "pwd123".into(), nickname: "张三".into(),
         email: Some("zs@example.com".into()), mobile: Some("13800000001".into()),
-        sex: Some(Sex::Male), remark: None,
-        role_ids: Some(vec![admin_role.id, user_role.id]),
-        dept_ids: Some(vec![tech_dept.id]),
+        sex: Some(Sex::Male as i32), remark: None,
+        role_ids: vec![admin_role.id, user_role.id],
+        dept_ids: vec![tech_dept.id],
     }, Some("admin".into())).await.unwrap();
     assert_eq!(user.username, "zhangsan");
     assert!(user.role_ids.contains(&admin_role.id));
@@ -93,7 +91,7 @@ async fn full_crud_workflow() {
 
     // 7. 文件上传
     let (file_app, _, _) = common::create_file_app().await;
-    let uploaded = file_app.upload_file(UploadFileCommand {
+    let uploaded = file_app.upload_file(UploadFileRequest {
         name: "avatar.png".into(), path: "/uploads/avatar.png".into(),
         url: "https://cdn.example.com/uploads/avatar.png".into(),
         file_type: Some("image/png".into()), size: 2048, config_id: None,
@@ -102,7 +100,7 @@ async fn full_crud_workflow() {
 
     // 8. 日志记录
     let (log_app, _, _) = common::create_operate_log_app().await;
-    let log = log_app.create_log(CreateOperateLogCommand {
+    let log = log_app.create_log(CreateOperateLogRequest {
         trace_id: "workflow-trace".into(), user_id: user.id, user_type: 1,
         log_type: "操作日志".into(), sub_type: "用户管理".into(),
         biz_id: user.id, action: "创建用户".into(), success: 1,

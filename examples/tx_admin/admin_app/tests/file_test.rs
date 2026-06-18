@@ -5,14 +5,14 @@
 //!   6.5 文件元数据   ✅
 
 mod common;
-use admin_app::file::dto::*;
+use admin_proto::{UploadFileRequest, ListFilesRequest};
 
 // ── 文件上传 ───────────────────────────────────────────────────────────────
 
 #[tokio::test]
 async fn upload_file_success() {
     let (app, _, _) = common::create_file_app().await;
-    let cmd = UploadFileCommand {
+    let cmd = UploadFileRequest {
         name: "report.pdf".into(),
         path: "/uploads/2024/report.pdf".into(),
         url: "https://cdn.example.com/uploads/2024/report.pdf".into(),
@@ -30,7 +30,7 @@ async fn upload_file_success() {
 #[tokio::test]
 async fn upload_file_minimal() {
     let (app, _, _) = common::create_file_app().await;
-    let file = app.upload_file(UploadFileCommand {
+    let file = app.upload_file(UploadFileRequest {
         name: "photo.jpg".into(),
         path: "/uploads/photos/1.jpg".into(),
         url: "/uploads/photos/1.jpg".into(),
@@ -47,7 +47,7 @@ async fn upload_file_minimal() {
 async fn paginate_files() {
     let (app, _, _) = common::create_file_app().await;
     for i in 0..5 {
-        app.upload_file(UploadFileCommand {
+        app.upload_file(UploadFileRequest {
             name: format!("file{}.txt", i),
             path: format!("/uploads/f{}.txt", i),
             url: format!("/uploads/f{}.txt", i),
@@ -56,8 +56,8 @@ async fn paginate_files() {
             config_id: None,
         }, Some("admin".into())).await.unwrap();
     }
-    let page = app.get_file_page(FileQueryRequest {
-        name: None, file_type: None, config_id: None, page: 1, size: 2,
+    let page = app.get_file_page(ListFilesRequest {
+        name: None, file_type: None, config_id: None, page: 1, page_size: 2,
     }).await.unwrap();
     assert_eq!(page.list.len(), 2);
     assert_eq!(page.total, 5);
@@ -66,7 +66,7 @@ async fn paginate_files() {
 #[tokio::test]
 async fn get_file_detail() {
     let (app, _, _) = common::create_file_app().await;
-    let f = app.upload_file(UploadFileCommand {
+    let f = app.upload_file(UploadFileRequest {
         name: "detail.txt".into(),
         path: "/uploads/detail.txt".into(),
         url: "https://cdn.example.com/detail.txt".into(),
@@ -84,18 +84,18 @@ async fn get_file_detail() {
 #[tokio::test]
 async fn query_files_by_type() {
     let (app, _, _) = common::create_file_app().await;
-    app.upload_file(UploadFileCommand {
+    app.upload_file(UploadFileRequest {
         name: "doc.pdf".into(), path: "/p/doc.pdf".into(), url: "/p/doc.pdf".into(),
         file_type: Some("application/pdf".into()), size: 1000, config_id: None,
     }, Some("admin".into())).await.unwrap();
-    app.upload_file(UploadFileCommand {
+    app.upload_file(UploadFileRequest {
         name: "img.png".into(), path: "/p/img.png".into(), url: "/p/img.png".into(),
         file_type: Some("image/png".into()), size: 2000, config_id: None,
     }, Some("admin".into())).await.unwrap();
 
-    let page = app.get_file_page(FileQueryRequest {
+    let page = app.get_file_page(ListFilesRequest {
         name: None, file_type: Some("application/pdf".into()), config_id: None,
-        page: 1, size: 10,
+        page: 1, page_size: 10,
     }).await.unwrap();
     assert_eq!(page.list.len(), 1);
     assert_eq!(page.list[0].name, "doc.pdf");
@@ -106,7 +106,7 @@ async fn query_files_by_type() {
 #[tokio::test]
 async fn delete_file() {
     let (app, _, _) = common::create_file_app().await;
-    let f = app.upload_file(UploadFileCommand {
+    let f = app.upload_file(UploadFileRequest {
         name: "todelete.txt".into(),
         path: "/uploads/todel.txt".into(),
         url: "/uploads/todel.txt".into(),

@@ -6,11 +6,8 @@
 mod common;
 
 use std::sync::Arc;
-use admin_proto::{PermissionCheckRequest, CreatePermissionRequest};
+use admin_proto::{PermissionCheckRequest, CreatePermissionRequest, CreateRoleRequest, CreateMenuRequest, CreateUserRequest};
 use admin_app::permission::app_service::PermissionAppService;
-use admin_app::user::dto::CreateUserCommand;
-use admin_proto::CreateRoleRequest;
-use admin_proto::CreateMenuRequest;
 use admin_domain::permission::service::PermissionService;
 use admin_domain::user::service::UserService;
 use admin_domain::role::service::RoleService;
@@ -93,12 +90,12 @@ async fn check_permission_has_permission() {
         create_permission_test_env().await;
 
     // 创建用户
-    let user = user_app.create_user(CreateUserCommand {
+    let user = user_app.create_user(CreateUserRequest {
         username: "testuser".into(),
         password: "pwd".into(),
         nickname: "测试用户".into(),
         email: None, mobile: None, sex: None, remark: None,
-        role_ids: None, dept_ids: None,
+        role_ids: vec![], dept_ids: vec![],
     }, Some("admin".into())).await.unwrap();
 
     // 创建角色
@@ -130,12 +127,12 @@ async fn check_permission_no_permission() {
     let (perm_app, user_app, role_app, menu_app, user_repo, role_repo) =
         create_permission_test_env().await;
 
-    let user = user_app.create_user(CreateUserCommand {
+    let user = user_app.create_user(CreateUserRequest {
         username: "testuser".into(),
         password: "pwd".into(),
         nickname: "测试用户".into(),
         email: None, mobile: None, sex: None, remark: None,
-        role_ids: None, dept_ids: None,
+        role_ids: vec![], dept_ids: vec![],
     }, Some("admin".into())).await.unwrap();
 
     let role = role_app.create_role(CreateRoleRequest {
@@ -176,12 +173,12 @@ async fn get_user_permissions_aggregate_from_roles() {
     let (perm_app, user_app, role_app, menu_app, user_repo, role_repo) =
         create_permission_test_env().await;
 
-    let user = user_app.create_user(CreateUserCommand {
+    let user = user_app.create_user(CreateUserRequest {
         username: "testuser".into(),
         password: "pwd".into(),
         nickname: "测试用户".into(),
         email: None, mobile: None, sex: None, remark: None,
-        role_ids: None, dept_ids: None,
+        role_ids: vec![], dept_ids: vec![],
     }, Some("admin".into())).await.unwrap();
 
     // 创建两个角色
@@ -223,12 +220,12 @@ async fn get_user_permissions_deduplicate_same_permission() {
     let (perm_app, user_app, role_app, menu_app, user_repo, role_repo) =
         create_permission_test_env().await;
 
-    let user = user_app.create_user(CreateUserCommand {
+    let user = user_app.create_user(CreateUserRequest {
         username: "testuser".into(),
         password: "pwd".into(),
         nickname: "测试用户".into(),
         email: None, mobile: None, sex: None, remark: None,
-        role_ids: None, dept_ids: None,
+        role_ids: vec![], dept_ids: vec![],
     }, Some("admin".into())).await.unwrap();
 
     let role1 = role_app.create_role(CreateRoleRequest {
