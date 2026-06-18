@@ -2,7 +2,7 @@ import request from './request'
 import type { ApiRes, MenuTreeNode, CreateMenuRequest, UpdateMenuRequest, ListMenusRequest } from '@/types'
 
 export function createMenu(data: CreateMenuRequest) {
-  return request.post<ApiRes<MenuTreeNode>>('/api/menu/', data).then(r => r.data)
+  return request.post<ApiRes<MenuTreeNode>>('/api/menu', data).then(r => r.data)
 }
 
 export function getMenu(menuId: string) {

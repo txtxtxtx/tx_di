@@ -2,7 +2,7 @@ import request from './request'
 import type { ApiRes, PermissionDetail, CreatePermissionRequest, UpdatePermissionRequest, PermissionCheckRequest, PermissionCheckResponse, UserPermissionsResponse } from '@/types'
 
 export function createPermission(data: CreatePermissionRequest) {
-  return request.post<ApiRes<PermissionDetail>>('/api/permission/', data).then(r => r.data)
+  return request.post<ApiRes<PermissionDetail>>('/api/permission', data).then(r => r.data)
 }
 
 export function getPermission(id: string) {

@@ -2,7 +2,7 @@ import request from './request'
 import type { ApiRes, PageData, UserResponse, CreateUserRequest, UpdateUserRequest, ListUsersRequest, ChangePasswordRequest, AssignRolesRequest, AssignDeptsRequest, UserIdRequest } from '@/types'
 
 export function createUser(data: CreateUserRequest) {
-  return request.post<ApiRes<UserResponse>>('/api/user/', data).then(r => r.data)
+  return request.post<ApiRes<UserResponse>>('/api/user', data).then(r => r.data)
 }
 
 export function getUser(userId: string) {

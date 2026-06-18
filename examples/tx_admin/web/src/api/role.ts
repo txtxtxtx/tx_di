@@ -2,7 +2,7 @@ import request from './request'
 import type { ApiRes, PageData, RoleResponse, CreateRoleRequest, UpdateRoleRequest, ListRolesRequest, AssignMenusRequest, UserResponse } from '@/types'
 
 export function createRole(data: CreateRoleRequest) {
-  return request.post<ApiRes<RoleResponse>>('/api/role/', data).then(r => r.data)
+  return request.post<ApiRes<RoleResponse>>('/api/role', data).then(r => r.data)
 }
 
 export function getRole(roleId: string) {

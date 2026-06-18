@@ -2,7 +2,7 @@ import request from './request'
 import type { ApiRes, PageData, FileResponse, UploadFileRequest, ListFilesRequest } from '@/types'
 
 export function uploadFile(data: UploadFileRequest) {
-  return request.post<ApiRes<FileResponse>>('/api/file/', data).then(r => r.data)
+  return request.post<ApiRes<FileResponse>>('/api/file', data).then(r => r.data)
 }
 
 export function getFile(fileId: string) {
