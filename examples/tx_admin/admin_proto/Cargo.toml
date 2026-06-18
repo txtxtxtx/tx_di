@@ -14,7 +14,7 @@ tonic = "0.12"
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 schemars = { workspace = true }
-serde_with = { version = "3.21.0", features = ["macros", "alloc"] }
+serde_with = { version = "3.21.0", features = ["macros", "alloc", "schemars_0_8"] }
 
 [build-dependencies]
 tonic-build = "0.12"

@@ -35,11 +35,15 @@ fn main() -> Result<()> {
 
     tonic_build::configure()
         .out_dir("src/pb")
-        .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
+        // 顺序很重要：
+        // 1. schemars 先展开，看到原始 struct（无 phantom 字段）
+        // 2. serde(rename_all) 同时被 schemars 和 serde 读取
+        // 3. serde_as 展开，注入 phantom 字段和 serde(with) 属性
+        // 4. Serialize/Deserialize derive 展开，看到 DisplayFromStr 生效
         .type_attribute(".", "#[derive(schemars::JsonSchema)]")
         .type_attribute(".", "#[serde(rename_all = \"camelCase\")]")
-        // 为所有 message 添加 serde_as，配合 DisplayFromStr 实现 i64/u64 <-> JSON string
         .type_attribute(".", "#[serde_with::serde_as]")
+        .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
         .field_attribute("optional", "#[serde(skip_serializing_if = \"Option::is_none\")]")
         .compile_protos(&proto_paths, &[proto_dir])?;
 
@@ -56,9 +60,10 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-/// 后处理：
+/// 后处理：为 i64/u64 字段添加 serde_as 注解
 /// - repeated i64/u64 字段 → #[serde_as(as = "Vec<serde_with::DisplayFromStr>")]
-/// - 非 repeated i64/u64 字段 → #[serde_as(as = "serde_with::DisplayFromStr")]
+/// - optional i64/u64 字段 → #[serde_as(as = "Option<serde_with::DisplayFromStr>")]
+/// - 普通 i64/u64 字段 → #[serde_as(as = "serde_with::DisplayFromStr")]
 fn post_process_serde_as(path: &Path) -> Result<()> {
     let mut content = String::new();
     std::fs::File::open(path)?.read_to_string(&mut content)?;
@@ -70,21 +75,23 @@ fn post_process_serde_as(path: &Path) -> Result<()> {
 
         let is_i64 = line.contains("#[prost(int64,");
         let is_u64 = line.contains("#[prost(uint64,") || line.contains("#[prost(uint64)]");
-        let is_repeated = line.contains("repeated");
 
         if is_i64 || is_u64 {
             let indent = &line[..line.len() - line.trim_start().len()];
-            if is_repeated {
-                result.push_str(&format!(
-                    "{}#[serde_as(as = \"Vec<serde_with::DisplayFromStr>\")]\n",
-                    indent
-                ));
+            let is_repeated = line.contains("repeated");
+            let is_optional = line.contains("optional");
+
+            let as_type = if is_repeated {
+                "Vec<serde_with::DisplayFromStr>"
+            } else if is_optional {
+                "Option<serde_with::DisplayFromStr>"
             } else {
-                result.push_str(&format!(
-                    "{}#[serde_as(as = \"serde_with::DisplayFromStr\")]\n",
-                    indent
-                ));
-            }
+                "serde_with::DisplayFromStr"
+            };
+            result.push_str(&format!(
+                "{}#[serde_as(as = \"{}\")]\n",
+                indent, as_type
+            ));
         }
     }
 
