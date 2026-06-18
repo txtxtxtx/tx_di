@@ -52,8 +52,7 @@ async fn login(
         StpUtil::set_permissions(&user_id_str, r.permissions.clone()).await?;
     }
     StpUtil::set_roles(&user_id_str, r.role_codes.clone()).await?;
-
-    let mut resp = R(ApiR::success(r));
+    let resp = R(ApiR::success(r));
     Ok(resp)
 }
 
