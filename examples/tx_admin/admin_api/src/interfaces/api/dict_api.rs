@@ -1,6 +1,10 @@
 //! 字典管理 HTTP API
 
+use std::collections::HashMap;
+
 use axum::Json;
+use axum::extract::Query;
+use serde::Deserialize;
 use tx_di_axum::Router;
 use axum::routing::{get, post, put, delete};
 use tx_di_axum::bound::DiComp;
@@ -25,6 +29,7 @@ pub fn router() -> Router {
         .route("/data/list", post(list_dict_data))
         .route("/data/type/{dict_type}", get(get_dict_data_by_type))
         .route("/data/code/{dict_code}", get(get_dict_data_by_code))
+        .route("/data/batch", get(get_dict_data_batch))
 }
 
 async fn create_dict_type(
@@ -153,4 +158,22 @@ async fn get_dict_data_by_code(
     ensure_permission("dict:view").await?;
     let list = dict_data.get_by_dict_type(&dict_code).await?;
     Ok(ApiR::success(list))
+}
+
+/// 批量查询参数
+#[derive(Debug, Deserialize)]
+struct BatchQuery {
+    /// 逗号分隔的字典类型编码，如 `sys_status,sys_sex`
+    types: String,
+}
+
+/// GET /api/dict/data/batch?types=sys_status,sys_sex
+async fn get_dict_data_batch(
+    DiComp(dict_data): DiComp<DictDataAppService>,
+    Query(q): Query<BatchQuery>,
+) -> Result<ApiR<HashMap<String, Vec<DictDataResponse>>>, ApiErr> {
+    ensure_permission("dict:view").await?;
+    let types: Vec<String> = q.types.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+    let map = dict_data.get_by_dict_types(types).await?;
+    Ok(ApiR::success(map))
 }

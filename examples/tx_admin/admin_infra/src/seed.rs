@@ -9,6 +9,7 @@ use crate::role::model::SysRole;
 use crate::user::model::SysUserRole;
 use crate::department::model::SysDepartment;
 use crate::permission::model::SysPermission;
+use crate::dictionary::model::{SysDictType, SysDictData};
 use tx_di_toasty::ToastyDb;
 use tx_error::AppResult;
 use tracing::info;
@@ -85,6 +86,58 @@ pub const PERMISSIONS: &[(&str, &str, i32, i64, i32, &str)] = &[
     ("认证管理",     "auth:view",         1, 1, 10, "认证相关"),
     ("用户信息",     "auth:info",         2, 40, 1, "查看当前用户信息"),
     ("登出",         "auth:logout",       2, 40, 2, "退出登录"),
+];
+
+/// 字典种子数据：(dict_type, type_name, data_items)
+/// data_items: (sort, label, value, color_type)
+const DICT_SEEDS: &[(&str, &str, &[(i32, &str, &str, &str)])] = &[
+    ("sys_status", "通用状态", &[
+        (1, "正常", "0", "success"),
+        (2, "停用", "1", "danger"),
+    ]),
+    ("sys_user_status", "用户状态", &[
+        (1, "正常", "0", "success"),
+        (2, "停用", "1", "danger"),
+        (3, "锁定", "2", "warning"),
+    ]),
+    ("sys_sex", "性别", &[
+        (1, "未知", "0", "info"),
+        (2, "男", "1", ""),
+        (3, "女", "2", ""),
+    ]),
+    ("sys_menu_type", "菜单类型", &[
+        (1, "目录", "0", ""),
+        (2, "菜单", "1", ""),
+        (3, "按钮", "2", ""),
+    ]),
+    ("sys_permission_type", "权限类型", &[
+        (1, "菜单", "0", ""),
+        (2, "按钮", "1", ""),
+        (3, "API", "2", ""),
+    ]),
+    ("sys_config_type", "配置类型", &[
+        (1, "系统", "1", ""),
+        (2, "自定义", "2", ""),
+    ]),
+    ("sys_visible", "可见性", &[
+        (1, "显示", "0", "success"),
+        (2, "隐藏", "1", "danger"),
+    ]),
+    ("sys_data_scope", "数据范围", &[
+        (1, "全部数据", "1", ""),
+        (2, "自定义数据", "2", ""),
+        (3, "本部门数据", "3", ""),
+        (4, "本部门及以下", "4", ""),
+        (5, "仅本人数据", "5", ""),
+    ]),
+    ("sys_operate_result", "操作结果", &[
+        (1, "成功", "0", "success"),
+        (2, "失败", "1", "danger"),
+    ]),
+    ("sys_keep_alive", "缓存策略", &[
+        (1, "不缓存", "0", ""),
+        (2, "缓存", "1", ""),
+    ]),
 ];
 
 /// 执行种子数据初始化
@@ -202,6 +255,47 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
             .map_err(|e| anyhow::anyhow!("创建权限 {} 失败: {}", code, e))?;
     }
     info!("已创建 {} 个权限", PERMISSIONS.len());
+
+    // 6. 创建字典类型和字典数据
+    for (type_id, (dict_type, type_name, items)) in DICT_SEEDS.iter().enumerate() {
+        SysDictType::create()
+            .id((type_id + 1) as i64)
+            .name(type_name.to_string())
+            .dict_type(dict_type.to_string())
+            .status(Status::Enabled)
+            .remark("".to_string())
+            .creator("system".to_string())
+            .created_at(now.clone())
+            .updater("system".to_string())
+            .updated_at(now.clone())
+            .deleted(Deleted::No)
+            .exec(&mut db)
+            .await
+            .map_err(|e| anyhow::anyhow!("创建字典类型 {} 失败: {}", dict_type, e))?;
+
+        for (item_idx, (sort, label, value, color_type)) in items.iter().enumerate() {
+            let data_id = (type_id * 100 + item_idx + 1) as i64;
+            SysDictData::create()
+                .id(data_id)
+                .sort(*sort)
+                .label(label.to_string())
+                .value(value.to_string())
+                .dict_type(dict_type.to_string())
+                .status(Status::Enabled)
+                .color_type(color_type.to_string())
+                .css_class("".to_string())
+                .remark("".to_string())
+                .creator("system".to_string())
+                .created_at(now.clone())
+                .updater("system".to_string())
+                .updated_at(now.clone())
+                .deleted(Deleted::No)
+                .exec(&mut db)
+                .await
+                .map_err(|e| anyhow::anyhow!("创建字典数据 {}/{} 失败: {}", dict_type, label, e))?;
+        }
+    }
+    info!("已创建 {} 个字典类型", DICT_SEEDS.len());
 
     Ok(())
 }
