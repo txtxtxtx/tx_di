@@ -81,7 +81,7 @@ export interface CreateUserRequest {
 }
 
 export interface UpdateUserRequest {
-  userId: string
+  userId?: string
   nickname?: string
   email?: string
   mobile?: string
@@ -146,7 +146,7 @@ export interface CreateRoleRequest {
 
 // proto, camelCase
 export interface UpdateRoleRequest {
-  roleId: string
+  roleId?: string
   name: string
   code: string
   sort: number
