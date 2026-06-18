@@ -122,7 +122,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { listRoles, createRole, updateRole, deleteRole, assignMenus, getRoleUsers } from '@/api/role'
 import { listMenus } from '@/api/menu'
-import { statusOptions, statusLabel, dataScopeOptions } from '@/utils'
+import { statusOptions, statusLabel, dataScopeOptions, toPageData } from '@/utils'
 import type { RoleResponse, MenuTreeNode, UserResponse } from '@/types'
 
 const loading = ref(false)
@@ -161,8 +161,9 @@ async function loadData() {
       page: page.value,
       pageSize: size.value,
     })
-    tableData.value = res.data.list
-    total.value = res.data.total
+    const pageData = toPageData(res.data)
+    tableData.value = pageData.list
+    total.value = pageData.total
   } catch {} finally {
     loading.value = false
   }

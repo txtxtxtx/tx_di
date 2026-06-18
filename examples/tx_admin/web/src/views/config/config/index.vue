@@ -91,7 +91,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { listConfigs, createConfig, updateConfig, deleteConfig } from '@/api/config'
-import { configTypeLabel, configTypeOptions } from '@/utils'
+import { configTypeLabel, configTypeOptions, toPageData } from '@/utils'
 import type { ConfigResponse } from '@/types'
 
 const loading = ref(false)
@@ -117,8 +117,9 @@ async function loadData() {
   loading.value = true
   try {
     const res = await listConfigs({ name: query.name || undefined, category: query.category || undefined, configKey: query.configKey || undefined, page: page.value, pageSize: size.value })
-    tableData.value = res.data.list
-    total.value = res.data.total
+    const pageData = toPageData(res.data)
+    tableData.value = pageData.list
+    total.value = pageData.total
   } catch {} finally { loading.value = false }
 }
 

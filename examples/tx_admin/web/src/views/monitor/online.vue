@@ -32,7 +32,7 @@ onMounted(async () => {
   try {
     const res = await getOnlineUsers()
     users.value = res.data.users
-    total.value = res.data.total
+    total.value = Number(res.data.total) || 0
   } catch {} finally { loading.value = false }
 })
 </script>

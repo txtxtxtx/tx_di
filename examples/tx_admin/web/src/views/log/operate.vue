@@ -61,6 +61,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listOperateLogs, deleteOperateLogs, cleanOperateLogs } from '@/api/log'
+import { toPageData } from '@/utils'
 import type { OperateLogResponse } from '@/types'
 
 const loading = ref(false)
@@ -75,8 +76,9 @@ async function loadData() {
   loading.value = true
   try {
     const res = await listOperateLogs({ userId: query.userId || undefined, logType: query.logType || undefined, success: query.success, page: page.value, pageSize: size.value })
-    tableData.value = res.data.list
-    total.value = res.data.total
+    const pageData = toPageData(res.data)
+    tableData.value = pageData.list
+    total.value = pageData.total
   } catch {} finally { loading.value = false }
 }
 

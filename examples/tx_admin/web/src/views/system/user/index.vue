@@ -141,7 +141,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { listUsers, createUser, updateUser, deleteUser, assignRoles, assignDepts } from '@/api/user'
 import { getAllRoles } from '@/api/role'
 import { listDepts } from '@/api/dept'
-import { formatTimestamp, sexOptions, sexLabel, userStatusOptions, userStatusLabel, userStatusType } from '@/utils'
+import { formatTimestamp, toPageData, sexOptions, sexLabel, userStatusOptions, userStatusLabel, userStatusType } from '@/utils'
 import type { UserResponse, RoleResponse, DeptTreeNode } from '@/types'
 
 const loading = ref(false)
@@ -194,8 +194,9 @@ async function loadData() {
       status: query.status,
       pageInfo: { page: page.value, size: size.value },
     })
-    tableData.value = res.data.list
-    total.value = res.data.total
+    const pageData = toPageData(res.data)
+    tableData.value = pageData.list
+    total.value = pageData.total
   } catch {} finally {
     loading.value = false
   }

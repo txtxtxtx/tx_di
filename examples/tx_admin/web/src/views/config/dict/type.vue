@@ -78,7 +78,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { listDictTypes, createDictType, updateDictType, deleteDictType } from '@/api/dict'
-import { statusLabel, statusOptions } from '@/utils'
+import { statusLabel, statusOptions, toPageData } from '@/utils'
 import type { DictTypeResponse } from '@/types'
 
 const router = useRouter()
@@ -103,8 +103,9 @@ async function loadData() {
   loading.value = true
   try {
     const res = await listDictTypes({ name: query.name || undefined, dictType: query.dictType || undefined, status: query.status, page: page.value, pageSize: size.value })
-    tableData.value = res.data.list
-    total.value = res.data.total
+    const pageData = toPageData(res.data)
+    tableData.value = pageData.list
+    total.value = pageData.total
   } catch {} finally { loading.value = false }
 }
 

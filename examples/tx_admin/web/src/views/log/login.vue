@@ -58,6 +58,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listLoginLogs, deleteLoginLogs, cleanLoginLogs } from '@/api/log'
+import { toPageData } from '@/utils'
 import type { LoginLogResponse } from '@/types'
 
 const loading = ref(false)
@@ -72,8 +73,9 @@ async function loadData() {
   loading.value = true
   try {
     const res = await listLoginLogs({ username: query.username || undefined, loginIp: query.loginIp || undefined, result: query.result, page: page.value, pageSize: size.value })
-    tableData.value = res.data.list
-    total.value = res.data.total
+    const pageData = toPageData(res.data)
+    tableData.value = pageData.list
+    total.value = pageData.total
   } catch {} finally { loading.value = false }
 }
 

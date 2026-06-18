@@ -47,7 +47,7 @@ export interface UserInfoResponse {
 }
 
 // ==================== 用户 (proto, camelCase) ====================
-// u64 fields: id, roleIds, deptIds, tenantId, loginDate, createTime, updateTime
+// ID 字段为 string（u64 溢出），时间戳为 number（i64 毫秒，不超 JS 安全范围）
 export interface UserResponse {
   id: string
   username: string
@@ -61,10 +61,10 @@ export interface UserResponse {
   deptIds: string[]
   avatar: string | null
   loginIp: string | null
-  loginDate: string
+  loginDate: number
   tenantId: string
-  createTime: string
-  updateTime: string
+  createTime: number
+  updateTime: number
 }
 
 // proto, camelCase, u64 fields as string

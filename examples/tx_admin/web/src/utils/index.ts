@@ -13,7 +13,7 @@ export function formatBytes(bytes: number, decimals = 2): string {
 /**
  * 格式化时间戳 (毫秒) 为本地字符串
  */
-export function formatTimestamp(ts: number): string {
+export function formatTimestamp(ts: number | string): string {
   if (!ts) return '-'
   return new Date(ts).toLocaleString('zh-CN')
 }
@@ -131,4 +131,28 @@ export const dataScopeOptions = [
 
 export function dataScopeLabel(val: number): string {
   return dataScopeOptions.find(o => o.value === val)?.label || '未知'
+}
+
+// ==================== 后端 i64/u64 序列化为 string 的转换工具 ====================
+
+/**
+ * 将后端返回的分页数据中的 string 字段转为 number
+ * 后端 i64/u64 通过 serde_with::DisplayFromStr 序列化为 JSON string，
+ * 前端 page/size/total 需要 number 类型用于分页组件
+ */
+export function toPageData<T>(raw: { list?: T[]; page?: string | number; size?: string | number; total?: string | number }): { list: T[]; page: number; size: number; total: number } {
+  return {
+    list: (raw.list ?? []) as T[],
+    page: Number(raw.page) || 1,
+    size: Number(raw.size) || 10,
+    total: Number(raw.total) || 0,
+  }
+}
+
+/**
+ * 将后端返回的时间戳字段从 string 转为 number
+ * 用于 UserResponse、OperateLogResponse 等包含时间戳的类型
+ */
+export function toTimestamp(val: string | number): number {
+  return Number(val) || 0
 }
