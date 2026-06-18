@@ -202,7 +202,7 @@ export interface CreateMenuRequest {
 
 // proto, u64 fields as string
 export interface UpdateMenuRequest {
-  menuId: string
+  menuId?: string
   name: string
   permission: string
   types: number
@@ -245,7 +245,7 @@ export interface CreateDeptRequest {
 
 // u64 fields as string
 export interface UpdateDeptRequest {
-  deptId: string
+  deptId?: string
   name: string
   parentId: string
   sort: number
@@ -341,7 +341,7 @@ export interface CreateConfigRequest {
 
 // proto, camelCase
 export interface UpdateConfigRequest {
-  configId: string
+  configId?: string
   category: string
   configType: number
   name: string
@@ -379,7 +379,7 @@ export interface CreateDictTypeRequest {
 
 // proto, camelCase
 export interface UpdateDictTypeRequest {
-  id: string
+  id?: string
   name: string
   dictType: string
   remark?: string
@@ -419,7 +419,7 @@ export interface CreateDictDataRequest {
 
 // proto, camelCase
 export interface UpdateDictDataRequest {
-  id: string
+  id?: string
   sort: number
   label: string
   value: string
