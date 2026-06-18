@@ -22,7 +22,7 @@ export function listRoles(data: ListRolesRequest) {
 }
 
 export function assignMenus(data: AssignMenusRequest) {
-  return request.post<ApiRes<null>>('/api/role/assign-menus', data).then(r => r.data)
+  return request.post<ApiRes<null>>('/api/role/assign_menus', data).then(r => r.data)
 }
 
 export function getAllRoles() {

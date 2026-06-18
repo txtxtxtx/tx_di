@@ -61,7 +61,7 @@ async fn user_info(
     DiComp(auth): DiComp<AuthAppService>,
     LoginIdExtractor(login_id): LoginIdExtractor,
 ) -> Result<ApiR<UserInfoResponse>, ApiErr> {
-    ensure_permission("auth:info").await?;
+    // ensure_permission("auth:info").await?;
     let user_id: u64 = login_id.parse().unwrap_or(0);
     let r = auth.get_user_info(user_id).await?;
     Ok(ApiR::success(r))
@@ -82,7 +82,7 @@ async fn logout(
     DiComp(auth): DiComp<AuthAppService>,
     LoginIdExtractor(login_id): LoginIdExtractor,
 ) -> Result<ApiR<Empty>, ApiErr> {
-    ensure_permission("auth:logout").await?;
+    // ensure_permission("auth:logout").await?;
     let user_id: u64 = login_id.parse().unwrap_or(0);
     // 1. 使 sa-token 会话失效
     StpUtil::logout_current().await?;

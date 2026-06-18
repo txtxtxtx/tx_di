@@ -19,7 +19,7 @@ pub fn router() -> Router {
         .route("/{role_id}", put(update_role))
         .route("/{role_id}", delete(delete_role))
         .route("/list", post(list_roles))
-        .route("/assign-menus", post(assign_menus))
+        .route("/assign_menus", post(assign_menus))
         .route("/all", get(get_all_roles))
         .route("/{role_id}/users", get(get_role_users))
         .route("/{role_id}/users", post(add_users_to_role))
