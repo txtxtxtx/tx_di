@@ -29,6 +29,7 @@ mod permission_service_tests {
         insert_fn: Box<dyn Fn(&Permission) -> AppResult<()> + Send + Sync>,
         update_fn: Box<dyn Fn(&Permission) -> AppResult<()> + Send + Sync>,
         exists_by_code_fn: Box<dyn Fn(&str) -> AppResult<bool> + Send + Sync>,
+        find_by_codes_fn: Box<dyn Fn(&[String]) -> AppResult<Vec<Permission>> + Send + Sync>,
     }
 
     impl TestPermissionRepo {
@@ -43,6 +44,7 @@ mod permission_service_tests {
                 insert_fn: Box::new(|_| panic!("unexpected call: insert")),
                 update_fn: Box::new(|_| panic!("unexpected call: update")),
                 exists_by_code_fn: Box::new(|_| panic!("unexpected call: exists_by_code")),
+                find_by_codes_fn: Box::new(|_| panic!("unexpected call: find_by_codes")),
             }
         }
     }
@@ -78,6 +80,9 @@ mod permission_service_tests {
         }
         async fn exists_by_code(&self, code: &str) -> AppResult<bool> {
             (self.exists_by_code_fn)(code)
+        }
+        async fn find_by_codes(&self, codes: &[String]) -> AppResult<Vec<Permission>> {
+            (self.find_by_codes_fn)(codes)
         }
     }
 
@@ -433,6 +438,32 @@ mod permission_service_tests {
 
         let svc = PermissionService::new(Arc::new(repo));
         let result = svc.get_all_permission_details().await;
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
+    }
+
+    // ==========================================================
+    // get_permissions_by_codes
+    // ==========================================================
+
+    #[tokio::test]
+    async fn test_get_permissions_by_codes_success() {
+        let mut repo = TestPermissionRepo::new();
+        repo.find_by_codes_fn = Box::new(|_| Ok(vec![make_permission()]));
+
+        let svc = PermissionService::new(Arc::new(repo));
+        let result = svc.get_permissions_by_codes(&["system:user:view".into()]).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_permissions_by_codes_empty() {
+        let mut repo = TestPermissionRepo::new();
+        repo.find_by_codes_fn = Box::new(|_| Ok(vec![]));
+
+        let svc = PermissionService::new(Arc::new(repo));
+        let result = svc.get_permissions_by_codes(&["nonexistent".into()]).await;
         assert!(result.is_ok());
         assert!(result.unwrap().is_empty());
     }

@@ -80,7 +80,7 @@ mod menu_service_tests {
     #[tokio::test]
     async fn test_create_menu_insert_error() {
         let mut repo = TestMenuRepo::new();
-        repo.insert_fn = Box::new(|_| Err(RepositoryError::Database.into()));
+        repo.insert_fn = Box::new(|_| Err(RepositoryError::DatabaseMenu.into()));
 
         let svc = MenuService::new(Arc::new(repo));
         assert!(svc.create_menu(

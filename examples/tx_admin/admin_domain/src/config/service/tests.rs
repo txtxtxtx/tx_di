@@ -145,6 +145,7 @@ mod config_service_tests {
     async fn test_update_config_success() {
         let mut repo = TestConfigRepo::new();
         repo.find_by_id_fn = Box::new(|_| Ok(Some(make_config())));
+        repo.find_by_key_fn = Box::new(|_| Ok(Some(make_config())));
         repo.update_fn = Box::new(|_| Ok(()));
 
         let svc = ConfigService::new(Arc::new(repo));

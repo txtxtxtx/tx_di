@@ -322,7 +322,7 @@ mod dict_data_service_tests {
     #[tokio::test]
     async fn test_create_dict_data_insert_error() {
         let mut repo = TestDictDataRepo::new();
-        repo.insert_fn = Box::new(|_| Err(crate::shared::repository::RepositoryError::Duplicate)?);
+        repo.insert_fn = Box::new(|_| Err(crate::shared::repository::RepositoryError::DatabaseDict.into()));
 
         let svc = DictDataService::new(Arc::new(repo));
         let result = svc.create_dict_data(

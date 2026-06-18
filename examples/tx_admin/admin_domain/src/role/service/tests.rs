@@ -14,6 +14,9 @@ mod role_service_tests {
     use crate::role::repository::RoleRepository;
     use crate::role::service::RoleService;
     use crate::user::model::aggregate::User;
+    use crate::user::model::value_object::UserStatus;
+    use crate::user::repository::UserRepository;
+    use crate::user::model::value_object::UserQuery;
     use pretty_assertions::assert_eq;
 
     // ----------------------------------------------------------
@@ -104,6 +107,43 @@ mod role_service_tests {
     }
 
     // ----------------------------------------------------------
+    // TestUserRepo: mock for RoleService::add_users_to_role
+    // ----------------------------------------------------------
+
+    struct TestUserRepo {
+        find_by_id_fn: Box<dyn Fn(u64) -> AppResult<Option<User>> + Send + Sync>,
+    }
+
+    impl TestUserRepo {
+        fn new() -> Self {
+            Self {
+                find_by_id_fn: Box::new(|_| panic!("unexpected call: find_by_id")),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl UserRepository for TestUserRepo {
+        async fn find_by_id(&self, id: u64) -> AppResult<Option<User>> { (self.find_by_id_fn)(id) }
+        async fn find_by_username(&self, _: &str) -> AppResult<Option<User>> { Ok(None) }
+        async fn find_page(&self, _: &UserQuery, p: Page<User>) -> AppResult<Page<User>> { Ok(p) }
+        async fn find_all(&self, _: &UserQuery) -> AppResult<Vec<User>> { Ok(vec![]) }
+        async fn insert(&self, _: &User) -> AppResult<()> { Ok(()) }
+        async fn update(&self, _: &User) -> AppResult<()> { Ok(()) }
+        async fn soft_delete(&self, _: u64) -> AppResult<()> { Ok(()) }
+        async fn exists_by_username(&self, _: &str) -> AppResult<bool> { Ok(false) }
+        async fn exists_by_email(&self, _: &str) -> AppResult<bool> { Ok(false) }
+        async fn exists_by_mobile(&self, _: &str) -> AppResult<bool> { Ok(false) }
+        async fn count(&self, _: &UserQuery) -> AppResult<i64> { Ok(0) }
+        async fn find_by_role_id(&self, _: u64) -> AppResult<Vec<User>> { Ok(vec![]) }
+        async fn find_by_dept_id(&self, _: u64) -> AppResult<Vec<User>> { Ok(vec![]) }
+        async fn bind_roles(&self, _: u64, _: &[u64]) -> AppResult<()> { Ok(()) }
+        async fn bind_departments(&self, _: u64, _: &[u64]) -> AppResult<()> { Ok(()) }
+        async fn get_role_ids(&self, _: u64) -> AppResult<Vec<u64>> { Ok(vec![]) }
+        async fn get_dept_ids(&self, _: u64) -> AppResult<Vec<u64>> { Ok(vec![]) }
+    }
+
+    // ----------------------------------------------------------
     // Helper: create a sample Role for testing
     // ----------------------------------------------------------
 
@@ -133,7 +173,7 @@ mod role_service_tests {
         repo.exists_by_code_fn = Box::new(|_| Ok(false));
         repo.insert_fn = Box::new(|_| Ok(()));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         let result = svc.create_role("Editor".into(), "editor".into(), 2, Some("admin".into())).await;
         assert!(result.is_ok());
         let role = result.unwrap();
@@ -147,7 +187,7 @@ mod role_service_tests {
         let mut repo = TestRoleRepo::new();
         repo.exists_by_code_fn = Box::new(|_| Ok(true));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         let result = svc.create_role("Dup".into(), "admin".into(), 1, None).await;
         assert!(result.is_err());
     }
@@ -164,7 +204,7 @@ mod role_service_tests {
         repo.find_by_code_fn = Box::new(|_| Ok(Some(make_role())));
         repo.update_fn = Box::new(|_| Ok(()));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         let result = svc.update_role(
             1,
             "SuperAdmin".into(),
@@ -183,7 +223,7 @@ mod role_service_tests {
         let mut repo = TestRoleRepo::new();
         repo.find_by_id_fn = Box::new(|_| Ok(None));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         let result = svc.update_role(999, "X".into(), "x".into(), 0, 4, None, None).await;
         assert!(result.is_err());
     }
@@ -197,7 +237,7 @@ mod role_service_tests {
         other.id = 2;
         repo.find_by_code_fn = Box::new(move |_| Ok(Some(other.clone())));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         let result = svc.update_role(1, "X".into(), "taken_code".into(), 0, 4, None, None).await;
         assert!(result.is_err());
     }
@@ -212,7 +252,7 @@ mod role_service_tests {
         repo.find_by_id_fn = Box::new(|_| Ok(Some(make_role())));
         repo.update_fn = Box::new(|_| Ok(()));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         assert!(svc.delete_role(1, Some("admin".into())).await.is_ok());
     }
 
@@ -221,7 +261,7 @@ mod role_service_tests {
         let mut repo = TestRoleRepo::new();
         repo.find_by_id_fn = Box::new(|_| Ok(None));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         assert!(svc.delete_role(999, None).await.is_err());
     }
 
@@ -235,7 +275,7 @@ mod role_service_tests {
         repo.find_by_id_fn = Box::new(|_| Ok(Some(make_role())));
         repo.update_fn = Box::new(|_| Ok(()));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         let result = svc.change_status(1, 1, Some("admin".into())).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().status, 1);
@@ -246,7 +286,7 @@ mod role_service_tests {
         let mut repo = TestRoleRepo::new();
         repo.find_by_id_fn = Box::new(|_| Ok(None));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         assert!(svc.change_status(999, 1, None).await.is_err());
     }
 
@@ -261,7 +301,7 @@ mod role_service_tests {
         repo.bind_menus_fn = Box::new(|_, _| Ok(()));
         repo.update_fn = Box::new(|_| Ok(()));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         let result = svc.assign_menus(1, vec![10, 20, 30]).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().menu_ids, vec![10, 20, 30]);
@@ -272,8 +312,19 @@ mod role_service_tests {
         let mut repo = TestRoleRepo::new();
         repo.find_by_id_fn = Box::new(|_| Ok(None));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         assert!(svc.assign_menus(999, vec![1]).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_assign_menus_role_disabled() {
+        let mut repo = TestRoleRepo::new();
+        let mut role = make_role();
+        role.status = 1; // disabled
+        repo.find_by_id_fn = Box::new(move |_| Ok(Some(role.clone())));
+
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
+        assert!(svc.assign_menus(1, vec![10]).await.is_err());
     }
 
     // ==========================================================
@@ -288,7 +339,7 @@ mod role_service_tests {
             Ok(Page::new(roles.clone(), 1, 10, 1))
         });
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         let query = RoleQuery::default();
         let result = svc.get_role_page(&query, Page::request(1, 10)).await;
         assert!(result.is_ok());
@@ -306,7 +357,7 @@ mod role_service_tests {
         let mut repo = TestRoleRepo::new();
         repo.find_by_id_fn = Box::new(|_| Ok(Some(make_role())));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         let result = svc.get_role(1).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().code, "admin");
@@ -317,7 +368,7 @@ mod role_service_tests {
         let mut repo = TestRoleRepo::new();
         repo.find_by_id_fn = Box::new(|_| Ok(None));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         assert!(svc.get_role(999).await.is_err());
     }
 
@@ -330,7 +381,7 @@ mod role_service_tests {
         let mut repo = TestRoleRepo::new();
         repo.find_by_ids_fn = Box::new(|_| Ok(vec![make_role()]));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         let result = svc.get_roles_by_ids(&[1, 2]).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().len(), 1);
@@ -341,7 +392,7 @@ mod role_service_tests {
         let mut repo = TestRoleRepo::new();
         repo.find_by_ids_fn = Box::new(|_| Ok(vec![]));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         let result = svc.get_roles_by_ids(&[999]).await;
         assert!(result.is_ok());
         assert!(result.unwrap().is_empty());
@@ -356,7 +407,7 @@ mod role_service_tests {
         let mut repo = TestRoleRepo::new();
         repo.find_all_fn = Box::new(|_| Ok(vec![make_role()]));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         let query = RoleQuery::default();
         let result = svc.get_all_roles(&query).await;
         assert!(result.is_ok());
@@ -375,7 +426,7 @@ mod role_service_tests {
             Ok(vec![User::create(1, "user1".into(), "pwd".into(), "User One".into(), None)])
         });
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         let result = svc.get_role_users(1).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().len(), 1);
@@ -386,7 +437,7 @@ mod role_service_tests {
         let mut repo = TestRoleRepo::new();
         repo.find_by_id_fn = Box::new(|_| Ok(None));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         assert!(svc.get_role_users(999).await.is_err());
     }
 
@@ -396,21 +447,63 @@ mod role_service_tests {
 
     #[tokio::test]
     async fn test_add_users_to_role_success() {
-        let mut repo = TestRoleRepo::new();
-        repo.find_by_id_fn = Box::new(|_| Ok(Some(make_role())));
-        repo.bind_users_fn = Box::new(|_, _| Ok(()));
+        let mut role_repo = TestRoleRepo::new();
+        role_repo.find_by_id_fn = Box::new(|_| Ok(Some(make_role())));
+        role_repo.bind_users_fn = Box::new(|_, _| Ok(()));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let mut user_repo = TestUserRepo::new();
+        user_repo.find_by_id_fn = Box::new(|_| {
+            Ok(Some(User::create(10, "u".into(), "p".into(), "U".into(), None)))
+        });
+
+        let svc = RoleService::new(Arc::new(role_repo), Arc::new(user_repo));
         assert!(svc.add_users_to_role(1, vec![10, 20]).await.is_ok());
     }
 
     #[tokio::test]
     async fn test_add_users_to_role_not_found() {
-        let mut repo = TestRoleRepo::new();
-        repo.find_by_id_fn = Box::new(|_| Ok(None));
+        let mut role_repo = TestRoleRepo::new();
+        role_repo.find_by_id_fn = Box::new(|_| Ok(None));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(role_repo), Arc::new(TestUserRepo::new()));
         assert!(svc.add_users_to_role(999, vec![1]).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_add_users_to_role_role_disabled() {
+        let mut role_repo = TestRoleRepo::new();
+        let mut role = make_role();
+        role.status = 1;
+        role_repo.find_by_id_fn = Box::new(move |_| Ok(Some(role.clone())));
+
+        let svc = RoleService::new(Arc::new(role_repo), Arc::new(TestUserRepo::new()));
+        assert!(svc.add_users_to_role(1, vec![1]).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_add_users_to_role_user_not_found() {
+        let mut role_repo = TestRoleRepo::new();
+        role_repo.find_by_id_fn = Box::new(|_| Ok(Some(make_role())));
+
+        let mut user_repo = TestUserRepo::new();
+        user_repo.find_by_id_fn = Box::new(|_| Ok(None));
+
+        let svc = RoleService::new(Arc::new(role_repo), Arc::new(user_repo));
+        assert!(svc.add_users_to_role(1, vec![999]).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_add_users_to_role_user_disabled() {
+        let mut role_repo = TestRoleRepo::new();
+        role_repo.find_by_id_fn = Box::new(|_| Ok(Some(make_role())));
+
+        let mut user_repo = TestUserRepo::new();
+        let mut user = User::create(10, "u".into(), "p".into(), "U".into(), None);
+        user.status = UserStatus::Disabled;
+        user_repo.find_by_id_fn = Box::new(move |_| Ok(Some(user.clone())));
+
+        let svc = RoleService::new(Arc::new(role_repo), Arc::new(user_repo));
+        assert!(svc.add_users_to_role(1, vec![10]).await.is_err());
     }
 
     // ==========================================================
@@ -423,7 +516,7 @@ mod role_service_tests {
         repo.find_by_id_fn = Box::new(|_| Ok(Some(make_role())));
         repo.unbind_users_fn = Box::new(|_, _| Ok(()));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         assert!(svc.remove_users_from_role(1, vec![10, 20]).await.is_ok());
     }
 
@@ -432,7 +525,7 @@ mod role_service_tests {
         let mut repo = TestRoleRepo::new();
         repo.find_by_id_fn = Box::new(|_| Ok(None));
 
-        let svc = RoleService::new(Arc::new(repo));
+        let svc = RoleService::new(Arc::new(repo), Arc::new(TestUserRepo::new()));
         assert!(svc.remove_users_from_role(999, vec![1]).await.is_err());
     }
 }

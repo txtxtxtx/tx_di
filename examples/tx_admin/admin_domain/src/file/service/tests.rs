@@ -159,7 +159,7 @@ mod file_service_tests {
     #[tokio::test]
     async fn test_upload_file_insert_error() {
         let mut file_repo = TestFileRepo::new();
-        file_repo.insert_fn = Box::new(|_| Err(crate::shared::repository::RepositoryError::Duplicate)?);
+        file_repo.insert_fn = Box::new(|_| Err(crate::shared::repository::RepositoryError::DatabaseFile.into()));
         let config_repo = TestFileConfigRepo::new();
 
         let svc = FileService::new(Arc::new(file_repo), Arc::new(config_repo));

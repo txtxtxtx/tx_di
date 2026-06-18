@@ -15,6 +15,12 @@ mod user_service_tests {
     // Manually create a mock UserRepository using a test struct
     use async_trait::async_trait;
     use crate::user::repository::UserRepository;
+    use crate::role::repository::RoleRepository;
+    use crate::role::model::aggregate::Role;
+    use crate::role::model::value_object::RoleQuery;
+    use crate::department::repository::DepartmentRepository;
+    use crate::department::model::aggregate::Department;
+    use crate::department::model::value_object::DeptQuery;
     use crate::permission::repository::PermissionRepository;
 
     struct TestUserRepo {
@@ -72,6 +78,64 @@ mod user_service_tests {
         async fn get_dept_ids(&self, uid: u64) -> AppResult<Vec<u64>> { (self.get_dept_ids_fn)(uid) }
     }
 
+    // --- Role repo mock (needed by UserService::assign_roles) ---
+    struct TestRoleRepo {
+        find_by_ids_fn: Box<dyn Fn(&[u64]) -> AppResult<Vec<Role>> + Send + Sync>,
+    }
+
+    impl TestRoleRepo {
+        fn new() -> Self {
+            Self {
+                find_by_ids_fn: Box::new(|_| Ok(vec![])),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl RoleRepository for TestRoleRepo {
+        async fn find_by_id(&self, _: u64) -> AppResult<Option<Role>> { Ok(None) }
+        async fn find_by_code(&self, _: &str) -> AppResult<Option<Role>> { Ok(None) }
+        async fn find_by_ids(&self, ids: &[u64]) -> AppResult<Vec<Role>> { (self.find_by_ids_fn)(ids) }
+        async fn find_page(&self, _: &RoleQuery, p: Page<Role>) -> AppResult<Page<Role>> { Ok(p) }
+        async fn find_all(&self, _: &RoleQuery) -> AppResult<Vec<Role>> { Ok(vec![]) }
+        async fn insert(&self, _: &Role) -> AppResult<()> { Ok(()) }
+        async fn update(&self, _: &Role) -> AppResult<()> { Ok(()) }
+        async fn soft_delete(&self, _: u64) -> AppResult<()> { Ok(()) }
+        async fn exists_by_code(&self, _: &str) -> AppResult<bool> { Ok(false) }
+        async fn bind_menus(&self, _: u64, _: &[u64]) -> AppResult<()> { Ok(()) }
+        async fn get_menu_ids(&self, _: u64) -> AppResult<Vec<u64>> { Ok(vec![]) }
+        async fn get_user_ids(&self, _: u64) -> AppResult<Vec<u64>> { Ok(vec![]) }
+        async fn find_users_by_role_id(&self, _: u64) -> AppResult<Vec<User>> { Ok(vec![]) }
+        async fn bind_users(&self, _: u64, _: &[u64]) -> AppResult<()> { Ok(()) }
+        async fn unbind_users(&self, _: u64, _: &[u64]) -> AppResult<()> { Ok(()) }
+    }
+
+    // --- Department repo mock (needed by UserService::assign_departments) ---
+    struct TestDeptRepo {
+        find_by_ids_fn: Box<dyn Fn(&[u64]) -> AppResult<Vec<Department>> + Send + Sync>,
+    }
+
+    impl TestDeptRepo {
+        fn new() -> Self {
+            Self {
+                find_by_ids_fn: Box::new(|_| Ok(vec![])),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl DepartmentRepository for TestDeptRepo {
+        async fn find_by_id(&self, _: u64) -> AppResult<Option<Department>> { Ok(None) }
+        async fn find_all(&self, _: &DeptQuery) -> AppResult<Vec<Department>> { Ok(vec![]) }
+        async fn find_by_ids(&self, ids: &[u64]) -> AppResult<Vec<Department>> { (self.find_by_ids_fn)(ids) }
+        async fn find_by_parent_id(&self, _: u64) -> AppResult<Vec<Department>> { Ok(vec![]) }
+        async fn insert(&self, _: &Department) -> AppResult<()> { Ok(()) }
+        async fn update(&self, _: &Department) -> AppResult<()> { Ok(()) }
+        async fn soft_delete(&self, _: u64) -> AppResult<()> { Ok(()) }
+        async fn has_children(&self, _: u64) -> AppResult<bool> { Ok(false) }
+        async fn has_users(&self, _: u64) -> AppResult<bool> { Ok(false) }
+    }
+
     struct TestPermRepo {}
 
     #[async_trait]
@@ -94,11 +158,14 @@ mod user_service_tests {
         async fn update(&self, _: &crate::permission::model::aggregate::Permission) -> AppResult<()> { Ok(()) }
         async fn soft_delete(&self, _: u64) -> AppResult<()> { Ok(()) }
         async fn exists_by_code(&self, _: &str) -> AppResult<bool> { Ok(false) }
+        async fn find_by_codes(&self, _: &[String]) -> AppResult<Vec<crate::permission::model::aggregate::Permission>> { Ok(vec![]) }
     }
 
     fn make_user() -> User {
         User::create(1, "testuser".into(), "pwd".into(), "Test".into(), None)
     }
+
+    // ── create_user ──
 
     #[tokio::test]
     async fn test_create_user_success() {
@@ -106,7 +173,12 @@ mod user_service_tests {
         repo.exists_by_username_fn = Box::new(|_| Ok(false));
         repo.insert_fn = Box::new(|_| Ok(()));
 
-        let svc = UserService::new(Arc::new(repo), Arc::new(TestPermRepo {}));
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
         assert!(svc.create_user("new".into(), "p".into(), "N".into(), None).await.is_ok());
     }
 
@@ -115,9 +187,16 @@ mod user_service_tests {
         let mut repo = TestUserRepo::new();
         repo.exists_by_username_fn = Box::new(|_| Ok(true));
 
-        let svc = UserService::new(Arc::new(repo), Arc::new(TestPermRepo {}));
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
         assert!(svc.create_user("dup".into(), "p".into(), "N".into(), None).await.is_err());
     }
+
+    // ── update_user ──
 
     #[tokio::test]
     async fn test_update_user_success() {
@@ -125,7 +204,12 @@ mod user_service_tests {
         repo.find_by_id_fn = Box::new(|_| Ok(Some(make_user())));
         repo.update_fn = Box::new(|_| Ok(()));
 
-        let svc = UserService::new(Arc::new(repo), Arc::new(TestPermRepo {}));
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
         let r = svc.update_user(1, "New".into(), None, None, crate::user::model::value_object::Sex::Unknown, None, None).await;
         assert!(r.is_ok());
         assert_eq!(r.unwrap().nickname, "New");
@@ -136,9 +220,16 @@ mod user_service_tests {
         let mut repo = TestUserRepo::new();
         repo.find_by_id_fn = Box::new(|_| Ok(None));
 
-        let svc = UserService::new(Arc::new(repo), Arc::new(TestPermRepo {}));
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
         assert!(svc.update_user(999, "X".into(), None, None, crate::user::model::value_object::Sex::Unknown, None, None).await.is_err());
     }
+
+    // ── delete_user ──
 
     #[tokio::test]
     async fn test_delete_user() {
@@ -146,9 +237,30 @@ mod user_service_tests {
         repo.find_by_id_fn = Box::new(|_| Ok(Some(make_user())));
         repo.update_fn = Box::new(|_| Ok(()));
 
-        let svc = UserService::new(Arc::new(repo), Arc::new(TestPermRepo {}));
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
         assert!(svc.delete_user(1, None).await.is_ok());
     }
+
+    #[tokio::test]
+    async fn test_delete_user_not_found() {
+        let mut repo = TestUserRepo::new();
+        repo.find_by_id_fn = Box::new(|_| Ok(None));
+
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
+        assert!(svc.delete_user(999, None).await.is_err());
+    }
+
+    // ── change_status ──
 
     #[tokio::test]
     async fn test_change_status() {
@@ -156,21 +268,96 @@ mod user_service_tests {
         repo.find_by_id_fn = Box::new(|_| Ok(Some(make_user())));
         repo.update_fn = Box::new(|_| Ok(()));
 
-        let svc = UserService::new(Arc::new(repo), Arc::new(TestPermRepo {}));
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
         let r = svc.change_status(1, UserStatus::Locked, None).await;
         assert!(r.is_ok());
         assert_eq!(r.unwrap().status, UserStatus::Locked);
     }
 
+    // ── assign_roles ──
+
     #[tokio::test]
-    async fn test_assign_roles() {
+    async fn test_assign_roles_success() {
         let mut repo = TestUserRepo::new();
         repo.find_by_id_fn = Box::new(|_| Ok(Some(make_user())));
         repo.bind_roles_fn = Box::new(|_, _| Ok(()));
 
-        let svc = UserService::new(Arc::new(repo), Arc::new(TestPermRepo {}));
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
         assert!(svc.assign_roles(1, vec![10, 20]).await.is_ok());
     }
+
+    #[tokio::test]
+    async fn test_assign_roles_user_not_found() {
+        let mut repo = TestUserRepo::new();
+        repo.find_by_id_fn = Box::new(|_| Ok(None));
+
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
+        assert!(svc.assign_roles(999, vec![1]).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_assign_roles_user_disabled() {
+        let mut repo = TestUserRepo::new();
+        let mut user = make_user();
+        user.status = UserStatus::Disabled;
+        repo.find_by_id_fn = Box::new(move |_| Ok(Some(user.clone())));
+
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
+        assert!(svc.assign_roles(1, vec![10]).await.is_err());
+    }
+
+    // ── assign_departments ──
+
+    #[tokio::test]
+    async fn test_assign_departments_success() {
+        let mut repo = TestUserRepo::new();
+        repo.find_by_id_fn = Box::new(|_| Ok(Some(make_user())));
+        repo.bind_departments_fn = Box::new(|_, _| Ok(()));
+
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
+        assert!(svc.assign_departments(1, vec![10, 20]).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_assign_departments_user_not_found() {
+        let mut repo = TestUserRepo::new();
+        repo.find_by_id_fn = Box::new(|_| Ok(None));
+
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
+        assert!(svc.assign_departments(999, vec![1]).await.is_err());
+    }
+
+    // ── get_user ──
 
     #[tokio::test]
     async fn test_get_user_with_associations() {
@@ -179,11 +366,32 @@ mod user_service_tests {
         repo.get_role_ids_fn = Box::new(|_| Ok(vec![1, 2]));
         repo.get_dept_ids_fn = Box::new(|_| Ok(vec![10]));
 
-        let svc = UserService::new(Arc::new(repo), Arc::new(TestPermRepo {}));
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
         let u = svc.get_user(1).await.unwrap();
         assert_eq!(u.role_ids, vec![1, 2]);
         assert_eq!(u.dept_ids, vec![10]);
     }
+
+    #[tokio::test]
+    async fn test_get_user_not_found() {
+        let mut repo = TestUserRepo::new();
+        repo.find_by_id_fn = Box::new(|_| Ok(None));
+
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
+        assert!(svc.get_user(999).await.is_err());
+    }
+
+    // ── build_login_user ──
 
     #[tokio::test]
     async fn test_build_login_user() {
@@ -191,11 +399,18 @@ mod user_service_tests {
         repo.get_role_ids_fn = Box::new(|_| Ok(vec![1]));
         repo.get_dept_ids_fn = Box::new(|_| Ok(vec![10]));
 
-        let svc = UserService::new(Arc::new(repo), Arc::new(TestPermRepo {}));
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
         let lu = svc.build_login_user(&make_user()).await.unwrap();
         assert_eq!(lu.role_ids, vec![1]);
         assert!(lu.permissions.contains("read"));
     }
+
+    // ── record_login ──
 
     #[tokio::test]
     async fn test_record_login() {
@@ -203,16 +418,62 @@ mod user_service_tests {
         repo.find_by_id_fn = Box::new(|_| Ok(Some(make_user())));
         repo.update_fn = Box::new(|_| Ok(()));
 
-        let svc = UserService::new(Arc::new(repo), Arc::new(TestPermRepo {}));
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
         let u = svc.record_login(1, "10.0.0.1".into()).await.unwrap();
         assert_eq!(u.login_ip.as_deref(), Some("10.0.0.1"));
     }
+
+    // ── exists_by_email ──
 
     #[tokio::test]
     async fn test_exists_by_email() {
         let mut repo = TestUserRepo::new();
         repo.exists_by_email_fn = Box::new(|_| Ok(true));
-        let svc = UserService::new(Arc::new(repo), Arc::new(TestPermRepo {}));
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
         assert!(svc.exists_by_email("x@y.com").await.unwrap());
+    }
+
+    // ── get_by_username ──
+
+    #[tokio::test]
+    async fn test_get_by_username_found() {
+        let mut repo = TestUserRepo::new();
+        let user = make_user();
+        repo.find_by_username_fn = Box::new(move |_| Ok(Some(user.clone())));
+
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
+        let result = svc.get_by_username("testuser").await.unwrap();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().username, "testuser");
+    }
+
+    #[tokio::test]
+    async fn test_get_by_username_not_found() {
+        let mut repo = TestUserRepo::new();
+        repo.find_by_username_fn = Box::new(|_| Ok(None));
+
+        let svc = UserService::new(
+            Arc::new(repo),
+            Arc::new(TestRoleRepo::new()),
+            Arc::new(TestDeptRepo::new()),
+            Arc::new(TestPermRepo {}),
+        );
+        let result = svc.get_by_username("nobody").await.unwrap();
+        assert!(result.is_none());
     }
 }

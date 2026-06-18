@@ -108,7 +108,7 @@ mod operate_log_service_tests {
     #[tokio::test]
     async fn test_create_operate_log_insert_error() {
         let mut repo = TestOperateLogRepo::new();
-        repo.insert_fn = Box::new(|_| Err(crate::shared::repository::RepositoryError::Duplicate)?);
+        repo.insert_fn = Box::new(|_| Err(crate::shared::repository::RepositoryError::DatabaseLog.into()));
 
         let svc = OperateLogService::new(Arc::new(repo));
         let result = svc.create_log(
@@ -274,7 +274,7 @@ mod login_log_service_tests {
     #[tokio::test]
     async fn test_create_login_log_insert_error() {
         let mut repo = TestLoginLogRepo::new();
-        repo.insert_fn = Box::new(|_| Err(crate::shared::repository::RepositoryError::Duplicate)?);
+        repo.insert_fn = Box::new(|_| Err(crate::shared::repository::RepositoryError::DatabaseLog.into()));
 
         let svc = LoginLogService::new(Arc::new(repo));
         let result = svc.create_log(

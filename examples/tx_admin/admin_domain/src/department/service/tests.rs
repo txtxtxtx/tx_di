@@ -78,7 +78,7 @@ mod department_service_tests {
     #[tokio::test]
     async fn test_create_dept_insert_error() {
         let mut repo = TestDeptRepo::new();
-        repo.insert_fn = Box::new(|_| Err(RepositoryError::Database.into()));
+        repo.insert_fn = Box::new(|_| Err(RepositoryError::DatabaseDept.into()));
 
         let svc = DepartmentService::new(Arc::new(repo));
         assert!(svc.create_dept("Fail".into(), 0, 1, None).await.is_err());
