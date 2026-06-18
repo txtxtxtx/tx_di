@@ -37,11 +37,6 @@ const DICT_SEEDS: &[(&str, &str, &[(i32, &str, &str, &str)])] = &[
     ("sys_menu_type", "菜单类型", &[
         (1, "目录", "0", ""),
         (2, "菜单", "1", ""),
-        (3, "按钮", "2", ""),
-    ]),
-    ("sys_permission_type", "权限类型", &[
-        (1, "菜单", "0", ""),
-        (2, "按钮", "1", ""),
         (3, "API", "2", ""),
     ]),
     ("sys_config_type", "配置类型", &[
@@ -76,9 +71,6 @@ const DICT_SEEDS: &[(&str, &str, &[(i32, &str, &str, &str)])] = &[
 /// visible: 0=显示, 1=隐藏
 /// keep_alive: 0=不缓存, 1=缓存
 const MENU_SEEDS: &[(i64, &str, &str, i32, i32, i64, &str, &str, &str, &str, i32, i32)] = &[
-    // ── 仪表盘 ──
-    (1, "仪表盘", "", 1, 0, 0, "dashboard", "Odometer", "dashboard/index", "Dashboard", 0, 0),
-
     // ── 系统管理 ──
     (2, "系统管理", "system:view", 0, 1, 0, "system", "Setting", "", "", 0, 0),
 
@@ -91,6 +83,7 @@ const MENU_SEEDS: &[(i64, &str, &str, i32, i32, i64, &str, &str, &str, &str, i32
     (105, "重置密码", "user:password", 2, 5, 3, "", "", "", "", 0, 0),
     (106, "分配角色", "user:assign_role", 2, 6, 3, "", "", "", "", 0, 0),
     (107, "分配部门", "user:assign_dept", 2, 7, 3, "", "", "", "", 0, 0),
+    (140, "查看用户", "user:view", 2, 8, 3, "", "", "", "", 0, 0),
 
     // 角色管理
     (4, "角色管理", "role:view", 1, 2, 2, "role", "UserFilled", "system/role/index", "Role", 0, 1),
@@ -98,18 +91,21 @@ const MENU_SEEDS: &[(i64, &str, &str, i32, i32, i64, &str, &str, &str, &str, i32
     (109, "编辑角色", "role:update", 2, 2, 4, "", "", "", "", 0, 0),
     (110, "删除角色", "role:delete", 2, 3, 4, "", "", "", "", 0, 0),
     (111, "分配菜单", "role:assign_menu", 2, 4, 4, "", "", "", "", 0, 0),
+    (141, "查看角色", "role:view", 2, 5, 4, "", "", "", "", 0, 0),
 
     // 菜单管理
     (5, "菜单管理", "menu:view", 1, 3, 2, "menu", "Menu", "system/menu/index", "Menu", 0, 1),
     (112, "创建菜单", "menu:create", 2, 1, 5, "", "", "", "", 0, 0),
     (113, "编辑菜单", "menu:update", 2, 2, 5, "", "", "", "", 0, 0),
     (114, "删除菜单", "menu:delete", 2, 3, 5, "", "", "", "", 0, 0),
+    (142, "查看菜单", "menu:view", 2, 4, 5, "", "", "", "", 0, 0),
 
     // 部门管理
     (6, "部门管理", "dept:view", 1, 4, 2, "dept", "OfficeBuilding", "system/dept/index", "Dept", 0, 1),
     (115, "创建部门", "dept:create", 2, 1, 6, "", "", "", "", 0, 0),
     (116, "编辑部门", "dept:update", 2, 2, 6, "", "", "", "", 0, 0),
     (117, "删除部门", "dept:delete", 2, 3, 6, "", "", "", "", 0, 0),
+    (143, "查看部门", "dept:view", 2, 4, 6, "", "", "", "", 0, 0),
 
     // ── 系统配置 ──
     (8, "系统配置", "config:view", 0, 2, 0, "config", "Tools", "", "", 0, 0),
@@ -117,40 +113,47 @@ const MENU_SEEDS: &[(i64, &str, &str, i32, i32, i64, &str, &str, &str, &str, i32
     (121, "创建配置", "config:create", 2, 1, 9, "", "", "", "", 0, 0),
     (122, "编辑配置", "config:update", 2, 2, 9, "", "", "", "", 0, 0),
     (123, "删除配置", "config:delete", 2, 3, 9, "", "", "", "", 0, 0),
+    (144, "查看配置", "config:view", 2, 4, 9, "", "", "", "", 0, 0),
 
     (10, "字典类型", "dict:view", 1, 2, 8, "dict-type", "Collection", "config/dict/type", "DictType", 0, 1),
     (124, "创建字典类型", "dict:create", 2, 1, 10, "", "", "", "", 0, 0),
     (125, "编辑字典类型", "dict:update", 2, 2, 10, "", "", "", "", 0, 0),
     (126, "删除字典类型", "dict:delete", 2, 3, 10, "", "", "", "", 0, 0),
+    (145, "查看字典类型", "dict:view", 2, 4, 10, "", "", "", "", 0, 0),
 
     (11, "字典数据", "dict:view", 1, 3, 8, "dict-data", "Tickets", "config/dict/data", "DictData", 0, 1),
     (127, "创建字典数据", "dict:create", 2, 1, 11, "", "", "", "", 0, 0),
     (128, "编辑字典数据", "dict:update", 2, 2, 11, "", "", "", "", 0, 0),
     (129, "删除字典数据", "dict:delete", 2, 3, 11, "", "", "", "", 0, 0),
+    (146, "查看字典数据", "dict:view", 2, 4, 11, "", "", "", "", 0, 0),
 
     // ── 日志管理 ──
     (12, "日志管理", "log:view", 0, 3, 0, "log", "Notebook", "", "", 0, 0),
     (13, "操作日志", "log:view", 1, 1, 12, "operate", "List", "log/operate", "OperateLog", 0, 1),
     (130, "删除操作日志", "log:delete", 2, 1, 13, "", "", "", "", 0, 0),
     (131, "清空操作日志", "log:clean", 2, 2, 13, "", "", "", "", 0, 0),
+    (147, "查看操作日志", "log:view", 2, 3, 13, "", "", "", "", 0, 0),
     (14, "登录日志", "log:view", 1, 2, 12, "login", "Promotion", "log/login", "LoginLog", 0, 1),
     (132, "删除登录日志", "log:delete", 2, 1, 14, "", "", "", "", 0, 0),
     (133, "清空登录日志", "log:clean", 2, 2, 14, "", "", "", "", 0, 0),
+    (148, "查看登录日志", "log:view", 2, 3, 14, "", "", "", "", 0, 0),
 
     // ── 文件管理 ──
     (15, "文件管理", "file:view", 1, 4, 0, "file", "FolderOpened", "file/index", "File", 0, 0),
     (134, "上传文件", "file:upload", 2, 1, 15, "", "", "", "", 0, 0),
     (135, "删除文件", "file:delete", 2, 2, 15, "", "", "", "", 0, 0),
     (136, "下载文件", "file:download", 2, 3, 15, "", "", "", "", 0, 0),
+    (149, "查看文件", "file:view", 2, 4, 15, "", "", "", "", 0, 0),
 
     // ── 系统监控 ──
-    (16, "系统监控", "", 0, 5, 0, "monitor", "Monitor", "", "", 0, 0),
-    (17, "服务器信息", "", 1, 1, 16, "server", "Cpu", "monitor/server", "Server", 0, 1),
-    (18, "在线用户", "", 1, 2, 16, "online", "Connection", "monitor/online", "Online", 0, 1),
+    (16, "系统监控", "system:view", 0, 5, 0, "monitor", "Monitor", "", "", 0, 0),
+    (17, "服务器信息", "system:view", 1, 1, 16, "server", "Cpu", "monitor/server", "Server", 0, 1),
+    (18, "在线用户", "system:view", 1, 2, 16, "online", "Connection", "monitor/online", "Online", 0, 1),
+    (150, "系统监控权限", "system:view", 2, 1, 16, "", "", "", "", 0, 0),
 
     // ── 认证 ──
-    (137, "用户信息", "auth:info", 2, 1, 1, "", "", "", "", 0, 0),
-    (138, "登出", "auth:logout", 2, 2, 1, "", "", "", "", 0, 0),
+    (137, "用户信息", "auth:info", 2, 1, 0, "", "", "", "", 0, 0),
+    (138, "登出", "auth:logout", 2, 2, 0, "", "", "", "", 0, 0),
 ];
 
 /// 执行种子数据初始化

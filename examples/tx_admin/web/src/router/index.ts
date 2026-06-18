@@ -153,8 +153,9 @@ router.beforeEach(async (to, _from, next) => {
     try {
       const menus = await menuStore.fetchMenus()
       addDynamicRoutes(menus)
-      // 重新导航以匹配刚注册的路由（replace 避免历史堆叠）
-      next({ ...to, replace: true })
+      // 先放行当前导航到静态路由，再 replace 到目标路径
+      next()
+      await router.replace(to.fullPath)
     } catch {
       // 获取菜单失败（token 过期等），清空状态跳登录
       const { useUserStore } = await import('@/stores/user')
