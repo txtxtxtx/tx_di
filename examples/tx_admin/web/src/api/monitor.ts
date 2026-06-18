@@ -1,8 +1,8 @@
 import request from './request'
 import type { ApiRes, ServerInfo, OnlineUserListResponse } from '@/types'
 
-export function getServerInfo() {
-  return request.get<ApiRes<ServerInfo>>('/api/monitor/server').then(r => r.data)
+export function getServerInfo(all?: boolean) {
+  return request.get<ApiRes<ServerInfo>>('/api/monitor/server', { params: all ? { all: true } : {} }).then(r => r.data)
 }
 
 export function getOnlineUsers() {
