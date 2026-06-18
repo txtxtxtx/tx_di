@@ -18,7 +18,7 @@
           <!-- 单个菜单项（无子菜单或只有一个子菜单） -->
           <el-menu-item
             v-if="!item.children || item.children.length === 1"
-            :index="item.children ? item.children[0].path : item.path"
+            :index="resolveMenuPath(item)"
           >
             <el-icon v-if="item.children ? item.children[0].meta?.icon : item.meta?.icon">
               <component :is="item.children ? item.children[0].meta?.icon : item.meta?.icon" />
@@ -65,6 +65,16 @@ const menuList = computed(() => {
     .concat(router.options.routes.filter(r => r.path === '/'))
     .filter(r => r.children)
 })
+
+/** 拼接出绝对路径，避免 el-menu router 模式下相对路径拼错 */
+function resolveMenuPath(item: any): string {
+  if (!item.children || item.children.length === 0) return item.path
+  const child = item.children[0]
+  // child.path 为空字符串时直接用父路径（如 /file）
+  if (!child.path) return item.path
+  // 父路径为 '/' 时避免双斜杠
+  return item.path === '/' ? `/${child.path}` : `${item.path}/${child.path}`
+}
 </script>
 
 <style scoped>
