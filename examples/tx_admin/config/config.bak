@@ -21,27 +21,31 @@ prefix = "tx_admin"
 retention_days = 7
 time_format = "local"
 
+[sa_token_config]
+active_timeout = 1800
+auto_renew = true
+is_concurrent = true
+is_read_cookie = false
+is_read_header = true
+is_share = true
+timeout = 86400
+token_name = "Authorization"
+token_style = "simple-uuid"
+# 是否启用 Refresh Token（允许用 Refresh Token 换取新的 Access Token）
+enable_refresh_token = true
+# Refresh Token 有效期（秒），默认 7 天
+refresh_token_timeout = 604800
+
 [toasty_config]
 auto_schema = true
 database_url = "sqlite:examples/tx_admin/data/tx_admin.db"
 max_pool_size = 10
 
 [web_config]
-enable_cors = true
 enable_api_doc = true
+enable_cors = true
 host = "::"
 layers = [[5, "timeout"], [10, "api_log"], [100, "compression"], [10000, "cors"]]
 max_body_size = 10485760
 port = 8888
 timeout_secs = 30
-
-[sa_token_config]
-token_name = "Authorization"
-timeout = 86400
-is_concurrent = true
-is_share = true
-token_style = "uuid"
-is_read_header = true
-is_read_cookie = false
-auto_renew = true
-active_timeout = 1800

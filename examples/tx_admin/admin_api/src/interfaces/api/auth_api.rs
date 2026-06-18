@@ -21,8 +21,8 @@ pub fn open_router() -> Router {
 pub fn router() -> Router {
     use axum::routing::{get, post};
     Router::new()
-        .route("/api/auth/user-info", get(user_info))
-        .route("/api/auth/logout", post(logout))
+        .route("/user-info", get(user_info))
+        .route("/logout", post(logout))
 }
 
 /// POST /api/auth/login
@@ -47,7 +47,7 @@ async fn login(
     let user_id_str = r.user_id.to_string();
     let is_admin = r.role_codes.iter().any(|c| c == "super_admin" || c == "admin");
     if is_admin {
-        StpUtil::set_permissions(&user_id_str, vec!["*".to_string()]).await?;
+        StpUtil::set_permissions(&user_id_str, vec!["*".to_string(),"*:*".to_string(),"*:*:*".to_string()]).await?;
     } else {
         StpUtil::set_permissions(&user_id_str, r.permissions.clone()).await?;
     }

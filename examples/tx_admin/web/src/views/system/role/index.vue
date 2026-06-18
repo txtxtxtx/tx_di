@@ -75,7 +75,7 @@
           <el-input-number v-model="form.sort" :min="0" />
         </el-form-item>
         <el-form-item v-if="isEdit" label="数据范围">
-          <el-select v-model="form.data_scope">
+          <el-select v-model="form.dataScope">
             <el-option v-for="o in dataScopeOptions" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </el-form-item>
@@ -136,7 +136,7 @@ const query = reactive({ name: '', code: '', status: undefined as number | undef
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref<FormInstance>()
-const form = reactive({ id: '', name: '', code: '', sort: 0, data_scope: 1, remark: '' })
+const form = reactive({ id: '', name: '', code: '', sort: 0, dataScope: 1, remark: '' })
 const formRules: FormRules = {
   name: [{ required: true, message: '请输入角色名', trigger: 'blur' }],
   code: [{ required: true, message: '请输入角色编码', trigger: 'blur' }],
@@ -177,9 +177,9 @@ function resetQuery() {
 function openDialog(row?: RoleResponse) {
   isEdit.value = !!row
   if (row) {
-    Object.assign(form, { id: row.id, name: row.name, code: row.code, sort: row.sort, data_scope: row.dataScope, remark: row.remark || '' })
+    Object.assign(form, { id: row.id, name: row.name, code: row.code, sort: row.sort, dataScope: row.dataScope, remark: row.remark || '' })
   } else {
-    Object.assign(form, { id: '', name: '', code: '', sort: 0, data_scope: 1, remark: '' })
+    Object.assign(form, { id: '', name: '', code: '', sort: 0, dataScope: 1, remark: '' })
   }
   dialogVisible.value = true
 }
@@ -190,7 +190,7 @@ async function handleSubmit() {
   submitLoading.value = true
   try {
     if (isEdit.value) {
-      await updateRole(form.id, { name: form.name, code: form.code, sort: form.sort, dataScope: form.data_scope, remark: form.remark || undefined })
+      await updateRole(form.id, { name: form.name, code: form.code, sort: form.sort, dataScope: form.dataScope, remark: form.remark || undefined })
       ElMessage.success('更新成功')
     } else {
       await createRole({ name: form.name, code: form.code, sort: form.sort, remark: form.remark || undefined, menuIds: [] })

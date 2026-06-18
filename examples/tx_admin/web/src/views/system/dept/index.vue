@@ -22,7 +22,7 @@
       <el-table :data="treeData" v-loading="loading" row-key="id" border default-expand-all :tree-props="{ children: 'children' }">
         <el-table-column prop="name" label="部门名称" min-width="200" />
         <el-table-column prop="sort" label="排序" width="80" />
-        <el-table-column prop="leader_user_id" label="负责人ID" width="100" />
+        <el-table-column prop="leaderUserId" label="负责人ID" width="100" />
         <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
             <el-tag :type="row.status === 0 ? 'success' : 'danger'">{{ statusLabel(row.status) }}</el-tag>
@@ -41,7 +41,7 @@
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑部门' : '新增部门'" width="500px" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="80px">
         <el-form-item label="上级部门">
-          <el-tree-select v-model="form.parent_id" :data="deptTreeForSelect" :props="{ label: 'name', value: 'id', children: 'children' }" check-strictly clearable placeholder="顶级部门" />
+          <el-tree-select v-model="form.parentId" :data="deptTreeForSelect" :props="{ label: 'name', value: 'id', children: 'children' }" check-strictly clearable placeholder="顶级部门" />
         </el-form-item>
         <el-form-item label="部门名称" prop="name">
           <el-input v-model="form.name" />
@@ -50,7 +50,7 @@
           <el-input-number v-model="form.sort" :min="0" />
         </el-form-item>
         <el-form-item label="负责人">
-          <el-input v-model="form.leader_user_id" placeholder="负责人用户ID" />
+          <el-input v-model="form.leaderUserId" placeholder="负责人用户ID" />
         </el-form-item>
         <el-form-item label="电话">
           <el-input v-model="form.phone" />
@@ -86,9 +86,9 @@ const formRef = ref<FormInstance>()
 const form = reactive({
   id: '',
   name: '',
-  parent_id: '',
+  parentId: '',
   sort: 0,
-  leader_user_id: undefined as string | undefined,
+  leaderUserId: undefined as string | undefined,
   phone: '',
   email: '',
 })
@@ -97,7 +97,7 @@ const formRules: FormRules = {
 }
 
 const deptTreeForSelect = computed(() => {
-  const root: DeptTreeNode = { id: '0', name: '顶级部门', parent_id: '0', sort: 0, leader_user_id: null, status: 0, children: treeData.value }
+  const root: DeptTreeNode = { id: '0', name: '顶级部门', parentId: '0', sort: 0, leaderUserId: null, status: 0, children: treeData.value }
   return [root]
 })
 
@@ -114,11 +114,11 @@ function openDialog(row?: DeptTreeNode | null, parentId?: string) {
   isEdit.value = !!row
   if (row) {
     Object.assign(form, {
-      id: row.id, name: row.name, parent_id: row.parent_id, sort: row.sort,
-      leader_user_id: row.leader_user_id || undefined, phone: '', email: '',
+      id: row.id, name: row.name, parentId: row.parentId, sort: row.sort,
+      leaderUserId: row.leaderUserId || undefined, phone: '', email: '',
     })
   } else {
-    Object.assign(form, { id: '', name: '', parent_id: parentId || '', sort: 0, leader_user_id: undefined, phone: '', email: '' })
+    Object.assign(form, { id: '', name: '', parentId: parentId || '', sort: 0, leaderUserId: undefined, phone: '', email: '' })
   }
   dialogVisible.value = true
 }
@@ -129,8 +129,8 @@ async function handleSubmit() {
   submitLoading.value = true
   try {
     const data = {
-      name: form.name, parent_id: form.parent_id, sort: form.sort,
-      leader_user_id: form.leader_user_id, phone: form.phone || undefined, email: form.email || undefined,
+      name: form.name, parentId: form.parentId, sort: form.sort,
+      leaderUserId: form.leaderUserId, phone: form.phone || undefined, email: form.email || undefined,
     }
     if (isEdit.value) {
       await updateDept(form.id, data)

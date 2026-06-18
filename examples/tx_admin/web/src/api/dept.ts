@@ -10,7 +10,7 @@ export function getDept(deptId: string) {
 }
 
 export function updateDept(deptId: string, data: UpdateDeptRequest) {
-  return request.put<ApiRes<DeptTreeNode>>(`/api/dept/${deptId}`, data).then(r => r.data)
+  return request.put<ApiRes<DeptTreeNode>>(`/api/dept/${deptId}`, { ...data, deptId }).then(r => r.data)
 }
 
 export function deleteDept(deptId: string) {

@@ -11,7 +11,7 @@ export function getDictType(id: string) {
 }
 
 export function updateDictType(id: string, data: UpdateDictTypeRequest) {
-  return request.put<ApiRes<DictTypeResponse>>(`/api/dict/type/${id}`, data).then(r => r.data)
+  return request.put<ApiRes<DictTypeResponse>>(`/api/dict/type/${id}`, { ...data, id }).then(r => r.data)
 }
 
 export function deleteDictType(id: string) {
@@ -32,7 +32,7 @@ export function getDictData(id: string) {
 }
 
 export function updateDictData(id: string, data: UpdateDictDataRequest) {
-  return request.put<ApiRes<DictDataResponse>>(`/api/dict/data/${id}`, data).then(r => r.data)
+  return request.put<ApiRes<DictDataResponse>>(`/api/dict/data/${id}`, { ...data, id }).then(r => r.data)
 }
 
 export function deleteDictData(id: string) {

@@ -57,7 +57,7 @@
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑菜单' : '新增菜单'" width="600px" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="100px">
         <el-form-item label="上级菜单">
-          <el-tree-select v-model="form.parent_id" :data="menuTreeForSelect" :props="{ label: 'name', value: 'id', children: 'children' }" check-strictly clearable placeholder="顶级菜单" />
+          <el-tree-select v-model="form.parentId" :data="menuTreeForSelect" :props="{ label: 'name', value: 'id', children: 'children' }" check-strictly clearable placeholder="顶级菜单" />
         </el-form-item>
         <el-form-item label="菜单类型" prop="types">
           <el-radio-group v-model="form.types">
@@ -80,7 +80,7 @@
           <el-input v-model="form.component" />
         </el-form-item>
         <el-form-item v-if="form.types === 1" label="组件名称">
-          <el-input v-model="form.component_name" />
+          <el-input v-model="form.componentName" />
         </el-form-item>
         <el-form-item label="权限标识">
           <el-input v-model="form.permission" placeholder="如: user:create" />
@@ -92,7 +92,7 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item v-if="isEdit" label="是否缓存">
-          <el-radio-group v-model="form.keep_alive">
+          <el-radio-group v-model="form.keepAlive">
             <el-radio :value="0">不缓存</el-radio>
             <el-radio :value="1">缓存</el-radio>
           </el-radio-group>
@@ -128,13 +128,13 @@ const form = reactive({
   permission: '',
   types: 0,
   sort: 0,
-  parent_id: '',
+  parentId: '',
   path: '',
   icon: '',
   component: '',
-  component_name: '',
+  componentName: '',
   visible: 0,
-  keep_alive: 0,
+  keepAlive: 0,
 })
 const formRules: FormRules = {
   name: [{ required: true, message: '请输入菜单名称', trigger: 'blur' }],
@@ -142,7 +142,7 @@ const formRules: FormRules = {
 }
 
 const menuTreeForSelect = computed(() => {
-  const root: MenuTreeNode = { id: '0', name: '顶级菜单', parent_id: '0', permission: '', types: 0, sort: 0, path: null, icon: null, component: null, component_name: null, status: 0, visible: 0, keep_alive: 0, children: treeData.value }
+  const root: MenuTreeNode = { id: '0', name: '顶级菜单', parentId: '0', permission: '', types: 0, sort: 0, path: null, icon: null, component: null, componentName: null, status: 0, visible: 0, keepAlive: 0, children: treeData.value }
   return [root]
 })
 
@@ -160,14 +160,14 @@ function openDialog(row?: MenuTreeNode | null, parentId?: string) {
   if (row) {
     Object.assign(form, {
       id: row.id, name: row.name, permission: row.permission, types: row.types, sort: row.sort,
-      parent_id: row.parent_id, path: row.path || '', icon: row.icon || '',
-      component: row.component || '', component_name: row.component_name || '',
-      visible: row.visible, keep_alive: row.keep_alive,
+      parentId: row.parentId, path: row.path || '', icon: row.icon || '',
+      component: row.component || '', componentName: row.componentName || '',
+      visible: row.visible, keepAlive: row.keepAlive,
     })
   } else {
     Object.assign(form, {
-      id: '', name: '', permission: '', types: 0, sort: 0, parent_id: parentId || '',
-      path: '', icon: '', component: '', component_name: '', visible: 0, keep_alive: 0,
+      id: '', name: '', permission: '', types: 0, sort: 0, parentId: parentId || '',
+      path: '', icon: '', component: '', componentName: '', visible: 0, keepAlive: 0,
     })
   }
   dialogVisible.value = true
@@ -181,16 +181,16 @@ async function handleSubmit() {
     if (isEdit.value) {
       await updateMenu(form.id, {
         name: form.name, permission: form.permission, types: form.types, sort: form.sort,
-        parent_id: form.parent_id, path: form.path || undefined, icon: form.icon || undefined,
-        component: form.component || undefined, component_name: form.component_name || undefined,
-        visible: form.visible, keep_alive: form.keep_alive,
+        parentId: form.parentId, path: form.path || undefined, icon: form.icon || undefined,
+        component: form.component || undefined, componentName: form.componentName || undefined,
+        visible: form.visible, keepAlive: form.keepAlive,
       })
       ElMessage.success('更新成功')
     } else {
       await createMenu({
         name: form.name, permission: form.permission, types: form.types, sort: form.sort,
-        parent_id: form.parent_id, path: form.path || undefined, icon: form.icon || undefined,
-        component: form.component || undefined, component_name: form.component_name || undefined,
+        parentId: form.parentId, path: form.path || undefined, icon: form.icon || undefined,
+        component: form.component || undefined, componentName: form.componentName || undefined,
       })
       ElMessage.success('创建成功')
     }

@@ -10,7 +10,7 @@ export function getMenu(menuId: string) {
 }
 
 export function updateMenu(menuId: string, data: UpdateMenuRequest) {
-  return request.put<ApiRes<MenuTreeNode>>(`/api/menu/${menuId}`, data).then(r => r.data)
+  return request.put<ApiRes<MenuTreeNode>>(`/api/menu/${menuId}`, { ...data, menuId }).then(r => r.data)
 }
 
 export function deleteMenu(menuId: string) {

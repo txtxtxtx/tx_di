@@ -10,7 +10,7 @@ export function getRole(roleId: string) {
 }
 
 export function updateRole(roleId: string, data: UpdateRoleRequest) {
-  return request.put<ApiRes<RoleResponse>>(`/api/role/${roleId}`, data).then(r => r.data)
+  return request.put<ApiRes<RoleResponse>>(`/api/role/${roleId}`, { ...data, roleId }).then(r => r.data)
 }
 
 export function deleteRole(roleId: string) {

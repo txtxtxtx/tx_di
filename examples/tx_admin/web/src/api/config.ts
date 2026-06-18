@@ -10,7 +10,7 @@ export function getConfig(configId: string) {
 }
 
 export function updateConfig(configId: string, data: UpdateConfigRequest) {
-  return request.put<ApiRes<ConfigResponse>>(`/api/config/${configId}`, data).then(r => r.data)
+  return request.put<ApiRes<ConfigResponse>>(`/api/config/${configId}`, { ...data, configId }).then(r => r.data)
 }
 
 export function deleteConfig(configId: string) {

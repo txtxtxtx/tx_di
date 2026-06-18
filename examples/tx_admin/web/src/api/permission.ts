@@ -10,7 +10,7 @@ export function getPermission(id: string) {
 }
 
 export function updatePermission(id: string, data: UpdatePermissionRequest) {
-  return request.put<ApiRes<PermissionDetail>>(`/api/permission/${id}`, data).then(r => r.data)
+  return request.put<ApiRes<PermissionDetail>>(`/api/permission/${id}`, { ...data, id }).then(r => r.data)
 }
 
 export function deletePermission(id: string) {

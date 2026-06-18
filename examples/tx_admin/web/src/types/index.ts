@@ -81,6 +81,7 @@ export interface CreateUserRequest {
 }
 
 export interface UpdateUserRequest {
+  userId: string
   nickname?: string
   email?: string
   mobile?: string
@@ -145,6 +146,7 @@ export interface CreateRoleRequest {
 
 // proto, camelCase
 export interface UpdateRoleRequest {
+  roleId: string
   name: string
   code: string
   sort: number
@@ -166,22 +168,22 @@ export interface AssignMenusRequest {
   menuIds: string[]
 }
 
-// ==================== 菜单 (domain, snake_case) ====================
-// u64 fields: id, parent_id
+// ==================== 菜单 (proto, camelCase) ====================
+// u64 fields: id, parentId
 export interface MenuTreeNode {
   id: string
   name: string
   permission: string
   types: number
   sort: number
-  parent_id: string
+  parentId: string
   path: string | null
   icon: string | null
   component: string | null
-  component_name: string | null
+  componentName: string | null
   status: number
   visible: number
-  keep_alive: number
+  keepAlive: number
   children: MenuTreeNode[]
 }
 
@@ -191,26 +193,27 @@ export interface CreateMenuRequest {
   permission: string
   types: number
   sort: number
-  parent_id: string
+  parentId: string
   path?: string
   icon?: string
   component?: string
-  component_name?: string
+  componentName?: string
 }
 
 // proto, u64 fields as string
 export interface UpdateMenuRequest {
+  menuId: string
   name: string
   permission: string
   types: number
   sort: number
-  parent_id: string
+  parentId: string
   path?: string
   icon?: string
   component?: string
-  component_name?: string
+  componentName?: string
   visible: number
-  keep_alive: number
+  keepAlive: number
 }
 
 export interface ListMenusRequest {
@@ -218,14 +221,14 @@ export interface ListMenusRequest {
   status?: number
 }
 
-// ==================== 部门 (domain, snake_case) ====================
-// u64 fields: id, parent_id, leader_user_id
+// ==================== 部门 (proto, camelCase) ====================
+// u64 fields: id, parentId, leaderUserId
 export interface DeptTreeNode {
   id: string
   name: string
-  parent_id: string
+  parentId: string
   sort: number
-  leader_user_id: string | null
+  leaderUserId: string | null
   status: number
   children: DeptTreeNode[]
 }
@@ -233,19 +236,20 @@ export interface DeptTreeNode {
 // u64 fields as string
 export interface CreateDeptRequest {
   name: string
-  parent_id: string
+  parentId: string
   sort: number
-  leader_user_id?: string
+  leaderUserId?: string
   phone?: string
   email?: string
 }
 
 // u64 fields as string
 export interface UpdateDeptRequest {
+  deptId: string
   name: string
-  parent_id: string
+  parentId: string
   sort: number
-  leader_user_id?: string
+  leaderUserId?: string
   phone?: string
   email?: string
 }
@@ -280,6 +284,7 @@ export interface CreatePermissionRequest {
 
 // proto, camelCase, u64 fields as string
 export interface UpdatePermissionRequest {
+  id: string
   name: string
   permissionCode: string
   type: number
@@ -336,6 +341,7 @@ export interface CreateConfigRequest {
 
 // proto, camelCase
 export interface UpdateConfigRequest {
+  configId: string
   category: string
   configType: number
   name: string
@@ -373,6 +379,7 @@ export interface CreateDictTypeRequest {
 
 // proto, camelCase
 export interface UpdateDictTypeRequest {
+  id: string
   name: string
   dictType: string
   remark?: string
@@ -412,6 +419,7 @@ export interface CreateDictDataRequest {
 
 // proto, camelCase
 export interface UpdateDictDataRequest {
+  id: string
   sort: number
   label: string
   value: string
