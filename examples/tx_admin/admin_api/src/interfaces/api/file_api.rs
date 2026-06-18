@@ -1,7 +1,7 @@
 //! 文件管理 HTTP API
 
 use axum::Json;
-use tx_di_axum::{R, Router};
+use tx_di_axum::Router;
 use axum::routing::{get, post, delete};
 use tx_di_axum::bound::DiComp;
 use admin_app::file::app_service::FileAppService;
@@ -23,46 +23,46 @@ pub fn router() -> Router {
 async fn upload_file(
     DiComp(file_svc): DiComp<FileAppService>,
     Json(req): Json<UploadFileRequest>,
-) -> Result<R<FileResponse>, ApiErr> {
+) -> Result<ApiR<FileResponse>, ApiErr> {
     ensure_permission("file:upload").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     let r = file_svc.upload_file(req, Some(login_id)).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 async fn get_file(
     DiComp(file_svc): DiComp<FileAppService>,
     axum::extract::Path(file_id): axum::extract::Path<u64>,
-) -> Result<R<FileResponse>, ApiErr> {
+) -> Result<ApiR<FileResponse>, ApiErr> {
     ensure_permission("file:view").await?;
     let r = file_svc.get_file(file_id).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 async fn delete_file(
     DiComp(file_svc): DiComp<FileAppService>,
     axum::extract::Path(file_id): axum::extract::Path<u64>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("file:delete").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     file_svc.delete_file(file_id, Some(login_id)).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 async fn list_files(
     DiComp(file_svc): DiComp<FileAppService>,
     Json(req): Json<ListFilesRequest>,
-) -> Result<R<Page<FileResponse>>, ApiErr> {
+) -> Result<ApiR<Page<FileResponse>>, ApiErr> {
     ensure_permission("file:view").await?;
     let page = file_svc.get_file_page(req).await?;
-    Ok(R(ApiR::success(page)))
+    Ok(ApiR::success(page))
 }
 
 async fn download_file(
     DiComp(file_svc): DiComp<FileAppService>,
     axum::extract::Path(file_id): axum::extract::Path<u64>,
-) -> Result<R<DownloadFileResponse>, ApiErr> {
+) -> Result<ApiR<DownloadFileResponse>, ApiErr> {
     ensure_permission("file:download").await?;
     let r = file_svc.download_file(file_id).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }

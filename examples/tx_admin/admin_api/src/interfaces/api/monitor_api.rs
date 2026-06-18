@@ -13,7 +13,7 @@ use serde::Deserialize;
 use tokio::sync::RwLock;
 use tx_common::ApiR;
 use tx_di_axum::bound::DiComp;
-use tx_di_axum::{R, Router};
+use tx_di_axum::Router;
 
 use admin_app::user::app_service::UserAppService;
 use admin_proto::{OnlineUser, OnlineUserListResponse, ServerInfo};
@@ -123,7 +123,7 @@ struct ServerQuery {
 /// 2. 根据 `all` 参数决定返回全部缓存还是仅最新一条
 async fn get_server_info(
     Query(params): Query<ServerQuery>,
-) -> Result<R<serde_json::Value>, ApiErr> {
+) -> Result<ApiR<serde_json::Value>, ApiErr> {
     ensure_permission("system:view").await?;
 
     let cache = get_cache().read().await;
@@ -131,7 +131,7 @@ async fn get_server_info(
     if params.all.unwrap_or(false) {
         // 返回全部缓存
         let list: Vec<&ServerInfo> = cache.iter().collect();
-        Ok(R(ApiR::success(serde_json::json!({ "list": list }))))
+        Ok(ApiR::success(serde_json::json!({ "list": list })))
     } else {
         // 返回最新一条（环形队列迭代顺序为从旧到新，last 即最新）
         let latest = cache.iter().last().cloned().unwrap_or_else(|| ServerInfo {
@@ -147,7 +147,7 @@ async fn get_server_info(
             used_disk: 0,
             disk_usage: 0.0,
         });
-        Ok(R(ApiR::success(serde_json::json!(latest))))
+        Ok(ApiR::success(serde_json::json!(latest)))
     }
 }
 
@@ -162,7 +162,7 @@ const ONLINE_BATCH_SIZE: i64 = 100;
 /// 3. 对在线用户从 token extra_data 中提取登录 IP 和登录时间
 async fn get_online_users(
     DiComp(user_svc): DiComp<UserAppService>,
-) -> Result<R<OnlineUserListResponse>, ApiErr> {
+) -> Result<ApiR<OnlineUserListResponse>, ApiErr> {
     ensure_permission("system:view").await?;
 
     let status = Some(admin_domain::user::model::value_object::UserStatus::Active);
@@ -218,8 +218,8 @@ async fn get_online_users(
     }
 
     let total = online_users.len() as u64;
-    Ok(R(ApiR::success(OnlineUserListResponse {
+    Ok(ApiR::success(OnlineUserListResponse {
         users: online_users,
         total,
-    })))
+    }))
 }

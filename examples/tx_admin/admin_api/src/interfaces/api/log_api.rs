@@ -1,7 +1,7 @@
 //! 日志管理 HTTP API
 
 use axum::Json;
-use tx_di_axum::{R, Router};
+use tx_di_axum::Router;
 use axum::routing::{ post, delete};
 use tx_di_axum::bound::DiComp;
 use admin_app::log::app_service::{OperateLogAppService, LoginLogAppService};
@@ -26,73 +26,73 @@ pub fn router() -> Router {
 async fn create_operate_log(
     DiComp(oper_log): DiComp<OperateLogAppService>,
     Json(req): Json<CreateOperateLogRequest>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("log:view").await?;
     oper_log.create_log(req).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 async fn list_operate_logs(
     DiComp(oper_log): DiComp<OperateLogAppService>,
     Json(req): Json<ListOperateLogsRequest>,
-) -> Result<R<Page<OperateLogResponse>>, ApiErr> {
+) -> Result<ApiR<Page<OperateLogResponse>>, ApiErr> {
     ensure_permission("log:view").await?;
     let page = oper_log.get_log_page(req).await?;
-    Ok(R(ApiR::success(page)))
+    Ok(ApiR::success(page))
 }
 
 async fn create_login_log(
     DiComp(login_log): DiComp<LoginLogAppService>,
     Json(req): Json<CreateLoginLogRequest>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("log:view").await?;
     login_log.create_log(req).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 async fn list_login_logs(
     DiComp(login_log): DiComp<LoginLogAppService>,
     Json(req): Json<ListLoginLogsRequest>,
-) -> Result<R<Page<LoginLogResponse>>, ApiErr> {
+) -> Result<ApiR<Page<LoginLogResponse>>, ApiErr> {
     ensure_permission("log:view").await?;
     let page = login_log.get_log_page(req).await?;
-    Ok(R(ApiR::success(page)))
+    Ok(ApiR::success(page))
 }
 
 /// DELETE /api/log/operate
 async fn delete_operate_logs(
     DiComp(oper_log): DiComp<OperateLogAppService>,
     Json(req): Json<DeleteLogsRequest>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("log:delete").await?;
     oper_log.delete_logs(&req.ids).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 /// DELETE /api/log/operate/clean
 async fn clean_operate_logs(
     DiComp(oper_log): DiComp<OperateLogAppService>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("log:clean").await?;
     oper_log.clean_logs().await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 /// DELETE /api/log/login
 async fn delete_login_logs(
     DiComp(login_log): DiComp<LoginLogAppService>,
     Json(req): Json<DeleteLogsRequest>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("log:delete").await?;
     login_log.delete_logs(&req.ids).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 /// DELETE /api/log/login/clean
 async fn clean_login_logs(
     DiComp(login_log): DiComp<LoginLogAppService>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("log:clean").await?;
     login_log.clean_logs().await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }

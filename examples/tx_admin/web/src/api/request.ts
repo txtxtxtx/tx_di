@@ -25,7 +25,7 @@ request.interceptors.request.use(
 request.interceptors.response.use(
   (response: AxiosResponse<ApiRes>) => {
     const res = response.data
-    if (res.code !== 0) {
+    if (res.code !== 0 && res.code !== 200) {
       ElMessage.error(res.msg || '请求失败')
       // 认证失败
       if (res.code === 401) {

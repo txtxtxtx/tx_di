@@ -2,7 +2,7 @@
 
 use admin_domain::shared::model::value_object::{SessionEctData, TenantId};
 use axum::Json;
-use tx_di_axum::{Router, R};
+use tx_di_axum::Router;
 use tx_di_axum::bound::DiComp;
 use tx_di_sa_token::{StpUtil, LoginIdExtractor, sa_check_permission};
 use admin_app::auth::app_service::AuthAppService;
@@ -29,7 +29,7 @@ pub fn router() -> Router {
 async fn login(
     DiComp(auth): DiComp<AuthAppService>,
     Json(req): Json<LoginRequest>,
-) -> Result<R<LoginResponse>, ApiErr> {
+) -> Result<ApiR<LoginResponse>, ApiErr> {
     let login_ip = req.login_ip.clone();
     let mut r = auth.login(req).await?;
     let token = StpUtil::login(r.user_id.to_string()).await?;
@@ -52,7 +52,8 @@ async fn login(
         StpUtil::set_permissions(&user_id_str, r.permissions.clone()).await?;
     }
     StpUtil::set_roles(&user_id_str, r.role_codes.clone()).await?;
-    let resp = R(ApiR::success(r));
+    let mut resp = ApiR::success(r);
+    resp.msg = token.to_string();
     Ok(resp)
 }
 
@@ -61,10 +62,10 @@ async fn login(
 async fn user_info(
     DiComp(auth): DiComp<AuthAppService>,
     LoginIdExtractor(login_id): LoginIdExtractor,
-) -> Result<R<UserInfoResponse>, ApiErr> {
+) -> Result<ApiR<UserInfoResponse>, ApiErr> {
     let user_id: u64 = login_id.parse().unwrap_or(0);
     let r = auth.get_user_info(user_id).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 /// POST /api/auth/logout
@@ -72,7 +73,7 @@ async fn user_info(
 async fn logout(
     DiComp(auth): DiComp<AuthAppService>,
     LoginIdExtractor(login_id): LoginIdExtractor,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     let user_id: u64 = login_id.parse().unwrap_or(0);
     // 1. 使 sa-token 会话失效
     StpUtil::logout_current().await?;
@@ -81,5 +82,5 @@ async fn logout(
     StpUtil::clear_roles(&login_id).await?;
     // 3. 记录登出日志
     let _ = auth.logout(LogoutRequest { user_id }).await;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }

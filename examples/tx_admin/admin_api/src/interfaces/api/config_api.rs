@@ -1,7 +1,7 @@
 //! 配置管理 HTTP API
 
 use axum::Json;
-use tx_di_axum::{R, Router};
+use tx_di_axum::Router;
 use axum::routing::{get, post, put, delete};
 use tx_di_axum::bound::DiComp;
 use admin_app::config::app_service::ConfigAppService;
@@ -24,27 +24,27 @@ pub fn router() -> Router {
 async fn create_config(
     DiComp(config): DiComp<ConfigAppService>,
     Json(req): Json<CreateConfigRequest>,
-) -> Result<R<ConfigResponse>, ApiErr> {
+) -> Result<ApiR<ConfigResponse>, ApiErr> {
     ensure_permission("config:create").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     let r = config.create_config(req, Some(login_id)).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 async fn get_config(
     DiComp(config): DiComp<ConfigAppService>,
     axum::extract::Path(config_id): axum::extract::Path<u64>,
-) -> Result<R<ConfigResponse>, ApiErr> {
+) -> Result<ApiR<ConfigResponse>, ApiErr> {
     ensure_permission("config:view").await?;
     let r = config.get_config(config_id).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 async fn update_config(
     DiComp(config): DiComp<ConfigAppService>,
     axum::extract::Path(config_id): axum::extract::Path<u64>,
     Json(req): Json<UpdateConfigRequest>,
-) -> Result<R<ConfigResponse>, ApiErr> {
+) -> Result<ApiR<ConfigResponse>, ApiErr> {
     ensure_permission("config:update").await?;
     use admin_app::empty_string::opt_filter;
     let mut req = req;
@@ -52,34 +52,34 @@ async fn update_config(
     req.remark = opt_filter(req.remark);
     let login_id = StpUtil::get_login_id_as_string().await?;
     let r = config.update_config(req, Some(login_id)).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 async fn delete_config(
     DiComp(config): DiComp<ConfigAppService>,
     axum::extract::Path(config_id): axum::extract::Path<u64>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("config:delete").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     config.delete_config(config_id, Some(login_id)).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 async fn list_configs(
     DiComp(config): DiComp<ConfigAppService>,
     Json(req): Json<ListConfigsRequest>,
-) -> Result<R<Page<ConfigResponse>>, ApiErr> {
+) -> Result<ApiR<Page<ConfigResponse>>, ApiErr> {
     ensure_permission("config:view").await?;
     let page = config.get_config_page(req).await?;
-    Ok(R(ApiR::success(page)))
+    Ok(ApiR::success(page))
 }
 
 /// GET /api/config/key/{key}
 async fn get_config_by_key(
     DiComp(config): DiComp<ConfigAppService>,
     axum::extract::Path(key): axum::extract::Path<String>,
-) -> Result<R<ConfigResponse>, ApiErr> {
+) -> Result<ApiR<ConfigResponse>, ApiErr> {
     ensure_permission("config:view").await?;
     let r = config.get_by_key(&key).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }

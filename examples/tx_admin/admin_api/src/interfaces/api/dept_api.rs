@@ -8,7 +8,7 @@ use admin_app::empty_string::opt_filter;
 use tx_common::{ApiR, ApiRes};
 use axum::routing::{delete, get, post, put};
 use tx_di_axum::bound::DiComp;
-use tx_di_axum::{R, Router};
+use tx_di_axum::Router;
 use crate::auth::ensure_permission;
 use crate::error::ApiErr;
 use tx_di_sa_token::StpUtil;
@@ -25,54 +25,54 @@ pub fn router() -> Router {
 async fn create_dept(
     DiComp(dept): DiComp<DepartmentAppService>,
     Json(mut req): Json<CreateDeptRequest>,
-) -> Result<R<DeptResponse>, ApiErr> {
+) -> Result<ApiR<DeptResponse>, ApiErr> {
     ensure_permission("dept:create").await?;
     req.phone = opt_filter(req.phone);
     req.email = opt_filter(req.email);
     let login_id = StpUtil::get_login_id_as_string().await?;
     let r = dept.create_dept(req, Some(login_id)).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 async fn get_dept(
     DiComp(dept): DiComp<DepartmentAppService>,
     axum::extract::Path(dept_id): axum::extract::Path<u64>,
-) -> Result<R<DeptResponse>, ApiErr> {
+) -> Result<ApiR<DeptResponse>, ApiErr> {
     ensure_permission("dept:view").await?;
     let r = dept.get_dept(dept_id).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 async fn update_dept(
     DiComp(dept): DiComp<DepartmentAppService>,
     axum::extract::Path(dept_id): axum::extract::Path<u64>,
     Json(mut req): Json<UpdateDeptRequest>,
-) -> Result<R<DeptResponse>, ApiErr> {
+) -> Result<ApiR<DeptResponse>, ApiErr> {
     ensure_permission("dept:update").await?;
     req.dept_id = dept_id;
     req.phone = opt_filter(req.phone);
     req.email = opt_filter(req.email);
     let login_id = StpUtil::get_login_id_as_string().await?;
     let r = dept.update_dept(req, Some(login_id)).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 async fn delete_dept(
     DiComp(dept): DiComp<DepartmentAppService>,
     axum::extract::Path(dept_id): axum::extract::Path<u64>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("dept:delete").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     dept.delete_dept(dept_id, Some(login_id)).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 async fn list_depts(
     DiComp(dept): DiComp<DepartmentAppService>,
     Json(mut req): Json<ListDeptsRequest>,
-) -> Result<R<Vec<DeptTreeNode>>, ApiErr> {
+) -> Result<ApiR<Vec<DeptTreeNode>>, ApiErr> {
     ensure_permission("dept:view").await?;
     req.name = opt_filter(req.name);
     let tree = dept.get_dept_tree(req).await?;
-    Ok(R(ApiR::success(tree)))
+    Ok(ApiR::success(tree))
 }

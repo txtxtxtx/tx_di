@@ -2,7 +2,7 @@
 
 use axum::Json;
 use tx_di_sa_token::StpUtil;
-use tx_di_axum::{R, Router};
+use tx_di_axum::Router;
 use axum::routing::{get, post, put, delete};
 use tx_di_axum::bound::DiComp;
 use admin_app::role::app_service::RoleAppService;
@@ -29,83 +29,83 @@ pub fn router() -> Router {
 async fn create_role(
     DiComp(role): DiComp<RoleAppService>,
     Json(mut req): Json<CreateRoleRequest>,
-) -> Result<R<RoleResponse>, ApiErr> {
+) -> Result<ApiR<RoleResponse>, ApiErr> {
     ensure_permission("role:create").await?;
     use admin_app::empty_string::opt_filter;
     req.remark = opt_filter(req.remark);
     let login_id = StpUtil::get_login_id_as_string().await?;
     let r = role.create_role(req, Some(login_id)).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 async fn get_role(
     DiComp(role): DiComp<RoleAppService>,
     axum::extract::Path(role_id): axum::extract::Path<u64>,
-) -> Result<R<RoleResponse>, ApiErr> {
+) -> Result<ApiR<RoleResponse>, ApiErr> {
     ensure_permission("role:view").await?;
     let r = role.get_role(role_id).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 async fn update_role(
     DiComp(role): DiComp<RoleAppService>,
     axum::extract::Path(role_id): axum::extract::Path<u64>,
     Json(mut req): Json<UpdateRoleRequest>,
-) -> Result<R<RoleResponse>, ApiErr> {
+) -> Result<ApiR<RoleResponse>, ApiErr> {
     ensure_permission("role:update").await?;
     use admin_app::empty_string::opt_filter;
     req.role_id = role_id;
     req.remark = opt_filter(req.remark);
     let login_id = StpUtil::get_login_id_as_string().await?;
     let r = role.update_role(req, Some(login_id)).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 async fn delete_role(
     DiComp(role): DiComp<RoleAppService>,
     axum::extract::Path(role_id): axum::extract::Path<u64>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("role:delete").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     role.delete_role(role_id, Some(login_id)).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 async fn list_roles(
     DiComp(role): DiComp<RoleAppService>,
     Json(req): Json<ListRolesRequest>,
-) -> Result<R<Page<RoleResponse>>, ApiErr> {
+) -> Result<ApiR<Page<RoleResponse>>, ApiErr> {
     ensure_permission("role:view").await?;
     let page = role.get_role_page(req).await?;
-    Ok(R(ApiR::success(page)))
+    Ok(ApiR::success(page))
 }
 
 async fn assign_menus(
     DiComp(role): DiComp<RoleAppService>,
     Json(req): Json<AssignMenusRequest>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("role:assign_menu").await?;
     role.assign_menus(req).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 /// GET /api/role/all
 async fn get_all_roles(
     DiComp(role): DiComp<RoleAppService>,
-) -> Result<R<Vec<RoleResponse>>, ApiErr> {
+) -> Result<ApiR<Vec<RoleResponse>>, ApiErr> {
     ensure_permission("role:view").await?;
     let list = role.get_all_roles().await?;
-    Ok(R(ApiR::success(list)))
+    Ok(ApiR::success(list))
 }
 
 /// GET /api/role/{role_id}/users
 async fn get_role_users(
     DiComp(role): DiComp<RoleAppService>,
     axum::extract::Path(role_id): axum::extract::Path<u64>,
-) -> Result<R<Vec<UserResponse>>, ApiErr> {
+) -> Result<ApiR<Vec<UserResponse>>, ApiErr> {
     ensure_permission("role:view").await?;
     let users = role.get_role_users(role_id).await?;
-    Ok(R(ApiR::success(users)))
+    Ok(ApiR::success(users))
 }
 
 /// POST /api/role/{role_id}/users
@@ -113,10 +113,10 @@ async fn add_users_to_role(
     DiComp(role): DiComp<RoleAppService>,
     axum::extract::Path(role_id): axum::extract::Path<u64>,
     Json(user_ids): Json<Vec<u64>>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("role:assign_menu").await?;
     role.add_users_to_role(role_id, user_ids).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 /// DELETE /api/role/{role_id}/users
@@ -124,8 +124,8 @@ async fn remove_users_from_role(
     DiComp(role): DiComp<RoleAppService>,
     axum::extract::Path(role_id): axum::extract::Path<u64>,
     Json(user_ids): Json<Vec<u64>>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("role:assign_menu").await?;
     role.remove_users_from_role(role_id, user_ids).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }

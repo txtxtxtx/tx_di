@@ -2,7 +2,7 @@
 
 use axum::Json;
 use tx_di_sa_token::StpUtil;
-use tx_di_axum::{R, Router};
+use tx_di_axum::Router;
 use axum::routing::{get, post, put, delete};
 use tx_di_axum::bound::DiComp;
 use admin_app::user::app_service::UserAppService;
@@ -38,21 +38,21 @@ pub fn router() -> Router {
 async fn create_user(
     DiComp(user_svc): DiComp<UserAppService>,
     Json(req): Json<CreateUserRequest>,
-) -> Result<R<UserResponse>, ApiErr> {
+) -> Result<ApiR<UserResponse>, ApiErr> {
     ensure_permission("user:create").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     let r = user_svc.create_user(req, Some(login_id)).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 /// GET /api/user/{user_id}
 async fn get_user(
     DiComp(user_svc): DiComp<UserAppService>,
     axum::extract::Path(user_id): axum::extract::Path<u64>,
-) -> Result<R<UserResponse>, ApiErr> {
+) -> Result<ApiR<UserResponse>, ApiErr> {
     ensure_permission("user:view").await?;
     let r = user_svc.get_user(user_id).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 /// PUT /api/user/{user_id}
@@ -60,119 +60,119 @@ async fn update_user(
     DiComp(user_svc): DiComp<UserAppService>,
     axum::extract::Path(user_id): axum::extract::Path<u64>,
     Json(mut req): Json<UpdateUserRequest>,
-) -> Result<R<UserResponse>, ApiErr> {
+) -> Result<ApiR<UserResponse>, ApiErr> {
     ensure_permission("user:update").await?;
     req.user_id = user_id;
     let login_id = StpUtil::get_login_id_as_string().await?;
     let r = user_svc.update_user(req, Some(login_id)).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 /// DELETE /api/user/{user_id}
 async fn delete_user(
     DiComp(user_svc): DiComp<UserAppService>,
     axum::extract::Path(user_id): axum::extract::Path<u64>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("user:delete").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     user_svc.delete_user(user_id, Some(login_id)).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 /// POST /api/user/list
 async fn list_users(
     DiComp(user_svc): DiComp<UserAppService>,
     Json(req): Json<ListUsersRequest>,
-) -> Result<R<Page<UserResponse>>, ApiErr> {
+) -> Result<ApiR<Page<UserResponse>>, ApiErr> {
     ensure_permission("user:view").await?;
     let page = user_svc.get_user_page(req).await?;
-    Ok(R(ApiR::success(page)))
+    Ok(ApiR::success(page))
 }
 
 /// POST /api/user/change-password
 async fn change_password(
     DiComp(user_svc): DiComp<UserAppService>,
     Json(req): Json<ChangePasswordRequest>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("user:password").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     user_svc.change_password(req, Some(login_id)).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 /// POST /api/user/assign-roles
 async fn assign_roles(
     DiComp(user_svc): DiComp<UserAppService>,
     Json(req): Json<AssignRolesRequest>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("user:assign_role").await?;
     user_svc.assign_roles(req).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 /// POST /api/user/assign-depts
 async fn assign_depts(
     DiComp(user_svc): DiComp<UserAppService>,
     Json(req): Json<AssignDeptsRequest>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("user:assign_dept").await?;
     user_svc.assign_departments(req).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 /// POST /api/user/change-status
 async fn change_user_status(
     DiComp(user_svc): DiComp<UserAppService>,
     Json(req): Json<ChangeUserStatusRequest>,
-) -> Result<R<UserResponse>, ApiErr> {
+) -> Result<ApiR<UserResponse>, ApiErr> {
     ensure_permission("user:status").await?;
     let status = UserStatus::try_from_i32(req.status)
         .map_err(|_| anyhow::anyhow!("invalid status"))?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     let r = user_svc.change_status(req.user_id, status, Some(login_id)).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 /// POST /api/user/enable
 async fn enable_user(
     DiComp(user_svc): DiComp<UserAppService>,
     Json(req): Json<UserIdRequest>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("user:status").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     user_svc.change_status(req.user_id, UserStatus::Active, Some(login_id)).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 /// POST /api/user/disable
 async fn disable_user(
     DiComp(user_svc): DiComp<UserAppService>,
     Json(req): Json<UserIdRequest>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("user:status").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     user_svc.change_status(req.user_id, UserStatus::Disabled, Some(login_id)).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 /// POST /api/user/lock
 async fn lock_user(
     DiComp(user_svc): DiComp<UserAppService>,
     Json(req): Json<UserIdRequest>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("user:status").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     user_svc.change_status(req.user_id, UserStatus::Locked, Some(login_id)).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 /// POST /api/user/unlock
 async fn unlock_user(
     DiComp(user_svc): DiComp<UserAppService>,
     Json(req): Json<UserIdRequest>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("user:status").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     user_svc.change_status(req.user_id, UserStatus::Active, Some(login_id)).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }

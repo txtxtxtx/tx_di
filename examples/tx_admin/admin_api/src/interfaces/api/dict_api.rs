@@ -1,7 +1,7 @@
 //! 字典管理 HTTP API
 
 use axum::Json;
-use tx_di_axum::{R, Router};
+use tx_di_axum::Router;
 use axum::routing::{get, post, put, delete};
 use tx_di_axum::bound::DiComp;
 use admin_app::dictionary::app_service::{DictTypeAppService, DictDataAppService};
@@ -30,127 +30,127 @@ pub fn router() -> Router {
 async fn create_dict_type(
     DiComp(dict_type): DiComp<DictTypeAppService>,
     Json(req): Json<CreateDictTypeRequest>,
-) -> Result<R<DictTypeResponse>, ApiErr> {
+) -> Result<ApiR<DictTypeResponse>, ApiErr> {
     ensure_permission("dict:create").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     let r = dict_type.create_dict_type(req, Some(login_id)).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 async fn get_dict_type(
     DiComp(dict_type): DiComp<DictTypeAppService>,
     axum::extract::Path(id): axum::extract::Path<u64>,
-) -> Result<R<DictTypeResponse>, ApiErr> {
+) -> Result<ApiR<DictTypeResponse>, ApiErr> {
     ensure_permission("dict:view").await?;
     let q = ListDictTypesRequest { name: None, dict_type: None, status: None, page: 1, page_size: 100 };
     let page = dict_type.get_dict_type_page(q).await?;
     let r = page.list.into_iter().find(|d| d.id == id)
         .ok_or_else(|| anyhow::anyhow!("not found"))?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 async fn update_dict_type(
     DiComp(dict_type): DiComp<DictTypeAppService>,
     axum::extract::Path(id): axum::extract::Path<u64>,
     Json(req): Json<UpdateDictTypeRequest>,
-) -> Result<R<DictTypeResponse>, ApiErr> {
+) -> Result<ApiR<DictTypeResponse>, ApiErr> {
     ensure_permission("dict:update").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     let mut req = req;
     req.id = id;
     let r = dict_type.update_dict_type(req, Some(login_id)).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 async fn delete_dict_type(
     DiComp(dict_type): DiComp<DictTypeAppService>,
     axum::extract::Path(id): axum::extract::Path<u64>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("dict:delete").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     dict_type.delete_dict_type(id, Some(login_id)).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 async fn list_dict_types(
     DiComp(dict_type): DiComp<DictTypeAppService>,
     Json(req): Json<ListDictTypesRequest>,
-) -> Result<R<Page<DictTypeResponse>>, ApiErr> {
+) -> Result<ApiR<Page<DictTypeResponse>>, ApiErr> {
     ensure_permission("dict:view").await?;
     let page = dict_type.get_dict_type_page(req).await?;
-    Ok(R(ApiR::success(page)))
+    Ok(ApiR::success(page))
 }
 
 async fn create_dict_data(
     DiComp(dict_data): DiComp<DictDataAppService>,
     Json(req): Json<CreateDictDataRequest>,
-) -> Result<R<DictDataResponse>, ApiErr> {
+) -> Result<ApiR<DictDataResponse>, ApiErr> {
     ensure_permission("dict:create").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     let r = dict_data.create_dict_data(req, Some(login_id)).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 async fn get_dict_data(
     DiComp(dict_data): DiComp<DictDataAppService>,
     axum::extract::Path(id): axum::extract::Path<u64>,
-) -> Result<R<DictDataResponse>, ApiErr> {
+) -> Result<ApiR<DictDataResponse>, ApiErr> {
     ensure_permission("dict:view").await?;
     let q = ListDictDataRequest { dict_type: None, label: None, status: None, page: 1, page_size: 100 };
     let page = dict_data.get_dict_data_page(q).await?;
     let r = page.list.into_iter().find(|d| d.id == id)
         .ok_or_else(|| anyhow::anyhow!("not found"))?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 async fn update_dict_data(
     DiComp(dict_data): DiComp<DictDataAppService>,
     axum::extract::Path(id): axum::extract::Path<u64>,
     Json(req): Json<UpdateDictDataRequest>,
-) -> Result<R<DictDataResponse>, ApiErr> {
+) -> Result<ApiR<DictDataResponse>, ApiErr> {
     ensure_permission("dict:update").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     let mut req = req;
     req.id = id;
     let r = dict_data.update_dict_data(req, Some(login_id)).await?;
-    Ok(R(ApiR::success(r)))
+    Ok(ApiR::success(r))
 }
 
 async fn delete_dict_data(
     DiComp(dict_data): DiComp<DictDataAppService>,
     axum::extract::Path(id): axum::extract::Path<u64>,
-) -> Result<R<Empty>, ApiErr> {
+) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("dict:delete").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     dict_data.delete_dict_data(id, Some(login_id)).await?;
-    Ok(R(ApiRes::ok().into_typed()))
+    Ok(ApiRes::ok().into_typed())
 }
 
 async fn list_dict_data(
     DiComp(dict_data): DiComp<DictDataAppService>,
     Json(req): Json<ListDictDataRequest>,
-) -> Result<R<Page<DictDataResponse>>, ApiErr> {
+) -> Result<ApiR<Page<DictDataResponse>>, ApiErr> {
     ensure_permission("dict:view").await?;
     let page = dict_data.get_dict_data_page(req).await?;
-    Ok(R(ApiR::success(page)))
+    Ok(ApiR::success(page))
 }
 
 /// GET /api/dict/data/type/{dict_type}
 async fn get_dict_data_by_type(
     DiComp(dict_data): DiComp<DictDataAppService>,
     axum::extract::Path(dict_type): axum::extract::Path<String>,
-) -> Result<R<Vec<DictDataResponse>>, ApiErr> {
+) -> Result<ApiR<Vec<DictDataResponse>>, ApiErr> {
     ensure_permission("dict:view").await?;
     let list = dict_data.get_by_dict_type(&dict_type).await?;
-    Ok(R(ApiR::success(list)))
+    Ok(ApiR::success(list))
 }
 
 /// GET /api/dict/data/code/{dict_code}
 async fn get_dict_data_by_code(
     DiComp(dict_data): DiComp<DictDataAppService>,
     axum::extract::Path(dict_code): axum::extract::Path<String>,
-) -> Result<R<Vec<DictDataResponse>>, ApiErr> {
+) -> Result<ApiR<Vec<DictDataResponse>>, ApiErr> {
     ensure_permission("dict:view").await?;
     let list = dict_data.get_by_dict_type(&dict_code).await?;
-    Ok(R(ApiR::success(list)))
+    Ok(ApiR::success(list))
 }
