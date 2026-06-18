@@ -3,7 +3,7 @@ import type { RouteRecordRaw } from 'vue-router'
 import Layout from '@/layout/index.vue'
 import type { MenuTreeNode } from '@/types'
 
-// 静态路由：登录页和 Layout 壳子（仪表盘始终可见）
+// 静态路由：登录页和 Layout 壳子（用户中心始终可见）
 const staticRoutes: RouteRecordRaw[] = [
   {
     path: '/login',
@@ -11,19 +11,19 @@ const staticRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/login/index.vue'),
     meta: { title: '登录' },
   },
-  // {
-  //   path: '/',
-  //   component: Layout,
-  //   redirect: '/dashboard',
-  //   children: [
-  //     {
-  //       path: 'dashboard',
-  //       name: 'Dashboard',
-  //       component: () => import('@/views/dashboard/index.vue'),
-  //       meta: { title: '仪表盘', icon: 'Odometer' },
-  //     },
-  //   ],
-  // },
+  {
+    path: '/',
+    component: Layout,
+    redirect: '/user',
+    children: [
+      {
+        path: 'user',
+        name: 'UserCenter',
+        component: () => import('@/views/user/index.vue'),
+        meta: { title: '用户中心', icon: 'User' },
+      },
+    ],
+  },
 ]
 
 const router = createRouter({

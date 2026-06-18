@@ -14,10 +14,10 @@
         active-text-color="#409EFF"
         router
       >
-        <!-- 仪表盘（始终显示） -->
-        <el-menu-item index="/dashboard">
-          <el-icon><Odometer /></el-icon>
-          <template #title>仪表盘</template>
+        <!-- 用户中心（始终显示） -->
+        <el-menu-item index="/user">
+          <el-icon><User /></el-icon>
+          <template #title>用户中心</template>
         </el-menu-item>
 
         <!-- 后端菜单树 -->
