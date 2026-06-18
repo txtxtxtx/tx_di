@@ -22,8 +22,8 @@ use tx_error::AppResult;
 
 #[tokio::main]
 async fn main() -> AppResult<()> {
-    // let config_path = r"C:\a_me\proj\rust\tx_di\examples\tx_admin\config\config.toml";
-    let config_path = r"D:\proj\tx_di\examples\tx_admin\config\config.toml";
+    let config_path = r"C:\a_me\proj\rust\tx_di\examples\tx_admin\config\config.toml";
+    // let config_path = r"D:\proj\tx_di\examples\tx_admin\config\config.toml";
     let app = BuildContext::new(Some(config_path)).build()?;
     let app = app.ins_run().await?;
 
