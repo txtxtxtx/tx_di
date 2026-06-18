@@ -105,7 +105,7 @@ const query = reactive({ name: '', category: '', configKey: '' })
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref<FormInstance>()
-const form = reactive({ id: 0, name: '', configKey: '', value: '', category: '', configType: 1, visible: 0, remark: '' })
+const form = reactive({ id: '', name: '', configKey: '', value: '', category: '', configType: 1, visible: 0, remark: '' })
 const formRules: FormRules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
   configKey: [{ required: true, message: '请输入键名', trigger: 'blur' }],
@@ -129,7 +129,7 @@ function openDialog(row?: ConfigResponse) {
   if (row) {
     Object.assign(form, { id: row.id, name: row.name, configKey: row.configKey, value: row.value, category: row.category, configType: row.configType, visible: row.visible, remark: row.remark || '' })
   } else {
-    Object.assign(form, { id: 0, name: '', configKey: '', value: '', category: '', configType: 1, visible: 0, remark: '' })
+    Object.assign(form, { id: '', name: '', configKey: '', value: '', category: '', configType: 1, visible: 0, remark: '' })
   }
   dialogVisible.value = true
 }

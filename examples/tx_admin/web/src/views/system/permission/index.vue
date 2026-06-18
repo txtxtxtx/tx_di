@@ -45,7 +45,7 @@
         </el-form-item>
         <el-form-item label="上级权限">
           <el-select v-model="form.parentId" clearable placeholder="顶级">
-            <el-option :key="0" label="顶级" :value="0" />
+            <el-option key="0" label="顶级" value="0" />
             <el-option v-for="p in allPermissions" :key="p.id" :label="p.name" :value="p.id" />
           </el-select>
         </el-form-item>
@@ -80,7 +80,7 @@ const allPermissions = ref<PermissionDetail[]>([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref<FormInstance>()
-const form = reactive({ id: 0, name: '', permissionCode: '', type: 0, parentId: 0, sort: 0, description: '' })
+const form = reactive({ id: '', name: '', permissionCode: '', type: 0, parentId: '', sort: 0, description: '' })
 const formRules: FormRules = {
   name: [{ required: true, message: '请输入权限名称', trigger: 'blur' }],
   permissionCode: [{ required: true, message: '请输入权限编码', trigger: 'blur' }],
@@ -100,7 +100,7 @@ function openDialog(row?: PermissionDetail) {
   if (row) {
     Object.assign(form, { id: row.id, name: row.name, permissionCode: row.permissionCode, type: row.type, parentId: row.parentId, sort: row.sort, description: row.description })
   } else {
-    Object.assign(form, { id: 0, name: '', permissionCode: '', type: 0, parentId: 0, sort: 0, description: '' })
+    Object.assign(form, { id: '', name: '', permissionCode: '', type: 0, parentId: '', sort: 0, description: '' })
   }
   dialogVisible.value = true
 }

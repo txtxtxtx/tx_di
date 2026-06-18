@@ -5,15 +5,15 @@ export function createUser(data: CreateUserRequest) {
   return request.post<ApiRes<UserResponse>>('/api/user/', data).then(r => r.data)
 }
 
-export function getUser(userId: number) {
+export function getUser(userId: string) {
   return request.get<ApiRes<UserResponse>>(`/api/user/${userId}`).then(r => r.data)
 }
 
-export function updateUser(userId: number, data: UpdateUserRequest) {
+export function updateUser(userId: string, data: UpdateUserRequest) {
   return request.put<ApiRes<UserResponse>>(`/api/user/${userId}`, data).then(r => r.data)
 }
 
-export function deleteUser(userId: number) {
+export function deleteUser(userId: string) {
   return request.delete<ApiRes<null>>(`/api/user/${userId}`).then(r => r.data)
 }
 

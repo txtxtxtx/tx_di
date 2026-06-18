@@ -5,15 +5,15 @@ export function createDept(data: CreateDeptRequest) {
   return request.post<ApiRes<DeptTreeNode>>('/api/dept/', data).then(r => r.data)
 }
 
-export function getDept(deptId: number) {
+export function getDept(deptId: string) {
   return request.get<ApiRes<DeptTreeNode>>(`/api/dept/${deptId}`).then(r => r.data)
 }
 
-export function updateDept(deptId: number, data: UpdateDeptRequest) {
+export function updateDept(deptId: string, data: UpdateDeptRequest) {
   return request.put<ApiRes<DeptTreeNode>>(`/api/dept/${deptId}`, data).then(r => r.data)
 }
 
-export function deleteDept(deptId: number) {
+export function deleteDept(deptId: string) {
   return request.delete<ApiRes<null>>(`/api/dept/${deptId}`).then(r => r.data)
 }
 

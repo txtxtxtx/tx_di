@@ -66,7 +66,7 @@ const page = ref(1)
 const size = ref(10)
 const total = ref(0)
 const query = reactive({ username: '', loginIp: '', result: undefined as number | undefined })
-const selectedIds = ref<number[]>([])
+const selectedIds = ref<string[]>([])
 
 async function loadData() {
   loading.value = true

@@ -136,7 +136,7 @@ const query = reactive({ name: '', code: '', status: undefined as number | undef
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref<FormInstance>()
-const form = reactive({ id: 0, name: '', code: '', sort: 0, data_scope: 1, remark: '' })
+const form = reactive({ id: '', name: '', code: '', sort: 0, data_scope: 1, remark: '' })
 const formRules: FormRules = {
   name: [{ required: true, message: '请输入角色名', trigger: 'blur' }],
   code: [{ required: true, message: '请输入角色编码', trigger: 'blur' }],
@@ -144,9 +144,9 @@ const formRules: FormRules = {
 
 const menuDialogVisible = ref(false)
 const menuTreeData = ref<MenuTreeNode[]>([])
-const selectedMenuIds = ref<number[]>([])
+const selectedMenuIds = ref<string[]>([])
 const menuTreeRef = ref()
-const currentRoleId = ref(0)
+const currentRoleId = ref('')
 
 const roleUsersVisible = ref(false)
 const roleUsers = ref<UserResponse[]>([])
@@ -178,7 +178,7 @@ function openDialog(row?: RoleResponse) {
   if (row) {
     Object.assign(form, { id: row.id, name: row.name, code: row.code, sort: row.sort, data_scope: row.dataScope, remark: row.remark || '' })
   } else {
-    Object.assign(form, { id: 0, name: '', code: '', sort: 0, data_scope: 1, remark: '' })
+    Object.assign(form, { id: '', name: '', code: '', sort: 0, data_scope: 1, remark: '' })
   }
   dialogVisible.value = true
 }

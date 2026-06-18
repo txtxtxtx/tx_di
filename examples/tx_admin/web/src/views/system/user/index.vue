@@ -157,7 +157,7 @@ const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref<FormInstance>()
 const form = reactive({
-  id: 0,
+  id: '',
   username: '',
   password: '',
   nickname: '',
@@ -174,14 +174,14 @@ const formRules: FormRules = {
 
 // 角色分配
 const rolesDialogVisible = ref(false)
-const allRoleOptions = ref<{ key: number; label: string }[]>([])
-const selectedRoleIds = ref<number[]>([])
-const currentUserId = ref(0)
+const allRoleOptions = ref<{ key: string; label: string }[]>([])
+const selectedRoleIds = ref<string[]>([])
+const currentUserId = ref('')
 
 // 部门分配
 const deptsDialogVisible = ref(false)
 const deptTreeData = ref<DeptTreeNode[]>([])
-const selectedDeptIds = ref<number[]>([])
+const selectedDeptIds = ref<string[]>([])
 const deptTreeRef = ref()
 
 async function loadData() {
@@ -224,7 +224,7 @@ function openDialog(row?: UserResponse) {
       remark: row.remark || '',
     })
   } else {
-    Object.assign(form, { id: 0, username: '', password: '', nickname: '', email: '', mobile: '', sex: undefined, remark: '' })
+    Object.assign(form, { id: '', username: '', password: '', nickname: '', email: '', mobile: '', sex: undefined, remark: '' })
   }
   dialogVisible.value = true
 }

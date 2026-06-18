@@ -100,7 +100,7 @@ const query = reactive({ dictType: (route.query.dictType as string) || '', label
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref<FormInstance>()
-const form = reactive({ id: 0, dictType: '', label: '', value: '', sort: 0, remark: '' })
+const form = reactive({ id: '', dictType: '', label: '', value: '', sort: 0, remark: '' })
 const formRules: FormRules = {
   dictType: [{ required: true, message: '请输入字典类型', trigger: 'blur' }],
   label: [{ required: true, message: '请输入标签', trigger: 'blur' }],
@@ -123,7 +123,7 @@ function openDialog(row?: DictDataResponse) {
   if (row) {
     Object.assign(form, { id: row.id, dictType: row.dictType, label: row.label, value: row.value, sort: row.sort, remark: row.remark || '' })
   } else {
-    Object.assign(form, { id: 0, dictType: query.dictType || '', label: '', value: '', sort: 0, remark: '' })
+    Object.assign(form, { id: '', dictType: query.dictType || '', label: '', value: '', sort: 0, remark: '' })
   }
   dialogVisible.value = true
 }

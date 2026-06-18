@@ -20,22 +20,22 @@ export interface LoginRequest {
   loginIp: string
 }
 
-// proto, camelCase
+// proto, camelCase, u64 fields as string
 export interface LoginResponse {
-  userId: number
+  userId: string
   username: string
   nickname: string
-  tenantId: number
-  roleIds: number[]
+  tenantId: string
+  roleIds: string[]
   permissions: string[]
-  deptIds: number[]
+  deptIds: string[]
   token: string
   roleCodes: string[]
 }
 
-// proto, camelCase
+// proto, camelCase, u64 fields as string
 export interface UserInfoResponse {
-  userId: number
+  userId: string
   username: string
   nickname: string
   email: string | null
@@ -43,12 +43,13 @@ export interface UserInfoResponse {
   avatar: string | null
   roles: string[]
   permissions: string[]
-  tenantId: number
+  tenantId: string
 }
 
 // ==================== 用户 (proto, camelCase) ====================
+// u64 fields: id, roleIds, deptIds, tenantId, loginDate, createTime, updateTime
 export interface UserResponse {
-  id: number
+  id: string
   username: string
   nickname: string
   email: string | null
@@ -56,17 +57,17 @@ export interface UserResponse {
   sex: number
   status: number
   remark: string | null
-  roleIds: number[]
-  deptIds: number[]
+  roleIds: string[]
+  deptIds: string[]
   avatar: string | null
   loginIp: string | null
-  loginDate: number
-  tenantId: number
-  createTime: number
-  updateTime: number
+  loginDate: string
+  tenantId: string
+  createTime: string
+  updateTime: string
 }
 
-// proto, camelCase
+// proto, camelCase, u64 fields as string
 export interface CreateUserRequest {
   username: string
   password: string
@@ -75,8 +76,8 @@ export interface CreateUserRequest {
   mobile?: string
   sex?: number
   remark?: string
-  roleIds: number[]
-  deptIds: number[]
+  roleIds: string[]
+  deptIds: string[]
 }
 
 export interface UpdateUserRequest {
@@ -93,52 +94,53 @@ export interface ListUsersRequest {
   nickname?: string
   mobile?: string
   status?: number
-  deptId?: number
+  deptId?: string
   pageInfo?: { page: number; size: number }
 }
 
-// proto, camelCase
+// proto, camelCase, u64 fields as string
 export interface ChangePasswordRequest {
-  userId: number
+  userId: string
   newPassword: string
 }
 
-// proto, camelCase
+// proto, camelCase, u64 fields as string
 export interface AssignRolesRequest {
-  userId: number
-  roleIds: number[]
+  userId: string
+  roleIds: string[]
 }
 
-// proto, camelCase
+// proto, camelCase, u64 fields as string
 export interface AssignDeptsRequest {
-  userId: number
-  deptIds: number[]
+  userId: string
+  deptIds: string[]
 }
 
-// proto, camelCase
+// proto, camelCase, u64 fields as string
 export interface UserIdRequest {
-  userId: number
+  userId: string
 }
 
 // ==================== 角色 (proto, camelCase) ====================
+// u64 fields: id, menuIds
 export interface RoleResponse {
-  id: number
+  id: string
   name: string
   code: string
   sort: number
   dataScope: number
   status: number
   remark: string | null
-  menuIds: number[]
+  menuIds: string[]
 }
 
-// proto, camelCase
+// proto, camelCase, u64 fields as string
 export interface CreateRoleRequest {
   name: string
   code: string
   sort: number
   remark?: string
-  menuIds: number[]
+  menuIds: string[]
 }
 
 // proto, camelCase
@@ -158,20 +160,21 @@ export interface ListRolesRequest {
   pageSize: number
 }
 
-// proto, camelCase
+// proto, camelCase, u64 fields as string
 export interface AssignMenusRequest {
-  roleId: number
-  menuIds: number[]
+  roleId: string
+  menuIds: string[]
 }
 
 // ==================== 菜单 (domain, snake_case) ====================
+// u64 fields: id, parent_id
 export interface MenuTreeNode {
-  id: number
+  id: string
   name: string
   permission: string
   types: number
   sort: number
-  parent_id: number
+  parent_id: string
   path: string | null
   icon: string | null
   component: string | null
@@ -182,24 +185,26 @@ export interface MenuTreeNode {
   children: MenuTreeNode[]
 }
 
+// proto, u64 fields as string
 export interface CreateMenuRequest {
   name: string
   permission: string
   types: number
   sort: number
-  parent_id: number
+  parent_id: string
   path?: string
   icon?: string
   component?: string
   component_name?: string
 }
 
+// proto, u64 fields as string
 export interface UpdateMenuRequest {
   name: string
   permission: string
   types: number
   sort: number
-  parent_id: number
+  parent_id: string
   path?: string
   icon?: string
   component?: string
@@ -214,30 +219,33 @@ export interface ListMenusRequest {
 }
 
 // ==================== 部门 (domain, snake_case) ====================
+// u64 fields: id, parent_id, leader_user_id
 export interface DeptTreeNode {
-  id: number
+  id: string
   name: string
-  parent_id: number
+  parent_id: string
   sort: number
-  leader_user_id: number | null
+  leader_user_id: string | null
   status: number
   children: DeptTreeNode[]
 }
 
+// u64 fields as string
 export interface CreateDeptRequest {
   name: string
-  parent_id: number
+  parent_id: string
   sort: number
-  leader_user_id?: number
+  leader_user_id?: string
   phone?: string
   email?: string
 }
 
+// u64 fields as string
 export interface UpdateDeptRequest {
   name: string
-  parent_id: number
+  parent_id: string
   sort: number
-  leader_user_id?: number
+  leader_user_id?: string
   phone?: string
   email?: string
 }
@@ -248,40 +256,41 @@ export interface ListDeptsRequest {
 }
 
 // ==================== 权限 (proto, camelCase) ====================
+// u64 fields: id, parentId
 export interface PermissionDetail {
-  id: number
+  id: string
   name: string
   permissionCode: string
   type: number
-  parentId: number
+  parentId: string
   sort: number
   description: string
   status: number
 }
 
-// proto, camelCase
+// proto, camelCase, u64 fields as string
 export interface CreatePermissionRequest {
   name: string
   permissionCode: string
   type: number
-  parentId: number
+  parentId: string
   sort: number
   description: string
 }
 
-// proto, camelCase
+// proto, camelCase, u64 fields as string
 export interface UpdatePermissionRequest {
   name: string
   permissionCode: string
   type: number
-  parentId: number
+  parentId: string
   sort: number
   description: string
 }
 
-// proto, camelCase
+// proto, camelCase, u64 fields as string
 export interface PermissionCheckRequest {
-  userId: number
+  userId: string
   permission: string
 }
 
@@ -295,15 +304,17 @@ export interface UserPermissionItem {
   permissionType: string
 }
 
+// u64 fields as string
 export interface UserPermissionsResponse {
-  userId: number
+  userId: string
   permissions: string[]
   items: UserPermissionItem[]
 }
 
 // ==================== 配置 (proto, camelCase) ====================
+// u64 fields: id
 export interface ConfigResponse {
-  id: number
+  id: string
   category: string
   configType: number
   name: string
@@ -344,8 +355,9 @@ export interface ListConfigsRequest {
 }
 
 // ==================== 字典 (proto, camelCase) ====================
+// u64 fields: id
 export interface DictTypeResponse {
-  id: number
+  id: string
   name: string
   dictType: string
   status: number
@@ -374,8 +386,9 @@ export interface ListDictTypesRequest {
   pageSize: number
 }
 
+// u64 fields: id
 export interface DictDataResponse {
-  id: number
+  id: string
   sort: number
   label: string
   value: string
@@ -417,14 +430,15 @@ export interface ListDictDataRequest {
 }
 
 // ==================== 日志 (proto, camelCase) ====================
+// u64 fields: id, userId, bizId
 export interface OperateLogResponse {
-  id: number
+  id: string
   traceId: string
-  userId: number
+  userId: string
   userType: number
   logType: string
   subType: string
-  bizId: number
+  bizId: string
   action: string
   success: number
   extra: string
@@ -433,8 +447,9 @@ export interface OperateLogResponse {
   userIp: string | null
 }
 
+// u64 fields as string
 export interface ListOperateLogsRequest {
-  userId?: number
+  userId?: string
   logType?: string
   subType?: string
   success?: number
@@ -444,9 +459,10 @@ export interface ListOperateLogsRequest {
   pageSize: number
 }
 
+// u64 fields: id, userId
 export interface LoginLogResponse {
-  id: number
-  userId: number
+  id: string
+  userId: string
   userType: number
   username: string
   loginIp: string
@@ -455,8 +471,9 @@ export interface LoginLogResponse {
   msg: string | null
 }
 
+// u64 fields as string
 export interface ListLoginLogsRequest {
-  userId?: number
+  userId?: string
   username?: string
   loginIp?: string
   loginType?: string
@@ -467,13 +484,15 @@ export interface ListLoginLogsRequest {
   pageSize: number
 }
 
+// u64 fields as string
 export interface DeleteLogsRequest {
-  ids: number[]
+  ids: string[]
 }
 
 // ==================== 文件 (proto, camelCase) ====================
+// u64 fields: id; int32 fields: configId, size
 export interface FileResponse {
-  id: number
+  id: string
   configId: number | null
   name: string
   path: string
@@ -482,7 +501,7 @@ export interface FileResponse {
   size: number
 }
 
-// proto, camelCase
+// proto, camelCase, int32 fields as number
 export interface UploadFileRequest {
   name: string
   path: string
@@ -515,8 +534,9 @@ export interface ServerInfo {
   diskUsage: number
 }
 
+// u64 fields: userId
 export interface OnlineUser {
-  userId: number
+  userId: string
   username: string
   loginIp: string
   loginTime: string

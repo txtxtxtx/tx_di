@@ -93,7 +93,7 @@ const query = reactive({ name: '', dictType: '' as string, status: undefined as 
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref<FormInstance>()
-const form = reactive({ id: 0, name: '', dictType: '', remark: '' })
+const form = reactive({ id: '', name: '', dictType: '', remark: '' })
 const formRules: FormRules = {
   name: [{ required: true, message: '请输入字典名称', trigger: 'blur' }],
   dictType: [{ required: true, message: '请输入字典类型', trigger: 'blur' }],
@@ -115,7 +115,7 @@ function openDialog(row?: DictTypeResponse) {
   if (row) {
     Object.assign(form, { id: row.id, name: row.name, dictType: row.dictType, remark: row.remark || '' })
   } else {
-    Object.assign(form, { id: 0, name: '', dictType: '', remark: '' })
+    Object.assign(form, { id: '', name: '', dictType: '', remark: '' })
   }
   dialogVisible.value = true
 }

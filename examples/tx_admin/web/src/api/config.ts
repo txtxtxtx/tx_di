@@ -5,15 +5,15 @@ export function createConfig(data: CreateConfigRequest) {
   return request.post<ApiRes<ConfigResponse>>('/api/config/', data).then(r => r.data)
 }
 
-export function getConfig(configId: number) {
+export function getConfig(configId: string) {
   return request.get<ApiRes<ConfigResponse>>(`/api/config/${configId}`).then(r => r.data)
 }
 
-export function updateConfig(configId: number, data: UpdateConfigRequest) {
+export function updateConfig(configId: string, data: UpdateConfigRequest) {
   return request.put<ApiRes<ConfigResponse>>(`/api/config/${configId}`, data).then(r => r.data)
 }
 
-export function deleteConfig(configId: number) {
+export function deleteConfig(configId: string) {
   return request.delete<ApiRes<null>>(`/api/config/${configId}`).then(r => r.data)
 }
 

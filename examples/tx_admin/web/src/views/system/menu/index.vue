@@ -123,12 +123,12 @@ const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref<FormInstance>()
 const form = reactive({
-  id: 0,
+  id: '',
   name: '',
   permission: '',
   types: 0,
   sort: 0,
-  parent_id: 0,
+  parent_id: '',
   path: '',
   icon: '',
   component: '',
@@ -142,7 +142,7 @@ const formRules: FormRules = {
 }
 
 const menuTreeForSelect = computed(() => {
-  const root: MenuTreeNode = { id: 0, name: '顶级菜单', parent_id: 0, permission: '', types: 0, sort: 0, path: null, icon: null, component: null, component_name: null, status: 0, visible: 0, keep_alive: 0, children: treeData.value }
+  const root: MenuTreeNode = { id: '0', name: '顶级菜单', parent_id: '0', permission: '', types: 0, sort: 0, path: null, icon: null, component: null, component_name: null, status: 0, visible: 0, keep_alive: 0, children: treeData.value }
   return [root]
 })
 
@@ -155,7 +155,7 @@ async function loadData() {
 
 function resetQuery() { query.name = ''; query.status = undefined; loadData() }
 
-function openDialog(row?: MenuTreeNode | null, parentId?: number) {
+function openDialog(row?: MenuTreeNode | null, parentId?: string) {
   isEdit.value = !!row
   if (row) {
     Object.assign(form, {
@@ -166,7 +166,7 @@ function openDialog(row?: MenuTreeNode | null, parentId?: number) {
     })
   } else {
     Object.assign(form, {
-      id: 0, name: '', permission: '', types: 0, sort: 0, parent_id: parentId || 0,
+      id: '', name: '', permission: '', types: 0, sort: 0, parent_id: parentId || '',
       path: '', icon: '', component: '', component_name: '', visible: 0, keep_alive: 0,
     })
   }

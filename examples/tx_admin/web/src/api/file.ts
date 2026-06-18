@@ -5,15 +5,15 @@ export function uploadFile(data: UploadFileRequest) {
   return request.post<ApiRes<FileResponse>>('/api/file/', data).then(r => r.data)
 }
 
-export function getFile(fileId: number) {
+export function getFile(fileId: string) {
   return request.get<ApiRes<FileResponse>>(`/api/file/${fileId}`).then(r => r.data)
 }
 
-export function deleteFile(fileId: number) {
+export function deleteFile(fileId: string) {
   return request.delete<ApiRes<null>>(`/api/file/${fileId}`).then(r => r.data)
 }
 
-export function downloadFile(fileId: number) {
+export function downloadFile(fileId: string) {
   return request.get<ApiRes<{ url: string; filename: string; size: number; contentType: string }>>(`/api/file/${fileId}/download`).then(r => r.data)
 }
 

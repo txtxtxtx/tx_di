@@ -50,7 +50,7 @@
           <el-input-number v-model="form.sort" :min="0" />
         </el-form-item>
         <el-form-item label="负责人">
-          <el-input v-model.number="form.leader_user_id" placeholder="负责人用户ID" />
+          <el-input v-model="form.leader_user_id" placeholder="负责人用户ID" />
         </el-form-item>
         <el-form-item label="电话">
           <el-input v-model="form.phone" />
@@ -84,11 +84,11 @@ const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref<FormInstance>()
 const form = reactive({
-  id: 0,
+  id: '',
   name: '',
-  parent_id: 0,
+  parent_id: '',
   sort: 0,
-  leader_user_id: undefined as number | undefined,
+  leader_user_id: undefined as string | undefined,
   phone: '',
   email: '',
 })
@@ -97,7 +97,7 @@ const formRules: FormRules = {
 }
 
 const deptTreeForSelect = computed(() => {
-  const root: DeptTreeNode = { id: 0, name: '顶级部门', parent_id: 0, sort: 0, leader_user_id: null, status: 0, children: treeData.value }
+  const root: DeptTreeNode = { id: '0', name: '顶级部门', parent_id: '0', sort: 0, leader_user_id: null, status: 0, children: treeData.value }
   return [root]
 })
 
@@ -110,7 +110,7 @@ async function loadData() {
 
 function resetQuery() { query.name = ''; query.status = undefined; loadData() }
 
-function openDialog(row?: DeptTreeNode | null, parentId?: number) {
+function openDialog(row?: DeptTreeNode | null, parentId?: string) {
   isEdit.value = !!row
   if (row) {
     Object.assign(form, {
@@ -118,7 +118,7 @@ function openDialog(row?: DeptTreeNode | null, parentId?: number) {
       leader_user_id: row.leader_user_id || undefined, phone: '', email: '',
     })
   } else {
-    Object.assign(form, { id: 0, name: '', parent_id: parentId || 0, sort: 0, leader_user_id: undefined, phone: '', email: '' })
+    Object.assign(form, { id: '', name: '', parent_id: parentId || '', sort: 0, leader_user_id: undefined, phone: '', email: '' })
   }
   dialogVisible.value = true
 }

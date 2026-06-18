@@ -5,6 +5,9 @@
 //!
 //! 模块结构需与 prost 生成的跨包引用路径匹配：
 //! `admin::auth` 中 `super::common` 指向 `admin::common`
+//!
+//! 所有 i64/u64 字段通过 serde_with 的 DisplayFromStr 序列化为 JSON 字符串，
+//! 避免 JavaScript 数值精度丢失。
 
 pub mod admin {
     /// 通用类型（PageRequest, Empty, PageResponse 等）
@@ -144,21 +147,3 @@ pub use admin::file::{
 pub use admin::monitor::{ServerInfo, OnlineUser, OnlineUserListResponse};
 // --- Tool ---
 pub use admin::tool::{CacheInfo, CacheStatsResponse};
-
-// ============================================================
-// serde u64 辅助模块：uint64 <-> JSON string
-// ============================================================
-
-/// proton 中 uint64 在 JSON 中序列化为字符串，避免 JS 精度丢失
-pub mod serde_u64 {
-    use serde::{Deserialize, Serializer, Deserializer};
-
-    pub fn serialize<S: Serializer>(val: &u64, s: S) -> Result<S::Ok, S::Error> {
-        s.serialize_str(&val.to_string())
-    }
-
-    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<u64, D::Error> {
-        let s = String::deserialize(d)?;
-        s.parse::<u64>().map_err(serde::de::Error::custom)
-    }
-}

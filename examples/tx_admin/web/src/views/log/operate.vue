@@ -3,7 +3,7 @@
     <el-card shadow="never" class="search-card">
       <el-form :model="query" inline>
         <el-form-item label="用户ID">
-          <el-input v-model.number="query.userId" placeholder="请输入" clearable />
+          <el-input v-model="query.userId" placeholder="请输入" clearable />
         </el-form-item>
         <el-form-item label="日志类型">
           <el-input v-model="query.logType" placeholder="请输入" clearable />
@@ -68,8 +68,8 @@ const tableData = ref<OperateLogResponse[]>([])
 const page = ref(1)
 const size = ref(10)
 const total = ref(0)
-const query = reactive({ userId: undefined as number | undefined, logType: '', success: undefined as number | undefined })
-const selectedIds = ref<number[]>([])
+const query = reactive({ userId: undefined as string | undefined, logType: '', success: undefined as number | undefined })
+const selectedIds = ref<string[]>([])
 
 async function loadData() {
   loading.value = true

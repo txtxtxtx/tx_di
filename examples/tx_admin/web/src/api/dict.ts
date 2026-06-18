@@ -6,15 +6,15 @@ export function createDictType(data: CreateDictTypeRequest) {
   return request.post<ApiRes<DictTypeResponse>>('/api/dict/type', data).then(r => r.data)
 }
 
-export function getDictType(id: number) {
+export function getDictType(id: string) {
   return request.get<ApiRes<DictTypeResponse>>(`/api/dict/type/${id}`).then(r => r.data)
 }
 
-export function updateDictType(id: number, data: UpdateDictTypeRequest) {
+export function updateDictType(id: string, data: UpdateDictTypeRequest) {
   return request.put<ApiRes<DictTypeResponse>>(`/api/dict/type/${id}`, data).then(r => r.data)
 }
 
-export function deleteDictType(id: number) {
+export function deleteDictType(id: string) {
   return request.delete<ApiRes<null>>(`/api/dict/type/${id}`).then(r => r.data)
 }
 
@@ -27,15 +27,15 @@ export function createDictData(data: CreateDictDataRequest) {
   return request.post<ApiRes<DictDataResponse>>('/api/dict/data', data).then(r => r.data)
 }
 
-export function getDictData(id: number) {
+export function getDictData(id: string) {
   return request.get<ApiRes<DictDataResponse>>(`/api/dict/data/${id}`).then(r => r.data)
 }
 
-export function updateDictData(id: number, data: UpdateDictDataRequest) {
+export function updateDictData(id: string, data: UpdateDictDataRequest) {
   return request.put<ApiRes<DictDataResponse>>(`/api/dict/data/${id}`, data).then(r => r.data)
 }
 
-export function deleteDictData(id: number) {
+export function deleteDictData(id: string) {
   return request.delete<ApiRes<null>>(`/api/dict/data/${id}`).then(r => r.data)
 }
 
