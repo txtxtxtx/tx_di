@@ -2,7 +2,9 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
 
+// 部署到子路径时通过环境变量 BASE_URL 指定，如 BASE_URL=/admin/
 export default defineConfig({
+  base: process.env.BASE_URL ?? '/',
   plugins: [vue()],
   resolve: {
     alias: {
