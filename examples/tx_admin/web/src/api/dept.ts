@@ -2,7 +2,7 @@ import request from './request'
 import type { ApiRes, DeptTreeNode, CreateDeptRequest, UpdateDeptRequest, ListDeptsRequest } from '@/types'
 
 export function createDept(data: CreateDeptRequest) {
-  return request.post<ApiRes<DeptTreeNode>>('/api/dept/', data).then(r => r.data)
+  return request.post<ApiRes<DeptTreeNode>>('/api/dept', data).then(r => r.data)
 }
 
 export function getDept(deptId: string) {
