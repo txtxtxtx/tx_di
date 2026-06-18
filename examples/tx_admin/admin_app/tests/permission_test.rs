@@ -38,10 +38,11 @@ async fn create_permission_test_env() -> (
     let user_repo = Arc::new(ToastyUserRepository::new(plugin.clone()));
     let role_repo = Arc::new(ToastyRoleRepository::new(plugin.clone()));
     let menu_repo = Arc::new(ToastyMenuRepository::new(plugin.clone()));
+    let dept_repo = Arc::new(admin_infra::department::repository::ToastyDepartmentRepository::new(plugin.clone()));
     let permission_repo = Arc::new(ToastyPermissionRepository::new(plugin));
 
-    let user_svc = Arc::new(UserService::new(user_repo.clone(), permission_repo.clone()));
-    let role_svc = Arc::new(RoleService::new(role_repo.clone()));
+    let user_svc = Arc::new(UserService::new(user_repo.clone(), role_repo.clone(), dept_repo, permission_repo.clone()));
+    let role_svc = Arc::new(RoleService::new(role_repo.clone(), user_repo.clone()));
     let menu_svc = Arc::new(MenuService::new(menu_repo.clone()));
     let perm_svc = Arc::new(PermissionService::new(permission_repo));
 

@@ -145,12 +145,12 @@ async fn test_add_users_to_role_and_get_role_users() {
     let plugin = common::create_db_plugin().await;
 
     let user_repo = Arc::new(admin_infra::user::repository::ToastyUserRepository::new(plugin.clone()));
+    let role_repo = Arc::new(admin_infra::role::repository::ToastyRoleRepository::new(plugin.clone()));
+    let dept_repo = Arc::new(admin_infra::department::repository::ToastyDepartmentRepository::new(plugin.clone()));
     let permission_repo = Arc::new(admin_infra::permission::repository::ToastyPermissionRepository::new(plugin.clone()));
-    let user_svc = Arc::new(admin_domain::user::service::UserService::new(user_repo, permission_repo));
+    let user_svc = Arc::new(admin_domain::user::service::UserService::new(user_repo.clone(), role_repo.clone(), dept_repo, permission_repo));
+    let role_svc = Arc::new(admin_domain::role::service::RoleService::new(role_repo, user_repo));
     let user_app = admin_app::user::app_service::UserAppService::new(user_svc);
-
-    let role_repo = Arc::new(admin_infra::role::repository::ToastyRoleRepository::new(plugin));
-    let role_svc = Arc::new(admin_domain::role::service::RoleService::new(role_repo));
     let role_app = admin_app::role::app_service::RoleAppService::new(role_svc);
 
     // Create a role
@@ -227,12 +227,12 @@ async fn test_remove_users_from_role() {
     let plugin = common::create_db_plugin().await;
 
     let user_repo = Arc::new(admin_infra::user::repository::ToastyUserRepository::new(plugin.clone()));
+    let role_repo = Arc::new(admin_infra::role::repository::ToastyRoleRepository::new(plugin.clone()));
+    let dept_repo = Arc::new(admin_infra::department::repository::ToastyDepartmentRepository::new(plugin.clone()));
     let permission_repo = Arc::new(admin_infra::permission::repository::ToastyPermissionRepository::new(plugin.clone()));
-    let user_svc = Arc::new(admin_domain::user::service::UserService::new(user_repo, permission_repo));
+    let user_svc = Arc::new(admin_domain::user::service::UserService::new(user_repo.clone(), role_repo.clone(), dept_repo, permission_repo));
+    let role_svc = Arc::new(admin_domain::role::service::RoleService::new(role_repo, user_repo));
     let user_app = admin_app::user::app_service::UserAppService::new(user_svc);
-
-    let role_repo = Arc::new(admin_infra::role::repository::ToastyRoleRepository::new(plugin));
-    let role_svc = Arc::new(admin_domain::role::service::RoleService::new(role_repo));
     let role_app = admin_app::role::app_service::RoleAppService::new(role_svc);
 
     // Create role and users

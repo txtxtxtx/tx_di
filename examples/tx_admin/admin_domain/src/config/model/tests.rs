@@ -67,4 +67,52 @@ mod config_tests {
         assert_eq!(c.events().len(), before + 1);
         assert!(matches!(c.events().last(), Some(DomainEvent::ConfigDeleted { config_id: 1 })));
     }
+
+    // ============================================================
+    // Business rule: restore does not raise events
+    // ============================================================
+
+    #[test]
+    fn test_restore_does_not_raise_events() {
+        use crate::shared::model::AuditFields;
+        let c = Config::restore(
+            1, "s".into(), 1, "N".into(), "k".into(), "v".into(), 1, None,
+            AuditFields::default(),
+        );
+        assert!(c.events().is_empty());
+    }
+
+    // ============================================================
+    // Business rule: create sets default visible
+    // ============================================================
+
+    #[test]
+    fn test_create_sets_default_visible() {
+        let c = Config::create(1, "s".into(), 1, "N".into(), "k".into(), "v".into(), None);
+        assert_eq!(c.visible, 1); // default visible
+    }
+
+    // ============================================================
+    // Business rule: soft_delete sets audit
+    // ============================================================
+
+    #[test]
+    fn test_soft_delete_sets_audit() {
+        let mut c = make_config();
+        c.soft_delete(Some("admin".into()));
+        assert_eq!(c.audit.deleted, DeletedStatus::Deleted);
+        assert_eq!(c.audit.updater.as_deref(), Some("admin"));
+    }
+
+    // ============================================================
+    // Business rule: update_info clears remark with None
+    // ============================================================
+
+    #[test]
+    fn test_update_info_clears_remark() {
+        let mut c = make_config();
+        c.remark = Some("old".into());
+        c.update_info("s".into(), 1, "N".into(), "k".into(), "v".into(), 1, None, None);
+        assert!(c.remark.is_none());
+    }
 }

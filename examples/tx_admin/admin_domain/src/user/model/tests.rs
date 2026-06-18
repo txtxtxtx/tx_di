@@ -8,7 +8,7 @@
 #[cfg(test)]
 mod user_tests {
     use crate::shared::model::value_object::{DeletedStatus, TenantId};
-    use crate::shared::model::AggregateRoot;
+    use crate::shared::model::{AggregateRoot, AuditFields};
     use crate::user::model::aggregate::User;
     use crate::user::model::value_object::{Sex, UserStatus};
     use crate::shared::model::DomainEvent;
@@ -452,5 +452,97 @@ mod user_tests {
 
         user.soft_delete(None);
         assert!(user.audit.is_deleted());
+    }
+
+    // ============================================================
+    // Business rule: inactive user is not active
+    // ============================================================
+
+    #[test]
+    fn test_disabled_user_is_not_active() {
+        let mut user = make_user();
+        user.status = UserStatus::Disabled;
+        assert!(!user.is_active());
+    }
+
+    #[test]
+    fn test_locked_user_is_not_active() {
+        let mut user = make_user();
+        user.status = UserStatus::Locked;
+        assert!(!user.is_active());
+    }
+
+    #[test]
+    fn test_deleted_user_is_not_active() {
+        let mut user = make_user();
+        user.audit.deleted = DeletedStatus::Deleted;
+        assert!(!user.is_active());
+    }
+
+    #[test]
+    fn test_locked_user_is_locked() {
+        let mut user = make_user();
+        user.status = UserStatus::Locked;
+        assert!(user.is_locked());
+    }
+
+    #[test]
+    fn test_active_user_is_not_locked() {
+        let user = make_user();
+        assert!(!user.is_locked());
+    }
+
+    #[test]
+    fn test_disabled_user_is_not_locked() {
+        let mut user = make_user();
+        user.status = UserStatus::Disabled;
+        assert!(!user.is_locked());
+    }
+
+    // ============================================================
+    // Business rule: restore does not raise events
+    // ============================================================
+
+    #[test]
+    fn test_restore_does_not_raise_events() {
+        let user = User::restore(
+            1, "u".into(), "p".into(), "N".into(), None,
+            None, None, Sex::Unknown, None, UserStatus::Active,
+            None, None, TenantId::default(), AuditFields::default(),
+            vec![], vec![],
+        );
+        assert!(user.events().is_empty());
+    }
+
+    // ============================================================
+    // Business rule: set_roles/set_departments replace entire list
+    // ============================================================
+
+    #[test]
+    fn test_set_roles_replaces_all() {
+        let mut user = make_user();
+        user.role_ids = vec![1, 2, 3];
+        user.set_roles(vec![4]);
+        assert_eq!(user.role_ids, vec![4]);
+    }
+
+    #[test]
+    fn test_set_departments_replaces_all() {
+        let mut user = make_user();
+        user.dept_ids = vec![10, 20];
+        user.set_departments(vec![]);
+        assert!(user.dept_ids.is_empty());
+    }
+
+    // ============================================================
+    // Business rule: change_password updates audit timestamp
+    // ============================================================
+
+    #[test]
+    fn test_change_password_updates_audit() {
+        let mut user = make_user();
+        user.change_password("new_hash".into(), Some("admin".into()));
+        assert_eq!(user.password, "new_hash");
+        assert_eq!(user.audit.updater.as_deref(), Some("admin"));
     }
 }

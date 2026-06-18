@@ -1,11 +1,6 @@
 use std::sync::Arc;
 
 use crate::user::dto::*;
-use crate::empty_string::opt_filter;
-use admin_proto::{
-    CreateUserRequest, UpdateUserRequest, ChangePasswordRequest,
-    AssignRolesRequest, AssignDeptsRequest, ListUsersRequest,
-};
 use admin_domain::user::model::value_object::{Sex, UserQuery, UserStatus};
 use admin_domain::user::service::UserService;
 use admin_domain::shared::repository::RepositoryError;
@@ -31,7 +26,7 @@ impl UserAppService {
     /// 创建新用户
     ///
     /// # 参数
-    /// * `req` - 创建用户请求（proto），包含用户名、密码、昵称、邮箱、手机号、性别、备注、角色ID列表、部门ID列表
+    /// * `cmd` - 创建用户命令，包含用户名、密码、昵称、邮箱、手机号、性别、备注、角色ID列表、部门ID列表
     /// * `creator` - 创建者标识（可选）
     ///
     /// # 执行逻辑
@@ -51,13 +46,13 @@ impl UserAppService {
     /// - 数据库写入异常
     pub async fn create_user(
         &self,
-        req: CreateUserRequest,
+        cmd: CreateUserCommand,
         creator: Option<String>,
     ) -> AppResult<UserResponse> {
-        let email = opt_filter(req.email);
-        let mobile = opt_filter(req.mobile);
-        let remark = opt_filter(req.remark);
-        let sex: Sex = req.sex.map(Sex::from).unwrap_or_default();
+        let email = cmd.email.filter(|s| !s.is_empty());
+        let mobile = cmd.mobile.filter(|s| !s.is_empty());
+        let remark = cmd.remark.filter(|s| !s.is_empty());
+        let sex = cmd.sex.unwrap_or_default();
 
         // Check email uniqueness
         if let Some(ref e) = email {
@@ -75,11 +70,11 @@ impl UserAppService {
 
         let mut user = self
             .user_service
-            .create_user(req.username, req.password, req.nickname, creator.clone())
+            .create_user(cmd.username, cmd.password, cmd.nickname, creator.clone())
             .await?;
 
         // Set optional fields and persist to repository
-        if email.is_some() || mobile.is_some() || req.sex.is_some() || remark.is_some() {
+        if email.is_some() || mobile.is_some() || cmd.sex.is_some() || remark.is_some() {
             user.email = email;
             user.mobile = mobile;
             user.sex = sex;
@@ -99,15 +94,19 @@ impl UserAppService {
         }
 
         // Assign roles if provided
-        if !req.role_ids.is_empty() {
-            self.user_service.assign_roles(user.id, req.role_ids.clone()).await?;
-            user.role_ids = req.role_ids;
+        if let Some(role_ids) = cmd.role_ids {
+            if !role_ids.is_empty() {
+                self.user_service.assign_roles(user.id, role_ids.clone()).await?;
+                user.role_ids = role_ids;
+            }
         }
 
         // Assign departments if provided
-        if !req.dept_ids.is_empty() {
-            self.user_service.assign_departments(user.id, req.dept_ids.clone()).await?;
-            user.dept_ids = req.dept_ids;
+        if let Some(dept_ids) = cmd.dept_ids {
+            if !dept_ids.is_empty() {
+                self.user_service.assign_departments(user.id, dept_ids.clone()).await?;
+                user.dept_ids = dept_ids;
+            }
         }
 
         Ok(user_to_response(user))
@@ -116,11 +115,8 @@ impl UserAppService {
     /// 更新用户信息
     ///
     /// # 参数
-    /// * `req` - 更新用户请求（proto），包含用户ID、昵称、邮箱、手机号、性别、备注
+    /// * `cmd` - 更新用户命令，包含用户ID、昵称、邮箱、手机号、性别、备注
     /// * `updater` - 更新者标识（可选）
-    ///
-    /// # 执行逻辑
-    /// 委托给用户领域服务执行更新操作，逻辑详见 `UserService::update_user`
     ///
     /// # 返回
     /// 成功返回更新后的 `UserResponse`
@@ -130,18 +126,18 @@ impl UserAppService {
     /// - 数据库更新异常
     pub async fn update_user(
         &self,
-        req: UpdateUserRequest,
+        cmd: UpdateUserCommand,
         updater: Option<String>,
     ) -> AppResult<UserResponse> {
         let user = self
             .user_service
             .update_user(
-                req.user_id,
-                req.nickname.unwrap_or_default(),
-                opt_filter(req.email),
-                opt_filter(req.mobile),
-                req.sex.map(Sex::from).unwrap_or_default(),
-                opt_filter(req.remark),
+                cmd.user_id,
+                cmd.nickname.unwrap_or_default(),
+                cmd.email.filter(|s| !s.is_empty()),
+                cmd.mobile.filter(|s| !s.is_empty()),
+                cmd.sex.unwrap_or_default(),
+                cmd.remark.filter(|s| !s.is_empty()),
                 updater,
             )
             .await?;
@@ -153,9 +149,6 @@ impl UserAppService {
     /// # 参数
     /// * `user_id` - 要删除的用户ID
     /// * `updater` - 操作者标识（可选）
-    ///
-    /// # 执行逻辑
-    /// 委托给用户领域服务执行删除操作，逻辑详见 `UserService::delete_user`
     ///
     /// # 返回
     /// 成功返回 `()`
@@ -178,9 +171,6 @@ impl UserAppService {
     /// * `status` - 目标状态（`UserStatus` 枚举值）
     /// * `updater` - 操作者标识（可选）
     ///
-    /// # 执行逻辑
-    /// 委托给用户领域服务执行状态变更，逻辑详见 `UserService::change_status`
-    ///
     /// # 返回
     /// 成功返回变更后的 `UserResponse`
     ///
@@ -200,11 +190,8 @@ impl UserAppService {
     /// 修改用户密码
     ///
     /// # 参数
-    /// * `req` - 修改密码请求（proto），包含用户ID和新密码
+    /// * `cmd` - 修改密码命令，包含用户ID和新密码
     /// * `updater` - 操作者标识（可选）
-    ///
-    /// # 执行逻辑
-    /// 委托给用户领域服务执行密码修改，逻辑详见 `UserService::change_password`
     ///
     /// # 返回
     /// 成功返回 `()`
@@ -214,11 +201,11 @@ impl UserAppService {
     /// - 密码哈希计算异常
     pub async fn change_password(
         &self,
-        req: ChangePasswordRequest,
+        cmd: ChangePasswordCommand,
         updater: Option<String>,
     ) -> AppResult<()> {
         self.user_service
-            .change_password(req.user_id, req.new_password, updater)
+            .change_password(cmd.user_id, cmd.new_password, updater)
             .await?;
         Ok(())
     }
@@ -226,10 +213,7 @@ impl UserAppService {
     /// 为用户分配角色
     ///
     /// # 参数
-    /// * `req` - 分配角色请求（proto），包含用户ID和角色ID列表
-    ///
-    /// # 执行逻辑
-    /// 委托给用户领域服务执行角色分配，逻辑详见 `UserService::assign_roles`
+    /// * `cmd` - 分配角色命令，包含用户ID和角色ID列表
     ///
     /// # 返回
     /// 成功返回 `()`
@@ -237,17 +221,14 @@ impl UserAppService {
     /// # 错误
     /// - `NotFoundUser` - 用户ID对应的用户不存在
     /// - 角色ID不存在
-    pub async fn assign_roles(&self, req: AssignRolesRequest) -> AppResult<()> {
-        self.user_service.assign_roles(req.user_id, req.role_ids).await
+    pub async fn assign_roles(&self, cmd: AssignRolesCommand) -> AppResult<()> {
+        self.user_service.assign_roles(cmd.user_id, cmd.role_ids).await
     }
 
     /// 为用户分配部门
     ///
     /// # 参数
-    /// * `req` - 分配部门请求（proto），包含用户ID和部门ID列表
-    ///
-    /// # 执行逻辑
-    /// 委托给用户领域服务执行部门分配，逻辑详见 `UserService::assign_departments`
+    /// * `cmd` - 分配部门命令，包含用户ID和部门ID列表
     ///
     /// # 返回
     /// 成功返回 `()`
@@ -255,17 +236,14 @@ impl UserAppService {
     /// # 错误
     /// - `NotFoundUser` - 用户ID对应的用户不存在
     /// - 部门ID不存在
-    pub async fn assign_departments(&self, req: AssignDeptsRequest) -> AppResult<()> {
-        self.user_service.assign_departments(req.user_id, req.dept_ids).await
+    pub async fn assign_departments(&self, cmd: AssignDeptsCommand) -> AppResult<()> {
+        self.user_service.assign_departments(cmd.user_id, cmd.dept_ids).await
     }
 
     /// 根据ID获取用户信息
     ///
     /// # 参数
     /// * `user_id` - 用户ID
-    ///
-    /// # 执行逻辑
-    /// 委托给用户领域服务查询用户，逻辑详见 `UserService::get_user`
     ///
     /// # 返回
     /// 成功返回 `UserResponse`
@@ -280,13 +258,7 @@ impl UserAppService {
     /// 分页查询用户列表
     ///
     /// # 参数
-    /// * `req` - 分页查询请求（proto），包含用户名、昵称、手机号、状态、部门ID等筛选条件，以及页码和每页大小
-    ///
-    /// # 执行逻辑
-    /// 1. 将请求参数转换为领域查询对象 `UserQuery`
-    /// 2. 构建分页参数 `Page`
-    /// 3. 委托给用户领域服务执行分页查询
-    /// 4. 将领域模型列表转换为响应DTO列表
+    /// * `req` - 分页查询请求，包含用户名、昵称、手机号、状态、部门ID等筛选条件，以及页码和每页大小
     ///
     /// # 返回
     /// 成功返回 `Page<UserResponse>`，包含用户列表、页码、每页大小和总记录数
@@ -295,19 +267,18 @@ impl UserAppService {
     /// - 数据库查询异常
     pub async fn get_user_page(
         &self,
-        req: ListUsersRequest,
+        req: UserQueryRequest,
     ) -> AppResult<Page<UserResponse>> {
         let query = UserQuery {
             username: req.username,
             nickname: req.nickname,
             mobile: req.mobile,
-            status: req.status.map(UserStatus::from),
+            status: req.status,
             dept_id: req.dept_id,
             begin_time: None,
             end_time: None,
         };
-        let pi = req.page_info.unwrap_or_default();
-        let page = Page::request(pi.page, pi.size);
+        let page = Page::request(req.page, req.size);
         let result = self.user_service.get_user_page(&query, page).await?;
 
         Ok(Page::new(

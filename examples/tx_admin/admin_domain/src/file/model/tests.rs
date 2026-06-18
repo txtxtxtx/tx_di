@@ -81,4 +81,59 @@ mod file_tests {
         let fc = FileConfig::create(1, "x".into(), 0, "{}".into(), None);
         assert!(fc.events().is_empty());
     }
+
+    // ============================================================
+    // Business rule: restore does not raise events
+    // ============================================================
+
+    #[test]
+    fn test_file_restore_no_events() {
+        use crate::shared::model::AuditFields;
+        let f = File::restore(
+            1, None, "f".into(), "/f".into(), "/f".into(), None, 0,
+            AuditFields::default(),
+        );
+        assert!(f.events().is_empty());
+    }
+
+    #[test]
+    fn test_file_config_restore_no_events() {
+        use crate::shared::model::AuditFields;
+        let fc = FileConfig::restore(
+            1, "c".into(), 0, None, 0, "{}".into(),
+            AuditFields::default(),
+        );
+        assert!(fc.events().is_empty());
+    }
+
+    // ============================================================
+    // Business rule: soft_delete sets audit
+    // ============================================================
+
+    #[test]
+    fn test_file_soft_delete_sets_audit() {
+        let mut f = make_file();
+        f.soft_delete(Some("admin".into()));
+        assert_eq!(f.audit.deleted, DeletedStatus::Deleted);
+        assert_eq!(f.audit.updater.as_deref(), Some("admin"));
+    }
+
+    // ============================================================
+    // Business rule: create sets defaults
+    // ============================================================
+
+    #[test]
+    fn test_file_create_sets_audit() {
+        let f = File::create(1, None, "f".into(), "/f".into(), "/f".into(), None, 100, Some("admin".into()));
+        assert_eq!(f.audit.creator.as_deref(), Some("admin"));
+        assert_eq!(f.audit.updater.as_deref(), Some("admin"));
+        assert_eq!(f.audit.deleted, DeletedStatus::Normal);
+    }
+
+    #[test]
+    fn test_file_config_create_sets_defaults() {
+        let fc = FileConfig::create(1, "c".into(), 0, "{}".into(), None);
+        assert_eq!(fc.master, 0);
+        assert!(fc.remark.is_none());
+    }
 }

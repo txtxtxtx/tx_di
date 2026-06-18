@@ -116,4 +116,89 @@ mod role_tests {
         role.audit.deleted = DeletedStatus::Deleted;
         assert!(!role.is_active());
     }
+
+    // ============================================================
+    // Business rule: restore does not raise events
+    // ============================================================
+
+    #[test]
+    fn test_restore_does_not_raise_events() {
+        use crate::shared::model::AuditFields;
+        let role = Role::restore(
+            1, "R".into(), "r".into(), 0, 4, None, 0, None, 0,
+            AuditFields::default(), vec![],
+        );
+        assert!(role.events().is_empty());
+    }
+
+    // ============================================================
+    // Business rule: change_status does not raise event
+    // (This is a design choice - status change is silent)
+    // ============================================================
+
+    #[test]
+    fn test_change_status_does_not_raise_event() {
+        let mut role = make_role();
+        let before = role.events().len();
+        role.change_status(1, Some("admin".into()));
+        // change_status does NOT add a domain event (by design)
+        assert_eq!(role.events().len(), before);
+    }
+
+    // ============================================================
+    // Business rule: set_menus replaces entire list
+    // ============================================================
+
+    #[test]
+    fn test_set_menus_replaces_all() {
+        let mut role = make_role();
+        role.menu_ids = vec![1, 2, 3];
+        role.set_menus(vec![10]);
+        assert_eq!(role.menu_ids, vec![10]);
+    }
+
+    #[test]
+    fn test_set_menus_to_empty() {
+        let mut role = make_role();
+        role.menu_ids = vec![1, 2];
+        role.set_menus(vec![]);
+        assert!(role.menu_ids.is_empty());
+    }
+
+    // ============================================================
+    // Business rule: soft_delete sets deleted status
+    // ============================================================
+
+    #[test]
+    fn test_soft_delete_sets_audit() {
+        let mut role = make_role();
+        role.soft_delete(Some("admin".into()));
+        assert_eq!(role.audit.deleted, DeletedStatus::Deleted);
+        assert_eq!(role.audit.updater.as_deref(), Some("admin"));
+    }
+
+    // ============================================================
+    // Business rule: create sets defaults
+    // ============================================================
+
+    #[test]
+    fn test_create_sets_default_data_scope() {
+        let role = Role::create(1, "R".into(), "r".into(), 0, None);
+        assert_eq!(role.data_scope, 4); // default data scope
+        assert_eq!(role.status, 0); // active by default
+        assert_eq!(role.tenant_id, 0);
+        assert!(role.menu_ids.is_empty());
+    }
+
+    // ============================================================
+    // Business rule: update_info updates all fields
+    // ============================================================
+
+    #[test]
+    fn test_update_info_clears_remark_with_none() {
+        let mut role = make_role();
+        role.remark = Some("old remark".into());
+        role.update_info("X".into(), "x".into(), 0, 0, None, None);
+        assert!(role.remark.is_none());
+    }
 }

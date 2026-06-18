@@ -139,4 +139,113 @@ mod dict_tests {
         assert_eq!(dd.events().len(), before + 1);
         assert!(matches!(dd.events().last(), Some(DomainEvent::DictDataDeleted { dict_data_id: 100 })));
     }
+
+    // ============================================================
+    // Business rule: restore does not raise events
+    // ============================================================
+
+    #[test]
+    fn test_dict_type_restore_no_events() {
+        use crate::shared::model::AuditFields;
+        let dt = DictType::restore(
+            1, "N".into(), "t".into(), 0, None, AuditFields::default(),
+        );
+        assert!(dt.events().is_empty());
+    }
+
+    #[test]
+    fn test_dict_data_restore_no_events() {
+        use crate::shared::model::AuditFields;
+        let dd = DictData::restore(
+            1, 1, "L".into(), "V".into(), "t".into(), 0, None, None, None,
+            AuditFields::default(),
+        );
+        assert!(dd.events().is_empty());
+    }
+
+    // ============================================================
+    // Business rule: change_status does not raise event
+    // ============================================================
+
+    #[test]
+    fn test_dict_type_change_status_no_event() {
+        let mut dt = make_dict_type();
+        let before = dt.events().len();
+        dt.change_status(1, None);
+        assert_eq!(dt.events().len(), before);
+        assert_eq!(dt.status, 1);
+    }
+
+    #[test]
+    fn test_dict_data_change_status_no_event() {
+        let mut dd = make_dict_data();
+        let before = dd.events().len();
+        dd.change_status(1, None);
+        assert_eq!(dd.events().len(), before);
+        assert_eq!(dd.status, 1);
+    }
+
+    // ============================================================
+    // Business rule: soft_delete sets audit
+    // ============================================================
+
+    #[test]
+    fn test_dict_type_soft_delete_sets_audit() {
+        let mut dt = make_dict_type();
+        dt.soft_delete(Some("admin".into()));
+        assert_eq!(dt.audit.deleted, DeletedStatus::Deleted);
+        assert_eq!(dt.audit.updater.as_deref(), Some("admin"));
+    }
+
+    #[test]
+    fn test_dict_data_soft_delete_sets_audit() {
+        let mut dd = make_dict_data();
+        dd.soft_delete(Some("admin".into()));
+        assert_eq!(dd.audit.deleted, DeletedStatus::Deleted);
+        assert_eq!(dd.audit.updater.as_deref(), Some("admin"));
+    }
+
+    // ============================================================
+    // Business rule: create sets defaults
+    // ============================================================
+
+    #[test]
+    fn test_dict_type_create_sets_defaults() {
+        let dt = DictType::create(1, "N".into(), "t".into(), None);
+        assert_eq!(dt.status, 0);
+        assert!(dt.remark.is_none());
+    }
+
+    #[test]
+    fn test_dict_data_create_sets_defaults() {
+        let dd = DictData::create(1, 1, "L".into(), "V".into(), "t".into(), None);
+        assert_eq!(dd.status, 0);
+        assert!(dd.color_type.is_none());
+        assert!(dd.css_class.is_none());
+        assert!(dd.remark.is_none());
+    }
+
+    // ============================================================
+    // Business rule: update_info clears optional fields
+    // ============================================================
+
+    #[test]
+    fn test_dict_type_update_info_clears_remark() {
+        let mut dt = make_dict_type();
+        dt.remark = Some("old".into());
+        dt.update_info("N".into(), "t".into(), None, None);
+        assert!(dt.remark.is_none());
+    }
+
+    #[test]
+    fn test_dict_data_update_info_clears_optionals() {
+        let mut dd = make_dict_data();
+        dd.color_type = Some("red".into());
+        dd.css_class = Some("cls".into());
+        dd.remark = Some("old".into());
+        dd.update_info(1, "L".into(), "V".into(), "t".into(), None, None, None, None);
+        assert!(dd.color_type.is_none());
+        assert!(dd.css_class.is_none());
+        assert!(dd.remark.is_none());
+    }
 }

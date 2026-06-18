@@ -100,4 +100,82 @@ mod log_tests {
         assert_eq!(log.events().len(), 1);
         assert!(matches!(log.events()[0], DomainEvent::LoginLogCreated { log_id: 2 }));
     }
+
+    // ============================================================
+    // Business rule: restore does not raise events
+    // ============================================================
+
+    #[test]
+    fn test_operate_log_restore_no_events() {
+        use crate::shared::model::AuditFields;
+        let log = OperateLog::restore(
+            1, "t".into(), 1, 1, "l".into(), "s".into(), 1, "a".into(), 1, "{}".into(),
+            None, None, None, None, 0, AuditFields::default(),
+        );
+        assert!(log.events().is_empty());
+    }
+
+    #[test]
+    fn test_login_log_restore_no_events() {
+        use crate::shared::model::AuditFields;
+        use jiff::Timestamp;
+        let log = LoginLog::restore(
+            1, 1, 0, "u".into(), "127.0.0.1".into(), None, None, None,
+            "pwd".into(), 1, None, Timestamp::now(), 0, AuditFields::default(),
+        );
+        assert!(log.events().is_empty());
+    }
+
+    // ============================================================
+    // Business rule: with_request builder pattern
+    // ============================================================
+
+    #[test]
+    fn test_operate_log_with_request_chaining() {
+        let log = make_operate_log()
+            .with_request(
+                Some("PUT".into()),
+                Some("/api/update".into()),
+                Some("10.0.0.1".into()),
+                Some("curl/7.0".into()),
+            );
+        assert_eq!(log.request_method.as_deref(), Some("PUT"));
+        assert_eq!(log.request_url.as_deref(), Some("/api/update"));
+        assert_eq!(log.user_ip.as_deref(), Some("10.0.0.1"));
+        assert_eq!(log.user_agent.as_deref(), Some("curl/7.0"));
+    }
+
+    #[test]
+    fn test_operate_log_with_request_none_values() {
+        let log = make_operate_log()
+            .with_request(None, None, None, None);
+        assert!(log.request_method.is_none());
+        assert!(log.request_url.is_none());
+        assert!(log.user_ip.is_none());
+        assert!(log.user_agent.is_none());
+    }
+
+    // ============================================================
+    // Business rule: create sets defaults
+    // ============================================================
+
+    #[test]
+    fn test_operate_log_create_sets_defaults() {
+        let log = make_operate_log();
+        assert_eq!(log.tenant_id, 0);
+        assert!(log.request_method.is_none());
+        assert!(log.request_url.is_none());
+        assert!(log.user_ip.is_none());
+        assert!(log.user_agent.is_none());
+    }
+
+    #[test]
+    fn test_login_log_create_sets_defaults() {
+        let log = make_login_log();
+        assert_eq!(log.tenant_id, 0);
+        assert!(log.login_location.is_none());
+        assert!(log.browser.is_none());
+        assert!(log.os.is_none());
+        assert!(log.msg.is_none());
+    }
 }

@@ -106,4 +106,81 @@ mod menu_tests {
         assert_eq!(m.events().len(), before + 1);
         assert!(matches!(m.events().last(), Some(DomainEvent::MenuDeleted { menu_id: 10 })));
     }
+
+    // ============================================================
+    // Business rule: change_status does not raise event
+    // ============================================================
+
+    #[test]
+    fn test_change_status_does_not_raise_event() {
+        let mut m = make_menu();
+        let before = m.events().len();
+        m.change_status(1, Some("admin".into()));
+        assert_eq!(m.events().len(), before);
+        assert_eq!(m.status, 1);
+    }
+
+    // ============================================================
+    // Business rule: restore does not raise events
+    // ============================================================
+
+    #[test]
+    fn test_restore_does_not_raise_events() {
+        use crate::shared::model::AuditFields;
+        let m = Menu::restore(
+            1, "M".into(), "m".into(), 1, 0, 0,
+            None, None, None, None, 0, 0, 0, 0,
+            AuditFields::default(),
+        );
+        assert!(m.events().is_empty());
+    }
+
+    // ============================================================
+    // Business rule: create sets defaults
+    // ============================================================
+
+    #[test]
+    fn test_create_sets_defaults() {
+        let m = Menu::create(1, "M".into(), "m".into(), 1, 0, 0, None);
+        assert_eq!(m.status, 0);
+        assert_eq!(m.visible, 0);
+        assert_eq!(m.keep_alive, 0);
+        assert_eq!(m.tenant_id, 0);
+        assert!(m.path.is_none());
+        assert!(m.icon.is_none());
+        assert!(m.component.is_none());
+        assert!(m.component_name.is_none());
+        assert!(m.children.is_empty());
+    }
+
+    // ============================================================
+    // Business rule: update_info clears optional fields
+    // ============================================================
+
+    #[test]
+    fn test_update_info_clears_optional_fields() {
+        let mut m = make_menu();
+        m.path = Some("/old".into());
+        m.icon = Some("old-icon".into());
+        m.component = Some("OldComp".into());
+        m.component_name = Some("old".into());
+        m.update_info("X".into(), "x".into(), 0, 0, 0,
+            None, None, None, None, 0, 0, None);
+        assert!(m.path.is_none());
+        assert!(m.icon.is_none());
+        assert!(m.component.is_none());
+        assert!(m.component_name.is_none());
+    }
+
+    // ============================================================
+    // Business rule: soft_delete sets audit
+    // ============================================================
+
+    #[test]
+    fn test_soft_delete_sets_audit() {
+        let mut m = make_menu();
+        m.soft_delete(Some("admin".into()));
+        assert_eq!(m.audit.deleted, DeletedStatus::Deleted);
+        assert_eq!(m.audit.updater.as_deref(), Some("admin"));
+    }
 }

@@ -81,4 +81,71 @@ mod dept_tests {
         assert_eq!(d.events().len(), before + 1);
         assert!(matches!(d.events().last(), Some(DomainEvent::DepartmentDeleted { dept_id: 1 })));
     }
+
+    // ============================================================
+    // Business rule: change_status does not raise event
+    // ============================================================
+
+    #[test]
+    fn test_change_status_does_not_raise_event() {
+        let mut d = make_dept();
+        let before = d.events().len();
+        d.change_status(1, Some("admin".into()));
+        assert_eq!(d.events().len(), before);
+        assert_eq!(d.status, 1);
+    }
+
+    // ============================================================
+    // Business rule: restore does not raise events
+    // ============================================================
+
+    #[test]
+    fn test_restore_does_not_raise_events() {
+        use crate::shared::model::AuditFields;
+        let d = Department::restore(
+            1, "D".into(), 0, 0, None, None, None, 0, 0,
+            AuditFields::default(),
+        );
+        assert!(d.events().is_empty());
+    }
+
+    // ============================================================
+    // Business rule: update_info clears optional fields with None
+    // ============================================================
+
+    #[test]
+    fn test_update_info_clears_optional_fields() {
+        let mut d = make_dept();
+        d.leader_user_id = Some(100);
+        d.phone = Some("123".into());
+        d.email = Some("a@b.com".into());
+        d.update_info("X".into(), 0, 0, None, None, None, None);
+        assert!(d.leader_user_id.is_none());
+        assert!(d.phone.is_none());
+        assert!(d.email.is_none());
+    }
+
+    // ============================================================
+    // Business rule: soft_delete sets audit updater
+    // ============================================================
+
+    #[test]
+    fn test_soft_delete_sets_audit_updater() {
+        let mut d = make_dept();
+        d.soft_delete(Some("admin".into()));
+        assert_eq!(d.audit.deleted, DeletedStatus::Deleted);
+        assert_eq!(d.audit.updater.as_deref(), Some("admin"));
+    }
+
+    // ============================================================
+    // Business rule: create sets default status
+    // ============================================================
+
+    #[test]
+    fn test_create_sets_default_status() {
+        let d = Department::create(1, "D".into(), 0, 0, None);
+        assert_eq!(d.status, 0);
+        assert_eq!(d.tenant_id, 0);
+        assert!(d.children.is_empty());
+    }
 }

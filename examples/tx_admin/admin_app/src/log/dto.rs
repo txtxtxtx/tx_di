@@ -1,4 +1,61 @@
 use admin_proto::{OperateLogResponse, LoginLogResponse};
+use serde::{Deserialize, Serialize};
+
+// ── Command / Query DTOs ──────────────────────────────────────────────
+
+/// 创建操作日志命令
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateOperateLogCommand {
+    pub trace_id: String,
+    pub user_id: u64,
+    pub user_type: i32,
+    pub log_type: String,
+    pub sub_type: String,
+    pub biz_id: u64,
+    pub action: String,
+    pub success: i32,
+    pub extra: String,
+}
+
+/// 操作日志分页查询请求
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OperateLogQueryRequest {
+    pub user_id: Option<u64>,
+    pub log_type: Option<String>,
+    pub sub_type: Option<String>,
+    pub success: Option<i32>,
+    pub begin_time: Option<String>,
+    pub end_time: Option<String>,
+    pub page: i64,
+    pub size: i64,
+}
+
+/// 创建登录日志命令
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateLoginLogCommand {
+    pub user_id: u64,
+    pub user_type: i32,
+    pub username: String,
+    pub login_ip: String,
+    pub login_type: String,
+    pub result: i32,
+}
+
+/// 登录日志分页查询请求
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoginLogQueryRequest {
+    pub user_id: Option<u64>,
+    pub username: Option<String>,
+    pub login_ip: Option<String>,
+    pub login_type: Option<String>,
+    pub result: Option<i32>,
+    pub begin_time: Option<String>,
+    pub end_time: Option<String>,
+    pub page: i64,
+    pub size: i64,
+}
+
+// ── Conversion ────────────────────────────────────────────────────────
 
 /// 领域模型 → Proto 响应：操作日志
 pub fn operate_log_to_response(log: admin_domain::log::model::aggregate::OperateLog) -> OperateLogResponse {

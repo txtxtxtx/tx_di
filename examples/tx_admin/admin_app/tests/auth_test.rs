@@ -6,7 +6,8 @@
 mod common;
 
 use std::sync::Arc;
-use admin_proto::{LoginRequest, LogoutRequest, CreateUserRequest, CreateRoleRequest, CreateMenuRequest};
+use admin_proto::{LoginRequest, LogoutRequest, CreateRoleRequest, CreateMenuRequest};
+use admin_app::user::dto::CreateUserCommand;
 use admin_app::auth::app_service::AuthAppService;
 use admin_domain::user::service::UserService;
 use admin_domain::role::service::RoleService;
@@ -67,12 +68,12 @@ async fn login_success() {
         create_auth_test_env().await;
 
     // 创建用户（密码由 UserAppService 自动哈希）
-    let user = user_app.create_user(CreateUserRequest {
+    let user = user_app.create_user(CreateUserCommand {
         username: "admin".into(),
         password: "password123".into(),
         nickname: "管理员".into(),
         email: None, mobile: None, sex: None, remark: None,
-        role_ids: vec![], dept_ids: vec![],
+        role_ids: None, dept_ids: None,
     }, Some("admin".into())).await.unwrap();
 
     // 创建角色
@@ -109,12 +110,12 @@ async fn login_success() {
 async fn login_wrong_password() {
     let (auth_app, user_app, _, _, _, _) = create_auth_test_env().await;
 
-    user_app.create_user(CreateUserRequest {
+    user_app.create_user(CreateUserCommand {
         username: "admin".into(),
         password: "password123".into(),
         nickname: "管理员".into(),
         email: None, mobile: None, sex: None, remark: None,
-        role_ids: vec![], dept_ids: vec![],
+        role_ids: None, dept_ids: None,
     }, Some("admin".into())).await.unwrap();
 
     let r = auth_app.login(LoginRequest {
@@ -141,12 +142,12 @@ async fn login_nonexistent_user() {
 async fn login_disabled_user() {
     let (auth_app, user_app, _, _, _, _) = create_auth_test_env().await;
 
-    let user = user_app.create_user(CreateUserRequest {
+    let user = user_app.create_user(CreateUserCommand {
         username: "admin".into(),
         password: "password123".into(),
         nickname: "管理员".into(),
         email: None, mobile: None, sex: None, remark: None,
-        role_ids: vec![], dept_ids: vec![],
+        role_ids: None, dept_ids: None,
     }, Some("admin".into())).await.unwrap();
 
     // 禁用用户
@@ -165,12 +166,12 @@ async fn login_disabled_user() {
 async fn login_locked_user() {
     let (auth_app, user_app, _, _, _, _) = create_auth_test_env().await;
 
-    let user = user_app.create_user(CreateUserRequest {
+    let user = user_app.create_user(CreateUserCommand {
         username: "admin".into(),
         password: "password123".into(),
         nickname: "管理员".into(),
         email: None, mobile: None, sex: None, remark: None,
-        role_ids: vec![], dept_ids: vec![],
+        role_ids: None, dept_ids: None,
     }, Some("admin".into())).await.unwrap();
 
     // 锁定用户
@@ -192,12 +193,12 @@ async fn get_user_info() {
     let (auth_app, user_app, role_app, menu_app, user_repo, role_repo) =
         create_auth_test_env().await;
 
-    let user = user_app.create_user(CreateUserRequest {
+    let user = user_app.create_user(CreateUserCommand {
         username: "admin".into(),
         password: "pwd".into(),
         nickname: "管理员".into(),
         email: None, mobile: None, sex: None, remark: None,
-        role_ids: vec![], dept_ids: vec![],
+        role_ids: None, dept_ids: None,
     }, Some("admin".into())).await.unwrap();
 
     let role = role_app.create_role(CreateRoleRequest {
@@ -240,12 +241,12 @@ async fn get_user_info_not_found() {
 async fn logout_success() {
     let (auth_app, user_app, _, _, _, _) = create_auth_test_env().await;
 
-    let user = user_app.create_user(CreateUserRequest {
+    let user = user_app.create_user(CreateUserCommand {
         username: "admin".into(),
         password: "pwd".into(),
         nickname: "管理员".into(),
         email: None, mobile: None, sex: None, remark: None,
-        role_ids: vec![], dept_ids: vec![],
+        role_ids: None, dept_ids: None,
     }, Some("admin".into())).await.unwrap();
 
     auth_app.logout(LogoutRequest { user_id: user.id }).await.unwrap();
