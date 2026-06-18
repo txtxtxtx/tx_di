@@ -49,5 +49,5 @@ port = 8888
 timeout_secs = 30
 
 [web_config.spa_apps]
-"/web"  = "examples/tx_admin/data/dist"
+"/web"  = "examples/tx_admin/web/dist"
 
