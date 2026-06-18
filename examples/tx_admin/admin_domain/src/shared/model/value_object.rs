@@ -22,7 +22,7 @@ impl TenantId {
     pub fn new(id: u64) -> Self {
         Self(id)
     }
-    
+
     pub fn into_inner(self) -> u64 {
         self.0
     }
@@ -41,12 +41,6 @@ impl From<u64> for TenantId {
 impl From<TenantId> for u64 {
     fn from(id: TenantId) -> Self {
         id.0
-    }
-}
-
-impl From<TenantId> for i64 {
-    fn from(id: TenantId) -> Self {
-        id.0 as i64
     }
 }
 
@@ -84,4 +78,16 @@ impl<'de> Deserialize<'de> for TenantId {
         let id = u64::deserialize(deserializer)?;
         Ok(TenantId(id))
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SessionEctData {
+    /// 租户ID
+    pub tenant_id: TenantId,
+    /// 用户部门列表
+    pub dept_ids: Vec<u64>,
+    /// 用户角色列表
+    pub role_ids: Vec<u64>,
+    /// 登录IP
+    pub login_ip: String,
 }

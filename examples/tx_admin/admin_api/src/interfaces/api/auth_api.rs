@@ -1,5 +1,6 @@
 //! 认证 HTTP API
 
+use admin_domain::shared::model::value_object::{SessionEctData, TenantId};
 use axum::Json;
 use tx_di_axum::{Router, R};
 use tx_di_axum::bound::DiComp;
@@ -30,11 +31,16 @@ async fn login(
     Json(req): Json<LoginRequest>,
 ) -> Result<R<LoginResponse>, ApiErr> {
     let login_ip = req.login_ip.clone();
-    let r = auth.login(req).await?;
+    let mut r = auth.login(req).await?;
     let token = StpUtil::login(r.user_id.to_string()).await?;
-
+    r.token = token.to_string();
     // 将登录 IP 存入 token 的 extra_data，供在线用户查询使用
-    let extra = serde_json::json!({ "login_ip": login_ip });
+    let extra = serde_json::json!(SessionEctData{
+        login_ip,
+        tenant_id: r.tenant_id.into(),
+        role_ids: r.role_ids.clone(),
+        dept_ids: r.dept_ids.clone()
+    });
     let _ = StpUtil::set_extra_data(&token, extra).await;
 
     // 根据角色设置 sa-token 权限和角色
@@ -48,7 +54,6 @@ async fn login(
     StpUtil::set_roles(&user_id_str, r.role_codes.clone()).await?;
 
     let mut resp = R(ApiR::success(r));
-    resp.0.msg = token.to_string();
     Ok(resp)
 }
 

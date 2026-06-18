@@ -27,7 +27,7 @@ message LoginResponse {
   uint64 user_id = 1;
   string username = 2;
   string nickname = 3;
-  int64 tenant_id = 4;
+  uint64 tenant_id = 4;
   repeated uint64 role_ids = 5;
   repeated string permissions = 6;
   repeated uint64 dept_ids = 7;
@@ -48,7 +48,7 @@ message UserInfoResponse {
   optional string avatar = 6;
   repeated string roles = 7;
   repeated string permissions = 8;
-  int64 tenant_id = 9;
+  uint64 tenant_id = 9;
 }
 
 message LogoutRequest {

@@ -23,7 +23,7 @@ impl AuthService for AuthGrpcService {
         services::get().auth.login(cmd).await
             .map(|r| Response::new(LoginResponse {
                 user_id: r.user_id, username: r.username, nickname: r.nickname,
-                tenant_id: r.tenant_id.into_inner() as i64,
+                tenant_id: r.tenant_id.into(),
                 role_ids: r.role_ids, permissions: r.permissions, dept_ids: r.dept_ids,
                 token: String::new(),
             }))

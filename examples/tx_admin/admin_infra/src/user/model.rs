@@ -43,7 +43,7 @@ pub struct SysUser {
     pub login_date: String,
 
     #[default(0)]
-    pub tenant_id: i64,
+    pub tenant_id: u64,
 
     #[default("".to_string())]
     pub creator: String,
