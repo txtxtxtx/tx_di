@@ -1,6 +1,8 @@
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 
-use tokio::io::AsyncRead;
+use tokio::io::{AsyncRead, ReadBuf};
 
 use admin_domain::file::model::value_object::{FileQuery, FileUploadCommand};
 use admin_domain::file::service::FileService;
@@ -12,7 +14,28 @@ use tx_di_file::FilePlugin;
 use tx_error::{AppError, AppResult};
 
 use crate::file::dto::{file_to_response, DownloadFileStream};
-use crate::file::limited_reader::LimitedAsyncRead;
+
+/// 轻量字节计数器 —— 只计数不限制（大小限制由 axum DefaultBodyLimit 负责）
+struct CountingReader<R> {
+    inner: R,
+    bytes_read: u64,
+}
+
+impl<R> CountingReader<R> {
+    fn new(inner: R) -> Self {
+        Self { inner, bytes_read: 0 }
+    }
+}
+
+impl<R: AsyncRead + Unpin> AsyncRead for CountingReader<R> {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+        let this = self.get_mut();
+        let before = buf.filled().len();
+        let poll = Pin::new(&mut this.inner).poll_read(cx, buf);
+        this.bytes_read += (buf.filled().len() - before) as u64;
+        poll
+    }
+}
 
 #[tx_comp]
 pub struct FileAppService {
@@ -28,21 +51,25 @@ impl FileAppService {
         }
     }
 
+    /// 获取单文件最大大小限制（字节），0 表示不限制
+    pub fn max_file_size(&self) -> u64 {
+        self.file_plugin.config.max_file_size
+    }
+
     // ========================================================================
     // 流式上传（核心新方法）
     // ========================================================================
 
     /// 流式上传单个文件 —— 零内存缓冲
     ///
-    /// 文件二进制通过 `AsyncRead` 传入，流经 `LimitedAsyncRead`（大小拦截），
-    /// 直接写入存储后端，全程不将文件内容加载到应用内存。
+    /// 文件二进制通过 `AsyncRead` 传入，经 `CountingReader` 计数后直接写入存储后端。
+    /// 大小限制由 axum `DefaultBodyLimit` 层负责，此处不再重复校验。
     ///
     /// # 流程
     /// 1. 校验扩展名 → `FileConfig::allowed_extensions`
-    /// 2. `LimitedAsyncRead` 包装 reader（边读边计数，超限即断）
-    /// 3. 生成存储路径 `YYYY/MM/uuid_filename.ext`
-    /// 4. `storage.write_stream(path, &mut limited, content_type)`
-    /// 5. 写 DB 元数据 → 返回 `FileResponse`
+    /// 2. 生成存储路径 `YYYY/MM/uuid_filename.ext`
+    /// 3. `storage.write_stream(path, &mut counting_reader, content_type)`
+    /// 4. 写 DB 元数据 → 返回 `FileResponse`
     pub async fn upload_file_stream(
         &self,
         filename: String,
@@ -65,13 +92,8 @@ impl FileAppService {
             }
         }
 
-        // 2. 大小感知流式拦截
-        let max_size = if config.max_file_size > 0 {
-            config.max_file_size
-        } else {
-            u64::MAX
-        };
-        let mut limited = LimitedAsyncRead::new(reader, max_size);
+        // 2. 字节计数（不限制，仅用于记录文件大小）
+        let mut counting = CountingReader::new(reader);
 
         // 3. 生成存储路径: YYYY/MM/uuid_filename.ext
         let now = jiff::Zoned::now();
@@ -86,11 +108,11 @@ impl FileAppService {
 
         // 4. 流式写入存储后端
         let storage_path = storage
-            .write_stream(&path, &mut limited, Some(&content_type))
+            .write_stream(&path, &mut counting, Some(&content_type))
             .await?;
 
         // 5. 获取实际写入大小
-        let actual_size = limited.bytes_read() as i32;
+        let actual_size = counting.bytes_read as i32;
 
         // 6. 推断 MIME（multipart 可能传 application/octet-stream）
         let mime = if content_type.is_empty() || content_type == "application/octet-stream" {

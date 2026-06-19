@@ -8,7 +8,7 @@
 
 use axum::Json;
 use axum::extract::{Multipart, Path};
-use axum::http::header;
+use axum::http::{header, HeaderMap};
 use axum::response::{IntoResponse, Response};
 use tx_di_axum::Router;
 use axum::routing::{get, post, delete};
@@ -16,6 +16,8 @@ use tx_di_axum::bound::DiComp;
 use admin_app::file::app_service::FileAppService;
 use admin_proto::{ListFilesRequest, FileResponse, Empty};
 use tx_common::{ApiR, ApiRes, Page};
+use tx_error::AppError;
+use tx_di_file::storage::FileStorageErr;
 use crate::auth::ensure_permission;
 use crate::error::ApiErr;
 use tx_di_sa_token::StpUtil;
@@ -44,15 +46,37 @@ pub fn router() -> Router {
 /// 每个文件边收边写，全程零内存缓冲。
 async fn upload_files(
     DiComp(file_svc): DiComp<FileAppService>,
+    headers: HeaderMap,
     mut multipart: Multipart,
 ) -> Result<ApiR<Vec<FileResponse>>, ApiErr> {
+    // ── 提前检查 Content-Length，避免接收大文件到一半才发现超限 ──
+    let max_size = file_svc.max_file_size();
+    if max_size > 0 {
+        if let Some(cl) = headers
+            .get(header::CONTENT_LENGTH)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u64>().ok())
+        {
+            if cl > max_size {
+                return Err(AppError::from_code(FileStorageErr::FileTooLarge).into());
+            }
+        }
+    }
+
     ensure_permission("file:upload").await?;
     let creator = StpUtil::get_login_id_as_string().await?;
 
     let mut config_id: Option<i32> = None;
     let mut results: Vec<FileResponse> = Vec::new();
 
-    while let Some(field) = multipart.next_field().await.map_err(|e| anyhow::anyhow!(e))? {
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        let msg = e.to_string();
+        if msg.contains("length limit") {
+            AppError::from_code(FileStorageErr::FileTooLarge)
+        } else {
+            AppError::from_anyhow(anyhow::anyhow!(e))
+        }
+    })? {
         match field.name() {
             Some("config_id") => {
                 let text = field.text().await.map_err(|e| anyhow::anyhow!(e))?;
