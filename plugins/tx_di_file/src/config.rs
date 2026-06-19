@@ -116,11 +116,6 @@ impl CompInit for FileConfig {
             max_file_size = self.max_file_size,
             "文件存储配置已加载"
         );
-
-        // 本地存储时确保目录存在
-        if self.backend == StorageBackend::Local {
-            std::fs::create_dir_all(&self.base_path).ok();
-        }
         Ok(())
     }
 

@@ -1,12 +1,10 @@
 //! 文件服务插件核心组件
 //!
 //! 封装文件存储后端的初始化和访问逻辑。
-//! 根据 `FileConfig.backend` 自动选择本地或 S3 存储后端。
+//! 通过 OpenDAL 统一支持本地文件系统和 S3 等多种后端。
 
 use crate::config::FileConfig;
-use crate::storage::{FileStorage, LocalFileStorage};
-#[cfg(feature = "s3")]
-use crate::storage::S3FileStorage;
+use crate::storage::{FileStorage, OpendalStorage};
 use std::sync::{Arc, OnceLock};
 use tokio_util::sync::CancellationToken;
 use tx_di_core::App;
@@ -27,7 +25,7 @@ use tx_di_core::{CompInit, RIE, tx_comp};
 /// impl MyService {
 ///     async fn do_something(&self) {
 ///         let storage = self.file_plugin.storage();
-///         storage.upload(...).await?;
+///         storage.upload("test.txt", b"hello", None).await?;
 ///     }
 /// }
 /// ```
@@ -65,38 +63,10 @@ impl CompInit for FilePlugin {
                 return Ok(());
             }
 
-            let storage: Arc<dyn FileStorage> = match config.backend {
-                crate::config::StorageBackend::Local => {
-                    tracing::info!(base_path = %config.base_path, "初始化本地文件存储");
-                    Arc::new(LocalFileStorage::new(
-                        &config.base_path,
-                        &config.base_url,
-                    ))
-                }
-                #[cfg(feature = "s3")]
-                crate::config::StorageBackend::S3 => {
-                    tracing::info!(
-                        bucket = %config.s3.bucket,
-                        region = %config.s3.region,
-                        endpoint = %config.s3.endpoint,
-                        "初始化 S3 文件存储"
-                    );
-                    let s3 = S3FileStorage::new(
-                        &config.s3.bucket,
-                        &config.s3.region,
-                        if config.s3.endpoint.is_empty() { None } else { Some(&config.s3.endpoint) },
-                        if config.s3.access_key.is_empty() { None } else { Some(&config.s3.access_key) },
-                        if config.s3.secret_key.is_empty() { None } else { Some(&config.s3.secret_key) },
-                        config.s3.force_path_style,
-                    )
-                    .await?;
-                    Arc::new(s3)
-                }
-                #[cfg(not(feature = "s3"))]
-                crate::config::StorageBackend::S3 => {
-                    Err("S3 存储后端需要启用 's3' feature flag")?
-                }
-            };
+            let storage: Arc<dyn FileStorage> = Arc::new(
+                OpendalStorage::new(&config)
+                    .map_err(|e| anyhow::anyhow!(e))?
+            );
 
             if plugin.storage.set(storage).is_err() {
                 tracing::warn!("FilePlugin: storage concurrently initialized");
