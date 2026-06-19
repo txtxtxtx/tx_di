@@ -53,6 +53,9 @@ impl CompInit for WebPlugin {
             // 应用中间件（日志、CORS、超时等）
             api_router = WebPlugin::layer_with_router(api_router);
 
+            // 应用请求体大小限制（multipart 上传需要）
+            api_router = api_router.layer(axum::extract::DefaultBodyLimit::max(config.max_body_size));
+
             // ═══ 中间件外的路由（静态资源、文档） ═══
             let mut outer_router = axum::Router::new();
 
