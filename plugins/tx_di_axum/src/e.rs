@@ -31,7 +31,9 @@ impl IntoResponse for WebErr {
             }
             Self::Other(e) => {
                 tracing::error!("internal server error:{e:?}");
-                (StatusCode::INTERNAL_SERVER_ERROR, Json(ApiRes::fail(e.to_string())))
+                // 不暴露原始错误链给前端，使用统一内部错误码
+                let app_err = AppError::from_anyhow(e);
+                (StatusCode::OK, Json(ApiRes::error(app_err.code(), app_err.message().to_string())))
             }
         }.into_response()
     }
