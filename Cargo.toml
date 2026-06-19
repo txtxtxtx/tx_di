@@ -147,3 +147,4 @@ livekit = { version = "0.7.42", default-features = false }
 toasty = { version = "0.7", default-features = false, features = ["serde"] }
 jiff = { version = "0.2", default-features = false, features = ["std", "serde"] }
 argon2 = { version = "0.5", features = ["std"] }
+criterion = { version = "0.8.2"}

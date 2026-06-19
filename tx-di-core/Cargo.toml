@@ -1,6 +1,6 @@
 [package]
 name = "tx-di-core"
-version = "0.2.0"
+version = "0.3.0"
 edition.workspace = true
 license.workspace = true
 readme.workspace = true
@@ -28,7 +28,7 @@ tokio-util.workspace = true
 #tracing-subscriber.workspace = true
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { workspace = true, features = ["html_reports"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 
 [[bench]]
