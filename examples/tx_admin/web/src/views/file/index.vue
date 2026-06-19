@@ -31,8 +31,9 @@
           <template #default="{ row }">{{ formatBytes(row.size) }}</template>
         </el-table-column>
         <el-table-column prop="path" label="存储路径" min-width="200" show-overflow-tooltip />
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="handlePreview(row)">预览</el-button>
             <el-button link type="primary" size="small" @click="handleDownload(row)">下载</el-button>
             <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
           </template>
@@ -81,6 +82,14 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 文件预览 -->
+    <FilePreview
+      v-model:visible="previewVisible"
+      :file-url="previewFile.url"
+      :file-name="previewFile.name"
+      :file-type="previewFile.fileType"
+    />
   </div>
 </template>
 
@@ -92,6 +101,7 @@ import type { UploadInstance, UploadFile } from 'element-plus'
 import request from '@/api/request'
 import { uploadFiles, listFiles, deleteFile } from '@/api/file'
 import { formatBytes, toPageData } from '@/utils'
+import FilePreview from '@/components/FilePreview.vue'
 import type { FileResponse } from '@/types'
 
 const loading = ref(false)
@@ -105,6 +115,20 @@ const query = reactive({ name: '', fileType: '' })
 const uploadDialogVisible = ref(false)
 const uploadRef = ref<UploadInstance>()
 const fileList = ref<UploadFile[]>([])
+
+const previewVisible = ref(false)
+const previewFile = reactive<{ url: string; name: string; fileType: string | null }>({
+  url: '',
+  name: '',
+  fileType: null,
+})
+
+function handlePreview(row: FileResponse) {
+  previewFile.url = `/api/file/${row.id}/download`
+  previewFile.name = row.name
+  previewFile.fileType = row.fileType
+  previewVisible.value = true
+}
 
 function handleFileChange(_file: UploadFile, fileListNew: UploadFile[]) {
   fileList.value = fileListNew
