@@ -1,5 +1,5 @@
 [file_config]
-allowed_extensions = ["jpg", "jpeg", "png", "gif", "pdf", "doc", "docx", "xls", "xlsx", "txt", "zip"]
+# allowed_extensions = ["jpg", "jpeg", "png", "gif", "pdf", "doc", "docx", "xls", "xlsx", "txt", "zip"]
 backend = "local"
 base_path = "./uploads"
 base_url = "http://localhost:8080/files"
