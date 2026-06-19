@@ -4,6 +4,7 @@
 
 #[cfg(test)]
 mod menu_service_tests {
+    use std::collections::HashSet;
     use std::sync::Arc;
     use async_trait::async_trait;
     use tx_error::AppResult;
@@ -22,6 +23,7 @@ mod menu_service_tests {
         insert_fn: Box<dyn Fn(&Menu) -> AppResult<()> + Send + Sync>,
         update_fn: Box<dyn Fn(&Menu) -> AppResult<()> + Send + Sync>,
         has_children_fn: Box<dyn Fn(u64) -> AppResult<bool> + Send + Sync>,
+        find_permission_codes_by_user_id_fn: Box<dyn Fn(u64) -> AppResult<HashSet<String>> + Send + Sync>,
     }
 
     impl TestMenuRepo {
@@ -33,6 +35,7 @@ mod menu_service_tests {
                 insert_fn: Box::new(|_| panic!("unexpected call")),
                 update_fn: Box::new(|_| panic!("unexpected call")),
                 has_children_fn: Box::new(|_| panic!("unexpected call")),
+                find_permission_codes_by_user_id_fn: Box::new(|_| panic!("unexpected call")),
             }
         }
     }
@@ -47,6 +50,10 @@ mod menu_service_tests {
         async fn update(&self, menu: &Menu) -> AppResult<()> { (self.update_fn)(menu) }
         async fn soft_delete(&self, _: u64) -> AppResult<()> { Ok(()) }
         async fn has_children(&self, parent_id: u64) -> AppResult<bool> { (self.has_children_fn)(parent_id) }
+
+        async fn find_permission_codes_by_user_id(&self, user_id: u64) -> AppResult<HashSet<String>> {
+            (self.find_permission_codes_by_user_id_fn)(user_id)
+        }
     }
 
     fn make_menu() -> Menu {

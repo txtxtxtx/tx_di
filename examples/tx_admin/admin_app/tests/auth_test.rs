@@ -49,7 +49,7 @@ async fn create_auth_test_env() -> (
 
     let user_app = admin_app::user::app_service::UserAppService::new(user_svc.clone());
     let role_app = admin_app::role::app_service::RoleAppService::new(role_svc.clone());
-    let menu_app = admin_app::menu::app_service::MenuAppService::new(menu_svc);
+    let menu_app = admin_app::menu::app_service::MenuAppService::new(menu_svc.clone());
     let auth_app = AuthAppService::new(user_svc, role_svc, menu_svc, login_log_app);
 
     (auth_app, user_app, role_app, menu_app, user_repo, role_repo)
