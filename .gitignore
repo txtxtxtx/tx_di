@@ -14,3 +14,4 @@ examples/tx_admin/data/tx_admin.db
 examples/tx_admin/web/dist
 examples/tx_admin/web/node_modules
 examples/tx_admin/data/dist
+/uploads/
