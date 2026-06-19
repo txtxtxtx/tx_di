@@ -6581,13 +6581,10 @@ name = "tx-di-core"
 version = "0.3.0"
 dependencies = [
  "anyhow",
- "chrono",
  "criterion",
  "dashmap",
  "linkme",
  "serde",
- "serde_json",
- "thiserror 2.0.18",
  "tokio",
  "tokio-util",
  "toml 1.1.2+spec-1.1.0",
