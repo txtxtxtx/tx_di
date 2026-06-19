@@ -61,6 +61,6 @@ mod config;
 mod plugin;
 pub mod storage;
 
-pub use config::FileConfig;
+pub use config::{FileConfig, StorageBackend};
 pub use plugin::FilePlugin;
 pub use storage::{FileInfo, FileStorage, FileStorageErr, OpendalStorage};

@@ -10,7 +10,6 @@ use futures::Stream;
 use opendal::Operator;
 use std::pin::Pin;
 use tokio::io::{AsyncRead, AsyncReadExt};
-use tokio_stream::StreamExt;
 use tx_error::{AppError, AppResult};
 
 /// 基于 OpenDAL 的统一文件存储
@@ -111,22 +110,27 @@ impl FileStorage for OpendalStorage {
         if let Some(parent) = std::path::Path::new(path).parent() {
             if let Some(parent_str) = parent.to_str() {
                 if !parent_str.is_empty() {
-                    // OpenDAL 的 create_dir 幂等
+                    // OpenDAL Fs 服务要求 create_dir 路径以 `/` 结尾
+                    let dir_path = if parent_str.ends_with('/') {
+                        parent_str.to_string()
+                    } else {
+                        format!("{}/", parent_str)
+                    };
                     self.operator
-                        .create_dir(parent_str)
+                        .create_dir(&dir_path)
                         .await
                         .map_err(|e| map_opendal_error(e, path))?;
                 }
             }
         }
 
+        // 流式写入：通过 OpenDAL Writer 分块传输，不缓冲全文件
         let mut writer = self
             .operator
             .writer(path)
             .await
             .map_err(|e| map_opendal_error(e, path))?;
 
-        // OpenDAL Writer 分块写入（需要 'static buffer）
         let mut buf = vec![0u8; 8192];
         loop {
             let n = reader
@@ -137,7 +141,7 @@ impl FileStorage for OpendalStorage {
                 break;
             }
             writer
-                .write(bytes::Bytes::copy_from_slice(&buf[..n]))
+                .write(buf[..n].to_vec())
                 .await
                 .map_err(|e| map_opendal_error(e, path))?;
         }
@@ -148,7 +152,7 @@ impl FileStorage for OpendalStorage {
             .map_err(|e| map_opendal_error(e, path))?;
 
         let path_str = path.to_string();
-        tracing::debug!(path = %path_str, "文件已流式写入存储");
+        tracing::debug!(path = %path_str, "文件已写入存储");
         Ok(path_str)
     }
 
@@ -156,20 +160,25 @@ impl FileStorage for OpendalStorage {
         &self,
         path: &str,
     ) -> AppResult<Pin<Box<dyn tokio::io::AsyncRead + Send + Unpin>>> {
+        use tokio_util::io::StreamReader;
+        use futures::StreamExt;
+
         let reader = self
             .operator
             .reader(path)
             .await
             .map_err(|e| map_opendal_error(e, path))?;
 
-        // opendal::Reader → BytesStream → tokio StreamReader
         let bytes_stream = reader
             .into_bytes_stream(0..)
             .await
             .map_err(|e| map_opendal_error(e, path))?;
-        let mapped =
-            bytes_stream.map(|r| r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)));
-        Ok(Box::pin(tokio_util::io::StreamReader::new(mapped)))
+
+        let io_stream = bytes_stream.map(|r| {
+            r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
+        });
+
+        Ok(Box::pin(StreamReader::new(io_stream)))
     }
 
     async fn delete(&self, path: &str) -> AppResult<()> {

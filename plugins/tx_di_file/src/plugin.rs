@@ -37,7 +37,7 @@ pub struct FilePlugin {
 
     /// 存储后端（延迟初始化）
     #[tx_cst(OnceLock::new())]
-    storage: OnceLock<Arc<dyn FileStorage>>,
+    pub storage: OnceLock<Arc<dyn FileStorage>>,
 }
 
 impl FilePlugin {
