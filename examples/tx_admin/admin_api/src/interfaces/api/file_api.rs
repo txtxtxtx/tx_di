@@ -8,7 +8,7 @@
 
 use axum::Json;
 use axum::extract::{Multipart, Path};
-use axum::http::{header, HeaderMap};
+use axum::http::header;
 use axum::response::{IntoResponse, Response};
 use tx_di_axum::Router;
 use axum::routing::{get, post, delete};
@@ -17,16 +17,27 @@ use admin_app::file::app_service::FileAppService;
 use admin_proto::{ListFilesRequest, FileResponse, Empty};
 use tx_common::{ApiR, ApiRes, Page};
 use tx_error::AppError;
+use tx_di_core::CodeMsg;
 use tx_di_file::storage::FileStorageErr;
+use tx_di_axum::BodySizeLimitLayer;
 use crate::auth::ensure_permission;
 use crate::error::ApiErr;
 use tx_di_sa_token::StpUtil;
 use tokio_util::io::ReaderStream;
 use futures::StreamExt;
 
-pub fn router() -> Router {
+/// `max_body_size`: 全局请求体上限（字节），用于 Content-Length 提前拦截。0 表示不限制。
+pub fn router(max_body_size: u64) -> Router {
     Router::new()
-        .route("/upload", post(upload_files))
+        .route(
+            "/upload",
+            post(upload_files)
+                .route_layer(BodySizeLimitLayer::new(
+                    max_body_size,
+                    FileStorageErr::FileTooLarge.code(),
+                    FileStorageErr::FileTooLarge.message(),
+                )),
+        )
         .route("/{file_id}", get(get_file))
         .route("/{file_id}", delete(delete_file))
         .route("/{file_id}/download", get(download_file))
@@ -46,23 +57,8 @@ pub fn router() -> Router {
 /// 每个文件边收边写，全程零内存缓冲。
 async fn upload_files(
     DiComp(file_svc): DiComp<FileAppService>,
-    headers: HeaderMap,
     mut multipart: Multipart,
 ) -> Result<ApiR<Vec<FileResponse>>, ApiErr> {
-    // ── 提前检查 Content-Length，避免接收大文件到一半才发现超限 ──
-    let max_size = file_svc.max_file_size();
-    if max_size > 0 {
-        if let Some(cl) = headers
-            .get(header::CONTENT_LENGTH)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.parse::<u64>().ok())
-        {
-            if cl > max_size {
-                return Err(AppError::from_code(FileStorageErr::FileTooLarge).into());
-            }
-        }
-    }
-
     ensure_permission("file:upload").await?;
     let creator = StpUtil::get_login_id_as_string().await?;
 

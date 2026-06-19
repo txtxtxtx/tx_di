@@ -10,7 +10,7 @@ pub use comp::*;
 pub use bound::DiComp;
 pub use e::WebErr;
 pub use err::WebErrCode;
-pub use layers::{add_arc_layer, add_layer};
+pub use layers::{add_arc_layer, add_layer, body_limit::BodySizeLimitLayer};
 
 /// aide 重新导出，方便用户使用 `JsonSchema` 等派生宏
 #[cfg(feature = "api-doc")]

@@ -17,7 +17,9 @@ mod tool_api;
 use tx_di_axum::Router;
 
 /// 注册所有 HTTP 路由
-pub fn router() -> Router {
+///
+/// `max_body_size`: 全局请求体上限（字节），用于文件上传的 Content-Length 提前拦截
+pub fn router(max_body_size: u64) -> Router {
     Router::new()
         .nest("/api/auth", auth_api::router())
         .nest("/api/user", user_api::router())
@@ -27,7 +29,7 @@ pub fn router() -> Router {
         .nest("/api/config", config_api::router())
         .nest("/api/dict", dict_api::router())
         .nest("/api/log", log_api::router())
-        .nest("/api/file", file_api::router())
+        .nest("/api/file", file_api::router(max_body_size))
         .nest("/api/monitor", monitor_api::router())
         .nest("/api/tool", tool_api::router())
 }

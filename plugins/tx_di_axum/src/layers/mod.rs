@@ -25,6 +25,7 @@ use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, Tr
 use tracing::{debug, error, Level};
 
 pub mod api_log;
+pub mod body_limit;
 
 /// 超时配置（秒）
 static TIMEOUT_SECS: LazyLock<Arc<RwLock<u64>>> =

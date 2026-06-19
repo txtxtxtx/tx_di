@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use tracing::info;
-use tx_di_axum::WebPlugin;
+use tx_di_axum::{WebPlugin, WebConfig};
 use tx_di_core::{App, CancellationToken, CompInit, RIE, async_method, tx_comp};
 use tx_di_sa_token::{SaTokenPlugin, SaTokenLayer, SaCheckLoginLayer};
 
@@ -20,9 +20,13 @@ impl CompInit for AdminPlugin {
             let sa_plugin = ctx.inject::<SaTokenPlugin>();
             let sa_state = sa_plugin.state().clone();
 
+            // 获取 WebConfig 的 max_body_size，用于文件上传 Content-Length 提前拦截
+            let web_config = ctx.inject::<WebConfig>();
+            let max_body_size = web_config.max_body_size as u64;
+
             // 构建路由：登录接口公开，其他接口需要认证
             let open = api::auth_api::open_router();
-            let protected = api::router();
+            let protected = api::router(max_body_size);
 
             let router = tx_di_axum::Router::new()
                 .merge(open)
