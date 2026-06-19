@@ -49,7 +49,7 @@ request.interceptors.response.use(
     }
     return response
   },
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401) {
       useUserStore().clearAuthData()
       if (!isRedirectingToLogin) {
@@ -59,7 +59,17 @@ request.interceptors.response.use(
       }
       return Promise.reject(error)
     }
-    ElMessage.error(error.response?.data?.msg || error.message || '网络错误')
+
+    // blob/arraybuffer 响应的错误体也是二进制，需要解析后取 msg
+    let msg = error.response?.data?.msg
+    if (!msg && error.response?.data instanceof Blob) {
+      try {
+        const text = await error.response.data.text()
+        msg = JSON.parse(text)?.msg
+      } catch { /* 非 JSON，忽略 */ }
+    }
+
+    ElMessage.error(msg || error.message || '网络错误')
     return Promise.reject(error)
   }
 )
