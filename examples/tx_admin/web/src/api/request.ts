@@ -28,6 +28,10 @@ request.interceptors.request.use(
 // 响应拦截器：统一错误处理
 request.interceptors.response.use(
   (response: AxiosResponse<ApiRes>) => {
+    // 二进制响应（blob / arraybuffer）直接透传，不做 JSON 解析
+    if (response.config.responseType === 'blob' || response.config.responseType === 'arraybuffer') {
+      return response
+    }
     const res = response.data
     if (res.code !== 0 && res.code !== 200) {
       // 认证失败

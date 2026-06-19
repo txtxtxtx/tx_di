@@ -89,6 +89,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import type { UploadInstance, UploadFile } from 'element-plus'
+import request from '@/api/request'
 import { uploadFiles, listFiles, deleteFile } from '@/api/file'
 import { formatBytes, toPageData } from '@/utils'
 import type { FileResponse } from '@/types'
@@ -162,8 +163,18 @@ async function handleUpload() {
   }
 }
 
-function handleDownload(row: FileResponse) {
-  window.open(`/api/file/${row.id}/download`, '_blank')
+async function handleDownload(row: FileResponse) {
+  try {
+    const res = await request.get(`/api/file/${row.id}/download`, { responseType: 'blob' })
+    const url = URL.createObjectURL(res.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = row.name
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    /* 错误由拦截器统一处理 */
+  }
 }
 
 async function handleDelete(row: FileResponse) {
