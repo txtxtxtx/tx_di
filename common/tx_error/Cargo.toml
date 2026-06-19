@@ -11,7 +11,7 @@ anyhow.workspace = true
 serde_json.workspace = true
 toml.workspace = true
 tracing.workspace = true
-tx_macros = { path = "../tx_macros" }
+tx_macros = { path = "../tx_macros",version = "0.1.0" }
 
 # 可选依赖：axum IntoResponse 支持
 axum = { workspace = true, optional = true }

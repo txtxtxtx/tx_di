@@ -6,7 +6,7 @@ license.workspace = true
 readme.workspace = true
 description = "DI framwork,依赖自动注入框架，运行时使用拓扑排序，排序依赖关系"
 [dependencies]
-tx-di-macros = { path = "../tx-di-macros" }
+tx-di-macros = { path = "../tx-di-macros", version = "0.3.0" }
 #tx-di-macros = { version = "0.2.0" }
 tx_error = { path = "../common/tx_error" }
 tx_common = { path = "../common/crates/tx_common" }

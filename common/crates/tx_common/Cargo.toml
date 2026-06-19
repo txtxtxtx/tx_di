@@ -8,7 +8,7 @@ description = "通用工具类型（ApiR, ApiRes, FormattedDateTime）"
 [dependencies]
 serde.workspace = true
 chrono.workspace = true
-tx_error = { path = "../../tx_error" }
+tx_error = { path = "../../tx_error", version = "0.1.0" }
 axum = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 
