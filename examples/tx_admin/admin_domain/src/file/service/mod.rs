@@ -188,6 +188,7 @@ impl FileService {
             filename: file.name,
             size: file.size,
             content_type: content_type.to_string(),
+            storage_path: file.path,
         })
     }
 }

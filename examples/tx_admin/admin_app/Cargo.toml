@@ -14,17 +14,19 @@ admin_proto = { path = "../admin_proto" }
 tx_error = { path = "../../../common/tx_error"}
 tx_common = { path = "../../../common/crates/tx_common"}
 tx-di-core  = { path = "../../../tx-di-core" }
+tx_di_file = { path = "../../../plugins/tx_di_file" }
 
 async-trait = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-chrono = { workspace = true }
 jiff = { workspace = true }
 dashmap = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true, features = ["io"] }
 schemars = { workspace = true }
+uuid = { version = "1", features = ["v4", "v7"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
@@ -34,3 +36,4 @@ pretty_assertions = "1"
 admin_infra = { path = "../admin_infra" }
 toasty = { version = "0.7", features = ["sqlite"] }
 tx_di_toasty = { path = "../../../plugins/tx_di_toasty", features = ["sqlite"] }
+tempfile = "3"

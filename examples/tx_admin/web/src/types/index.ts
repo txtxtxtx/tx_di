@@ -452,16 +452,6 @@ export interface FileResponse {
   size: number
 }
 
-// proto, camelCase, int32 fields as number
-export interface UploadFileRequest {
-  name: string
-  path: string
-  url: string
-  fileType?: string
-  size: number
-  configId?: number
-}
-
 export interface ListFilesRequest {
   name?: string
   fileType?: string

@@ -176,6 +176,11 @@ pub async fn create_dict_data_app() -> (DictDataAppService, Arc<DictDataService>
 
 // ── File helpers ───────────────────────────────────────────────────────────
 
+use tx_di_file::FilePlugin;
+use tx_di_file::FileConfig;
+use tx_di_file::StorageBackend;
+use tx_di_file::storage::{FileStorage, OpendalStorage};
+
 pub async fn create_file_service() -> (Arc<FileService>, Arc<ToastyFileRepository>) {
     let plugin = create_db_plugin().await;
     let file_repo = Arc::new(ToastyFileRepository::new(plugin.clone()));
@@ -184,10 +189,32 @@ pub async fn create_file_service() -> (Arc<FileService>, Arc<ToastyFileRepositor
     (file_service, file_repo)
 }
 
-pub async fn create_file_app() -> (FileAppService, Arc<FileService>, Arc<ToastyFileRepository>) {
+/// 创建带真实本地文件存储的 FileAppService，适用于集成测试
+///
+/// 返回的 `TempDir` 必须被调用方持有（否则目录会被删除导致读取失败）。
+pub async fn create_file_app() -> (FileAppService, Arc<FileService>, Arc<ToastyFileRepository>, tempfile::TempDir) {
     let (svc, repo) = create_file_service().await;
-    let app = FileAppService::new(svc.clone());
-    (app, svc, repo)
+
+    let temp_dir = tempfile::tempdir().expect("无法创建临时目录");
+    let config = Arc::new(FileConfig {
+        backend: StorageBackend::Local,
+        base_path: temp_dir.path().to_string_lossy().to_string(),
+        max_file_size: 10 * 1024 * 1024, // 10MB
+        ..Default::default()
+    });
+
+    let storage: Arc<dyn FileStorage> =
+        Arc::new(OpendalStorage::new(&config).expect("无法创建测试文件存储"));
+    let storage_lock = std::sync::OnceLock::new();
+    storage_lock.set(storage).unwrap();
+
+    let plugin = Arc::new(FilePlugin {
+        config,
+        storage: storage_lock,
+    });
+
+    let app = FileAppService::new(svc.clone(), plugin);
+    (app, svc, repo, temp_dir)
 }
 
 // ── Log helpers ────────────────────────────────────────────────────────────

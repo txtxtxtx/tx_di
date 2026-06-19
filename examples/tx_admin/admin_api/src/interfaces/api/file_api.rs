@@ -1,53 +1,156 @@
 //! 文件管理 HTTP API
+//!
+//! - `POST /api/file/upload`  流式多文件上传（multipart/form-data）
+//! - `GET  /api/file/{id}`    获取文件元数据
+//! - `DELETE /api/file/{id}`  删除物理文件 + DB 软删除
+//! - `GET  /api/file/{id}/download`  流式下载文件二进制
+//! - `POST /api/file/list`    分页查询
 
 use axum::Json;
+use axum::extract::{Multipart, Path};
+use axum::http::header;
+use axum::response::{IntoResponse, Response};
 use tx_di_axum::Router;
 use axum::routing::{get, post, delete};
 use tx_di_axum::bound::DiComp;
 use admin_app::file::app_service::FileAppService;
-use admin_proto::{UploadFileRequest, ListFilesRequest, FileResponse, DownloadFileResponse, Empty};
+use admin_proto::{ListFilesRequest, FileResponse, Empty};
 use tx_common::{ApiR, ApiRes, Page};
 use crate::auth::ensure_permission;
 use crate::error::ApiErr;
 use tx_di_sa_token::StpUtil;
+use tokio_util::io::ReaderStream;
+use futures::StreamExt;
 
 pub fn router() -> Router {
     Router::new()
-        .route("/", post(upload_file))
+        .route("/upload", post(upload_files))
         .route("/{file_id}", get(get_file))
         .route("/{file_id}", delete(delete_file))
         .route("/{file_id}/download", get(download_file))
         .route("/list", post(list_files))
 }
 
-async fn upload_file(
+// ============================================================================
+// 流式多文件上传
+// ============================================================================
+
+/// `POST /api/file/upload`
+///
+/// 接收 `multipart/form-data`：
+/// - `config_id` (可选) — 公共配置 ID，应用于所有文件
+/// - `file` (可多个) — 文件二进制，每个 file field 一个文件
+///
+/// 每个文件边收边写，全程零内存缓冲。
+async fn upload_files(
     DiComp(file_svc): DiComp<FileAppService>,
-    Json(req): Json<UploadFileRequest>,
-) -> Result<ApiR<FileResponse>, ApiErr> {
+    mut multipart: Multipart,
+) -> Result<ApiR<Vec<FileResponse>>, ApiErr> {
     ensure_permission("file:upload").await?;
-    let login_id = StpUtil::get_login_id_as_string().await?;
-    let r = file_svc.upload_file(req, Some(login_id)).await?;
-    Ok(ApiR::success(r))
+    let creator = StpUtil::get_login_id_as_string().await?;
+
+    let mut config_id: Option<i32> = None;
+    let mut results: Vec<FileResponse> = Vec::new();
+
+    while let Some(field) = multipart.next_field().await.map_err(|e| anyhow::anyhow!(e))? {
+        match field.name() {
+            Some("config_id") => {
+                let text = field.text().await.map_err(|e| anyhow::anyhow!(e))?;
+                config_id = text.parse().ok();
+            }
+            Some("file") => {
+                let filename = field
+                    .file_name()
+                    .unwrap_or("unknown")
+                    .to_string();
+                let content_type = field
+                    .content_type()
+                    .unwrap_or("application/octet-stream")
+                    .to_string();
+
+                // ═══ multipart Stream → AsyncRead → write_stream ═══
+                // 文件二进制从头到尾不进入应用内存
+                let byte_stream = field.map(|r| {
+                    r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+                });
+                let mut reader = tokio_util::io::StreamReader::new(byte_stream);
+
+                let r = file_svc
+                    .upload_file_stream(
+                        filename,
+                        content_type,
+                        &mut reader,
+                        config_id,
+                        Some(creator.clone()),
+                    )
+                    .await?;
+                results.push(r);
+            }
+            _ => { /* 忽略未知字段 */ }
+        }
+    }
+
+    Ok(ApiR::success(results))
 }
+
+// ============================================================================
+// 获取文件元数据
+// ============================================================================
 
 async fn get_file(
     DiComp(file_svc): DiComp<FileAppService>,
-    axum::extract::Path(file_id): axum::extract::Path<u64>,
+    Path(file_id): Path<u64>,
 ) -> Result<ApiR<FileResponse>, ApiErr> {
     ensure_permission("file:view").await?;
     let r = file_svc.get_file(file_id).await?;
     Ok(ApiR::success(r))
 }
 
+// ============================================================================
+// 删除文件（物理文件 + DB 软删除）
+// ============================================================================
+
 async fn delete_file(
     DiComp(file_svc): DiComp<FileAppService>,
-    axum::extract::Path(file_id): axum::extract::Path<u64>,
+    Path(file_id): Path<u64>,
 ) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("file:delete").await?;
     let login_id = StpUtil::get_login_id_as_string().await?;
     file_svc.delete_file(file_id, Some(login_id)).await?;
     Ok(ApiRes::ok().into_typed())
 }
+
+// ============================================================================
+// 流式下载
+// ============================================================================
+
+/// `GET /api/file/{id}/download`
+///
+/// 流式返回文件二进制，设置 Content-Disposition / Content-Type / Content-Length。
+/// 不经过 JSON 包装，不缓冲文件到内存。
+async fn download_file(
+    DiComp(file_svc): DiComp<FileAppService>,
+    Path(file_id): Path<u64>,
+) -> Result<impl IntoResponse, ApiErr> {
+    ensure_permission("file:download").await?;
+    let stream = file_svc.download_file_stream(file_id).await?;
+
+    let body = axum::body::Body::from_stream(ReaderStream::new(stream.reader));
+
+    Ok(Response::builder()
+        .header(header::CONTENT_TYPE, &stream.content_type)
+        .header(
+            header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"{}\"", stream.filename),
+        )
+        .header(header::CONTENT_LENGTH, stream.size)
+        .body(body)
+        .unwrap())
+}
+
+// ============================================================================
+// 分页查询
+// ============================================================================
 
 async fn list_files(
     DiComp(file_svc): DiComp<FileAppService>,
@@ -56,13 +159,4 @@ async fn list_files(
     ensure_permission("file:view").await?;
     let page = file_svc.get_file_page(req).await?;
     Ok(ApiR::success(page))
-}
-
-async fn download_file(
-    DiComp(file_svc): DiComp<FileAppService>,
-    axum::extract::Path(file_id): axum::extract::Path<u64>,
-) -> Result<ApiR<DownloadFileResponse>, ApiErr> {
-    ensure_permission("file:download").await?;
-    let r = file_svc.download_file(file_id).await?;
-    Ok(ApiR::success(r))
 }

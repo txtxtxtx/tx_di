@@ -17,11 +17,13 @@ pub struct FileUploadCommand {
     pub config_id: Option<i32>,
 }
 
-/// 文件下载信息
+/// 文件下载信息（含存储路径，用于流式下载定位物理文件）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileDownloadInfo {
     pub url: String,
     pub filename: String,
     pub size: i32,
     pub content_type: String,
+    /// 存储后端路径（用于 `read_stream` 定位文件）
+    pub storage_path: String,
 }
