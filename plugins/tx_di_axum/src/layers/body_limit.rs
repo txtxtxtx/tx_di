@@ -16,7 +16,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tower::{Layer, Service};
 use tx_common::ApiRes;
-use tracing::{info, warn};
+use tracing::{ warn};
 
 /// 请求体大小限制层
 ///
