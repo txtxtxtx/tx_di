@@ -8,8 +8,8 @@ description = "DI framwork,依赖自动注入框架，运行时使用拓扑排�
 [dependencies]
 tx-di-macros = { path = "../tx-di-macros", version = "0.3.0" }
 #tx-di-macros = { version = "0.2.0" }
-tx_error = { path = "../common/tx_error" }
-tx_common = { path = "../common/crates/tx_common" }
+tx_error = { path = "../common/tx_error", version = "0.1.0" }
+tx_common = { path = "../common/crates/tx_common", version = "0.1.0" }
 # linkme 用于跨 crate 在链接期收集静态数组切片
 # 基于 ELF/Mach-O/PE 的自定义 link section，完全零运行时开销
 linkme.workspace = true
