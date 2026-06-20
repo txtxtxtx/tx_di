@@ -61,6 +61,26 @@ impl Default for Deleted {
     }
 }
 
+/// 文件存储后端类型
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Embed)]
+pub enum StorageType {
+    /// 本地文件系统
+    #[column(variant = 0)]
+    Local,
+    /// S3 对象存储
+    #[column(variant = 1)]
+    S3,
+    /// 数据库存储
+    #[column(variant = 2)]
+    Database,
+}
+
+impl Default for StorageType {
+    fn default() -> Self {
+        StorageType::Local
+    }
+}
+
 // ── i32 互转 ──
 
 impl From<Sex> for i32 {
@@ -118,6 +138,26 @@ impl From<i32> for Deleted {
         match v {
             1 => Deleted::Yes,
             _ => Deleted::No,
+        }
+    }
+}
+
+impl From<StorageType> for i32 {
+    fn from(v: StorageType) -> Self {
+        match v {
+            StorageType::Local => 0,
+            StorageType::S3 => 1,
+            StorageType::Database => 2,
+        }
+    }
+}
+
+impl From<i32> for StorageType {
+    fn from(v: i32) -> Self {
+        match v {
+            1 => StorageType::S3,
+            2 => StorageType::Database,
+            _ => StorageType::Local,
         }
     }
 }

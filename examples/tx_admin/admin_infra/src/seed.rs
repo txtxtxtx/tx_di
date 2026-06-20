@@ -3,7 +3,7 @@
 //! 定义系统初始化时的默认数据。
 //! 所有权限码在此统一管理，handler 通过 `#[sa_check_permission("code")]` 注解引用。
 
-use crate::common::{Sex, Status, Deleted};
+use crate::common::{Sex, Status, Deleted, StorageType};
 use crate::user::model::SysUser;
 use crate::role::model::{SysRole, SysRoleMenu};
 use crate::user::model::SysUserRole;
@@ -340,7 +340,25 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
     }
     info!("已创建 {} 个菜单", MENU_SEEDS.len());
 
-    // 7. 超级管理员关联所有菜单
+    // 7. 创建默认文件存储配置（本地存储）
+    crate::file::model::SysFileConfig::create()
+        .id(1)
+        .name("本地存储".to_string())
+        .storage(StorageType::Local)
+        .remark("默认本地文件存储配置".to_string())
+        .master(1) // 主配置
+        .config(r#"{"base_path":"./uploads","base_url":"http://localhost:8888/files"}"#.to_string())
+        .creator("system".to_string())
+        .created_at(now.clone())
+        .updater("system".to_string())
+        .updated_at(now.clone())
+        .deleted(Deleted::No)
+        .exec(&mut db)
+        .await
+        .map_err(|e| anyhow::anyhow!("创建默认文件存储配置失败: {}", e))?;
+    info!("已创建默认文件存储配置: 本地存储");
+
+    // 8. 超级管理员关联所有菜单
     let all_menu_ids: Vec<u64> = MENU_SEEDS.iter().map(|&(id, ..)| id as u64).collect();
     for &menu_id in &all_menu_ids {
         crate::role::model::SysRoleMenu::create()

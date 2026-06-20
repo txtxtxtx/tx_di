@@ -11,6 +11,7 @@ use std::sync::{Arc, OnceLock};
 use admin_domain::job::repository::{JobLogRepository, JobRepository};
 use tx_common::id;
 use tx_di_core::{tx_comp, App, CancellationToken, CompInit, RIE};
+use tx_di_toasty::ToastyConfig;
 
 /// 任务处理器函数类型
 type HandlerFn = fn(&str) -> Pin<Box<dyn Future<Output = Result<String, String>> + Send>>;
@@ -44,13 +45,14 @@ pub struct SchedulerPlugin {
 impl CompInit for SchedulerPlugin {
     tx_di_core::async_method!(
         fn async_init_impl(ctx: Arc<App>, _token: CancellationToken) -> RIE<()> {
+
             let plugin = ctx.inject::<SchedulerPlugin>();
             let job_repo = plugin.job_repo.clone();
             let log_repo = plugin.log_repo.clone();
 
             tokio::spawn(async move {
-                // 等待数据库初始化完成（DbInitPlugin 在 MAX-25 完成）
-                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                // 等待数据库初始化完成（DbInitPlugin 需要时间建表和种子数据）
+                tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
                 if let Err(e) = run_scheduler(job_repo, log_repo).await {
                     tracing::error!(error = %e, "定时任务调度引擎启动失败");
                 }
@@ -75,8 +77,14 @@ async fn run_scheduler(
 
     let scheduler = CronScheduler::new().await?;
 
-    // 加载活跃任务
-    let active_jobs = job_repo.find_active().await?;
+    // 加载活跃任务（表可能不存在，优雅处理）
+    let active_jobs = match job_repo.find_active().await {
+        Ok(jobs) => jobs,
+        Err(e) => {
+            tracing::warn!(error = %e, "加载定时任务失败（表可能不存在），跳过调度");
+            return Ok(());
+        }
+    };
     tracing::info!(count = active_jobs.len(), "加载活跃定时任务");
 
     for job in active_jobs {

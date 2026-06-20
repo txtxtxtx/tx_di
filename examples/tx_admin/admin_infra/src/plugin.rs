@@ -4,10 +4,10 @@
 //! 1. `InfraPlugin` — 注册所有 toasty 模型（在 DB 连接之前）
 //! 2. `DbInitPlugin` — 检测首次启动，执行种子数据初始化（在 DB 连接之后）
 
-use tx_di_core::{tx_comp, App, CancellationToken, CompInit, RIE, async_method};
-use tx_di_toasty::{ToastyPlugin, ToastyDb};
 use std::sync::Arc;
-use tracing::{info, debug};
+use tracing::{debug, info};
+use tx_di_core::{App, CancellationToken, CompInit, RIE, async_method, tx_comp};
+use tx_di_toasty::{ToastyConfig, ToastyDb, ToastyPlugin};
 
 /// 模型注册插件
 ///
@@ -34,23 +34,24 @@ impl CompInit for InfraPlugin {
 /// 数据库初始化插件
 ///
 /// 在 `ToastyPlugin` 连接数据库之后执行，检测空数据库并初始化种子数据。
+/// 仅在 `auto_schema = true` 时执行种子初始化。
 #[tx_comp(init)]
 pub struct DbInitPlugin;
 
 impl CompInit for DbInitPlugin {
     async_method!(
         fn async_init_impl(ctx: Arc<App>, _token: CancellationToken) -> RIE<()> {
-            let toasty_plugin = ctx.inject::<ToastyPlugin>();
-            let db = toasty_plugin.db();
-
-            if needs_init(db).await {
-                info!("infra: 检测到空数据库，开始初始化种子数据...");
-                crate::seed::seed_data(db).await?;
-                info!("infra: 种子数据初始化完成");
-            } else {
-                debug!("infra: 数据库已有数据，跳过初始化");
+            // auto_schema = false 时跳过种子初始化（用户自行管理表结构）
+            let toasty_config = ctx.inject::<ToastyConfig>();
+            if !toasty_config.auto_schema {
+                debug!("infra: auto_schema=false，跳过种子数据初始化");
+                return Ok(());
             }
 
+            let toasty_plugin = ctx.inject::<ToastyPlugin>();
+            let db = toasty_plugin.db();
+            crate::seed::seed_data(db).await?;
+            info!("infra: 种子数据初始化完成");
             Ok(())
         }
     );
@@ -58,18 +59,5 @@ impl CompInit for DbInitPlugin {
     fn init_sort() -> i32 {
         // 在 ToastyPlugin（MAX-50）之后，确保 DB 已连接
         i32::MAX - 25
-    }
-}
-
-/// 检测数据库是否需要初始化
-///
-/// 通过查询 sys_user 表是否有数据来判断
-async fn needs_init(db: &ToastyDb) -> bool {
-    use crate::user::model::SysUser;
-
-    let mut db = db.clone();
-    match SysUser::all().count().exec(&mut db).await {
-        Ok(count) => count == 0,
-        Err(_) => true,
     }
 }

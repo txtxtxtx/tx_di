@@ -13,7 +13,7 @@ use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
 use super::model::{SysFile, SysFileConfig};
-use crate::common::Deleted;
+use crate::common::{Deleted, StorageType};
 
 /// Toasty 实现的 FileRepository
 #[tx_comp(as_trait = dyn FileRepository)]
@@ -180,7 +180,7 @@ impl ToastyFileConfigRepository {
         FileConfig::restore(
             c.id,
             c.name.clone(),
-            c.storage,
+            c.storage.into(),
             if c.remark.is_empty() { None } else { Some(c.remark.clone()) },
             c.master,
             c.config.clone(),
@@ -238,7 +238,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
         SysFileConfig::create()
             .id(config.id)
             .name(config.name.clone())
-            .storage(config.storage)
+            .storage(StorageType::from(config.storage))
             .remark(config.remark.clone().unwrap_or_default())
             .master(config.master)
             .config(config.config.clone())
@@ -263,7 +263,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
         existing
             .update()
             .name(config.name.clone())
-            .storage(config.storage)
+            .storage(StorageType::from(config.storage))
             .remark(config.remark.clone().unwrap_or_default())
             .master(config.master)
             .config(config.config.clone())

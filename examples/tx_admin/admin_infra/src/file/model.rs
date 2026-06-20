@@ -1,6 +1,6 @@
 use toasty::Model;
 
-use crate::common::Deleted;
+use crate::common::{Deleted, StorageType};
 
 /// 系统文件表
 #[derive(Debug, Clone, Model)]
@@ -55,8 +55,8 @@ pub struct SysFileConfig {
     #[default("".to_string())]
     pub name: String,
 
-    #[default(0)]
-    pub storage: i32,
+    #[default(StorageType::Local)]
+    pub storage: StorageType,
 
     #[default("".to_string())]
     pub remark: String,
