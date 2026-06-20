@@ -1,8 +1,10 @@
+use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
+use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 use tx_di_core::{App, CompInit, RIE, tx_comp, async_method, InnerContext};
 use tracing::{info, warn, error, debug};
-use jiff::Timestamp;
+use jiff::{Timestamp, civil, tz::TimeZone};
 
 use crate::config::JobConfig;
 use crate::models::{InfrustJob, InfrustJobLog, AuditFields, SoftDelete, ExecutionStatus, JobStatus};
@@ -95,6 +97,20 @@ impl JobPlugin {
         self.python_executor
             .get()
             .expect("PythonJobExecutor 未初始化")
+    }
+
+    async fn execute_by_type(
+        &self,
+        job_id: i64,
+        handler_name: &str,
+        handler_param: Option<&str>,
+    ) -> JobResult {
+        let executor_type = ExecutorType::from_handler_name(&handler_name);
+        match executor_type {
+            ExecutorType::Internal => self.internal_exec().execute(job_id, handler_name, handler_param).await,
+            ExecutorType::Shell => self.shell_exec().execute(job_id, handler_name, handler_param).await,
+            ExecutorType::Python => self.python_exec().execute(job_id, handler_name, handler_param).await,
+        }
     }
 
     // ---- 公共 API ----
@@ -235,8 +251,8 @@ impl JobPlugin {
     }
 
     /// 查询任务列表（分页，id 倒序）
-    pub async fn list_jobs(&self, page: i64, page_size: i64) -> RIE<Vec<InfrustJob>> {
-        let jobs = self.repo().get_running_jobs(page, page_size).await?;
+    pub async fn list_jobs(&self, page: Page<InfrustJob>) -> RIE<Vec<InfrustJob>> {
+        let jobs = self.repo().get_running_jobs(page).await?;
         Ok(jobs)
     }
 
@@ -255,10 +271,66 @@ impl JobPlugin {
         }
     }
 
-    /// 执行任务
+    /// 执行任务（含重试机制）
+    ///
+    /// 首次执行 + `retry_count` 次重试，每次重试前等待 `retry_interval` 秒。
+    /// 每次尝试（含首次和重试）都会独立记录一条执行日志。
     async fn execute_job(&self, job: &InfrustJob) -> RIE<()> {
         info!(job_id = job.id, job_name = %job.name, "开始执行任务");
 
+        let max_attempts = 1 + job.retry_count.max(0) as usize;
+
+        for attempt in 0..max_attempts {
+            let execute_index = (attempt + 1) as i16;
+            let is_retry = attempt > 0;
+
+            if is_retry {
+                info!(
+                    job_id = job.id,
+                    attempt = attempt + 1,
+                    max_attempts = max_attempts,
+                    interval_secs = job.retry_interval,
+                    "等待后重试任务"
+                );
+                tokio::time::sleep(Duration::from_secs(job.retry_interval as u64)).await;
+            }
+
+            let result = self.execute_single_attempt(job, execute_index).await?;
+
+            if result.status == ExecutionStatus::Success {
+                info!(
+                    job_id = job.id,
+                    attempt = attempt + 1,
+                    "任务执行成功"
+                );
+                return Ok(());
+            }
+
+            // 本次尝试失败，如果还有重试次数则继续
+            if attempt + 1 < max_attempts {
+                warn!(
+                    job_id = job.id,
+                    attempt = attempt + 1,
+                    remaining = max_attempts - attempt - 1,
+                    "任务执行失败，准备重试"
+                );
+            }
+        }
+
+        warn!(
+            job_id = job.id,
+            attempts = max_attempts,
+            "任务所有尝试均已失败"
+        );
+        Ok(())
+    }
+
+    /// 执行单次任务尝试（创建日志 → 执行 → 更新日志）
+    async fn execute_single_attempt(
+        &self,
+        job: &InfrustJob,
+        execute_index: i16,
+    ) -> RIE<JobResult> {
         let begin = Timestamp::now();
         let begin_str = begin.to_string();
 
@@ -268,7 +340,7 @@ impl JobPlugin {
             job_id: job.id,
             handler_name: job.handler_name.clone(),
             handler_param: job.handler_param.clone(),
-            execute_index: 1,
+            execute_index,
             begin_time: begin_str.clone(),
             end_time: None,
             duration: None,
@@ -285,76 +357,103 @@ impl JobPlugin {
 
         log = self.repo().create_job_log(log).await?;
 
-        // 根据 handler_name 选择执行器
-        let executor_type = ExecutorType::from_handler_name(&job.handler_name);
-        let result = match executor_type {
-            ExecutorType::Internal => {
-                self.internal_exec()
-                    .execute(job.id, &job.handler_name, job.handler_param.as_deref())
-                    .await
-            }
-            ExecutorType::Shell => {
-                self.shell_exec()
-                    .execute(job.id, &job.handler_name, job.handler_param.as_deref())
-                    .await
-            }
-            ExecutorType::Python => {
-                self.python_exec()
-                    .execute(job.id, &job.handler_name, job.handler_param.as_deref())
-                    .await
-            }
-        };
+        let result = self
+            .execute_by_type(job.id, &job.handler_name, job.handler_param.as_deref())
+            .await;
 
-        // 更新执行日志
         let end = Timestamp::now();
         let duration_ms = (end.as_millisecond() - begin.as_millisecond()) as i32;
 
         log.end_time = Some(end.to_string());
         log.duration = Some(duration_ms);
         log.status = result.status;
-        log.result = result.result;
+        log.result = result.result.clone();
         log.audit.update_time = end.to_string();
 
         self.repo().update_job_log(log).await?;
 
-        // 检查是否需要重试
-        if result.status != ExecutionStatus::Success && job.retry_count > 0 {
-            info!(
-                job_id = job.id,
-                retry_count = job.retry_count,
-                "任务执行失败，准备重试"
-            );
-            // TODO: 实现重试逻辑 — 需要异步重试，可能涉及任务重新调度
-            todo!("任务重试逻辑尚未实现");
-        }
-
-        info!(
+        debug!(
             job_id = job.id,
+            execute_index = execute_index,
             status = ?result.status,
             duration_ms = duration_ms,
-            "任务执行完成"
+            "单次尝试完成"
         );
 
-        Ok(())
+        Ok(result)
     }
 
     /// 调度器主循环
+    ///
+    /// 每个轮询周期检查所有运行中任务，匹配 cron 表达式，到期触发执行。
+    /// 通过 `last_trigger` 记录每次触发的精确时间槽，避免同一分钟重复执行。
     async fn scheduler_loop(&self, token: CancellationToken) -> RIE<()> {
         info!("调度器主循环启动");
 
         let mut interval = tokio::time::interval(self.config.poll_interval());
+        // 跟踪每个任务的上次触发时间槽: (年, 月, 日, 时, 分)
+        let mut last_trigger: HashMap<i64, (i16, i8, i8, i8, i8)> = HashMap::new();
 
         loop {
             tokio::select! {
                 _ = interval.tick() => {
-                    let _now = Timestamp::now();
+                    let now_ts = Timestamp::now();
+                    let now_dt = now_ts.to_zoned(TimeZone::UTC).datetime();
 
-                    // TODO: 实现 Cron 表达式调度逻辑
-                    // 1. 查询所有运行中的任务
-                    // 2. 解析 Cron 表达式（使用 jiff::civil::DateTime）
-                    // 3. 计算下次执行时间
-                    // 4. 如果到达执行时间，执行任务
-                    debug!("调度器轮询 (Cron 调度逻辑尚未实现)");
+                    // 查询所有运行中的任务
+                    let jobs = match self.repo().get_all_running_jobs().await {
+                        Ok(jobs) => jobs,
+                        Err(e) => {
+                            error!(error = %e, "查询运行中任务失败");
+                            continue;
+                        }
+                    };
+
+                    // 清理已移除任务的缓存
+                    let active_ids: std::collections::HashSet<i64> =
+                        jobs.iter().map(|j| j.id).collect();
+                    last_trigger.retain(|id, _| active_ids.contains(id));
+
+                    for job in &jobs {
+                        if !cron_matches(&job.cron_expression, &now_dt) {
+                            continue;
+                        }
+
+                        // 当前时间槽
+                        let slot = (
+                            now_dt.year(),
+                            now_dt.month(),
+                            now_dt.day(),
+                            now_dt.hour(),
+                            now_dt.minute(),
+                        );
+
+                        // 检查是否已在当前分钟触发过
+                        if last_trigger.get(&job.id) == Some(&slot) {
+                            continue;
+                        }
+
+                        info!(
+                            job_id = job.id,
+                            job_name = %job.name,
+                            "到达调度时间，触发任务执行"
+                        );
+
+                        if let Err(e) = self.execute_job(job).await {
+                            error!(
+                                job_id = job.id,
+                                error = %e,
+                                "任务执行失败"
+                            );
+                        }
+
+                        last_trigger.insert(job.id, slot);
+                    }
+
+                    debug!(
+                        active_jobs = jobs.len(),
+                        "调度器轮询完成"
+                    );
                 }
                 _ = token.cancelled() => {
                     info!("调度器收到关闭信号，正在停止...");
@@ -365,6 +464,103 @@ impl JobPlugin {
 
         info!("调度器主循环停止");
         Ok(())
+    }
+}
+
+// ── Cron 表达式匹配（基于 jiff::civil::DateTime） ──────────
+
+/// 判断 cron 表达式（5 字段）是否匹配给定的日期时间
+///
+/// 支持: `*`(通配)、`N`(指定值)、`N,M`(列表)、`N-M`(范围)、`*/N`(步进)、`N-M/N`(范围步进)
+fn cron_matches(expr: &str, dt: &civil::DateTime) -> bool {
+    let fields: Vec<&str> = expr.split_whitespace().collect();
+    if fields.len() != 5 {
+        return false;
+    }
+    // cron: min hour dom month dow
+    let dow = dt.weekday().to_sunday_zero_offset() as u32; // Sunday=0
+
+    cron_field_match(fields[0], dt.minute() as u32, 0, 59)
+        && cron_field_match(fields[1], dt.hour() as u32, 0, 23)
+        && cron_field_match(fields[2], dt.day() as u32, 1, 31)
+        && cron_field_match(fields[3], dt.month() as u32, 1, 12)
+        && cron_field_match(fields[4], dow, 0, 7)
+}
+
+/// 匹配单个 cron 字段值
+fn cron_field_match(field: &str, value: u32, min: u32, max: u32) -> bool {
+    if field == "*" {
+        return true;
+    }
+    for part in field.split(',') {
+        if cron_part_match(part.trim(), value, min, max) {
+            return true;
+        }
+    }
+    false
+}
+
+/// 匹配单个 cron 字段片段（不含逗号分隔）
+fn cron_part_match(part: &str, value: u32, min: u32, _max: u32) -> bool {
+    // */N 步进
+    if let Some(step_str) = part.strip_prefix("*/") {
+        if let Ok(step) = step_str.parse::<u32>() {
+            return step > 0 && (value - min) % step == 0;
+        }
+    }
+    // N-M/N 范围步进
+    if let Some(slash_pos) = part.find('/') {
+        let range_part = &part[..slash_pos];
+        let step_str = &part[slash_pos + 1..];
+        if let (Some(dash_pos), Ok(step)) =
+            (range_part.find('-'), step_str.parse::<u32>())
+        {
+            if let (Ok(start), Ok(end)) = (
+                range_part[..dash_pos].parse::<u32>(),
+                range_part[dash_pos + 1..].parse::<u32>(),
+            ) {
+                return step > 0
+                    && value >= start
+                    && value <= end
+                    && (value - start) % step == 0;
+            }
+        }
+    }
+    // N-M 范围
+    if let Some(dash_pos) = part.find('-') {
+        if let (Ok(start), Ok(end)) = (
+            part[..dash_pos].parse::<u32>(),
+            part[dash_pos + 1..].parse::<u32>(),
+        ) {
+            return value >= start && value <= end;
+        }
+    }
+    // 数值
+    if let Ok(v) = part.parse::<u32>() {
+        return v == value;
+    }
+    // 名称（月份/星期）
+    match part.to_lowercase().as_str() {
+        "jan" => value == 1,
+        "feb" => value == 2,
+        "mar" => value == 3,
+        "apr" => value == 4,
+        "may" => value == 5,
+        "jun" => value == 6,
+        "jul" => value == 7,
+        "aug" => value == 8,
+        "sep" => value == 9,
+        "oct" => value == 10,
+        "nov" => value == 11,
+        "dec" => value == 12,
+        "sun" => value == 0,
+        "mon" => value == 1,
+        "tue" => value == 2,
+        "wed" => value == 3,
+        "thu" => value == 4,
+        "fri" => value == 5,
+        "sat" => value == 6,
+        _ => false,
     }
 }
 

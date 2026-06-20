@@ -115,15 +115,15 @@ impl JobRepository {
     ///
     /// - `page`: 页码（从 1 开始）
     /// - `page_size`: 每页条数
-    pub async fn get_running_jobs(&self, page: i64, page_size: i64) -> AppResult<Vec<InfrustJob>> {
+    pub async fn get_running_jobs(&self, page: tx_common::Page<InfrustJob>) -> AppResult<Vec<InfrustJob>> {
         let mut db = self.tp.db().clone();
-        let offset = ((page - 1) * page_size) as usize;
+        let offset = page.offset() as usize;
 
         let mut query = Query::<toasty::stmt::List<InfrustJob>>::all()
             .and(InfrustJob::fields().status().eq(JobStatus::Running))
             .and(InfrustJob::fields().soft_delete().eq(SoftDelete::NORMAL));
         query.order_by(InfrustJob::fields().id().desc());
-        query.limit(page_size as usize);
+        query.limit(page.size as usize);
         query.offset(offset);
 
         let jobs = query.exec(&mut db).await.map_err(to_err)?;
