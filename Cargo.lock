@@ -6903,6 +6903,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "tx_di_job"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "cron 0.15.0",
+ "dashmap",
+ "jiff",
+ "linkme",
+ "serde",
+ "serde_json",
+ "toasty",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tx-di-core",
+ "tx_common",
+ "tx_di_toasty",
+ "tx_error",
+]
+
+[[package]]
 name = "tx_di_log"
 version = "0.1.0"
 dependencies = [

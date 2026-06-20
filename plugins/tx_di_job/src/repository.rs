@@ -1,0 +1,184 @@
+use std::sync::Arc;
+use tx_error::{AppError, AppResult};
+use crate::err::JobErr;
+use crate::models::{InfrustJob, InfrustJobLog, JobStatus, SoftDelete};
+use tx_di_toasty::ToastyPlugin;
+
+/// toasty::Error → AppError 辅助转换
+#[inline]
+fn to_err(e: toasty::Error) -> AppError {
+    AppError::Internal(e.into())
+}
+
+/// 任务数据访问层
+pub struct JobRepository {
+    tp: Arc<ToastyPlugin>,
+}
+
+impl JobRepository {
+    pub fn new(tp: Arc<ToastyPlugin>) -> Self {
+        Self { tp }
+    }
+
+    /// 创建任务
+    pub async fn create_job(&self, job: InfrustJob) -> AppResult<InfrustJob> {
+        let mut db = self.tp.db().clone();
+        let created = InfrustJob::create()
+            .id(job.id)
+            .name(job.name)
+            .status(job.status)
+            .handler_name(job.handler_name)
+            .handler_param(job.handler_param)
+            .cron_expression(job.cron_expression)
+            .retry_count(job.retry_count)
+            .retry_interval(job.retry_interval)
+            .monitor_timeout(job.monitor_timeout)
+            .audit(job.audit)
+            .soft_delete(job.soft_delete)
+            .exec(&mut db)
+            .await
+            .map_err(to_err)?;
+        tracing::info!(job_id = created.id, "创建任务成功");
+        Ok(created)
+    }
+
+    /// 更新任务（全字段覆盖）
+    /// `exec()` 返回 `()`，因此直接返回传入的 job（其字段已是最新值）
+    pub async fn update_job(&self, job: InfrustJob) -> AppResult<InfrustJob> {
+        let mut db = self.tp.db().clone();
+        let mut existing = InfrustJob::get_by_id(&mut db, job.id).await.map_err(to_err)?;
+
+        existing
+            .update()
+            .name(job.name.clone())
+            .status(job.status)
+            .handler_name(job.handler_name.clone())
+            .handler_param(job.handler_param.clone())
+            .cron_expression(job.cron_expression.clone())
+            .retry_count(job.retry_count)
+            .retry_interval(job.retry_interval)
+            .monitor_timeout(job.monitor_timeout)
+            .audit(job.audit.clone())
+            .soft_delete(job.soft_delete)
+            .exec(&mut db)
+            .await
+            .map_err(to_err)?;
+        tracing::info!(job_id = job.id, "更新任务成功");
+        Ok(job)
+    }
+
+    /// 软删除任务
+    pub async fn delete_job(&self, job_id: i64) -> AppResult<()> {
+        let mut db = self.tp.db().clone();
+        match InfrustJob::get_by_id(&mut db, job_id).await {
+            Ok(mut job) => {
+                job.update()
+                    .soft_delete(SoftDelete::DELETED)
+                    .exec(&mut db)
+                    .await
+                    .map_err(to_err)?;
+                tracing::info!(job_id = job_id, "删除任务成功");
+            }
+            Err(e) => {
+                return Err(to_err(e));
+            }
+        }
+        Ok(())
+    }
+
+    /// 按 ID 查询任务（排除已删除）
+    pub async fn get_job_by_id(&self, job_id: i64) -> AppResult<InfrustJob> {
+        let mut db = self.tp.db().clone();
+        let job = InfrustJob::get_by_id(&mut db, job_id).await.map_err(to_err)?;
+        if job.is_deleted() {
+            return Err(AppError::with_context(
+                JobErr::JobNotFound,
+                format!("id={}", job_id),
+            ));
+        }
+        Ok(job)
+    }
+
+    /// 分页查询运行中的任务（id 倒序，排除已删除）
+    ///
+    /// - `page`: 页码（从 1 开始）
+    /// - `page_size`: 每页条数
+    pub async fn get_running_jobs(&self, page: i64, page_size: i64) -> AppResult<Vec<InfrustJob>> {
+        let mut db = self.tp.db().clone();
+        let offset = ((page - 1) * page_size) as usize;
+        let jobs: Vec<InfrustJob> = InfrustJob::filter_by_status(JobStatus::Running)
+            .offset(offset)
+            .limit(page_size as usize)
+            .exec(&mut db)
+            .await
+            .map_err(to_err)?
+            .into_iter()
+            .filter(|job| !job.is_deleted())
+            .collect();
+        Ok(jobs)
+    }
+
+    /// 创建执行日志
+    pub async fn create_job_log(&self, log: InfrustJobLog) -> AppResult<InfrustJobLog> {
+        let mut db = self.tp.db().clone();
+        let created = InfrustJobLog::create()
+            .id(log.id)
+            .job_id(log.job_id)
+            .handler_name(log.handler_name)
+            .handler_param(log.handler_param)
+            .execute_index(log.execute_index)
+            .begin_time(log.begin_time)
+            .end_time(log.end_time)
+            .duration(log.duration)
+            .status(log.status)
+            .result(log.result)
+            .audit(log.audit)
+            .soft_delete(log.soft_delete)
+            .exec(&mut db)
+            .await
+            .map_err(to_err)?;
+        Ok(created)
+    }
+
+    /// 更新执行日志
+    /// `exec()` 返回 `()`，因此直接返回传入的 log（其字段已是最新值）
+    pub async fn update_job_log(&self, log: InfrustJobLog) -> AppResult<InfrustJobLog> {
+        let mut db = self.tp.db().clone();
+        let mut existing = InfrustJobLog::get_by_id(&mut db, log.id).await.map_err(to_err)?;
+
+        existing
+            .update()
+            .end_time(log.end_time.clone())
+            .duration(log.duration)
+            .status(log.status)
+            .result(log.result.clone())
+            .audit(log.audit.clone())
+            .soft_delete(log.soft_delete)
+            .exec(&mut db)
+            .await
+            .map_err(to_err)?;
+        Ok(log)
+    }
+
+    /// 分页查询任务的执行日志（id 倒序）
+    ///
+    /// - `job_id`: 任务 ID
+    /// - `page`: 页码（从 1 开始）
+    /// - `page_size`: 每页条数
+    pub async fn get_job_logs(&self, job_id: i64, page: tx_common::page::Page<InfrustJobLog>) -> AppResult<Vec<InfrustJobLog>> {
+        let mut db = self.tp.db().clone();
+        let mut logs: Vec<InfrustJobLog> = InfrustJobLog::filter_by_job_id(job_id)
+            .exec(&mut db)
+            .await
+            .map_err(to_err)?
+            .into_iter()
+            .filter(|log| log.soft_delete == SoftDelete::NORMAL)
+            .collect();
+        // 按 id 倒序
+        logs.sort_by(|a, b| b.id.cmp(&a.id));
+        // 内存分页
+        let offset = page.offset() as usize;
+        let logs = logs.into_iter().skip(offset).take(page.size as usize).collect();
+        Ok(logs)
+    }
+}
