@@ -100,6 +100,17 @@ impl JobRepository {
         Ok(job)
     }
 
+    /// 查询所有运行中的任务（id 倒序，排除已删除，供调度器使用）
+    pub async fn get_all_running_jobs(&self) -> AppResult<Vec<InfrustJob>> {
+        let mut db = self.tp.db().clone();
+        let mut query = Query::<toasty::stmt::List<InfrustJob>>::all()
+            .and(InfrustJob::fields().status().eq(JobStatus::Running))
+            .and(InfrustJob::fields().soft_delete().eq(SoftDelete::NORMAL));
+        query.order_by(InfrustJob::fields().id().desc());
+        let jobs = query.exec(&mut db).await.map_err(to_err)?;
+        Ok(jobs)
+    }
+
     /// 分页查询运行中的任务（id 倒序，排除已删除）
     ///
     /// - `page`: 页码（从 1 开始）
