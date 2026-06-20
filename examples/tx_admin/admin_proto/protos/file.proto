@@ -66,3 +66,56 @@ message DownloadFileResponse {
   uint64 size = 3;         // 文件大小
   string content_type = 4; // MIME 类型
 }
+
+// ============================================================
+// 文件配置服务
+// ============================================================
+
+service FileConfigService {
+  rpc ListFileConfigs(admin.common.Empty) returns (ListFileConfigsResponse);
+  rpc GetFileConfig(GetFileConfigRequest) returns (FileConfigResponse);
+  rpc CreateFileConfig(CreateFileConfigRequest) returns (FileConfigResponse);
+  rpc UpdateFileConfig(UpdateFileConfigRequest) returns (FileConfigResponse);
+  rpc DeleteFileConfig(DeleteFileConfigRequest) returns (admin.common.Empty);
+  rpc SetMasterFileConfig(SetMasterFileConfigRequest) returns (FileConfigResponse);
+}
+
+message FileConfigResponse {
+  int32 id = 1;
+  string name = 2;
+  int32 storage = 3;         // 0=本地, 1=S3, 2=数据库
+  optional string remark = 4;
+  int32 master = 5;          // 0=普通, 1=主配置
+  string config = 6;         // JSON 配置
+}
+
+message ListFileConfigsResponse {
+  repeated FileConfigResponse items = 1;
+}
+
+message GetFileConfigRequest {
+  int32 id = 1;
+}
+
+message CreateFileConfigRequest {
+  string name = 1;
+  int32 storage = 2;
+  optional string remark = 3;
+  string config = 4;
+}
+
+message UpdateFileConfigRequest {
+  int32 id = 1;
+  string name = 2;
+  int32 storage = 3;
+  optional string remark = 4;
+  string config = 5;
+}
+
+message DeleteFileConfigRequest {
+  int32 id = 1;
+}
+
+message SetMasterFileConfigRequest {
+  int32 id = 1;
+}

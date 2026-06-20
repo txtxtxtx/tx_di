@@ -23,6 +23,7 @@ fn main() -> Result<()> {
         "dictionary",
         "log",
         "file",
+        "job",
         "monitor",
         "tool",
     ];

@@ -1,7 +1,7 @@
 use std::pin::Pin;
 use tokio::io::AsyncRead;
-use admin_proto::FileResponse;
-use admin_domain::file::model::aggregate::File;
+use admin_proto::{FileResponse, FileConfigResponse};
+use admin_domain::file::model::aggregate::{File, FileConfig};
 
 /// 领域模型 → Proto 响应：文件
 pub fn file_to_response(file: File) -> FileResponse {
@@ -13,6 +13,18 @@ pub fn file_to_response(file: File) -> FileResponse {
         url: file.url,
         file_type: file.file_type,
         size: file.size,
+    }
+}
+
+/// 领域模型 → Proto 响应：文件配置
+pub fn config_to_response(config: FileConfig) -> FileConfigResponse {
+    FileConfigResponse {
+        id: config.id,
+        name: config.name,
+        storage: config.storage,
+        remark: config.remark,
+        master: config.master,
+        config: config.config,
     }
 }
 

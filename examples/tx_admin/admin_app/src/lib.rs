@@ -6,5 +6,6 @@ pub mod file;
 pub mod config;
 pub mod dictionary;
 pub mod log;
+pub mod job;
 pub mod auth;
 pub mod empty_string;

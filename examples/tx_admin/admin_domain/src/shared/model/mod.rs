@@ -68,6 +68,14 @@ pub enum DomainEvent {
     // Log events
     OperateLogCreated { log_id: u64 },
     LoginLogCreated { log_id: u64 },
+
+    // Job events
+    JobCreated { job_id: u64 },
+    JobUpdated { job_id: u64 },
+    JobDeleted { job_id: u64 },
+    JobStatusChanged { job_id: u64, status: i32 },
+    JobLogCreated { log_id: u64 },
+    JobLogFinished { log_id: u64 },
 }
 
 /// Audit fields that all entities share

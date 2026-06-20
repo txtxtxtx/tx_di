@@ -160,6 +160,7 @@ impl FileConfig {
         id: i32,
         name: String,
         storage: i32,
+        remark: Option<String>,
         config: String,
         creator: Option<String>,
     ) -> Self {
@@ -167,7 +168,7 @@ impl FileConfig {
             id,
             name,
             storage,
-            remark: None,
+            remark,
             master: 0,
             config,
             audit: AuditFields {
@@ -179,5 +180,43 @@ impl FileConfig {
             },
             events: Vec::new(),
         }
+    }
+
+    /// 更新配置信息
+    pub fn update_info(
+        &mut self,
+        name: String,
+        storage: i32,
+        remark: Option<String>,
+        config: String,
+        updater: Option<String>,
+    ) {
+        self.name = name;
+        self.storage = storage;
+        self.remark = remark;
+        self.config = config;
+        self.audit.updater = updater;
+        self.audit.update_time = Timestamp::now();
+    }
+
+    /// 设为主配置
+    pub fn set_master(&mut self, updater: Option<String>) {
+        self.master = 1;
+        self.audit.updater = updater;
+        self.audit.update_time = Timestamp::now();
+    }
+
+    /// 取消主配置
+    pub fn unset_master(&mut self, updater: Option<String>) {
+        self.master = 0;
+        self.audit.updater = updater;
+        self.audit.update_time = Timestamp::now();
+    }
+
+    /// 软删除
+    pub fn soft_delete(&mut self, updater: Option<String>) {
+        self.audit.deleted = DeletedStatus::Deleted;
+        self.audit.updater = updater;
+        self.audit.update_time = Timestamp::now();
     }
 }

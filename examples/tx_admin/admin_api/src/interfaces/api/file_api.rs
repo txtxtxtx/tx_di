@@ -1,20 +1,32 @@
 //! 文件管理 HTTP API
 //!
-//! - `POST /api/file/upload`  流式多文件上传（multipart/form-data）
-//! - `GET  /api/file/{id}`    获取文件元数据
-//! - `DELETE /api/file/{id}`  删除物理文件 + DB 软删除
-//! - `GET  /api/file/{id}/download`  流式下载文件二进制
-//! - `POST /api/file/list`    分页查询
+//! 文件操作：
+//! - `POST /api/file/upload`    流式多文件上传
+//! - `GET  /api/file/{id}`      获取文件元数据
+//! - `DELETE /api/file/{id}`    删除物理文件 + DB 软删除
+//! - `GET  /api/file/{id}/download`  流式下载
+//! - `POST /api/file/list`      分页查询
+//!
+//! 文件配置：
+//! - `GET  /api/file/config/list`       配置列表
+//! - `GET  /api/file/config/{id}`       配置详情
+//! - `POST /api/file/config`            新增配置
+//! - `PUT  /api/file/config/{id}`       修改配置
+//! - `DELETE /api/file/config/{id}`     删除配置
+//! - `PUT  /api/file/config/{id}/master` 设为主配置
 
 use axum::Json;
 use axum::extract::{Multipart, Path};
 use axum::http::header;
 use axum::response::{IntoResponse, Response};
 use tx_di_axum::Router;
-use axum::routing::{get, post, delete};
+use axum::routing::{get, post, put, delete};
 use tx_di_axum::bound::DiComp;
 use admin_app::file::app_service::FileAppService;
-use admin_proto::{ListFilesRequest, FileResponse, Empty};
+use admin_proto::{
+    ListFilesRequest, FileResponse, FileConfigResponse, Empty,
+    CreateFileConfigRequest, UpdateFileConfigRequest,
+};
 use tx_common::{ApiR, ApiRes, Page};
 use tx_error::AppError;
 use tx_di_core::CodeMsg;
@@ -28,7 +40,8 @@ use futures::StreamExt;
 
 /// `max_body_size`: 全局请求体上限（字节），用于 Content-Length 提前拦截。0 表示不限制。
 pub fn router(max_body_size: u64) -> Router {
-    Router::new()
+    // 文件操作路由
+    let file_routes = Router::new()
         .route(
             "/upload",
             post(upload_files)
@@ -41,7 +54,18 @@ pub fn router(max_body_size: u64) -> Router {
         .route("/{file_id}", get(get_file))
         .route("/{file_id}", delete(delete_file))
         .route("/{file_id}/download", get(download_file))
-        .route("/list", post(list_files))
+        .route("/list", post(list_files));
+
+    // 文件配置路由
+    let config_routes = Router::new()
+        .route("/list", get(list_configs))
+        .route("/{id}", get(get_config))
+        .route("/", post(create_config))
+        .route("/{id}", put(update_config))
+        .route("/{id}", delete(delete_config))
+        .route("/{id}/master", put(set_master_config));
+
+    file_routes.nest("/config", config_routes)
 }
 
 // ============================================================================
@@ -49,12 +73,6 @@ pub fn router(max_body_size: u64) -> Router {
 // ============================================================================
 
 /// `POST /api/file/upload`
-///
-/// 接收 `multipart/form-data`：
-/// - `config_id` (可选) — 公共配置 ID，应用于所有文件
-/// - `file` (可多个) — 文件二进制，每个 file field 一个文件
-///
-/// 每个文件边收边写，全程零内存缓冲。
 async fn upload_files(
     DiComp(file_svc): DiComp<FileAppService>,
     mut multipart: Multipart,
@@ -88,8 +106,6 @@ async fn upload_files(
                     .unwrap_or("application/octet-stream")
                     .to_string();
 
-                // ═══ multipart Stream → AsyncRead → write_stream ═══
-                // 文件二进制从头到尾不进入应用内存
                 let byte_stream = field.map(|r| {
                     r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
                 });
@@ -145,9 +161,6 @@ async fn delete_file(
 // ============================================================================
 
 /// `GET /api/file/{id}/download`
-///
-/// 流式返回文件二进制，设置 Content-Disposition / Content-Type / Content-Length。
-/// 不经过 JSON 包装，不缓冲文件到内存。
 async fn download_file(
     DiComp(file_svc): DiComp<FileAppService>,
     Path(file_id): Path<u64>,
@@ -179,4 +192,114 @@ async fn list_files(
     ensure_permission("file:view").await?;
     let page = file_svc.get_file_page(req).await?;
     Ok(ApiR::success(page))
+}
+
+// ============================================================================
+// 文件配置 CRUD
+// ============================================================================
+
+/// `GET /api/file/config/list`
+async fn list_configs(
+    DiComp(file_svc): DiComp<FileAppService>,
+) -> Result<ApiR<Vec<FileConfigResponse>>, ApiErr> {
+    ensure_permission("file:view").await?;
+    let configs = file_svc.get_config_all().await?;
+    let resp = configs.into_iter().map(|c| {
+        FileConfigResponse {
+            id: c.id,
+            name: c.name,
+            storage: c.storage,
+            remark: c.remark,
+            master: c.master,
+            config: c.config,
+        }
+    }).collect();
+    Ok(ApiR::success(resp))
+}
+
+/// `GET /api/file/config/{id}`
+async fn get_config(
+    DiComp(file_svc): DiComp<FileAppService>,
+    Path(id): Path<i32>,
+) -> Result<ApiR<FileConfigResponse>, ApiErr> {
+    ensure_permission("file:view").await?;
+    let c = file_svc.get_config(id).await?;
+    Ok(ApiR::success(FileConfigResponse {
+        id: c.id,
+        name: c.name,
+        storage: c.storage,
+        remark: c.remark,
+        master: c.master,
+        config: c.config,
+    }))
+}
+
+/// `POST /api/file/config`
+async fn create_config(
+    DiComp(file_svc): DiComp<FileAppService>,
+    Json(req): Json<CreateFileConfigRequest>,
+) -> Result<ApiR<FileConfigResponse>, ApiErr> {
+    ensure_permission("file:upload").await?;
+    let creator = StpUtil::get_login_id_as_string().await.ok();
+    let c = file_svc
+        .create_config(req.name, req.storage, req.remark, req.config, creator)
+        .await?;
+    Ok(ApiR::success(FileConfigResponse {
+        id: c.id,
+        name: c.name,
+        storage: c.storage,
+        remark: c.remark,
+        master: c.master,
+        config: c.config,
+    }))
+}
+
+/// `PUT /api/file/config/{id}`
+async fn update_config(
+    DiComp(file_svc): DiComp<FileAppService>,
+    Path(id): Path<i32>,
+    Json(req): Json<UpdateFileConfigRequest>,
+) -> Result<ApiR<FileConfigResponse>, ApiErr> {
+    ensure_permission("file:upload").await?;
+    let updater = StpUtil::get_login_id_as_string().await.ok();
+    let c = file_svc
+        .update_config(id, req.name, req.storage, req.remark, req.config, updater)
+        .await?;
+    Ok(ApiR::success(FileConfigResponse {
+        id: c.id,
+        name: c.name,
+        storage: c.storage,
+        remark: c.remark,
+        master: c.master,
+        config: c.config,
+    }))
+}
+
+/// `DELETE /api/file/config/{id}`
+async fn delete_config(
+    DiComp(file_svc): DiComp<FileAppService>,
+    Path(id): Path<i32>,
+) -> Result<ApiR<Empty>, ApiErr> {
+    ensure_permission("file:delete").await?;
+    let updater = StpUtil::get_login_id_as_string().await.ok();
+    file_svc.delete_config(id, updater).await?;
+    Ok(ApiRes::ok().into_typed())
+}
+
+/// `PUT /api/file/config/{id}/master`
+async fn set_master_config(
+    DiComp(file_svc): DiComp<FileAppService>,
+    Path(id): Path<i32>,
+) -> Result<ApiR<FileConfigResponse>, ApiErr> {
+    ensure_permission("file:upload").await?;
+    let updater = StpUtil::get_login_id_as_string().await.ok();
+    let c = file_svc.set_master_config(id, updater).await?;
+    Ok(ApiR::success(FileConfigResponse {
+        id: c.id,
+        name: c.name,
+        storage: c.storage,
+        remark: c.remark,
+        master: c.master,
+        config: c.config,
+    }))
 }

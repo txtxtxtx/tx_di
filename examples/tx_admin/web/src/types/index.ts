@@ -460,6 +460,30 @@ export interface ListFilesRequest {
   pageSize: number
 }
 
+// u64 fields: id
+export interface FileConfigResponse {
+  id: number
+  name: string
+  storage: number      // 0=本地, 1=S3, 2=数据库
+  remark: string | null
+  master: number        // 0=普通, 1=主配置
+  config: string        // JSON 配置
+}
+
+export interface CreateFileConfigRequest {
+  name: string
+  storage: number
+  remark?: string
+  config: string
+}
+
+export interface UpdateFileConfigRequest {
+  name: string
+  storage: number
+  remark?: string
+  config: string
+}
+
 // ==================== 监控 (proto, camelCase) ====================
 export interface DiskInfo {
   name: string
@@ -514,4 +538,65 @@ export interface CacheStatsResponse {
   hitCount: number
   missCount: number
   hitRate: number
+}
+
+// ==================== 定时任务 (proto, camelCase) ====================
+// u64 fields: id, jobId
+export interface JobResponse {
+  id: string
+  name: string
+  status: number            // 0=暂停, 1=运行
+  handlerName: string
+  handlerParam: string | null
+  cronExpression: string
+  retryCount: number
+  retryInterval: number     // 秒
+  monitorTimeout: number    // 秒
+}
+
+export interface JobLogResponse {
+  id: string
+  jobId: string
+  handlerName: string
+  handlerParam: string | null
+  executeIndex: number
+  beginTime: string
+  endTime: string | null
+  duration: number | null   // 毫秒
+  status: number            // 0=执行中, 1=成功, 2=失败
+  result: string | null
+}
+
+export interface CreateJobRequest {
+  name: string
+  handlerName: string
+  handlerParam?: string
+  cronExpression: string
+  retryCount?: number
+  retryInterval?: number
+  monitorTimeout?: number
+}
+
+export interface UpdateJobRequest {
+  name: string
+  handlerName: string
+  handlerParam?: string
+  cronExpression: string
+  retryCount?: number
+  retryInterval?: number
+  monitorTimeout?: number
+}
+
+export interface ListJobsRequest {
+  name?: string
+  status?: number
+  page: number
+  pageSize: number
+}
+
+export interface ListJobLogsRequest {
+  jobId?: string
+  status?: number
+  page: number
+  pageSize: number
 }

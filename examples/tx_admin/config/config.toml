@@ -1,5 +1,4 @@
 [file_config]
-# allowed_extensions = ["jpg", "jpeg", "png", "gif", "pdf", "doc", "docx", "xls", "xlsx", "txt", "zip"]
 backend = "local"
 base_path = "./uploads"
 base_url = "http://localhost:8080/files"
@@ -49,5 +48,4 @@ port = 8888
 timeout_secs = 30
 
 [web_config.spa_apps]
-"/web"  = "examples/tx_admin/web/dist"
-
+"/web" = "examples/tx_admin/web/dist"

@@ -4,12 +4,14 @@ use std::task::{Context, Poll};
 
 use tokio::io::{AsyncRead, ReadBuf};
 
+use admin_domain::file::model::aggregate::FileConfig;
 use admin_domain::file::model::value_object::{FileQuery, FileUploadCommand};
 use admin_domain::file::service::FileService;
+use admin_domain::file::repository::FileConfigRepository;
 use admin_proto::{ListFilesRequest, FileResponse};
 use tx_common::page::Page;
 use tx_di_core::tx_comp;
-use tx_di_file::storage::{guess_mime_type, extract_extension, FileStorageErr};
+use tx_di_file::storage::{guess_mime_type, extract_extension, FileStorageErr, FileStorage};
 use tx_di_file::FilePlugin;
 use tx_error::{AppError, AppResult};
 
@@ -41,30 +43,68 @@ impl<R: AsyncRead + Unpin> AsyncRead for CountingReader<R> {
 pub struct FileAppService {
     pub file_service: Arc<FileService>,
     pub file_plugin: Arc<FilePlugin>,
+    pub file_config_repo: Arc<dyn FileConfigRepository>,
 }
 
 impl FileAppService {
-    pub fn new(file_service: Arc<FileService>, file_plugin: Arc<FilePlugin>) -> Self {
+    pub fn new(
+        file_service: Arc<FileService>,
+        file_plugin: Arc<FilePlugin>,
+        file_config_repo: Arc<dyn FileConfigRepository>,
+    ) -> Self {
         Self {
             file_service,
             file_plugin,
+            file_config_repo,
         }
     }
 
     // ========================================================================
-    // 流式上传（核心新方法）
+    // 内部工具
     // ========================================================================
 
-    /// 流式上传单个文件 —— 零内存缓冲
+    /// 获取存储后端 —— 优先 DB 配置，回退到插件默认配置
     ///
-    /// 文件二进制通过 `AsyncRead` 传入，经 `CountingReader` 计数后直接写入存储后端。
-    /// 大小限制由 axum `DefaultBodyLimit` 层负责，此处不再重复校验。
-    ///
-    /// # 流程
-    /// 1. 校验扩展名 → `FileConfig::allowed_extensions`
-    /// 2. 生成存储路径 `YYYY/MM/uuid_filename.ext`
-    /// 3. `storage.write_stream(path, &mut counting_reader, content_type)`
-    /// 4. 写 DB 元数据 → 返回 `FileResponse`
+    /// - `config_id` 为 Some 时查找指定配置
+    /// - 为 None 时查找主配置（master=1）
+    /// - DB 无配置时回退到 FilePlugin 的 TOML 配置
+    async fn get_storage(&self, config_id: Option<i32>) -> AppResult<Arc<dyn FileStorage>> {
+        // 尝试从 DB 获取配置
+        let db_config = if let Some(cid) = config_id {
+            self.file_config_repo.find_by_id(cid).await?
+        } else {
+            self.file_config_repo.find_master().await?
+        };
+
+        if let Some(cfg) = db_config {
+            if cfg.storage == 2 {
+                // Database 后端 — 由调用方处理，这里返回错误
+                return Err(AppError::with_context(
+                    FileStorageErr::NotFound,
+                    "数据库存储后端不适用此操作",
+                ));
+            }
+            if let Some(storage) = tx_di_file::create_storage(cfg.storage, &cfg.config) {
+                return Ok(storage);
+            }
+        }
+
+        // 回退到插件默认存储
+        Ok(self.file_plugin.storage())
+    }
+
+    /// 获取文件配置（带校验）
+    async fn get_config_or_err(&self, id: i32) -> AppResult<FileConfig> {
+        self.file_config_repo
+            .find_by_id(id)
+            .await?
+            .ok_or_else(|| AppError::with_context(FileStorageErr::NotFound, "文件配置不存在"))
+    }
+
+    // ========================================================================
+    // 流式上传
+    // ========================================================================
+
     pub async fn upload_file_stream(
         &self,
         filename: String,
@@ -73,13 +113,14 @@ impl FileAppService {
         config_id: Option<i32>,
         creator: Option<String>,
     ) -> AppResult<FileResponse> {
-        let storage = self.file_plugin.storage();
-        let config = &self.file_plugin.config;
+        // 1. 获取存储后端
+        let storage = self.get_storage(config_id).await?;
 
-        // 1. 校验扩展名
-        if !config.allowed_extensions.is_empty() {
+        // 2. 校验扩展名（从 DB 或 TOML 配置获取白名单）
+        let allowed = self.get_allowed_extensions(config_id).await;
+        if !allowed.is_empty() {
             let ext = extract_extension(&filename).unwrap_or_default();
-            if !config.allowed_extensions.contains(&ext) {
+            if !allowed.contains(&ext) {
                 return Err(AppError::with_context(
                     FileStorageErr::InvalidExtension,
                     format!("不允许的文件类型: .{}", ext),
@@ -87,10 +128,10 @@ impl FileAppService {
             }
         }
 
-        // 2. 字节计数（不限制，仅用于记录文件大小）
+        // 3. 字节计数
         let mut counting = CountingReader::new(reader);
 
-        // 3. 生成存储路径: YYYY/MM/uuid_filename.ext
+        // 4. 生成存储路径: YYYY/MM/uuid_filename.ext
         let now = jiff::Zoned::now();
         let file_uuid = uuid::Uuid::now_v7();
         let path = format!(
@@ -101,28 +142,28 @@ impl FileAppService {
             filename
         );
 
-        // 4. 流式写入存储后端
+        // 5. 流式写入存储后端
         let storage_path = storage
             .write_stream(&path, &mut counting, Some(&content_type))
             .await?;
 
-        // 5. 获取实际写入大小
+        // 6. 获取实际写入大小
         let actual_size = counting.bytes_read as i32;
 
-        // 6. 推断 MIME（multipart 可能传 application/octet-stream）
+        // 7. 推断 MIME
         let mime = if content_type.is_empty() || content_type == "application/octet-stream" {
             guess_mime_type(&filename)
         } else {
             content_type
         };
 
-        // 7. 生成访问 URL（优先 presigned，本地存储回退到公开 URL）
+        // 8. 生成访问 URL
         let url = storage
             .presigned_url(&storage_path, 3600)
             .await
             .unwrap_or_else(|_| storage_path.clone());
 
-        // 8. 持久化元数据到 DB
+        // 9. 持久化元数据到 DB
         let cmd = FileUploadCommand {
             name: filename,
             path: storage_path,
@@ -135,19 +176,37 @@ impl FileAppService {
         Ok(file_to_response(file))
     }
 
+    /// 获取允许的文件扩展名列表
+    async fn get_allowed_extensions(&self, config_id: Option<i32>) -> Vec<String> {
+        let db_config = if let Some(cid) = config_id {
+            self.file_config_repo.find_by_id(cid).await.ok().flatten()
+        } else {
+            self.file_config_repo.find_master().await.ok().flatten()
+        };
+
+        if let Some(cfg) = db_config {
+            // 从 JSON config 中解析 allowed_extensions
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&cfg.config) {
+                if let Some(arr) = json.get("allowed_extensions").and_then(|v| v.as_array()) {
+                    return arr
+                        .iter()
+                        .filter_map(|s| s.as_str().map(String::from))
+                        .collect();
+                }
+            }
+        }
+
+        // 回退到插件配置
+        self.file_plugin.config.allowed_extensions.clone()
+    }
+
     // ========================================================================
     // 流式下载
     // ========================================================================
 
-    /// 流式下载文件 —— 返回 `AsyncRead`，不缓冲到内存
-    ///
-    /// # 流程
-    /// 1. 查 DB 获取文件元数据（包含存储路径）
-    /// 2. `storage.read_stream(path)` → `AsyncRead`
-    /// 3. 返回 `DownloadFileStream`（含 reader + 元数据，供 API handler 构造 HTTP 响应）
     pub async fn download_file_stream(&self, file_id: u64) -> AppResult<DownloadFileStream> {
         let file = self.file_service.get_file(file_id).await?;
-        let storage = self.file_plugin.storage();
+        let storage = self.get_storage(file.config_id).await?;
         let reader = storage.read_stream(&file.path).await?;
 
         let content_type = file
@@ -165,18 +224,13 @@ impl FileAppService {
     }
 
     // ========================================================================
-    // 删除（增强：物理文件 + DB 软删除）
+    // 删除
     // ========================================================================
 
-    /// 删除文件 —— 先删物理文件，再 DB 软删除
-    ///
-    /// 物理文件删除失败仅 warn，不阻塞 DB 软删除。
     pub async fn delete_file(&self, file_id: u64, updater: Option<String>) -> AppResult<()> {
-        // 1. 先获取文件信息（查存储路径）
         let file = self.file_service.get_file(file_id).await?;
 
-        // 2. 删除物理文件（失败不阻塞）
-        let storage = self.file_plugin.storage();
+        let storage = self.get_storage(file.config_id).await?;
         if let Err(e) = storage.delete(&file.path).await {
             tracing::warn!(
                 file_id = file_id,
@@ -186,15 +240,13 @@ impl FileAppService {
             );
         }
 
-        // 3. DB 软删除
         self.file_service.delete_file(file_id, updater).await
     }
 
     // ========================================================================
-    // 查询（保持不变）
+    // 查询
     // ========================================================================
 
-    /// 分页查询文件列表
     pub async fn get_file_page(
         &self,
         req: ListFilesRequest,
@@ -215,9 +267,78 @@ impl FileAppService {
         ))
     }
 
-    /// 根据 ID 获取文件信息
     pub async fn get_file(&self, file_id: u64) -> AppResult<FileResponse> {
         let file = self.file_service.get_file(file_id).await?;
         Ok(file_to_response(file))
+    }
+
+    // ========================================================================
+    // 文件配置 CRUD
+    // ========================================================================
+
+    /// 获取配置列表
+    pub async fn get_config_all(&self) -> AppResult<Vec<FileConfig>> {
+        self.file_config_repo.find_all().await
+    }
+
+    /// 根据 ID 获取配置
+    pub async fn get_config(&self, id: i32) -> AppResult<FileConfig> {
+        self.get_config_or_err(id).await
+    }
+
+    /// 创建配置
+    pub async fn create_config(
+        &self,
+        name: String,
+        storage: i32,
+        remark: Option<String>,
+        config: String,
+        creator: Option<String>,
+    ) -> AppResult<FileConfig> {
+        let id = (jiff::Timestamp::now().as_millisecond() % i32::MAX as i64) as i32;
+        let agg = FileConfig::create(id, name, storage, remark, config, creator);
+        self.file_config_repo.insert(&agg).await?;
+        Ok(agg)
+    }
+
+    /// 更新配置
+    pub async fn update_config(
+        &self,
+        id: i32,
+        name: String,
+        storage: i32,
+        remark: Option<String>,
+        config: String,
+        updater: Option<String>,
+    ) -> AppResult<FileConfig> {
+        let mut agg = self.get_config_or_err(id).await?;
+        agg.update_info(name, storage, remark, config, updater);
+        self.file_config_repo.update(&agg).await?;
+        Ok(agg)
+    }
+
+    /// 删除配置
+    pub async fn delete_config(&self, id: i32, updater: Option<String>) -> AppResult<()> {
+        let mut agg = self.get_config_or_err(id).await?;
+        agg.soft_delete(updater);
+        self.file_config_repo.update(&agg).await?;
+        Ok(())
+    }
+
+    /// 设为主配置（先取消当前主配置，再设置新主配置）
+    pub async fn set_master_config(&self, id: i32, updater: Option<String>) -> AppResult<FileConfig> {
+        // 取消当前主配置
+        if let Some(mut current_master) = self.file_config_repo.find_master().await? {
+            if current_master.id != id {
+                current_master.unset_master(updater.clone());
+                self.file_config_repo.update(&current_master).await?;
+            }
+        }
+
+        // 设置新主配置
+        let mut agg = self.get_config_or_err(id).await?;
+        agg.set_master(updater);
+        self.file_config_repo.update(&agg).await?;
+        Ok(agg)
     }
 }

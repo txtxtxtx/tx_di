@@ -62,6 +62,11 @@ pub mod admin {
         include!("pb/admin.file.rs");
     }
 
+    /// 定时任务
+    pub mod job {
+        include!("pb/admin.job.rs");
+    }
+
     /// 系统监控
     pub mod monitor {
         include!("pb/admin.monitor.rs");
@@ -131,6 +136,18 @@ pub use admin::file::{
     UploadFileRequest, DeleteFileRequest, GetFileRequest, ListFilesRequest,
     FileResponse, ListFilesResponse,
     DownloadFileRequest, DownloadFileResponse,
+    // 文件配置
+    FileConfigResponse, ListFileConfigsResponse,
+    GetFileConfigRequest, CreateFileConfigRequest, UpdateFileConfigRequest,
+    DeleteFileConfigRequest, SetMasterFileConfigRequest,
+};
+// --- Job ---
+pub use admin::job::{
+    JobResponse, CreateJobRequest, UpdateJobRequest, DeleteJobRequest,
+    GetJobRequest, ListJobsRequest, ListJobsResponse,
+    ChangeJobStatusRequest, RunJobRequest,
+    JobLogResponse, ListJobLogsRequest, ListJobLogsResponse,
+    GetJobLogRequest, CleanJobLogsRequest,
 };
 // --- Monitor ---
 pub use admin::monitor::{ServerInfo, DiskInfo, NetworkInfo, OnlineUser, OnlineUserListResponse};

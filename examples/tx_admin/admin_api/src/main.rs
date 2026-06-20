@@ -2,6 +2,7 @@ mod plugin;
 mod interfaces;
 pub mod error;
 pub mod auth;
+pub mod scheduler;
 
 use tx_di_core::BuildContext;
 

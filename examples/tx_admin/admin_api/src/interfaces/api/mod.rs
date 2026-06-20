@@ -13,6 +13,7 @@ mod log_api;
 mod file_api;
 mod monitor_api;
 mod tool_api;
+mod job_api;
 
 use tx_di_axum::Router;
 
@@ -31,5 +32,6 @@ pub fn router(max_body_size: u64) -> Router {
         .nest("/api/log", log_api::router())
         .nest("/api/file", file_api::router(max_body_size))
         .nest("/api/monitor", monitor_api::router())
+        .nest("/api/job", job_api::router())
         .nest("/api/tool", tool_api::router())
 }
