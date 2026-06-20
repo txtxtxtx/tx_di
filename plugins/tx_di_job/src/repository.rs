@@ -3,6 +3,7 @@ use tx_error::{AppError, AppResult};
 use crate::err::JobErr;
 use crate::models::{InfrustJob, InfrustJobLog, JobStatus, SoftDelete};
 use tx_di_toasty::ToastyPlugin;
+use toasty::stmt::Query;
 
 /// toasty::Error → AppError 辅助转换
 #[inline]
@@ -106,15 +107,15 @@ impl JobRepository {
     pub async fn get_running_jobs(&self, page: i64, page_size: i64) -> AppResult<Vec<InfrustJob>> {
         let mut db = self.tp.db().clone();
         let offset = ((page - 1) * page_size) as usize;
-        let jobs: Vec<InfrustJob> = InfrustJob::filter_by_status(JobStatus::Running)
-            .offset(offset)
-            .limit(page_size as usize)
-            .exec(&mut db)
-            .await
-            .map_err(to_err)?
-            .into_iter()
-            .filter(|job| !job.is_deleted())
-            .collect();
+
+        let mut query = Query::<toasty::stmt::List<InfrustJob>>::all()
+            .and(InfrustJob::fields().status().eq(JobStatus::Running))
+            .and(InfrustJob::fields().soft_delete().eq(SoftDelete::NORMAL));
+        query.order_by(InfrustJob::fields().id().desc());
+        query.limit(page_size as usize);
+        query.offset(offset);
+
+        let jobs = query.exec(&mut db).await.map_err(to_err)?;
         Ok(jobs)
     }
 
@@ -160,25 +161,22 @@ impl JobRepository {
         Ok(log)
     }
 
-    /// 分页查询任务的执行日志（id 倒序）
+    /// 分页查询任务的执行日志（id 倒序，全部在数据库层完成）
     ///
     /// - `job_id`: 任务 ID
-    /// - `page`: 页码（从 1 开始）
-    /// - `page_size`: 每页条数
+    /// - `page`: 分页参数
     pub async fn get_job_logs(&self, job_id: i64, page: tx_common::page::Page<InfrustJobLog>) -> AppResult<Vec<InfrustJobLog>> {
         let mut db = self.tp.db().clone();
-        let mut logs: Vec<InfrustJobLog> = InfrustJobLog::filter_by_job_id(job_id)
-            .exec(&mut db)
-            .await
-            .map_err(to_err)?
-            .into_iter()
-            .filter(|log| log.soft_delete == SoftDelete::NORMAL)
-            .collect();
-        // 按 id 倒序
-        logs.sort_by(|a, b| b.id.cmp(&a.id));
-        // 内存分页
         let offset = page.offset() as usize;
-        let logs = logs.into_iter().skip(offset).take(page.size as usize).collect();
+
+        let mut query = Query::<toasty::stmt::List<InfrustJobLog>>::all()
+            .and(InfrustJobLog::fields().job_id().eq(job_id))
+            .and(InfrustJobLog::fields().soft_delete().eq(SoftDelete::NORMAL));
+        query.order_by(InfrustJobLog::fields().id().desc());
+        query.limit(page.size as usize);
+        query.offset(offset);
+
+        let logs = query.exec(&mut db).await.map_err(to_err)?;
         Ok(logs)
     }
 }

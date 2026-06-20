@@ -10,6 +10,7 @@ use crate::err::JobResult;
 use crate::repository::JobRepository;
 use crate::executors::{JobExecutor, ExecutorType, InternalJobExecutor, ShellJobExecutor, PythonJobExecutor};
 use tx_di_toasty::ToastyPlugin;
+use tx_common::page::Page;
 
 /// Job 插件组件
 ///
@@ -240,8 +241,8 @@ impl JobPlugin {
     }
 
     /// 查询任务执行日志（分页，id 倒序）
-    pub async fn get_job_logs(&self, job_id: i64, page: i64, page_size: i64) -> RIE<Vec<InfrustJobLog>> {
-        let logs = self.repo().get_job_logs(job_id, page, page_size).await?;
+    pub async fn get_job_logs(&self, job_id: i64, page: Page<InfrustJobLog>) -> RIE<Vec<InfrustJobLog>> {
+        let logs = self.repo().get_job_logs(job_id, page).await?;
         Ok(logs)
     }
 
