@@ -468,6 +468,16 @@ export interface DiskInfo {
   usage: number
 }
 
+export interface NetworkInfo {
+  name: string
+  macAddress: string
+  ipAddresses: string[]
+  receivedBytes: number
+  transmittedBytes: number
+  receivedPackets: number
+  transmittedPackets: number
+}
+
 export interface ServerInfo {
   osName: string
   osVersion: string
@@ -481,6 +491,7 @@ export interface ServerInfo {
   usedDisk: number
   diskUsage: number
   disks: DiskInfo[]
+  networks: NetworkInfo[]
 }
 
 // u64 fields: userId

@@ -1,0 +1,415 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug unit tests in library 'tx_di_core'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--package=tx-di-core"
+                ]
+            }
+        },
+        {
+            "name": "Debug benchmark 'di_bench'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--bench=di_bench",
+                    "--package=tx-di-core"
+                ]
+            }
+        },
+        {
+            "name": "Debug unit tests in library 'tx_common'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--package=tx_common"
+                ]
+            }
+        },
+        {
+            "name": "Debug unit tests in library 'tx_error'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--package=tx_error"
+                ]
+            }
+        },
+        {
+            "name": "Debug unit tests in library 'tx_di_axum'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--package=tx_di_axum"
+                ]
+            }
+        },
+        {
+            "name": "Debug unit tests in library 'tx_di_log'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--package=tx_di_log"
+                ]
+            }
+        },
+        {
+            "name": "Debug unit tests in library 'tx_di_sip'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--package=tx_di_sip"
+                ]
+            }
+        },
+        {
+            "name": "Debug unit tests in library 'tx_di_gb28181'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--package=tx_di_gb28181"
+                ]
+            }
+        },
+        {
+            "name": "Debug unit tests in library 'tx_gb28181'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--package=tx_gb28181"
+                ]
+            }
+        },
+        {
+            "name": "Debug unit tests in library 'tx_di_can'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--package=tx_di_can"
+                ]
+            }
+        },
+        {
+            "name": "Debug executable 'gb28181_admin'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--bin=gb28181_admin",
+                    "--package=gb28181_admin"
+                ]
+            },
+            "args": []
+        },
+        {
+            "name": "Debug unit tests in executable 'gb28181_admin'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--bin=gb28181_admin",
+                    "--package=gb28181_admin"
+                ]
+            }
+        },
+        {
+            "name": "Debug unit tests in library 'tx_di_sa_token'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--package=tx_di_sa_token"
+                ]
+            }
+        },
+        {
+            "name": "Debug unit tests in library 'tx_di_toasty'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--package=tx_di_toasty"
+                ]
+            }
+        },
+        {
+            "name": "Debug executable 'tx_di_meeting'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--bin=tx_di_meeting",
+                    "--package=tx_di_meeting"
+                ]
+            },
+            "args": []
+        },
+        {
+            "name": "Debug unit tests in executable 'tx_di_meeting'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--bin=tx_di_meeting",
+                    "--package=tx_di_meeting"
+                ]
+            }
+        },
+        {
+            "name": "Debug unit tests in library 'tx_di_file'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--package=tx_di_file"
+                ]
+            }
+        },
+        {
+            "name": "Debug unit tests in library 'admin_app'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--package=admin_app"
+                ]
+            }
+        },
+        {
+            "name": "Debug integration test 'auth_test'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=auth_test",
+                    "--package=admin_app"
+                ]
+            }
+        },
+        {
+            "name": "Debug integration test 'config_test'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=config_test",
+                    "--package=admin_app"
+                ]
+            }
+        },
+        {
+            "name": "Debug integration test 'department_test'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=department_test",
+                    "--package=admin_app"
+                ]
+            }
+        },
+        {
+            "name": "Debug integration test 'dict_test'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=dict_test",
+                    "--package=admin_app"
+                ]
+            }
+        },
+        {
+            "name": "Debug integration test 'file_test'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=file_test",
+                    "--package=admin_app"
+                ]
+            }
+        },
+        {
+            "name": "Debug integration test 'integration_test'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=integration_test",
+                    "--package=admin_app"
+                ]
+            }
+        },
+        {
+            "name": "Debug integration test 'log_test'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=log_test",
+                    "--package=admin_app"
+                ]
+            }
+        },
+        {
+            "name": "Debug integration test 'menu_test'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=menu_test",
+                    "--package=admin_app"
+                ]
+            }
+        },
+        {
+            "name": "Debug integration test 'real_db_test'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=real_db_test",
+                    "--package=admin_app"
+                ]
+            }
+        },
+        {
+            "name": "Debug integration test 'role_test'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=role_test",
+                    "--package=admin_app"
+                ]
+            }
+        },
+        {
+            "name": "Debug integration test 'user_test'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=user_test",
+                    "--package=admin_app"
+                ]
+            }
+        },
+        {
+            "name": "Debug integration test 'workflow_test'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=workflow_test",
+                    "--package=admin_app"
+                ]
+            }
+        },
+        {
+            "name": "Debug unit tests in library 'admin_domain'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--package=admin_domain"
+                ]
+            }
+        },
+        {
+            "name": "Debug unit tests in library 'admin_proto'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--package=admin_proto"
+                ]
+            }
+        },
+        {
+            "name": "Debug unit tests in library 'admin_infra'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--package=admin_infra"
+                ]
+            }
+        },
+        {
+            "name": "Debug executable 'admin_api'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--bin=admin_api",
+                    "--package=admin_api"
+                ]
+            },
+            "args": []
+        },
+        {
+            "name": "Debug unit tests in executable 'admin_api'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--bin=admin_api",
+                    "--package=admin_api"
+                ]
+            }
+        }
+    ]
+}

@@ -11,6 +11,16 @@ message DiskInfo {
   double usage = 4;           // 百分比
 }
 
+message NetworkInfo {
+  string name = 1;                     // 接口名称
+  string mac_address = 2;              // MAC 地址
+  repeated string ip_addresses = 3;    // IP 地址列表
+  uint64 received_bytes = 4;           // 收到字节总数
+  uint64 transmitted_bytes = 5;        // 发送字节总数
+  uint64 received_packets = 6;         // 收到包数
+  uint64 transmitted_packets = 7;      // 发送包数
+}
+
 message ServerInfo {
   string os_name = 1;
   string os_version = 2;
@@ -24,6 +34,7 @@ message ServerInfo {
   uint64 used_disk = 10;      // 字节
   double disk_usage = 11;     // 百分比
   repeated DiskInfo disks = 12;
+  repeated NetworkInfo networks = 13;
 }
 
 message OnlineUser {

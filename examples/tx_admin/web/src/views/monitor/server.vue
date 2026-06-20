@@ -94,6 +94,45 @@
           </el-table>
         </el-col>
       </el-row>
+
+      <!-- 网络信息 -->
+      <el-row :gutter="20" class="mb-4">
+        <el-col :span="24">
+          <el-descriptions title="网络信息" :column="2" border size="small">
+            <el-descriptions-item label="总接收">{{ fmtBytes(totalReceived) }}</el-descriptions-item>
+            <el-descriptions-item label="总发送">{{ fmtBytes(totalTransmitted) }}</el-descriptions-item>
+          </el-descriptions>
+        </el-col>
+      </el-row>
+
+      <!-- 网络接口明细 -->
+      <el-row :gutter="20">
+        <el-col :span="24">
+          <div class="chart-title">网络接口</div>
+          <el-table :data="server.networks" border size="small" stripe>
+            <el-table-column prop="name" label="接口名称" min-width="120" />
+            <el-table-column label="IP 地址" min-width="180">
+              <template #default="{ row }">
+                <div v-for="ip in row.ipAddresses" :key="ip">{{ ip }}</div>
+                <span v-if="!row.ipAddresses?.length">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="macAddress" label="MAC 地址" min-width="140" />
+            <el-table-column label="接收" min-width="120">
+              <template #default="{ row }">{{ fmtBytes(row.receivedBytes) }}</template>
+            </el-table-column>
+            <el-table-column label="发送" min-width="120">
+              <template #default="{ row }">{{ fmtBytes(row.transmittedBytes) }}</template>
+            </el-table-column>
+            <el-table-column label="收包数" min-width="100">
+              <template #default="{ row }">{{ Number(row.receivedPackets).toLocaleString() }}</template>
+            </el-table-column>
+            <el-table-column label="发包数" min-width="100">
+              <template #default="{ row }">{{ Number(row.transmittedPackets).toLocaleString() }}</template>
+            </el-table-column>
+          </el-table>
+        </el-col>
+      </el-row>
     </el-card>
   </div>
 </template>
@@ -184,11 +223,12 @@ function fmtPct(v: number | undefined): string {
   return `${round2(v)}%`
 }
 
-function fmtBytes(bytes: number | undefined): string {
-  if (bytes == null || bytes === 0) return '0 B'
+function fmtBytes(bytes: number | string | undefined): string {
+  const n = Number(bytes)
+  if (bytes == null || n === 0) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return `${round2(bytes / Math.pow(1024, i))} ${units[i]}`
+  const i = Math.floor(Math.log(n) / Math.log(1024))
+  return `${round2(n / Math.pow(1024, i))} ${units[i]}`
 }
 
 function getColor(usage: number | undefined): string {
@@ -245,6 +285,14 @@ function buildLineOption(yData: number[], color: string) {
 
 const cpuChartOption = computed(() => buildLineOption(cpuHistory.value, '#409EFF'))
 const memChartOption = computed(() => buildLineOption(memHistory.value, '#67C23A'))
+
+// ── 网络汇总 ─────────────────────────────────────────────────────
+const totalReceived = computed(() =>
+  (server.value.networks ?? []).reduce((sum, n) => sum + Number(n.receivedBytes ?? 0), 0)
+)
+const totalTransmitted = computed(() =>
+  (server.value.networks ?? []).reduce((sum, n) => sum + Number(n.transmittedBytes ?? 0), 0)
+)
 
 // ── 生命周期 ──────────────────────────────────────────────────────
 onMounted(() => startPolling())

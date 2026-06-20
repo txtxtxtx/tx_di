@@ -16,7 +16,7 @@ use tx_di_axum::bound::DiComp;
 use tx_di_axum::Router;
 
 use admin_app::user::app_service::UserAppService;
-use admin_proto::{DiskInfo, OnlineUser, OnlineUserListResponse, ServerInfo};
+use admin_proto::{DiskInfo, NetworkInfo, OnlineUser, OnlineUserListResponse, ServerInfo};
 use tx_di_sa_token::StpUtil;
 
 use crate::auth::ensure_permission;
@@ -48,7 +48,7 @@ fn get_cache() -> &'static RwLock<HeapRb<ServerInfo>> {
 
 /// 采集一次系统指标（同步，避免在 async 上下文中引入 System 的 !Send 问题）
 fn collect_server_info() -> ServerInfo {
-    use sysinfo::{Disks, System};
+    use sysinfo::{Disks, Networks, System};
 
     let mut sys = System::new();
     sys.refresh_cpu_all();
@@ -101,6 +101,27 @@ fn collect_server_info() -> ServerInfo {
         0.0
     };
 
+    let sys_networks = Networks::new_with_refreshed_list();
+    let mut network_infos: Vec<NetworkInfo> = Vec::new();
+    for (name, data) in &sys_networks {
+        let mut ip_addresses: Vec<String> = data
+            .ip_networks()
+            .iter()
+            .map(|n| n.addr.to_string())
+            .collect();
+        ip_addresses.sort();
+        network_infos.push(NetworkInfo {
+            name: name.clone(),
+            mac_address: data.mac_address().to_string(),
+            ip_addresses,
+            received_bytes: data.total_received(),
+            transmitted_bytes: data.total_transmitted(),
+            received_packets: data.total_packets_received(),
+            transmitted_packets: data.total_packets_transmitted(),
+        });
+    }
+    network_infos.sort_by(|a, b| a.name.cmp(&b.name));
+
     ServerInfo {
         os_name,
         os_version,
@@ -114,6 +135,7 @@ fn collect_server_info() -> ServerInfo {
         used_disk,
         disk_usage,
         disks: disk_infos,
+        networks: network_infos,
     }
 }
 
@@ -164,6 +186,7 @@ async fn get_server_info(
             used_disk: 0,
             disk_usage: 0.0,
             disks: vec![],
+            networks: vec![],
         });
         Ok(ApiR::success(serde_json::json!(latest)))
     }
