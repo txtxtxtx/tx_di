@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/a_me/proj/rust/tx_di/plugins/tx_di_file/src/**)",
+      "Read(//c/a_me/proj/rust/tx_di/plugins/tx_di_file/**)",
+      "Read(//c/a_me/proj/rust/tx_di/**)",
+      "Bash(cargo check *)"
+    ],
+    "additionalDirectories": [
+      "c:\\a_me\\proj\\rust\\tx_di\\plugins\\tx_di_file\\src"
+    ]
+  }
+}
