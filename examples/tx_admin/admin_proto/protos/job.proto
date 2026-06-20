@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package admin.job;
+
+import "common.proto";
+
+// ============================================================
+// 定时任务服务
+// ============================================================
+
+service JobService {
+  rpc CreateJob(CreateJobRequest) returns (JobResponse);
+  rpc UpdateJob(UpdateJobRequest) returns (JobResponse);
+  rpc DeleteJob(DeleteJobRequest) returns (admin.common.Empty);
+  rpc GetJob(GetJobRequest) returns (JobResponse);
+  rpc ListJobs(ListJobsRequest) returns (ListJobsResponse);
+  rpc ChangeJobStatus(ChangeJobStatusRequest) returns (JobResponse);
+  rpc RunJob(RunJobRequest) returns (admin.common.Empty);
+}
+
+service JobLogService {
+  rpc ListJobLogs(ListJobLogsRequest) returns (ListJobLogsResponse);
+  rpc GetJobLog(GetJobLogRequest) returns (JobLogResponse);
+  rpc CleanJobLogs(CleanJobLogsRequest) returns (admin.common.Empty);
+}
+
+// ============================================================
+// Job Messages
+// ============================================================
+
+message JobResponse {
+  uint64 id = 1;
+  string name = 2;
+  int32 status = 3;            // 0=暂停, 1=运行
+  string handler_name = 4;
+  optional string handler_param = 5;
+  string cron_expression = 6;
+  int32 retry_count = 7;
+  int32 retry_interval = 8;    // 秒
+  int32 monitor_timeout = 9;   // 秒
+}
+
+message CreateJobRequest {
+  string name = 1;
+  string handler_name = 2;
+  optional string handler_param = 3;
+  string cron_expression = 4;
+  int32 retry_count = 5;
+  int32 retry_interval = 6;
+  int32 monitor_timeout = 7;
+}
+
+message UpdateJobRequest {
+  uint64 id = 1;
+  string name = 2;
+  string handler_name = 3;
+  optional string handler_param = 4;
+  string cron_expression = 5;
+  int32 retry_count = 6;
+  int32 retry_interval = 7;
+  int32 monitor_timeout = 8;
+}
+
+message DeleteJobRequest {
+  uint64 id = 1;
+}
+
+message GetJobRequest {
+  uint64 id = 1;
+}
+
+message ListJobsRequest {
+  optional string name = 1;
+  optional int32 status = 2;
+  int64 page = 3;
+  int64 page_size = 4;
+}
+
+message ListJobsResponse {
+  repeated JobResponse items = 1;
+  admin.common.PageResponse page_info = 2;
+}
+
+message ChangeJobStatusRequest {
+  uint64 id = 1;
+  int32 status = 2;  // 0=暂停, 1=运行
+}
+
+message RunJobRequest {
+  uint64 id = 1;
+}
+
+// ============================================================
+// JobLog Messages
+// ============================================================
+
+message JobLogResponse {
+  uint64 id = 1;
+  uint64 job_id = 2;
+  string handler_name = 3;
+  optional string handler_param = 4;
+  int32 execute_index = 5;
+  string begin_time = 6;
+  optional string end_time = 7;
+  optional int32 duration = 8;   // 毫秒
+  int32 status = 9;              // 0=执行中, 1=成功, 2=失败
+  optional string result = 10;
+}
+
+message ListJobLogsRequest {
+  optional uint64 job_id = 1;
+  optional int32 status = 2;
+  int64 page = 3;
+  int64 page_size = 4;
+}
+
+message ListJobLogsResponse {
+  repeated JobLogResponse items = 1;
+  admin.common.PageResponse page_info = 2;
+}
+
+message GetJobLogRequest {
+  uint64 id = 1;
+}
+
+message CleanJobLogsRequest {
+  optional uint64 job_id = 1; // 为空则清空所有
+}
