@@ -13,6 +13,7 @@
 //! - **O(1) Handler 查找**：DashMap 索引，精确匹配无锁
 
 use crate::config::SipConfig;
+use crate::err::SipErr;
 use crate::handler::SipRouter;
 use crate::sender::SipSender;
 use anyhow::anyhow;
@@ -332,7 +333,7 @@ impl SipPlugin {
         Ok(self
             .endpoint
             .set(end_point)
-            .map_err(|_e| "已经设置过sip端点了")?)
+            .map_err(|_e| SipErr::EndpointAlreadySet)?)
     }
 
     /// 获取 SIP 发送器
@@ -357,7 +358,7 @@ impl SipPlugin {
             .ok_or("未设置sip端点")?
             .inner
             .clone();
-        Ok(SipSender::new(inner))
+        Ok(SipSender::new(inner, self.config.clone()))
     }
 
     /// 设置取消令牌（只能成功一次）
@@ -366,7 +367,7 @@ impl SipPlugin {
     /// - `Ok(())`：成功设置
     /// - `Err(CancellationToken)`：令牌已存在
     pub fn set_cancel_token(&self, token: CancellationToken) -> RIE<()> {
-        self.cancel_token.set(token).map_err(|_e| "令牌已存在")?;
+        self.cancel_token.set(token).map_err(|_e| SipErr::TokenAlreadySet)?;
         Ok(())
     }
 
@@ -434,5 +435,97 @@ async fn build_transport_layer(
         info!("SIP TCP transport 已绑定: {}", addr);
     }
 
+    // ── TLS ────────────────────────────────────────────────────────
+    #[cfg(feature = "rustls")]
+    if matches!(config.transport, SipTransport::Tls) {
+        build_tls_transport(config, addr, &mut transport_layer).await?;
+    }
+
+    // ── WebSocket ──────────────────────────────────────────────────
+    #[cfg(feature = "websocket")]
+    if matches!(config.transport, SipTransport::Ws) {
+        build_ws_transport(config, addr, &mut transport_layer).await?;
+    }
+
     Ok(transport_layer)
+}
+
+// ── TLS ────────────────────────────────────────────────────────────────
+
+#[cfg(feature = "rustls")]
+async fn build_tls_transport(
+    config: &SipConfig,
+    addr: SocketAddr,
+    transport_layer: &mut rsipstack::transport::TransportLayer,
+) -> anyhow::Result<()> {
+    let tls_cfg = config.tls.as_ref().ok_or_else(|| {
+        anyhow::anyhow!("启用 TLS 传输但未配置 [sip_config.tls]")
+    })?;
+
+    let cert_bytes = tokio::fs::read(&tls_cfg.cert_pem)
+        .await
+        .map_err(|e| anyhow::anyhow!("读取 TLS 证书失败: {}", e))?;
+    let key_bytes = tokio::fs::read(&tls_cfg.key_pem)
+        .await
+        .map_err(|e| anyhow::anyhow!("读取 TLS 私钥失败: {}", e))?;
+
+    let rsip_tls = rsipstack::transport::tls::TlsConfig {
+        cert: Some(cert_bytes),
+        key: Some(key_bytes),
+        client_cert: None,
+        client_key: None,
+        ca_certs: None,
+        sni_hostname: None,
+    };
+
+    let local_addr = rsipstack::transport::SipAddr {
+        r#type: Some(rsipstack::sip::transport::Transport::Tls),
+        addr: addr.into(),
+    };
+    let external = config
+        .external_ip
+        .as_ref()
+        .and_then(|ip| format!("{}:{}", ip, config.port).parse::<SocketAddr>().ok());
+
+    let tls_conn = rsipstack::transport::tls::TlsListenerConnection::new(
+        local_addr,
+        external,
+        rsip_tls,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("TLS transport 绑定 {} 失败: {}", addr, e))?;
+
+    transport_layer.add_transport(tls_conn.into());
+    info!("SIP TLS transport 已绑定: {}", addr);
+    Ok(())
+}
+
+// ── WebSocket ──────────────────────────────────────────────────────────
+
+#[cfg(feature = "websocket")]
+async fn build_ws_transport(
+    config: &SipConfig,
+    addr: SocketAddr,
+    transport_layer: &mut rsipstack::transport::TransportLayer,
+) -> anyhow::Result<()> {
+    let local_addr = rsipstack::transport::SipAddr {
+        r#type: Some(rsipstack::sip::transport::Transport::Ws),
+        addr: addr.into(),
+    };
+    let external = config
+        .external_ip
+        .as_ref()
+        .and_then(|ip| format!("{}:{}", ip, config.port).parse::<SocketAddr>().ok());
+
+    let ws_conn = rsipstack::transport::websocket::WebSocketListenerConnection::new(
+        local_addr,
+        external,
+        false, // is_secure (WSS 需另行配置)
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("WS transport 绑定 {} 失败: {}", addr, e))?;
+
+    transport_layer.add_transport(ws_conn.into());
+    info!("SIP WS transport 已绑定: {}", addr);
+    Ok(())
 }

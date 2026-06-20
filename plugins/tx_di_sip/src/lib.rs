@@ -479,6 +479,10 @@ mod tests {
             user_agent: default_user_agent(),
             external_ip: None,
             log_messages: false,
+            realm: None,
+            retry_count: 0,
+            request_timeout_secs: 0,
+            tls: None,
         }
     }
 

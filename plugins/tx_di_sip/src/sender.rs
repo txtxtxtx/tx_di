@@ -8,8 +8,10 @@ use rsipstack::dialog::invitation::InviteOption;
 use rsipstack::dialog::registration::Registration;
 use rsipstack::sip as rsip;
 use rsipstack::transaction::endpoint::EndpointInnerRef;
+use crate::config::SipConfig;
 use crate::SipErr;
 use std::sync::Arc;
+use std::sync::OnceLock;
 use tracing::info;
 
 /// SIP 发送器
@@ -30,11 +32,17 @@ use tracing::info;
 #[derive(Clone)]
 pub struct SipSender {
     endpoint: EndpointInnerRef,
+    config: Arc<SipConfig>,
+    dialog_layer: OnceLock<Arc<DialogLayer>>,
 }
 
 impl SipSender {
-    pub(crate) fn new(endpoint: EndpointInnerRef) -> Self {
-        Self { endpoint }
+    pub(crate) fn new(endpoint: EndpointInnerRef, config: Arc<SipConfig>) -> Self {
+        Self {
+            endpoint,
+            config,
+            dialog_layer: OnceLock::new(),
+        }
     }
 
     // ── 注册 ────────────────────────────────────────────────────────────────
@@ -70,9 +78,9 @@ impl SipSender {
 
         // 认证信息
         let credential = Credential {
-            username: username.to_string(), // 用户名 一般是设备的国标id
-            password: password.to_string(), // 密码
-            realm: None, // Realm None，表示不指定特定的认证域,todo 可能需要设置服务端的域
+            username: username.to_string(),
+            password: password.to_string(),
+            realm: self.config.realm.clone(),
         };
 
         let mut reg = Registration::new(self.endpoint.clone(), Some(credential));
@@ -125,7 +133,7 @@ impl SipSender {
         let callee_uri = rsip::Uri::try_from(callee)
             .map_err(|_| SipErr::InvalidUri)?;
 
-        let dialog_layer = Arc::new(DialogLayer::new(self.endpoint.clone()));
+        let dialog_layer = self.dialog_layer();
         let (state_sender, _state_receiver) = dialog_layer.new_dialog_state_channel();
 
         let invite_option = InviteOption {
@@ -154,7 +162,53 @@ impl SipSender {
     }
 
     /// 获取 DialogLayer（供高级用户使用）
+    ///
+    /// 首次调用时创建并缓存，后续调用直接返回缓存实例。
     pub fn dialog_layer(&self) -> Arc<DialogLayer> {
-        Arc::new(DialogLayer::new(self.endpoint.clone()))
+        self.dialog_layer
+            .get_or_init(|| Arc::new(DialogLayer::new(self.endpoint.clone())))
+            .clone()
     }
+
+    // ── 会话控制 ─────────────────────────────────────────────────────────────
+
+    /// 发送 BYE 挂断呼叫
+    ///
+    /// 在 INVITE 建立的对话上发送 BYE 请求，正常终止会话。
+    ///
+    /// # 参数
+    ///
+    /// - `dialog` — INVITE 建立的客户端对话
+    pub async fn bye(
+        &self,
+        dialog: &rsipstack::dialog::client_dialog::ClientInviteDialog,
+    ) -> anyhow::Result<()> {
+        dialog
+            .bye()
+            .await
+            .map_err(|e| anyhow::anyhow!(SipErr::ByeFailed).context(e))
+    }
+
+    /// 发送 CANCEL 取消正在进行的 INVITE
+    ///
+    /// 在 INVITE 尚未被接听时发送 CANCEL 请求。
+    ///
+    /// # 参数
+    ///
+    /// - `dialog` — INVITE 建立的客户端对话
+    pub async fn cancel(
+        &self,
+        dialog: &rsipstack::dialog::client_dialog::ClientInviteDialog,
+    ) -> anyhow::Result<()> {
+        dialog
+            .cancel()
+            .await
+            .map_err(|e| anyhow::anyhow!(SipErr::CancelFailed).context(e))
+    }
+
+    // ── 消息发送 ─────────────────────────────────────────────────────────────
+
+    // NOTE: MESSAGE 方法当前依赖 rsipstack 私有 Transaction API，
+    // 等待 rsipstack 未来版本暴露高层 MESSAGE 发送接口后再实现。
+    // 参见：https://github.com/rsipstack/rsipstack/issues
 }

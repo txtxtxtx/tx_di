@@ -22,4 +22,19 @@ pub enum SipErr {
     /// 传输层绑定失败
     #[err(-5, "传输层绑定失败")]
     TransportBindFailed,
+    /// BYE 请求失败
+    #[err(-6, "BYE 请求失败")]
+    ByeFailed,
+    /// CANCEL 请求失败
+    #[err(-7, "CANCEL 请求失败")]
+    CancelFailed,
+    /// MESSAGE 请求失败
+    #[err(-8, "MESSAGE 请求失败")]
+    MessageFailed,
+    /// SIP 端点已设置（重复初始化）
+    #[err(-9, "SIP 端点已设置")]
+    EndpointAlreadySet,
+    /// 取消令牌已存在
+    #[err(-10, "取消令牌已存在")]
+    TokenAlreadySet,
 }

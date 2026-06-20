@@ -9,7 +9,7 @@ repository.workspace = true
 
 [dependencies]
 tx_error = { workspace = true }
-rsipstack.workspace = true
+rsipstack = { workspace = true, features = ["rustls", "websocket"] }
 tx-di-core.workspace = true
 serde.workspace = true
 tracing.workspace = true
@@ -21,3 +21,7 @@ futures.workspace = true
 
 [dev-dependencies]
 toml.workspace = true
+
+[features]
+rustls = ["rsipstack/rustls"]
+websocket = ["rsipstack/websocket"]

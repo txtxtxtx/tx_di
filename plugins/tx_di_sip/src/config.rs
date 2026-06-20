@@ -14,6 +14,10 @@ pub enum SipTransport {
     Tcp,
     /// 同时启用 UDP 和 TCP
     Both,
+    /// TLS 安全传输（需要配置 `tls` 字段）
+    Tls,
+    /// WebSocket 传输（用于 WebRTC 等场景）
+    Ws,
 }
 
 /// SIP 服务器配置
@@ -86,6 +90,34 @@ pub struct SipConfig {
     /// 是否开启详细的 SIP 消息日志，默认 `false`
     #[serde(default)]
     pub log_messages: bool,
+
+    /// SIP 认证域（realm），不填则接受任何域的挑战（Credential.realm = None）
+    ///
+    /// 部分 SIP 服务器要求客户端在 REGISTER 时指定 realm，
+    /// 例如 GB28181 平台通常使用设备 ID 作为 realm。
+    #[serde(default)]
+    pub realm: Option<String>,
+
+    /// REGISTER/INVITE 等请求的超时重试次数，默认 1
+    #[serde(default = "default_retry_count")]
+    pub retry_count: u32,
+
+    /// SIP 请求超时时间（秒），默认 30
+    #[serde(default = "default_request_timeout_secs")]
+    pub request_timeout_secs: u64,
+
+    /// TLS 传输配置（仅 `transport = "tls"` 时使用）
+    #[serde(default)]
+    pub tls: Option<TlsConfig>,
+}
+
+/// TLS 传输配置
+#[derive(Debug, Clone, Deserialize)]
+pub struct TlsConfig {
+    /// 证书 PEM 文件路径
+    pub cert_pem: String,
+    /// 私钥 PEM 文件路径
+    pub key_pem: String,
 }
 
 impl Default for SipConfig {
@@ -95,8 +127,12 @@ impl Default for SipConfig {
             port: default_port(),
             transport: SipTransport::default(),
             user_agent: default_user_agent(),
-            external_ip: Some(default_host()),
+            external_ip: None,
             log_messages: false,
+            realm: None,
+            retry_count: default_retry_count(),
+            request_timeout_secs: default_request_timeout_secs(),
+            tls: None,
         }
     }
 }
@@ -150,4 +186,12 @@ pub(crate) fn default_port() -> u16 {
 
 pub(crate) fn default_user_agent() -> String {
     "tx-di-sip/1.0.0".to_string()
+}
+
+pub(crate) fn default_retry_count() -> u32 {
+    1
+}
+
+pub(crate) fn default_request_timeout_secs() -> u64 {
+    30
 }
