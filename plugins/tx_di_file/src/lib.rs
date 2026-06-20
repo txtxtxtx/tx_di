@@ -64,3 +64,61 @@ pub mod storage;
 pub use config::{FileConfig, StorageBackend};
 pub use plugin::FilePlugin;
 pub use storage::{FileInfo, FileStorage, FileStorageErr, OpendalStorage};
+
+/// 从数据库配置创建存储实例
+///
+/// - `backend`: 存储后端类型（0=Local, 1=S3, 2=Database）
+/// - `config_json`: 后端配置 JSON（Local 需要 base_path/base_url，S3 需要 bucket/region 等）
+///
+/// 对于 `Database` 后端，返回 `None`（由上层应用服务直接处理数据库存储）。
+pub fn create_storage(backend: i32, config_json: &str) -> Option<Arc<dyn FileStorage>> {
+    let backend = StorageBackend::from(backend);
+    match backend {
+        StorageBackend::Database => None,
+        _ => {
+            let mut config = FileConfig::default();
+            config.backend = backend;
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(config_json) {
+                if let Some(v) = json.get("base_path").and_then(|v| v.as_str()) {
+                    config.base_path = v.to_string();
+                }
+                if let Some(v) = json.get("base_url").and_then(|v| v.as_str()) {
+                    config.base_url = v.to_string();
+                }
+                if let Some(v) = json.get("max_file_size").and_then(|v| v.as_u64()) {
+                    config.max_file_size = v;
+                }
+                if let Some(v) = json.get("allowed_extensions").and_then(|v| v.as_array()) {
+                    config.allowed_extensions = v
+                        .iter()
+                        .filter_map(|s| s.as_str().map(String::from))
+                        .collect();
+                }
+                // S3 配置
+                if let Some(s3) = json.get("s3").and_then(|v| v.as_object()) {
+                    if let Some(v) = s3.get("bucket").and_then(|v| v.as_str()) {
+                        config.s3.bucket = v.to_string();
+                    }
+                    if let Some(v) = s3.get("region").and_then(|v| v.as_str()) {
+                        config.s3.region = v.to_string();
+                    }
+                    if let Some(v) = s3.get("endpoint").and_then(|v| v.as_str()) {
+                        config.s3.endpoint = v.to_string();
+                    }
+                    if let Some(v) = s3.get("access_key").and_then(|v| v.as_str()) {
+                        config.s3.access_key = v.to_string();
+                    }
+                    if let Some(v) = s3.get("secret_key").and_then(|v| v.as_str()) {
+                        config.s3.secret_key = v.to_string();
+                    }
+                    if let Some(v) = s3.get("force_path_style").and_then(|v| v.as_bool()) {
+                        config.s3.force_path_style = v;
+                    }
+                }
+            }
+            OpendalStorage::new(&config).ok().map(|s| Arc::new(s) as Arc<dyn FileStorage>)
+        }
+    }
+}
+
+use std::sync::Arc;

@@ -11,11 +11,33 @@ pub enum StorageBackend {
     Local,
     /// AWS S3（或兼容 S3 协议的对象存储，如 MinIO）
     S3,
+    /// 数据库存储（文件内容存入 infrust_file_content 表）
+    Database,
 }
 
 impl Default for StorageBackend {
     fn default() -> Self {
         Self::Local
+    }
+}
+
+impl From<i32> for StorageBackend {
+    fn from(v: i32) -> Self {
+        match v {
+            1 => Self::S3,
+            2 => Self::Database,
+            _ => Self::Local,
+        }
+    }
+}
+
+impl From<StorageBackend> for i32 {
+    fn from(b: StorageBackend) -> i32 {
+        match b {
+            StorageBackend::Local => 0,
+            StorageBackend::S3 => 1,
+            StorageBackend::Database => 2,
+        }
     }
 }
 

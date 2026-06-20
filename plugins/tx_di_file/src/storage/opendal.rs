@@ -33,6 +33,9 @@ impl OpendalStorage {
     /// 根据 `config.backend` 自动选择后端并初始化 OpenDAL Operator。
     pub fn new(config: &FileConfig) -> AppResult<Self> {
         let operator = match config.backend {
+            StorageBackend::Database => {
+                return Err(anyhow::anyhow!("数据库存储后端不支持 OpendalStorage，请使用 create_storage()").into());
+            }
             StorageBackend::Local => {
                 let mut builder = opendal::services::Fs::default();
                 builder = builder.root(&config.base_path);
