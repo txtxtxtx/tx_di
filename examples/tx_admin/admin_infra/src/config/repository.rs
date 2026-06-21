@@ -38,9 +38,9 @@ impl ToastyConfigRepository {
             if c.remark.is_empty() { None } else { Some(c.remark.clone()) },
             AuditFields {
                 creator: if c.creator.is_empty() { None } else { Some(c.creator.clone()) },
-                create_time: c.created_at.parse().unwrap_or_default(),
+                create_time: c.created_at,
                 updater: if c.updater.is_empty() { None } else { Some(c.updater.clone()) },
-                update_time: c.updated_at.parse().unwrap_or_default(),
+                update_time: c.updated_at,
                 deleted: if c.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
@@ -150,7 +150,6 @@ impl ConfigRepository for ToastyConfigRepository {
 
     async fn insert(&self, config: &Config) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let now = jiff::Timestamp::now().to_string();
         SysConfig::create()
             .id(config.id as i64)
             .category(config.category.clone())
@@ -161,9 +160,7 @@ impl ConfigRepository for ToastyConfigRepository {
             .visible(config.visible)
             .remark(config.remark.clone().unwrap_or_default())
             .creator(config.audit.creator.clone().unwrap_or_default())
-            .created_at(now.clone())
             .updater(config.audit.updater.clone().unwrap_or_default())
-            .updated_at(now)
             .deleted(Deleted::from(config.audit.deleted))
             .exec(&mut db)
             .await
@@ -177,7 +174,6 @@ impl ConfigRepository for ToastyConfigRepository {
             .await
             .map_err(|_| RepositoryError::NotFoundConfig)?;
 
-        let now = jiff::Timestamp::now().to_string();
         existing
             .update()
             .category(config.category.clone())
@@ -188,7 +184,6 @@ impl ConfigRepository for ToastyConfigRepository {
             .visible(config.visible)
             .remark(config.remark.clone().unwrap_or_default())
             .updater(config.audit.updater.clone().unwrap_or_default())
-            .updated_at(now)
             .deleted(Deleted::from(config.audit.deleted))
             .exec(&mut db)
             .await

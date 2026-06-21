@@ -39,8 +39,8 @@ pub struct SysUser {
     #[default("".to_string())]
     pub login_ip: String,
 
-    #[default("".to_string())]
-    pub login_date: String,
+    #[default(jiff::Timestamp::UNIX_EPOCH)]
+    pub login_date: jiff::Timestamp,
 
     #[default(0)]
     pub tenant_id: u64,
@@ -48,14 +48,14 @@ pub struct SysUser {
     #[default("".to_string())]
     pub creator: String,
 
-    #[default("".to_string())]
-    pub created_at: String,
+    #[auto]
+    pub created_at: jiff::Timestamp,
 
     #[default("".to_string())]
     pub updater: String,
 
-    #[default("".to_string())]
-    pub updated_at: String,
+    #[update(jiff::Timestamp::now())]
+    pub updated_at: jiff::Timestamp,
 
     #[default(Deleted::No)]
     pub deleted: Deleted,
@@ -75,8 +75,8 @@ pub struct SysUserRole {
     #[index]
     pub role_id: i64,
 
-    #[default("".to_string())]
-    pub created_at: String,
+    #[auto]
+    pub created_at: jiff::Timestamp,
 }
 
 /// 用户-部门关联表
@@ -93,6 +93,6 @@ pub struct SysUserDept {
     #[index]
     pub dept_id: i64,
 
-    #[default("".to_string())]
-    pub created_at: String,
+    #[auto]
+    pub created_at: jiff::Timestamp,
 }

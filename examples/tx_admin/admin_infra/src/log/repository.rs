@@ -45,9 +45,9 @@ impl ToastyOperateLogRepository {
             l.tenant_id,
             AuditFields {
                 creator: if l.creator.is_empty() { None } else { Some(l.creator.clone()) },
-                create_time: l.created_at.parse().unwrap_or_default(),
+                create_time: l.created_at,
                 updater: if l.updater.is_empty() { None } else { Some(l.updater.clone()) },
-                update_time: l.updated_at.parse().unwrap_or_default(),
+                update_time: l.updated_at,
                 deleted: if l.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
@@ -107,7 +107,6 @@ impl OperateLogRepository for ToastyOperateLogRepository {
 
     async fn insert(&self, log: &OperateLog) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let now = jiff::Timestamp::now().to_string();
         SysOperateLog::create()
             .id(log.id as i64)
             .trace_id(log.trace_id.clone())
@@ -125,9 +124,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
             .user_agent(log.user_agent.clone().unwrap_or_default())
             .tenant_id(log.tenant_id)
             .creator(log.audit.creator.clone().unwrap_or_default())
-            .created_at(now.clone())
             .updater(log.audit.updater.clone().unwrap_or_default())
-            .updated_at(now)
             .deleted(Deleted::from(log.audit.deleted))
             .exec(&mut db)
             .await
@@ -187,13 +184,13 @@ impl ToastyLoginLogRepository {
             l.login_type.clone(),
             l.result,
             if l.msg.is_empty() { None } else { Some(l.msg.clone()) },
-            l.login_time.parse().unwrap_or_default(),
+            l.login_time,
             l.tenant_id,
             AuditFields {
                 creator: if l.creator.is_empty() { None } else { Some(l.creator.clone()) },
-                create_time: l.created_at.parse().unwrap_or_default(),
+                create_time: l.created_at,
                 updater: if l.updater.is_empty() { None } else { Some(l.updater.clone()) },
-                update_time: l.updated_at.parse().unwrap_or_default(),
+                update_time: l.updated_at,
                 deleted: if l.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
@@ -256,7 +253,6 @@ impl LoginLogRepository for ToastyLoginLogRepository {
 
     async fn insert(&self, log: &LoginLog) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let now = jiff::Timestamp::now().to_string();
         SysLoginLog::create()
             .id(log.id as i64)
             .user_id(log.user_id as i64)
@@ -269,12 +265,10 @@ impl LoginLogRepository for ToastyLoginLogRepository {
             .login_type(log.login_type.clone())
             .result(log.result)
             .msg(log.msg.clone().unwrap_or_default())
-            .login_time(now.clone())
+            .login_time(jiff::Timestamp::now())
             .tenant_id(log.tenant_id)
             .creator(log.audit.creator.clone().unwrap_or_default())
-            .created_at(now.clone())
             .updater(log.audit.updater.clone().unwrap_or_default())
-            .updated_at(now)
             .deleted(Deleted::from(log.audit.deleted))
             .exec(&mut db)
             .await

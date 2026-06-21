@@ -29,7 +29,7 @@ impl JobAppService {
         req: CreateJobRequest,
         creator: Option<String>,
     ) -> AppResult<JobResponse> {
-        let now = jiff::Timestamp::now().to_string();
+        let now = jiff::Timestamp::now();
         let job_id = tx_common::id::next_id() as i64;
 
         let job = InfrustJob {
@@ -44,7 +44,7 @@ impl JobAppService {
             monitor_timeout: req.monitor_timeout,
             audit: AuditFields {
                 creator: creator.clone(),
-                create_time: now.clone(),
+                create_time: now,
                 updater: creator,
                 update_time: now,
             },
@@ -62,7 +62,7 @@ impl JobAppService {
         updater: Option<String>,
     ) -> AppResult<JobResponse> {
         let mut job = self.repo().get_job_by_id(req.id as i64).await?;
-        let now = jiff::Timestamp::now().to_string();
+        let now = jiff::Timestamp::now();
 
         job.name = req.name;
         job.handler_name = req.handler_name;
@@ -133,7 +133,7 @@ impl JobAppService {
         updater: Option<String>,
     ) -> AppResult<JobResponse> {
         let mut job = self.repo().get_job_by_id(id as i64).await?;
-        let now = jiff::Timestamp::now().to_string();
+        let now = jiff::Timestamp::now();
 
         job.status = match status {
             0 => JobStatus::Paused,
@@ -196,8 +196,7 @@ impl JobAppService {
         let job = self.repo().get_job_by_id(job_id).await?;
 
         // 2. 创建执行日志（开始执行）
-        let now = jiff::Timestamp::now().to_string();
-        let now_ms = jiff::Timestamp::now().as_millisecond() as i64;
+        let now = jiff::Timestamp::now();
         let log_id = tx_common::id::next_id() as i64;
         let log = InfrustJobLog {
             id: log_id,
@@ -205,14 +204,14 @@ impl JobAppService {
             handler_name: job.handler_name.clone(),
             handler_param: job.handler_param.clone(),
             execute_index: 1,
-            begin_time: now_ms,
+            begin_time: now,
             end_time: None,
             duration: None,
             status: ExecutionStatus::Failed,
             result: None,
             audit: AuditFields {
                 creator: operator.clone(),
-                create_time: now.clone(),
+                create_time: now,
                 updater: operator.clone(),
                 update_time: now,
             },
@@ -228,7 +227,7 @@ impl JobAppService {
 
         // 4. 更新执行日志
         let mut log = self.repo().get_job_log_by_id(log_id).await?;
-        let end_time_ms = jiff::Timestamp::now().as_millisecond() as i64;
+        let end = jiff::Timestamp::now();
 
         if result.status == ExecutionStatus::Success {
             log.status = ExecutionStatus::Success;
@@ -237,9 +236,9 @@ impl JobAppService {
             log.status = ExecutionStatus::Failed;
             log.result = result.error.or(Some("执行失败".to_string()));
         }
-        log.end_time = Some(end_time_ms);
+        log.end_time = Some(end);
         log.audit.updater = operator;
-        log.audit.update_time = jiff::Timestamp::now().to_string();
+        log.audit.update_time = jiff::Timestamp::now();
 
         self.repo().update_job_log(log).await?;
         Ok(())

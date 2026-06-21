@@ -180,7 +180,6 @@ const MENU_SEEDS: &[(i64, &str, &str, i32, i32, i64, &str, &str, &str, &str, i32
 /// 执行种子数据初始化
 pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
     let mut db = db.clone();
-    let now = jiff::Timestamp::now().to_string();
 
     // 1. 创建默认管理员用户（密码由调用方哈希后传入）
     let password_hash = admin_domain::password::hash_password(DEFAULT_ADMIN_PASSWORD)?;
@@ -196,9 +195,7 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
         .status(Status::Enabled)
         .tenant_id(0)
         .creator("system".to_string())
-        .created_at(now.clone())
         .updater("system".to_string())
-        .updated_at(now.clone())
         .deleted(Deleted::No)
         .exec(&mut db)
         .await
@@ -215,9 +212,7 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
         .status(Status::Enabled)
         .remark("系统默认角色，拥有全部权限".to_string())
         .creator("system".to_string())
-        .created_at(now.clone())
         .updater("system".to_string())
-        .updated_at(now.clone())
         .deleted(Deleted::No)
         .exec(&mut db)
         .await
@@ -232,9 +227,7 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
         .status(Status::Enabled)
         .remark("普通用户角色".to_string())
         .creator("system".to_string())
-        .created_at(now.clone())
         .updater("system".to_string())
-        .updated_at(now.clone())
         .deleted(Deleted::No)
         .exec(&mut db)
         .await
@@ -262,9 +255,7 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
         .status(Status::Enabled)
         .tenant_id(0)
         .creator("system".to_string())
-        .created_at(now.clone())
         .updater("system".to_string())
-        .updated_at(now.clone())
         .deleted(Deleted::No)
         .exec(&mut db)
         .await
@@ -280,9 +271,7 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
             .status(Status::Enabled)
             .remark("".to_string())
             .creator("system".to_string())
-            .created_at(now.clone())
             .updater("system".to_string())
-            .updated_at(now.clone())
             .deleted(Deleted::No)
             .exec(&mut db)
             .await
@@ -301,9 +290,7 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
                 .css_class("".to_string())
                 .remark("".to_string())
                 .creator("system".to_string())
-                .created_at(now.clone())
                 .updater("system".to_string())
-                .updated_at(now.clone())
                 .deleted(Deleted::No)
                 .exec(&mut db)
                 .await
@@ -330,9 +317,7 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
             .keep_alive(keep_alive)
             .tenant_id(0)
             .creator("system".to_string())
-            .created_at(now.clone())
             .updater("system".to_string())
-            .updated_at(now.clone())
             .deleted(Deleted::No)
             .exec(&mut db)
             .await
@@ -349,9 +334,7 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
         .master(1) // 主配置
         .config(r#"{"base_path":"./uploads","base_url":"http://localhost:8888/files"}"#.to_string())
         .creator("system".to_string())
-        .created_at(now.clone())
         .updater("system".to_string())
-        .updated_at(now.clone())
         .deleted(Deleted::No)
         .exec(&mut db)
         .await

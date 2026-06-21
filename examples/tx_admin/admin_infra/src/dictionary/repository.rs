@@ -35,9 +35,9 @@ impl ToastyDictTypeRepository {
             if d.remark.is_empty() { None } else { Some(d.remark.clone()) },
             AuditFields {
                 creator: if d.creator.is_empty() { None } else { Some(d.creator.clone()) },
-                create_time: d.created_at.parse().unwrap_or_default(),
+                create_time: d.created_at,
                 updater: if d.updater.is_empty() { None } else { Some(d.updater.clone()) },
-                update_time: d.updated_at.parse().unwrap_or_default(),
+                update_time: d.updated_at,
                 deleted: if d.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
@@ -133,7 +133,6 @@ impl DictTypeRepository for ToastyDictTypeRepository {
 
     async fn insert(&self, dict_type: &DictType) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let now = jiff::Timestamp::now().to_string();
         SysDictType::create()
             .id(dict_type.id as i64)
             .name(dict_type.name.clone())
@@ -141,9 +140,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
             .status(Status::from(dict_type.status))
             .remark(dict_type.remark.clone().unwrap_or_default())
             .creator(dict_type.audit.creator.clone().unwrap_or_default())
-            .created_at(now.clone())
             .updater(dict_type.audit.updater.clone().unwrap_or_default())
-            .updated_at(now)
             .deleted(Deleted::from(dict_type.audit.deleted))
             .exec(&mut db)
             .await
@@ -157,7 +154,6 @@ impl DictTypeRepository for ToastyDictTypeRepository {
             .await
             .map_err(|_| RepositoryError::NotFoundDict)?;
 
-        let now = jiff::Timestamp::now().to_string();
         existing
             .update()
             .name(dict_type.name.clone())
@@ -165,7 +161,6 @@ impl DictTypeRepository for ToastyDictTypeRepository {
             .status(Status::from(dict_type.status))
             .remark(dict_type.remark.clone().unwrap_or_default())
             .updater(dict_type.audit.updater.clone().unwrap_or_default())
-            .updated_at(now)
             .deleted(Deleted::from(dict_type.audit.deleted))
             .exec(&mut db)
             .await
@@ -222,9 +217,9 @@ impl ToastyDictDataRepository {
             if d.remark.is_empty() { None } else { Some(d.remark.clone()) },
             AuditFields {
                 creator: if d.creator.is_empty() { None } else { Some(d.creator.clone()) },
-                create_time: d.created_at.parse().unwrap_or_default(),
+                create_time: d.created_at,
                 updater: if d.updater.is_empty() { None } else { Some(d.updater.clone()) },
-                update_time: d.updated_at.parse().unwrap_or_default(),
+                update_time: d.updated_at,
                 deleted: if d.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
@@ -309,7 +304,6 @@ impl DictDataRepository for ToastyDictDataRepository {
 
     async fn insert(&self, data: &DictData) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let now = jiff::Timestamp::now().to_string();
         SysDictData::create()
             .id(data.id as i64)
             .sort(data.sort)
@@ -321,9 +315,7 @@ impl DictDataRepository for ToastyDictDataRepository {
             .css_class(data.css_class.clone().unwrap_or_default())
             .remark(data.remark.clone().unwrap_or_default())
             .creator(data.audit.creator.clone().unwrap_or_default())
-            .created_at(now.clone())
             .updater(data.audit.updater.clone().unwrap_or_default())
-            .updated_at(now)
             .deleted(Deleted::from(data.audit.deleted))
             .exec(&mut db)
             .await
@@ -337,7 +329,6 @@ impl DictDataRepository for ToastyDictDataRepository {
             .await
             .map_err(|_| RepositoryError::NotFoundDict)?;
 
-        let now = jiff::Timestamp::now().to_string();
         existing
             .update()
             .sort(data.sort)
@@ -349,7 +340,6 @@ impl DictDataRepository for ToastyDictDataRepository {
             .css_class(data.css_class.clone().unwrap_or_default())
             .remark(data.remark.clone().unwrap_or_default())
             .updater(data.audit.updater.clone().unwrap_or_default())
-            .updated_at(now)
             .deleted(Deleted::from(data.audit.deleted))
             .exec(&mut db)
             .await

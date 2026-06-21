@@ -46,9 +46,9 @@ impl ToastyMenuRepository {
             m.tenant_id,
             AuditFields {
                 creator: if m.creator.is_empty() { None } else { Some(m.creator.clone()) },
-                create_time: m.created_at.parse().unwrap_or_default(),
+                create_time: m.created_at,
                 updater: if m.updater.is_empty() { None } else { Some(m.updater.clone()) },
-                update_time: m.updated_at.parse().unwrap_or_default(),
+                update_time: m.updated_at,
                 deleted: if m.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
@@ -121,7 +121,6 @@ impl MenuRepository for ToastyMenuRepository {
 
     async fn insert(&self, menu: &Menu) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let now = jiff::Timestamp::now().to_string();
         SysMenu::create()
             .id(menu.id as i64)
             .name(menu.name.clone())
@@ -138,9 +137,7 @@ impl MenuRepository for ToastyMenuRepository {
             .keep_alive(menu.keep_alive)
             .tenant_id(menu.tenant_id)
             .creator(menu.audit.creator.clone().unwrap_or_default())
-            .created_at(now.clone())
             .updater(menu.audit.updater.clone().unwrap_or_default())
-            .updated_at(now)
             .deleted(Deleted::from(menu.audit.deleted))
             .exec(&mut db)
             .await
@@ -154,7 +151,6 @@ impl MenuRepository for ToastyMenuRepository {
             .await
             .map_err(|_| RepositoryError::NotFoundMenu)?;
 
-        let now = jiff::Timestamp::now().to_string();
         existing
             .update()
             .name(menu.name.clone())
@@ -171,7 +167,6 @@ impl MenuRepository for ToastyMenuRepository {
             .keep_alive(menu.keep_alive)
             .tenant_id(menu.tenant_id)
             .updater(menu.audit.updater.clone().unwrap_or_default())
-            .updated_at(now)
             .deleted(Deleted::from(menu.audit.deleted))
             .exec(&mut db)
             .await

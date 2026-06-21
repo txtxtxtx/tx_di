@@ -55,14 +55,14 @@ pub struct SysOperateLog {
     #[default("".to_string())]
     pub creator: String,
 
-    #[default("".to_string())]
-    pub created_at: String,
+    #[auto]
+    pub created_at: jiff::Timestamp,
 
     #[default("".to_string())]
     pub updater: String,
 
-    #[default("".to_string())]
-    pub updated_at: String,
+    #[update(jiff::Timestamp::now())]
+    pub updated_at: jiff::Timestamp,
 
     #[default(Deleted::No)]
     pub deleted: Deleted,
@@ -106,8 +106,8 @@ pub struct SysLoginLog {
     #[default("".to_string())]
     pub msg: String,
 
-    #[default("".to_string())]
-    pub login_time: String,
+    #[default(jiff::Timestamp::UNIX_EPOCH)]
+    pub login_time: jiff::Timestamp,
 
     #[default(0)]
     pub tenant_id: i32,
@@ -115,14 +115,14 @@ pub struct SysLoginLog {
     #[default("".to_string())]
     pub creator: String,
 
-    #[default("".to_string())]
-    pub created_at: String,
+    #[auto]
+    pub created_at: jiff::Timestamp,
 
     #[default("".to_string())]
     pub updater: String,
 
-    #[default("".to_string())]
-    pub updated_at: String,
+    #[update(jiff::Timestamp::now())]
+    pub updated_at: jiff::Timestamp,
 
     #[default(Deleted::No)]
     pub deleted: Deleted,

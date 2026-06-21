@@ -37,9 +37,9 @@ impl ToastyFileRepository {
             f.size,
             AuditFields {
                 creator: if f.creator.is_empty() { None } else { Some(f.creator.clone()) },
-                create_time: f.created_at.parse().unwrap_or_default(),
+                create_time: f.created_at,
                 updater: if f.updater.is_empty() { None } else { Some(f.updater.clone()) },
-                update_time: f.updated_at.parse().unwrap_or_default(),
+                update_time: f.updated_at,
                 deleted: if f.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
@@ -96,7 +96,6 @@ impl FileRepository for ToastyFileRepository {
 
     async fn insert(&self, file: &File) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let now = jiff::Timestamp::now().to_string();
         SysFile::create()
             .id(file.id as i64)
             .config_id(file.config_id.unwrap_or(0))
@@ -106,9 +105,7 @@ impl FileRepository for ToastyFileRepository {
             .file_type(file.file_type.clone().unwrap_or_default())
             .size(file.size)
             .creator(file.audit.creator.clone().unwrap_or_default())
-            .created_at(now.clone())
             .updater(file.audit.updater.clone().unwrap_or_default())
-            .updated_at(now)
             .deleted(Deleted::from(file.audit.deleted))
             .exec(&mut db)
             .await
@@ -121,7 +118,6 @@ impl FileRepository for ToastyFileRepository {
         let mut existing = SysFile::get_by_id(&mut db, file.id as i64)
             .await
             .map_err(|_| RepositoryError::NotFoundFile)?;
-        let now = jiff::Timestamp::now().to_string();
         existing
             .update()
             .name(file.name.clone())
@@ -130,7 +126,6 @@ impl FileRepository for ToastyFileRepository {
             .file_type(file.file_type.clone().unwrap_or_default())
             .size(file.size)
             .updater(file.audit.updater.clone().unwrap_or_default())
-            .updated_at(now)
             .deleted(Deleted::from(file.audit.deleted))
             .exec(&mut db)
             .await
@@ -186,9 +181,9 @@ impl ToastyFileConfigRepository {
             c.config.clone(),
             AuditFields {
                 creator: if c.creator.is_empty() { None } else { Some(c.creator.clone()) },
-                create_time: c.created_at.parse().unwrap_or_default(),
+                create_time: c.created_at,
                 updater: if c.updater.is_empty() { None } else { Some(c.updater.clone()) },
-                update_time: c.updated_at.parse().unwrap_or_default(),
+                update_time: c.updated_at,
                 deleted: if c.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
@@ -234,7 +229,6 @@ impl FileConfigRepository for ToastyFileConfigRepository {
 
     async fn insert(&self, config: &FileConfig) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let now = jiff::Timestamp::now().to_string();
         SysFileConfig::create()
             .id(config.id)
             .name(config.name.clone())
@@ -243,9 +237,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
             .master(config.master)
             .config(config.config.clone())
             .creator(config.audit.creator.clone().unwrap_or_default())
-            .created_at(now.clone())
             .updater(config.audit.updater.clone().unwrap_or_default())
-            .updated_at(now)
             .deleted(Deleted::from(config.audit.deleted))
             .exec(&mut db)
             .await
@@ -259,7 +251,6 @@ impl FileConfigRepository for ToastyFileConfigRepository {
             .await
             .map_err(|_| RepositoryError::NotFoundFile)?;
 
-        let now = jiff::Timestamp::now().to_string();
         existing
             .update()
             .name(config.name.clone())
@@ -268,7 +259,6 @@ impl FileConfigRepository for ToastyFileConfigRepository {
             .master(config.master)
             .config(config.config.clone())
             .updater(config.audit.updater.clone().unwrap_or_default())
-            .updated_at(now)
             .deleted(Deleted::from(config.audit.deleted))
             .exec(&mut db)
             .await

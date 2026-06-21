@@ -41,9 +41,9 @@ impl ToastyRoleRepository {
             r.tenant_id,
             AuditFields {
                 creator: if r.creator.is_empty() { None } else { Some(r.creator.clone()) },
-                create_time: r.created_at.parse().unwrap_or_default(),
+                create_time: r.created_at,
                 updater: if r.updater.is_empty() { None } else { Some(r.updater.clone()) },
-                update_time: r.updated_at.parse().unwrap_or_default(),
+                update_time: r.updated_at,
                 deleted: if r.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
             menu_ids,
@@ -77,13 +77,13 @@ impl ToastyRoleRepository {
             if u.avatar.is_empty() { None } else { Some(u.avatar.clone()) },
             admin_domain::user::model::value_object::UserStatus::from(u.status),
             if u.login_ip.is_empty() { None } else { Some(u.login_ip.clone()) },
-            if u.login_date.is_empty() { None } else { u.login_date.parse().ok() },
+            (u.login_date != jiff::Timestamp::UNIX_EPOCH).then(|| u.login_date),
             admin_domain::shared::model::value_object::TenantId::new(u.tenant_id as u64),
             AuditFields {
                 creator: if u.creator.is_empty() { None } else { Some(u.creator.clone()) },
-                create_time: u.created_at.parse().unwrap_or_default(),
+                create_time: u.created_at,
                 updater: if u.updater.is_empty() { None } else { Some(u.updater.clone()) },
-                update_time: u.updated_at.parse().unwrap_or_default(),
+                update_time: u.updated_at,
                 deleted: if u.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
             Vec::new(),
@@ -192,7 +192,6 @@ impl RoleRepository for ToastyRoleRepository {
 
     async fn insert(&self, role: &Role) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let now = jiff::Timestamp::now().to_string();
         let model = SysRole::create()
             .id(role.id as i64)
             .name(role.name.clone())
@@ -204,9 +203,7 @@ impl RoleRepository for ToastyRoleRepository {
             .remark(role.remark.clone().unwrap_or_default())
             .tenant_id(role.tenant_id)
             .creator(role.audit.creator.clone().unwrap_or_default())
-            .created_at(now.clone())
             .updater(role.audit.updater.clone().unwrap_or_default())
-            .updated_at(now)
             .deleted(Deleted::from(role.audit.deleted))
             .exec(&mut db)
             .await
@@ -230,7 +227,6 @@ impl RoleRepository for ToastyRoleRepository {
             .await
             .map_err(|_| RepositoryError::NotFoundRole)?;
 
-        let now = jiff::Timestamp::now().to_string();
         existing
             .update()
             .name(role.name.clone())
@@ -242,7 +238,6 @@ impl RoleRepository for ToastyRoleRepository {
             .remark(role.remark.clone().unwrap_or_default())
             .tenant_id(role.tenant_id)
             .updater(role.audit.updater.clone().unwrap_or_default())
-            .updated_at(now)
             .deleted(Deleted::from(role.audit.deleted))
             .exec(&mut db)
             .await

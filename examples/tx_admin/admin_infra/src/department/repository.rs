@@ -39,9 +39,9 @@ impl ToastyDepartmentRepository {
             d.tenant_id,
             AuditFields {
                 creator: if d.creator.is_empty() { None } else { Some(d.creator.clone()) },
-                create_time: d.created_at.parse().unwrap_or_default(),
+                create_time: d.created_at,
                 updater: if d.updater.is_empty() { None } else { Some(d.updater.clone()) },
-                update_time: d.updated_at.parse().unwrap_or_default(),
+                update_time: d.updated_at,
                 deleted: if d.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
             },
         )
@@ -111,7 +111,6 @@ impl DepartmentRepository for ToastyDepartmentRepository {
 
     async fn insert(&self, dept: &Department) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let now = jiff::Timestamp::now().to_string();
         SysDepartment::create()
             .id(dept.id as i64)
             .name(dept.name.clone())
@@ -123,9 +122,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
             .status(Status::from(dept.status))
             .tenant_id(dept.tenant_id)
             .creator(dept.audit.creator.clone().unwrap_or_default())
-            .created_at(now.clone())
             .updater(dept.audit.updater.clone().unwrap_or_default())
-            .updated_at(now)
             .deleted(Deleted::from(dept.audit.deleted))
             .exec(&mut db)
             .await
@@ -139,7 +136,6 @@ impl DepartmentRepository for ToastyDepartmentRepository {
             .await
             .map_err(|_| RepositoryError::NotFoundDept)?;
 
-        let now = jiff::Timestamp::now().to_string();
         existing
             .update()
             .name(dept.name.clone())
@@ -151,7 +147,6 @@ impl DepartmentRepository for ToastyDepartmentRepository {
             .status(Status::from(dept.status))
             .tenant_id(dept.tenant_id)
             .updater(dept.audit.updater.clone().unwrap_or_default())
-            .updated_at(now)
             .deleted(Deleted::from(dept.audit.deleted))
             .exec(&mut db)
             .await

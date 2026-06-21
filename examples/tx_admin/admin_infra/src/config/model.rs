@@ -34,14 +34,14 @@ pub struct SysConfig {
     #[default("".to_string())]
     pub creator: String,
 
-    #[default("".to_string())]
-    pub created_at: String,
+    #[auto]
+    pub created_at: jiff::Timestamp,
 
     #[default("".to_string())]
     pub updater: String,
 
-    #[default("".to_string())]
-    pub updated_at: String,
+    #[update(jiff::Timestamp::now())]
+    pub updated_at: jiff::Timestamp,
 
     #[default(Deleted::No)]
     pub deleted: Deleted,
