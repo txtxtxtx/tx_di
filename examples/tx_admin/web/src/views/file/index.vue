@@ -84,9 +84,9 @@
     </el-dialog>
 
     <!-- 文件预览 -->
-    <FilePreview
+    <FilePreviewDialog
       v-model:visible="previewVisible"
-      :file-url="previewFile.url"
+      :file-id="previewFile.id"
       :file-name="previewFile.name"
       :file-type="previewFile.fileType"
     />
@@ -101,7 +101,7 @@ import type { UploadInstance, UploadFile } from 'element-plus'
 import request from '@/api/request'
 import { uploadFiles, listFiles, deleteFile } from '@/api/file'
 import { formatBytes, toPageData } from '@/utils'
-import FilePreview from '@/components/FilePreview.vue'
+import FilePreviewDialog from '@/components/FilePreviewDialog.vue'
 import type { FileResponse } from '@/types'
 
 const loading = ref(false)
@@ -117,14 +117,14 @@ const uploadRef = ref<UploadInstance>()
 const fileList = ref<UploadFile[]>([])
 
 const previewVisible = ref(false)
-const previewFile = reactive<{ url: string; name: string; fileType: string | null }>({
-  url: '',
+const previewFile = reactive<{ id: string; name: string; fileType: string | null }>({
+  id: '',
   name: '',
   fileType: null,
 })
 
 function handlePreview(row: FileResponse) {
-  previewFile.url = `/api/file/${row.id}/download`
+  previewFile.id = String(row.id)
   previewFile.name = row.name
   previewFile.fileType = row.fileType
   previewVisible.value = true
