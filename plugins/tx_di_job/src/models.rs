@@ -73,7 +73,6 @@ pub struct InfrustJob {
     #[key]
     pub id: i64,
     pub name: String,
-    #[index]
     pub status: JobStatus,
     pub handler_name: String,
     pub handler_param: Option<String>,
