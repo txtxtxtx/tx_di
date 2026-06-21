@@ -1,18 +1,22 @@
+use jiff::{Timestamp, civil, tz::TimeZone};
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
-use tx_di_core::{App, CompInit, RIE, tx_comp, async_method, InnerContext};
-use tracing::{info, warn, error, debug};
-use jiff::{Timestamp, civil, tz::TimeZone};
+use tracing::{debug, error, info, warn};
+use tx_di_core::{App, CompInit, InnerContext, RIE, async_method, tx_comp};
 
 use crate::config::JobConfig;
-use crate::models::{InfrustJob, InfrustJobLog, AuditFields, SoftDelete, ExecutionStatus, JobStatus};
-use crate::err::JobResult;
+use crate::err::{JobErr, JobResult};
+use crate::executors::{
+    ExecutorType, InternalJobExecutor, JobExecutor, PythonJobExecutor, ShellJobExecutor,
+};
+use crate::models::{
+    AuditFields, ExecutionStatus, InfrustJob, InfrustJobLog, JobStatus, SoftDelete,
+};
 use crate::repository::JobRepository;
-use crate::executors::{JobExecutor, ExecutorType, InternalJobExecutor, ShellJobExecutor, PythonJobExecutor};
-use tx_di_toasty::ToastyPlugin;
 use tx_common::page::Page;
+use tx_di_toasty::ToastyPlugin;
 
 /// Job 插件组件
 ///
@@ -108,9 +112,21 @@ impl JobPlugin {
     ) -> JobResult {
         let executor_type = ExecutorType::from_handler_name(&handler_name);
         match executor_type {
-            ExecutorType::Internal => self.internal_exec().execute(job_id, handler_name, handler_param).await,
-            ExecutorType::Shell => self.shell_exec().execute(job_id, handler_name, handler_param).await,
-            ExecutorType::Python => self.python_exec().execute(job_id, handler_name, handler_param).await,
+            ExecutorType::Internal => {
+                self.internal_exec()
+                    .execute(job_id, handler_name, handler_param)
+                    .await
+            }
+            ExecutorType::Shell => {
+                self.shell_exec()
+                    .execute(job_id, handler_name, handler_param)
+                    .await
+            }
+            ExecutorType::Python => {
+                self.python_exec()
+                    .execute(job_id, handler_name, handler_param)
+                    .await
+            }
         }
     }
 
@@ -258,7 +274,11 @@ impl JobPlugin {
     }
 
     /// 查询任务执行日志（分页，id 倒序）
-    pub async fn get_job_logs(&self, job_id: i64, page: Page<InfrustJobLog>) -> RIE<Vec<InfrustJobLog>> {
+    pub async fn get_job_logs(
+        &self,
+        job_id: i64,
+        page: Page<InfrustJobLog>,
+    ) -> RIE<Vec<InfrustJobLog>> {
         let logs = self.repo().get_job_logs(job_id, page).await?;
         Ok(logs)
     }
@@ -268,7 +288,10 @@ impl JobPlugin {
         use std::str::FromStr;
         match cron::Schedule::from_str(cron_expression) {
             Ok(_) => Ok(()),
-            Err(e) => Err(anyhow::anyhow!("无效的 Cron 表达式: {}", e).into()),
+            Err(e) => Err(tx_error::AppError::with_context(
+                JobErr::CronParseFailed,
+                format!("无效的 Cron 表达式: {}", e),
+            )),
         }
     }
 
@@ -299,11 +322,7 @@ impl JobPlugin {
             let result = self.execute_single_attempt(job, execute_index).await?;
 
             if result.status == ExecutionStatus::Success {
-                info!(
-                    job_id = job.id,
-                    attempt = attempt + 1,
-                    "任务执行成功"
-                );
+                info!(job_id = job.id, attempt = attempt + 1, "任务执行成功");
                 return Ok(());
             }
 
@@ -327,11 +346,7 @@ impl JobPlugin {
     }
 
     /// 执行单次任务尝试（创建日志 → 执行 → 更新日志）
-    async fn execute_single_attempt(
-        &self,
-        job: &InfrustJob,
-        execute_index: i16,
-    ) -> RIE<JobResult> {
+    async fn execute_single_attempt(&self, job: &InfrustJob, execute_index: i16) -> RIE<JobResult> {
         let begin = Timestamp::now();
         let begin_str = begin.to_string();
 
@@ -513,17 +528,12 @@ fn cron_part_match(part: &str, value: u32, min: u32, _max: u32) -> bool {
     if let Some(slash_pos) = part.find('/') {
         let range_part = &part[..slash_pos];
         let step_str = &part[slash_pos + 1..];
-        if let (Some(dash_pos), Ok(step)) =
-            (range_part.find('-'), step_str.parse::<u32>())
-        {
+        if let (Some(dash_pos), Ok(step)) = (range_part.find('-'), step_str.parse::<u32>()) {
             if let (Ok(start), Ok(end)) = (
                 range_part[..dash_pos].parse::<u32>(),
                 range_part[dash_pos + 1..].parse::<u32>(),
             ) {
-                return step > 0
-                    && value >= start
-                    && value <= end
-                    && (value - start) % step == 0;
+                return step > 0 && value >= start && value <= end && (value - start) % step == 0;
             }
         }
     }
@@ -566,17 +576,9 @@ fn cron_part_match(part: &str, value: u32, min: u32, _max: u32) -> bool {
 }
 
 impl CompInit for JobPlugin {
-    /// 构建时初始化
-    fn inner_init(&mut self, _: &InnerContext) -> RIE<()> {
-        info!("JobPlugin: 初始化开始");
-        info!("JobPlugin: 初始化完成");
-        Ok(())
-    }
-
     async_method!(
         fn async_init_impl(ctx: Arc<App>, _token: CancellationToken) -> RIE<()> {
             info!("JobPlugin: 异步初始化开始");
-
             // 获取数据库实例
             let toasty_plugin = ctx.inject::<ToastyPlugin>();
 
@@ -594,18 +596,22 @@ impl CompInit for JobPlugin {
 
             // 设置到 JobPlugin 的 OnceLock 字段
             let plugin = ctx.inject::<JobPlugin>();
-            plugin.repository.set(repository).map_err(|_| {
-                anyhow::anyhow!("JobPlugin: repository 已初始化")
-            })?;
-            plugin.internal_executor.set(internal_executor).map_err(|_| {
-                anyhow::anyhow!("JobPlugin: internal_executor 已初始化")
-            })?;
-            plugin.shell_executor.set(shell_executor).map_err(|_| {
-                anyhow::anyhow!("JobPlugin: shell_executor 已初始化")
-            })?;
-            plugin.python_executor.set(python_executor).map_err(|_| {
-                anyhow::anyhow!("JobPlugin: python_executor 已初始化")
-            })?;
+            plugin
+                .repository
+                .set(repository)
+                .map_err(|_| JobErr::RepositoryAlreadyInit)?;
+            plugin
+                .internal_executor
+                .set(internal_executor)
+                .map_err(|_| JobErr::InternalExecutorAlreadyInit)?;
+            plugin
+                .shell_executor
+                .set(shell_executor)
+                .map_err(|_| JobErr::ShellExecutorAlreadyInit)?;
+            plugin
+                .python_executor
+                .set(python_executor)
+                .map_err(|_| JobErr::PythonExecutorAlreadyInit)?;
 
             info!("JobPlugin: 异步初始化完成");
             Ok(())
@@ -614,14 +620,13 @@ impl CompInit for JobPlugin {
 
     async_method!(
         fn async_run_impl(ctx: Arc<App>, token: CancellationToken) -> RIE<()> {
-            info!("JobPlugin: 启动调度器");
-
             let plugin = ctx.inject::<JobPlugin>();
 
             if !plugin.config.enabled {
                 info!("JobPlugin: 调度器未启用，跳过启动");
                 return Ok(());
             }
+            info!("JobPlugin: 启动调度器");
 
             // 启动调度器主循环
             let plugin_clone = plugin.clone();

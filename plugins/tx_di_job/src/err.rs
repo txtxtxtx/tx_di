@@ -33,6 +33,26 @@ pub enum JobErr {
     /// 未找到处理器
     #[err(1005, "未找到处理器")]
     HandlerNotFound,
+
+    /// Cron 表达式解析失败
+    #[err(1006, "Cron 表达式解析失败")]
+    CronParseFailed,
+
+    /// Repository 重复初始化
+    #[err(1007, "JobPlugin: repository 已初始化")]
+    RepositoryAlreadyInit,
+
+    /// InternalExecutor 重复初始化
+    #[err(1008, "JobPlugin: internal_executor 已初始化")]
+    InternalExecutorAlreadyInit,
+
+    /// ShellExecutor 重复初始化
+    #[err(1009, "JobPlugin: shell_executor 已初始化")]
+    ShellExecutorAlreadyInit,
+
+    /// PythonExecutor 重复初始化
+    #[err(1010, "JobPlugin: python_executor 已初始化")]
+    PythonExecutorAlreadyInit,
 }
 
 // ── 执行结果 ────────────────────────────────────────────────
