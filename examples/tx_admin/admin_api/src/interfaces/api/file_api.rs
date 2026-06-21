@@ -60,10 +60,9 @@ pub fn router(max_body_size: u64) -> Router {
         .route("/{file_id}/download", get(download_file))
         .route("/list", post(list_files));
 
-    // 预览路由
+    // 预览路由（需鉴权）
     let pre_routes = Router::new()
-        .route("/url/{file_id}", get(get_preview_url))
-        .route("/serve/{*path}", get(serve_local_file));
+        .route("/url/{file_id}", get(get_preview_url));
 
     // 文件配置路由
     let config_routes = Router::new()
@@ -75,6 +74,14 @@ pub fn router(max_body_size: u64) -> Router {
         .route("/{id}/master", put(set_master_config));
 
     file_routes.nest("/pre", pre_routes).nest("/config", config_routes)
+}
+
+/// 公开路由：无需鉴权（URL 含 UUID，不可猜测）
+///
+/// 当前包含：
+/// - `GET /api/file/pre/serve/{*path}` 本地文件静态服务
+pub fn open_router() -> Router {
+    Router::new().route("/api/file/pre/serve/{*path}", get(serve_local_file))
 }
 
 // ============================================================================

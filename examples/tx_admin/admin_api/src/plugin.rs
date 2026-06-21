@@ -20,8 +20,8 @@ impl CompInit for AdminPlugin {
             let web_config = ctx.inject::<WebConfig>();
             let max_body_size = web_config.max_body_size as u64;
 
-            // 构建路由：登录接口公开，其他接口需要认证
-            let open = api::auth_api::open_router();
+            // 构建路由：公开接口与受保护接口
+            let open = api::open_router();
             let protected = api::router(max_body_size);
 
             let router = tx_di_axum::Router::new()

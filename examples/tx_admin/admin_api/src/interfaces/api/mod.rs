@@ -17,7 +17,16 @@ mod job_api;
 
 use tx_di_axum::Router;
 
-/// 注册所有 HTTP 路由
+/// 公开路由（无需登录认证）
+///
+/// 各模块如需添加公开接口，在此处 .merge(module::open_router()) 即可。
+pub fn open_router() -> Router {
+    Router::new()
+        .merge(auth_api::open_router())
+        .merge(file_api::open_router())
+}
+
+/// 注册所有受保护 HTTP 路由（需要登录认证）
 ///
 /// `max_body_size`: 全局请求体上限（字节），用于文件上传的 Content-Length 提前拦截
 pub fn router(max_body_size: u64) -> Router {
