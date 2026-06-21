@@ -6,22 +6,28 @@ use admin_domain::job::service::JobService;
 use admin_proto::{JobResponse, JobLogResponse};
 use tx_common::page::Page;
 use tx_di_core::tx_comp;
+use tx_di_job::JobPlugin;
 use tx_error::AppResult;
 
 use crate::job::dto::{*, job_to_response, job_log_to_response};
 
 /// 定时任务应用服务
 ///
-/// 封装定时任务和任务日志的用例逻辑，协调领域服务与仓储完成业务操作。
+/// 封装定时任务和任务日志的用例逻辑，协调领域服务、JobPlugin 与仓储完成业务操作。
 #[tx_comp]
 pub struct JobAppService {
     job_service: Arc<JobService>,
     job_log_repo: Arc<dyn JobLogRepository>,
+    job_plugin: Arc<JobPlugin>,
 }
 
 impl JobAppService {
-    pub fn new(job_service: Arc<JobService>, job_log_repo: Arc<dyn JobLogRepository>) -> Self {
-        Self { job_service, job_log_repo }
+    pub fn new(
+        job_service: Arc<JobService>,
+        job_log_repo: Arc<dyn JobLogRepository>,
+        job_plugin: Arc<JobPlugin>,
+    ) -> Self {
+        Self { job_service, job_log_repo, job_plugin }
     }
 
     /// 创建定时任务
@@ -176,5 +182,57 @@ impl JobAppService {
     /// * `job_id` - 任务ID，为空则清空所有日志
     pub async fn clean_job_logs(&self, job_id: Option<u64>) -> AppResult<()> {
         self.job_log_repo.clean_by_job_id(job_id).await
+    }
+
+    /// 手动执行定时任务
+    ///
+    /// # 参数
+    /// * `id` - 任务ID
+    pub async fn run_job(&self, id: u64) -> AppResult<()> {
+        use admin_domain::job::model::aggregate::JobLog;
+        use tx_common::id;
+        use tx_di_job::ExecutionStatus;
+
+        // 1. 获取任务
+        let job = self.job_service.get_job(id).await?;
+
+        // 2. 创建执行日志（开始执行）
+        let log_id = id::next_id();
+        let mut log = JobLog::create(
+            log_id,
+            job.id,
+            job.handler_name.clone(),
+            job.handler_param.clone(),
+            1, // execute_index
+            Some("manual".to_string()),
+        );
+        self.job_log_repo.insert(&log).await?;
+
+        // 3. 通过 JobPlugin 执行
+        let result = self
+            .job_plugin
+            .execute_by_type(job.id as i64, &job.handler_name, job.handler_param.as_deref())
+            .await;
+
+        // 4. 更新执行日志
+        match result.status {
+            ExecutionStatus::Success => {
+                log.finish_success(
+                    result.result.unwrap_or_default(),
+                    Some("manual".to_string()),
+                );
+            }
+            _ => {
+                log.finish_failure(
+                    result
+                        .error
+                        .unwrap_or_else(|| "执行失败".to_string()),
+                    Some("manual".to_string()),
+                );
+            }
+        }
+        self.job_log_repo.update(&log).await?;
+
+        Ok(())
     }
 }
