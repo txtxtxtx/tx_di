@@ -20,6 +20,8 @@ impl CompInit for InfraPlugin {
         fn async_init_impl(ctx: Arc<App>, _token: CancellationToken) -> RIE<()> {
             let toasty_plugin = ctx.inject::<ToastyPlugin>();
             toasty_plugin.register_models(crate::register_models());
+            // 注册 tx_di_job 插件模型
+            toasty_plugin.register_models(tx_di_job::register_models());
             info!("infra: toasty 模型已注册");
             Ok(())
         }

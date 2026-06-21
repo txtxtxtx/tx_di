@@ -38,6 +38,14 @@ auto_schema = false
 database_url = "sqlite:examples/tx_admin/data/tx_admin.db"
 max_pool_size = 10
 
+[job_config]
+enabled = true
+poll_interval_secs = 1
+shell_timeout_secs = 300
+python_timeout_secs = 300
+python_path = "/usr/bin/python3"
+thread_pool_size = 4
+
 [web_config]
 enable_api_doc = true
 enable_cors = true

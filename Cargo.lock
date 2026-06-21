@@ -19,7 +19,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "axum 0.8.9",
- "cron 0.15.0",
  "futures",
  "prost 0.13.5",
  "ringbuf",
@@ -30,7 +29,6 @@ dependencies = [
  "sysinfo",
  "toasty",
  "tokio",
- "tokio-cron-scheduler",
  "tokio-util",
  "tonic",
  "tower 0.5.3",
@@ -39,6 +37,7 @@ dependencies = [
  "tx_common",
  "tx_di_axum",
  "tx_di_file",
+ "tx_di_job",
  "tx_di_log",
  "tx_di_sa_token",
  "tx_di_toasty",
@@ -70,6 +69,7 @@ dependencies = [
  "tx-di-core",
  "tx_common",
  "tx_di_file",
+ "tx_di_job",
  "tx_di_toasty",
  "tx_error",
  "uuid",
@@ -114,6 +114,7 @@ dependencies = [
  "tracing",
  "tx-di-core",
  "tx_common",
+ "tx_di_job",
  "tx_di_toasty",
  "tx_error",
 ]
@@ -1487,17 +1488,6 @@ name = "critical-section"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
-
-[[package]]
-name = "cron"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f8c3e73077b4b4a6ab1ea5047c37c57aee77657bc8ecd6f29b0af082d0b0c07"
-dependencies = [
- "chrono",
- "nom",
- "once_cell",
-]
 
 [[package]]
 name = "cron"
@@ -3686,17 +3676,6 @@ name = "num-conv"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6673768db2d862beb9b39a78fdcb1a69439615d5794a1be50caa9bc92c81967"
-
-[[package]]
-name = "num-derive"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed3955f1a9c7c0c15e092f9c887db08b1fc683305fdf6eb6684f22555355e202"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
 
 [[package]]
 name = "num-integer"
@@ -6334,21 +6313,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-cron-scheduler"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2594dd7c2abbbafbb1c78d167fd10860dc7bd75f814cb051a1e0d3e796b9702"
-dependencies = [
- "chrono",
- "cron 0.12.1",
- "num-derive",
- "num-traits",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "tokio-macros"
 version = "2.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6908,7 +6872,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "cron 0.15.0",
+ "cron",
  "dashmap",
  "jiff",
  "linkme",
