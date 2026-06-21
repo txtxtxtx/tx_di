@@ -160,7 +160,7 @@ impl JobPlugin {
 
         self.validate_cron_expression(cron_expression)?;
 
-        let now = Timestamp::now().to_string();
+        let now = Timestamp::now();
         let job_id = tx_common::id::next_id() as i64;
 
         let job = InfrustJob {
@@ -175,7 +175,7 @@ impl JobPlugin {
             monitor_timeout: 0,
             audit: AuditFields {
                 creator: Some("system".to_string()),
-                create_time: now.clone(),
+                create_time: now,
                 updater: Some("system".to_string()),
                 update_time: now,
             },
@@ -213,7 +213,7 @@ impl JobPlugin {
             job.cron_expression = cron_expression.to_string();
         }
 
-        job.audit.update_time = Timestamp::now().to_string();
+        job.audit.update_time = Timestamp::now();
 
         let job = self.repo().update_job(job).await?;
 
@@ -238,7 +238,7 @@ impl JobPlugin {
         let mut job = self.repo().get_job_by_id(job_id).await?;
 
         job.status = JobStatus::Paused;
-        job.audit.update_time = Timestamp::now().to_string();
+        job.audit.update_time = Timestamp::now();
 
         self.repo().update_job(job).await?;
 
@@ -253,7 +253,7 @@ impl JobPlugin {
         let mut job = self.repo().get_job_by_id(job_id).await?;
 
         job.status = JobStatus::Running;
-        job.audit.update_time = Timestamp::now().to_string();
+        job.audit.update_time = Timestamp::now();
 
         self.repo().update_job(job).await?;
 
@@ -342,8 +342,6 @@ impl JobPlugin {
     /// 执行单次任务尝试（创建日志 → 执行 → 更新日志）
     async fn execute_single_attempt(&self, job: &InfrustJob, execute_index: i16) -> RIE<JobResult> {
         let begin = Timestamp::now();
-        let begin_str = begin.to_string();
-        let begin_ms = begin.as_millisecond() as i64;
 
         let log_id = tx_common::id::next_id() as i64;
         let mut log = InfrustJobLog {
@@ -352,16 +350,16 @@ impl JobPlugin {
             handler_name: job.handler_name.clone(),
             handler_param: job.handler_param.clone(),
             execute_index,
-            begin_time: begin_ms,
+            begin_time: begin,
             end_time: None,
             duration: None,
             status: ExecutionStatus::Failed,
             result: None,
             audit: AuditFields {
                 creator: Some("system".to_string()),
-                create_time: begin_str.clone(),
+                create_time: begin,
                 updater: Some("system".to_string()),
-                update_time: begin_str,
+                update_time: begin,
             },
             soft_delete: SoftDelete::NORMAL,
         };
@@ -375,11 +373,11 @@ impl JobPlugin {
         let end = Timestamp::now();
         let duration_ms = (end.as_millisecond() - begin.as_millisecond()) as i32;
 
-        log.end_time = Some(end.as_millisecond() as i64);
+        log.end_time = Some(end);
         log.duration = Some(duration_ms);
         log.status = result.status;
         log.result = result.result.clone();
-        log.audit.update_time = end.to_string();
+        log.audit.update_time = end;
 
         self.repo().update_job_log(log).await?;
 

@@ -223,7 +223,7 @@ impl JobRepository {
         }
         let logs = query.exec(&mut db).await.map_err(to_err)?;
 
-        let now = jiff::Timestamp::now().to_string();
+        let now = jiff::Timestamp::now();
         for log in logs {
             let mut existing = InfrustJobLog::get_by_id(&mut db, log.id).await.map_err(to_err)?;
             let old_audit = existing.audit.clone();
@@ -234,7 +234,7 @@ impl JobRepository {
                     creator: old_audit.creator,
                     create_time: old_audit.create_time,
                     updater: Some("system".to_string()),
-                    update_time: now.clone(),
+                    update_time: now,
                 })
                 .exec(&mut db)
                 .await

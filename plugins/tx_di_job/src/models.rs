@@ -2,12 +2,14 @@ use serde::{Deserialize, Serialize};
 use toasty::{Model, Embed};
 
 /// 审计字段（创建者、创建时间、更新者、更新时间）
+///
+/// `Embed` 不支持 `#[auto]`/`#[update]`，时间值由调用方手动赋值。
 #[derive(Debug, Clone, Serialize, Deserialize, Embed)]
 pub struct AuditFields {
     pub creator: Option<String>,
-    pub create_time: String,
+    pub create_time: jiff::Timestamp,
     pub updater: Option<String>,
-    pub update_time: String,
+    pub update_time: jiff::Timestamp,
 }
 // ── 任务状态 ────────────────────────────────────────────────
 
@@ -102,8 +104,8 @@ impl InfrustJob {
 /// - `handler_name`: 执行器名称（如 `internal`、`shell`、`python`）
 /// - `handler_param`: 执行器参数（JSON 字符串）
 /// - `execute_index`: 执行序号，标识第几次执行（从 1 开始）
-/// - `begin_time`: 执行开始时间（Unix 毫秒时间戳）
-/// - `end_time`: 执行结束时间（Unix 毫秒时间戳，执行中为 `None`）
+/// - `begin_time`: 执行开始时间（`jiff::Timestamp`）
+/// - `end_time`: 执行结束时间（执行中为 `None`）
 /// - `duration`: 执行耗时（毫秒）
 /// - `status`: 执行状态（`ExecutionStatus` 枚举，toasty 自动映射为 `i32`）
 /// - `result`: 执行结果或错误信息
@@ -118,8 +120,8 @@ pub struct InfrustJobLog {
     pub handler_name: String,
     pub handler_param: Option<String>,
     pub execute_index: i16,
-    pub begin_time: i64,
-    pub end_time: Option<i64>,
+    pub begin_time: jiff::Timestamp,
+    pub end_time: Option<jiff::Timestamp>,
     pub duration: Option<i32>,
     pub status: ExecutionStatus,
     pub result: Option<String>,

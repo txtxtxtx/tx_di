@@ -25,7 +25,7 @@ tracing.workspace = true
 tokio = { workspace = true, features = ["full", "process"] }
 
 # 数据库依赖
-toasty = { workspace = true, features = ["serde"] }
+toasty = { workspace = true, features = ["serde", "jiff"] }
 tx_di_toasty = { path = "../tx_di_toasty" }
 
 # 公共工具（雪花 ID 等）
