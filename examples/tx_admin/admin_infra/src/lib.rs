@@ -10,7 +10,6 @@ pub mod menu;
 pub mod department;
 pub mod file;
 pub mod config;
-pub mod job;
 pub mod dictionary;
 pub mod log;
 pub mod plugin;
