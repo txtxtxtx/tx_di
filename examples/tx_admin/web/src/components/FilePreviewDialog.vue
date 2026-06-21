@@ -13,15 +13,9 @@
         <img :src="mediaUrl" :alt="fileName" @load="loading = false" @error="handleLoadError" />
       </div>
 
-      <!-- PDF：用 pdfjs-dist 直接渲染到 canvas -->
+      <!-- PDF：浏览器原生渲染 -->
       <div v-else-if="fileCategory === 'pdf'" class="preview-pdf">
-        <div v-if="pdfLoading" class="pdf-loading">
-          <el-icon class="is-loading" :size="32"><Loading /></el-icon>
-          <span>PDF 加载中...</span>
-        </div>
-        <template v-else>
-          <canvas v-for="p in pdfPages" :key="p" :ref="canvasRef" />
-        </template>
+        <iframe v-if="mediaUrl" :src="mediaUrl" @load="loading = false"></iframe>
       </div>
 
       <!-- Word -->
@@ -81,19 +75,14 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, watch } from 'vue'
 import axios from 'axios'
-import * as pdfjsLib from 'pdfjs-dist'
 import VueOfficeDocx from '@vue-office/docx'
 import '@vue-office/docx/lib/index.css'
 import VueOfficeExcel from '@vue-office/excel'
 import '@vue-office/excel/lib/index.css'
 import VueOfficePptx from '@vue-office/pptx'
 import { getPreviewUrl } from '@/api/file'
-import { Loading } from '@element-plus/icons-vue'
-
-// 配置 PDF.js Worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
 
 const props = defineProps({
   visible: {
@@ -119,19 +108,8 @@ const emit = defineEmits(['update:visible'])
 const loading = ref(false)
 const textContent = ref('')
 const officeSrc = ref(null)
+/** 图片/视频/音频/PDF 统一用 URL */
 const mediaUrl = ref('')
-
-// --- PDF 状态 ---
-const pdfSrc = ref('')
-const pdfPages = ref(0)
-const pdfLoading = ref(false)
-let pdfDoc = null
-
-// --- canvas ref 回调 ---
-const canvasRefs = []
-function canvasRef(el) {
-  if (el) canvasRefs.push(el)
-}
 
 // --- Dialog v-model ---
 const dialogVisible = computed({
@@ -189,44 +167,6 @@ function getAuthHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-// --- 渲染 PDF 所有页面到 canvas ---
-async function renderAllPdfPages() {
-  if (!pdfDoc) return
-  canvasRefs.length = 0
-  await nextTick()
-  await nextTick()
-  const SCALE = 1.5
-  for (let i = 1; i <= pdfDoc.numPages; i++) {
-    const canvas = canvasRefs[i - 1]
-    if (!canvas) continue
-    const page = await pdfDoc.getPage(i)
-    const viewport = page.getViewport({ scale: SCALE })
-    canvas.width = viewport.width
-    canvas.height = viewport.height
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
-  }
-}
-
-// --- 加载 PDF 文档 ---
-async function loadPdf(url) {
-  if (pdfDoc) {
-    pdfDoc.destroy()
-    pdfDoc = null
-  }
-  pdfLoading.value = true
-  pdfPages.value = 0
-  try {
-    pdfDoc = await pdfjsLib.getDocument(url).promise
-    pdfPages.value = pdfDoc.numPages
-    await renderAllPdfPages()
-  } catch (err) {
-    console.error('PDF 加载失败:', err)
-  } finally {
-    pdfLoading.value = false
-    loading.value = false
-  }
-}
-
 // --- Load content when dialog opens ---
 watch(
   () => props.visible,
@@ -236,8 +176,6 @@ watch(
     loading.value = true
     textContent.value = ''
     officeSrc.value = null
-    pdfSrc.value = ''
-    pdfPages.value = 0
     mediaUrl.value = ''
 
     const category = fileCategory.value
@@ -246,12 +184,10 @@ watch(
       const previewRes = await getPreviewUrl(String(props.fileId))
       const url = previewRes.data.url
 
-      if (category === 'image' || category === 'video' || category === 'audio') {
+      if (category === 'image' || category === 'video' || category === 'audio' || category === 'pdf') {
+        // 直接用 URL，浏览器原生渲染
         mediaUrl.value = url
         loading.value = false
-      } else if (category === 'pdf') {
-        pdfSrc.value = url
-        await loadPdf(url)
       } else if (category === 'word' || category === 'excel' || category === 'ppt') {
         const resp = await axios.get(url, {
           responseType: 'arraybuffer',
@@ -289,24 +225,11 @@ function handleOfficeError(err) {
 
 // --- Cleanup ---
 function handleClose() {
-  if (pdfDoc) {
-    pdfDoc.destroy()
-    pdfDoc = null
-  }
-  pdfSrc.value = ''
-  pdfPages.value = 0
   mediaUrl.value = ''
   textContent.value = ''
   officeSrc.value = null
   loading.value = false
 }
-
-onBeforeUnmount(() => {
-  if (pdfDoc) {
-    pdfDoc.destroy()
-    pdfDoc = null
-  }
-})
 
 // --- Download fallback ---
 function downloadFile() {
@@ -356,20 +279,10 @@ function downloadFile() {
   width: 100%;
 }
 
-.preview-pdf canvas {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  margin-bottom: 8px;
-}
-
-.preview-pdf .pdf-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 40px;
-  color: var(--el-text-color-secondary);
+.preview-pdf iframe {
+  width: 100%;
+  height: 75vh;
+  border: none;
 }
 
 .preview-office {
