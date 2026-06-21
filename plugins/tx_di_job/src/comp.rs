@@ -60,8 +60,8 @@ pub struct JobPlugin {
     pub repository: OnceLock<Arc<JobRepository>>,
 
     /// 内部函数执行器（内部构造，非 DI 注入）
-    #[tx_cst(OnceLock::new())]
-    pub internal_executor: OnceLock<Arc<InternalJobExecutor>>,
+    #[tx_cst(Arc::new(InternalJobExecutor::new()))]
+    pub internal_executor: Arc<InternalJobExecutor>,
 
     /// Shell 脚本执行器（内部构造，非 DI 注入）
     #[tx_cst(OnceLock::new())]
@@ -82,9 +82,7 @@ impl JobPlugin {
     }
 
     fn internal_exec(&self) -> &Arc<InternalJobExecutor> {
-        self.internal_executor
-            .get()
-            .expect("InternalJobExecutor 未初始化")
+        &self.internal_executor
     }
 
     fn shell_exec(&self) -> &Arc<ShellJobExecutor> {
@@ -583,7 +581,6 @@ impl CompInit for JobPlugin {
 
             // 创建执行器（内部构造，非 DI 注入）
             let config = ctx.inject::<JobConfig>();
-            let internal_executor = Arc::new(InternalJobExecutor::new());
             let shell_executor = Arc::new(ShellJobExecutor::new(config.shell_timeout()));
             let python_executor = Arc::new(PythonJobExecutor::new(
                 config.python_path.clone(),
@@ -596,10 +593,6 @@ impl CompInit for JobPlugin {
                 .repository
                 .set(repository)
                 .map_err(|_| JobErr::RepositoryAlreadyInit)?;
-            plugin
-                .internal_executor
-                .set(internal_executor)
-                .map_err(|_| JobErr::InternalExecutorAlreadyInit)?;
             plugin
                 .shell_executor
                 .set(shell_executor)
