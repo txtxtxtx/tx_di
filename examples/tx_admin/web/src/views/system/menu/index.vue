@@ -30,7 +30,7 @@
         <el-table-column prop="permission" label="权限标识" width="180" show-overflow-tooltip />
         <el-table-column prop="types" label="类型" width="80">
           <template #default="{ row }">
-            <el-tag :type="row.types === 0 ? '' : row.types === 1 ? 'success' : 'warning'">{{ dictLabel(dictStore.dictMap['sys_menu_type'] || [], row.types) }}</el-tag>
+            <el-tag :type="dictColorType(dictStore.dictMap['sys_menu_type'] || [], row.types) as any">{{ dictLabel(dictStore.dictMap['sys_menu_type'] || [], row.types) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="path" label="路由路径" width="180" show-overflow-tooltip />
@@ -40,7 +40,7 @@
         </el-table-column>
         <el-table-column prop="status" label="状态" width="70">
           <template #default="{ row }">
-            <el-tag :type="row.status === 0 ? 'success' : 'danger'">{{ dictLabel(dictStore.dictMap['sys_status'] || [], row.status) }}</el-tag>
+            <el-tag :type="dictColorType(dictStore.dictMap['sys_status'] || [], row.status) as any">{{ dictLabel(dictStore.dictMap['sys_status'] || [], row.status) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="200" fixed="right">

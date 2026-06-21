@@ -25,7 +25,7 @@
         <el-table-column prop="leaderUserId" label="负责人ID" width="100" />
         <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
-            <el-tag :type="row.status === 0 ? 'success' : 'danger'">{{ dictLabel(dictStore.dictMap['sys_status'] || [], row.status) }}</el-tag>
+            <el-tag :type="dictColorType(dictStore.dictMap['sys_status'] || [], row.status) as any">{{ dictLabel(dictStore.dictMap['sys_status'] || [], row.status) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="200" fixed="right">
@@ -72,7 +72,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { listDepts, createDept, updateDept, deleteDept } from '@/api/dept'
-import { dictToOptions, dictLabel } from '@/utils'
+import { dictToOptions, dictLabel, dictColorType } from '@/utils'
 import { useDictStore } from '@/stores/dict'
 import type { DeptTreeNode } from '@/types'
 

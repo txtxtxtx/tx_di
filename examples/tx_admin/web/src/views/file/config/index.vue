@@ -11,18 +11,19 @@
       <el-table :data="tableData" v-loading="loading" border stripe>
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column prop="name" label="名称" min-width="150" show-overflow-tooltip />
-        <el-table-column prop="storage" label="存储类型" width="120">
+        <el-table-column prop="storage" label="存储类型" width="140">
           <template #default="{ row }">
-            <el-tag v-if="row.storage === 0" type="info">本地存储</el-tag>
-            <el-tag v-else-if="row.storage === 1" type="warning">S3 对象存储</el-tag>
-            <el-tag v-else-if="row.storage === 2" type="success">数据库存储</el-tag>
+            <el-tag :type="dictColorType(dictStore.dictMap['sys_file_storage'] || [], row.storage) as any">
+              {{ dictLabel(dictStore.dictMap['sys_file_storage'] || [], row.storage) }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="remark" label="备注" min-width="150" show-overflow-tooltip />
         <el-table-column prop="master" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag v-if="row.master === 1" type="success">主配置</el-tag>
-            <el-tag v-else type="info">普通</el-tag>
+            <el-tag :type="dictColorType(dictStore.dictMap['sys_file_master'] || [], row.master) as any">
+              {{ dictLabel(dictStore.dictMap['sys_file_master'] || [], row.master) }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="220" fixed="right">
@@ -42,9 +43,7 @@
         </el-form-item>
         <el-form-item label="存储类型" prop="storage">
           <el-select v-model="form.storage" placeholder="请选择存储类型" @change="onStorageChange">
-            <el-option label="本地存储" :value="0" />
-            <el-option label="S3 对象存储" :value="1" />
-            <el-option label="数据库存储" :value="2" />
+            <el-option v-for="o in dictToOptions(dictStore.dictMap['sys_file_storage'] || [])" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="备注">
@@ -67,7 +66,11 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { listFileConfigs, createFileConfig, updateFileConfig, deleteFileConfig, setMasterFileConfig } from '@/api/file-config'
+import { dictToOptions, dictLabel, dictColorType } from '@/utils'
+import { useDictStore } from '@/stores/dict'
 import type { FileConfigResponse } from '@/types'
+
+const dictStore = useDictStore()
 
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -176,7 +179,13 @@ async function handleSetMaster(row: FileConfigResponse) {
   loadData()
 }
 
-onMounted(loadData)
+onMounted(async () => {
+  await Promise.all([
+    dictStore.getDictData('sys_file_storage'),
+    dictStore.getDictData('sys_file_master'),
+  ])
+  loadData()
+})
 </script>
 
 <style scoped>

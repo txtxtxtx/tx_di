@@ -34,7 +34,7 @@
         <el-table-column prop="dictType" label="字典类型" width="200" show-overflow-tooltip />
         <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
-            <el-tag :type="row.status === 0 ? 'success' : 'danger'">{{ dictLabel(dictStore.dictMap['sys_status'] || [], row.status) }}</el-tag>
+            <el-tag :type="dictColorType(dictStore.dictMap['sys_status'] || [], row.status) as any">{{ dictLabel(dictStore.dictMap['sys_status'] || [], row.status) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="remark" label="备注" min-width="150" show-overflow-tooltip />
@@ -78,7 +78,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { listDictTypes, createDictType, updateDictType, deleteDictType } from '@/api/dict'
-import { toPageData, dictToOptions, dictLabel } from '@/utils'
+import { toPageData, dictToOptions, dictLabel, dictColorType } from '@/utils'
 import { useDictStore } from '@/stores/dict'
 import type { DictTypeResponse } from '@/types'
 

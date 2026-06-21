@@ -7,10 +7,7 @@
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="query.status" placeholder="全部" clearable>
-            <el-option label="失败" :value="0" />
-            <el-option label="成功" :value="1" />
-            <el-option label="超时" :value="2" />
-            <el-option label="重试中" :value="3" />
+            <el-option v-for="o in dictToOptions(dictStore.dictMap['sys_job_log_status'] || [])" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -44,7 +41,9 @@
         </el-table-column>
         <el-table-column label="状态" width="90" align="center">
           <template #default="{ row }">
-            <el-tag :type="statusTagType(row.status)">{{ statusLabel(row.status) }}</el-tag>
+            <el-tag :type="dictColorType(dictStore.dictMap['sys_job_log_status'] || [], row.status) as any">
+              {{ dictLabel(dictStore.dictMap['sys_job_log_status'] || [], row.status) }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="result" label="结果" max-width="200" show-overflow-tooltip />
@@ -80,7 +79,9 @@
         <el-descriptions-item label="结束时间">{{ formatTime(detail.endTime) }}</el-descriptions-item>
         <el-descriptions-item label="执行时长">{{ formatDuration(detail.duration) }}</el-descriptions-item>
         <el-descriptions-item label="状态">
-          <el-tag :type="statusTagType(detail.status)">{{ statusLabel(detail.status) }}</el-tag>
+          <el-tag :type="dictColorType(dictStore.dictMap['sys_job_log_status'] || [], detail.status) as any">
+            {{ dictLabel(dictStore.dictMap['sys_job_log_status'] || [], detail.status) }}
+          </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="结果">
           <pre v-if="detail.result && detail.result.length > 100" class="result-pre">{{ detail.result }}</pre>
@@ -95,8 +96,11 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listJobLogs, getJobLog, cleanJobLogs } from '@/api/job'
-import { toPageData } from '@/utils'
+import { toPageData, dictToOptions, dictLabel, dictColorType } from '@/utils'
+import { useDictStore } from '@/stores/dict'
 import type { JobLogResponse } from '@/types'
+
+const dictStore = useDictStore()
 
 const loading = ref(false)
 const tableData = ref<JobLogResponse[]>([])
@@ -118,16 +122,6 @@ const detail = reactive<JobLogResponse>({
   status: 0,
   result: null,
 })
-
-function statusLabel(status: number): string {
-  const map: Record<number, string> = { 0: '失败', 1: '成功', 2: '超时', 3: '重试中' }
-  return map[status] ?? '未知'
-}
-
-function statusTagType(status: number): '' | 'success' | 'warning' | 'danger' | 'info' {
-  const map: Record<number, '' | 'success' | 'warning' | 'danger' | 'info'> = { 0: 'danger', 1: 'success', 2: 'warning', 3: 'info' }
-  return map[status] ?? ''
-}
 
 function formatDuration(ms: number | null): string {
   if (ms == null) return '-'
@@ -189,7 +183,10 @@ async function handleClean() {
   loadData()
 }
 
-onMounted(loadData)
+onMounted(async () => {
+  await dictStore.getDictData('sys_job_log_status')
+  loadData()
+})
 </script>
 
 <style scoped>

@@ -70,8 +70,7 @@
         </el-form-item>
         <el-form-item v-if="isEdit" label="是否可见">
           <el-radio-group v-model="form.visible">
-            <el-radio :value="0">显示</el-radio>
-            <el-radio :value="1">隐藏</el-radio>
+            <el-radio v-for="o in dictToOptions(dictStore.dictMap['sys_visible'] || [])" :key="o.value" :value="o.value">{{ o.label }}</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="备注">
@@ -160,7 +159,10 @@ async function handleDelete(row: ConfigResponse) {
 }
 
 onMounted(async () => {
-  await dictStore.getDictData('sys_config_type')
+  await Promise.all([
+    dictStore.getDictData('sys_config_type'),
+    dictStore.getDictData('sys_visible'),
+  ])
   loadData()
 })
 </script>

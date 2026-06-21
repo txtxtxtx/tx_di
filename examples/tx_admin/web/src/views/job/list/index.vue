@@ -7,8 +7,7 @@
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="query.status" placeholder="全部" clearable>
-            <el-option label="运行中" :value="1" />
-            <el-option label="已暂停" :value="0" />
+            <el-option v-for="o in dictToOptions(dictStore.dictMap['sys_job_status'] || [])" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -32,8 +31,8 @@
         <el-table-column prop="cronExpression" label="CRON 表达式" width="160" />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="row.status === 1 ? 'success' : 'info'">
-              {{ row.status === 1 ? '运行中' : '已暂停' }}
+            <el-tag :type="dictColorType(dictStore.dictMap['sys_job_status'] || [], row.status) as any">
+              {{ dictLabel(dictStore.dictMap['sys_job_status'] || [], row.status) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -109,8 +108,11 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { listJobs, createJob, updateJob, deleteJob, changeJobStatus, runJob } from '@/api/job'
-import { toPageData } from '@/utils'
+import { toPageData, dictToOptions, dictLabel, dictColorType } from '@/utils'
+import { useDictStore } from '@/stores/dict'
 import type { JobResponse } from '@/types'
+
+const dictStore = useDictStore()
 
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -243,7 +245,10 @@ async function handleDelete(row: JobResponse) {
   loadData()
 }
 
-onMounted(loadData)
+onMounted(async () => {
+  await dictStore.getDictData('sys_job_status')
+  loadData()
+})
 </script>
 
 <style scoped>
