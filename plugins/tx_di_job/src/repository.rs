@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use tx_error::{AppError, AppResult};
 use crate::err::JobErr;
-use crate::models::{InfrustJob, InfrustJobLog, JobStatus, SoftDelete};
+use crate::models::{InfrustJob, InfrustJobLog, JobStatus, AuditFields, SoftDelete};
 use tx_di_toasty::ToastyPlugin;
 use toasty::stmt::Query;
 
@@ -189,5 +189,69 @@ impl JobRepository {
 
         let logs = query.exec(&mut db).await.map_err(to_err)?;
         Ok(logs)
+    }
+
+    /// 查询所有未删除的任务（id 倒序）
+    pub async fn get_all_jobs(&self) -> AppResult<Vec<InfrustJob>> {
+        let mut db = self.tp.db().clone();
+        let mut query = Query::<toasty::stmt::List<InfrustJob>>::all()
+            .and(InfrustJob::fields().soft_delete().eq(SoftDelete::NORMAL));
+        query.order_by(InfrustJob::fields().id().desc());
+        query.exec(&mut db).await.map_err(to_err)
+    }
+
+    /// 按 ID 查询执行日志
+    pub async fn get_job_log_by_id(&self, log_id: i64) -> AppResult<InfrustJobLog> {
+        let mut db = self.tp.db().clone();
+        let log = InfrustJobLog::get_by_id(&mut db, log_id).await.map_err(to_err)?;
+        if log.soft_delete != SoftDelete::NORMAL {
+            return Err(AppError::with_context(
+                JobErr::JobNotFound,
+                format!("日志 id={} 已删除", log_id),
+            ));
+        }
+        Ok(log)
+    }
+
+    /// 清空执行日志（软删除），按 job_id 过滤，None 表示清空所有
+    pub async fn clean_job_logs(&self, job_id: Option<i64>) -> AppResult<()> {
+        let mut db = self.tp.db().clone();
+        let mut query = Query::<toasty::stmt::List<InfrustJobLog>>::all()
+            .and(InfrustJobLog::fields().soft_delete().eq(SoftDelete::NORMAL));
+        if let Some(jid) = job_id {
+            query = query.and(InfrustJobLog::fields().job_id().eq(jid));
+        }
+        let logs = query.exec(&mut db).await.map_err(to_err)?;
+
+        let now = jiff::Timestamp::now().to_string();
+        for log in logs {
+            let mut existing = InfrustJobLog::get_by_id(&mut db, log.id).await.map_err(to_err)?;
+            let old_audit = existing.audit.clone();
+            existing
+                .update()
+                .soft_delete(SoftDelete::DELETED)
+                .audit(AuditFields {
+                    creator: old_audit.creator,
+                    create_time: old_audit.create_time,
+                    updater: Some("system".to_string()),
+                    update_time: now.clone(),
+                })
+                .exec(&mut db)
+                .await
+                .map_err(to_err)?;
+        }
+        Ok(())
+    }
+
+    /// 查询所有未删除的执行日志（id 倒序），可选择性按 job_id 过滤
+    pub async fn get_all_job_logs(&self, job_id: Option<i64>) -> AppResult<Vec<InfrustJobLog>> {
+        let mut db = self.tp.db().clone();
+        let mut query = Query::<toasty::stmt::List<InfrustJobLog>>::all()
+            .and(InfrustJobLog::fields().soft_delete().eq(SoftDelete::NORMAL));
+        if let Some(jid) = job_id {
+            query = query.and(InfrustJobLog::fields().job_id().eq(jid));
+        }
+        query.order_by(InfrustJobLog::fields().id().desc());
+        query.exec(&mut db).await.map_err(to_err)
     }
 }
