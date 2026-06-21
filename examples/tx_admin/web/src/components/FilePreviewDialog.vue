@@ -35,6 +35,15 @@
         />
       </div>
 
+      <!-- PowerPoint -->
+      <div v-else-if="fileCategory === 'ppt'" class="preview-office">
+        <VueOfficePptx
+          :src="officeSrc"
+          @rendered="loading = false"
+          @error="handleOfficeError"
+        />
+      </div>
+
       <!-- Video -->
       <div v-else-if="fileCategory === 'video'" class="preview-video">
         <video :src="mediaUrl" controls @loadeddata="loading = false" @error="handleLoadError">
@@ -72,6 +81,7 @@ import VueOfficeDocx from '@vue-office/docx'
 import '@vue-office/docx/lib/index.css'
 import VueOfficeExcel from '@vue-office/excel'
 import '@vue-office/excel/lib/index.css'
+import VueOfficePptx from '@vue-office/pptx'
 import { getPreviewUrl } from '@/api/file'
 
 const props = defineProps({
@@ -131,6 +141,7 @@ const fileCategory = computed(() => {
   if (ext === 'pdf') return 'pdf'
   if (ext === 'docx') return 'word'
   if (ext === 'xlsx' || ext === 'xls') return 'excel'
+  if (ext === 'pptx' || ext === 'ppt') return 'ppt'
   if (VIDEO_EXTS.includes(ext)) return 'video'
   if (AUDIO_EXTS.includes(ext)) return 'audio'
   if (TEXT_EXTS.includes(ext)) return 'text'
@@ -146,6 +157,7 @@ const dialogWidth = computed(() => {
     case 'text': return '70vw'
     case 'excel': return '90vw'
     case 'word': return '80vw'
+    case 'ppt': return '90vw'
     default: return '500px'
   }
 })
@@ -181,7 +193,8 @@ watch(
         loading.value = false
       } else if (category === 'pdf') {
         pdfSrc.value = url
-      } else if (category === 'word' || category === 'excel') {
+        loading.value = false
+      } else if (category === 'word' || category === 'excel' || category === 'ppt') {
         // @vue-office 需要 ArrayBuffer，走带 auth 的 axios 请求
         const resp = await axios.get(url, {
           responseType: 'arraybuffer',
