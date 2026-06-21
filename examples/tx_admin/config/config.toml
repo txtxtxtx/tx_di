@@ -15,7 +15,7 @@ secret_key = ""
 [log_config]
 console_output = true
 dir = "./logs"
-level = "debug"
+# level = "debug"
 prefix = "tx_admin"
 retention_days = 7
 time_format = "local"
