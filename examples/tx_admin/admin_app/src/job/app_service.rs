@@ -189,7 +189,7 @@ impl JobAppService {
     }
 
     /// 手动执行定时任务
-    pub async fn run_job(&self, id: u64) -> AppResult<()> {
+    pub async fn run_job(&self, id: u64, operator: Option<String>) -> AppResult<()> {
         let job_id = id as i64;
 
         // 1. 获取任务
@@ -210,9 +210,9 @@ impl JobAppService {
             status: ExecutionStatus::Failed,
             result: None,
             audit: AuditFields {
-                creator: Some("manual".to_string()),
+                creator: operator.clone(),
                 create_time: now.clone(),
-                updater: Some("manual".to_string()),
+                updater: operator.clone(),
                 update_time: now,
             },
             soft_delete: SoftDelete::NORMAL,
@@ -237,7 +237,7 @@ impl JobAppService {
             log.result = result.error.or(Some("执行失败".to_string()));
         }
         log.end_time = Some(end_time);
-        log.audit.updater = Some("manual".to_string());
+        log.audit.updater = operator;
         log.audit.update_time = jiff::Timestamp::now().to_string();
 
         self.repo().update_job_log(log).await?;

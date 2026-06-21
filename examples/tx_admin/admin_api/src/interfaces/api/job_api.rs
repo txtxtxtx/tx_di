@@ -94,7 +94,7 @@ async fn change_job_status(
     axum::extract::Path(id): axum::extract::Path<u64>,
     Json(mut req): Json<ChangeJobStatusRequest>,
 ) -> Result<ApiR<JobResponse>, ApiErr> {
-    ensure_permission("job:update").await?;
+    ensure_permission("job:status").await?;
     req.id = id;
     let login_id = StpUtil::get_login_id_as_string().await?;
     let r = job_svc.change_status(req.id, req.status, Some(login_id)).await?;
@@ -106,8 +106,9 @@ async fn run_job(
     DiComp(job_svc): DiComp<JobAppService>,
     axum::extract::Path(id): axum::extract::Path<u64>,
 ) -> Result<ApiR<Empty>, ApiErr> {
-    ensure_permission("job:update").await?;
-    job_svc.run_job(id).await?;
+    ensure_permission("job:execute").await?;
+    let login_id = StpUtil::get_login_id_as_string().await?;
+    job_svc.run_job(id, Some(login_id)).await?;
     Ok(ApiRes::ok().into_typed())
 }
 
