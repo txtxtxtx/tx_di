@@ -47,7 +47,7 @@ export interface UserInfoResponse {
 }
 
 // ==================== 用户 (proto, camelCase) ====================
-// ID 字段为 string（u64 溢出），时间戳为 number（i64 毫秒，不超 JS 安全范围）
+// ID 字段为 string（u64 溢出），时间戳为 string（proto i64 + FlexibleDisplayFromStr 序列化为 JSON 字符串）
 export interface UserResponse {
   id: string
   username: string
@@ -61,10 +61,13 @@ export interface UserResponse {
   deptIds: string[]
   avatar: string | null
   loginIp: string | null
-  loginDate: number
+  /** Unix 毫秒时间戳（proto i64 + FlexibleDisplayFromStr 序列化为 string），0 = 未登录 */
+  loginDate: string
   tenantId: string
-  createTime: number
-  updateTime: number
+  /** Unix 毫秒时间戳（proto i64 + FlexibleDisplayFromStr 序列化为 string） */
+  createTime: string
+  /** Unix 毫秒时间戳（proto i64 + FlexibleDisplayFromStr 序列化为 string） */
+  updateTime: string
 }
 
 // proto, camelCase, u64 fields as string

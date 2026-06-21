@@ -14,10 +14,16 @@ export function formatBytes(bytes: number, decimals = 2): string {
 
 /**
  * 格式化时间戳 (毫秒) 为本地字符串
+ *
+ * 后端 proto i64 通过 FlexibleDisplayFromStr 序列化为 JSON 字符串，
+ * 因此 ts 的实际类型可能是字符串 "1718553600000" 或数字 0。
  */
 export function formatTimestamp(ts: number | string): string {
-  if (!ts) return '-'
-  return new Date(ts).toLocaleString('zh-CN')
+  const ms = Number(ts)
+  if (!ms) return '-'
+  const d = new Date(ms)
+  if (isNaN(d.getTime())) return '-'
+  return d.toLocaleString('zh-CN')
 }
 
 /**
