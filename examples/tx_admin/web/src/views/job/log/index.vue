@@ -7,9 +7,10 @@
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="query.status" placeholder="全部" clearable>
-            <el-option label="执行中" :value="0" />
+            <el-option label="失败" :value="0" />
             <el-option label="成功" :value="1" />
-            <el-option label="失败" :value="2" />
+            <el-option label="超时" :value="2" />
+            <el-option label="重试中" :value="3" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -117,12 +118,12 @@ const detail = reactive<JobLogResponse>({
 })
 
 function statusLabel(status: number): string {
-  const map: Record<number, string> = { 0: '执行中', 1: '成功', 2: '失败' }
+  const map: Record<number, string> = { 0: '失败', 1: '成功', 2: '超时', 3: '重试中' }
   return map[status] ?? '未知'
 }
 
-function statusTagType(status: number): '' | 'success' | 'warning' | 'danger' {
-  const map: Record<number, '' | 'success' | 'warning' | 'danger'> = { 0: 'warning', 1: 'success', 2: 'danger' }
+function statusTagType(status: number): '' | 'success' | 'warning' | 'danger' | 'info' {
+  const map: Record<number, '' | 'success' | 'warning' | 'danger' | 'info'> = { 0: 'danger', 1: 'success', 2: 'warning', 3: 'info' }
   return map[status] ?? ''
 }
 

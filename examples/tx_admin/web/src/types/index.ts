@@ -563,7 +563,7 @@ export interface JobLogResponse {
   beginTime: string
   endTime: string | null
   duration: number | null   // 毫秒
-  status: number            // 0=执行中, 1=成功, 2=失败
+  status: number            // 0=失败(Failed), 1=成功(Success), 2=超时(Timeout), 3=重试中(Retrying)
   result: string | null
 }
 
@@ -578,6 +578,7 @@ export interface CreateJobRequest {
 }
 
 export interface UpdateJobRequest {
+  id: string
   name: string
   handlerName: string
   handlerParam?: string
@@ -599,4 +600,13 @@ export interface ListJobLogsRequest {
   status?: number
   page: number
   pageSize: number
+}
+
+export interface ChangeJobStatusRequest {
+  id: string
+  status: number          // 0=暂停, 1=运行
+}
+
+export interface CleanJobLogsRequest {
+  jobId?: string | null   // 为空则清空所有
 }
