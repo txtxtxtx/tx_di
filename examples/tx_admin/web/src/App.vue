@@ -12,4 +12,12 @@ html, body, #app {
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
+
+/* 搜索栏表单控件统一宽度 */
+.search-card .el-input {
+  width: 200px;
+}
+.search-card .el-select {
+  width: 180px;
+}
 </style>
