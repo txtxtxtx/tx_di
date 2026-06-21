@@ -124,7 +124,7 @@ const previewFile = reactive<{ url: string; name: string; fileType: string | nul
 })
 
 function handlePreview(row: FileResponse) {
-  previewFile.url = row.url || `/api/file/${row.id}/download`
+  previewFile.url = `/api/file/${row.id}/download`
   previewFile.name = row.name
   previewFile.fileType = row.fileType
   previewVisible.value = true

@@ -9,7 +9,7 @@
     <div class="preview-container" v-loading="loading" element-loading-text="加载中...">
       <!-- Images -->
       <div v-if="fileCategory === 'image'" class="preview-image">
-        <img :src="fileUrl" :alt="fileName" @load="loading = false" @error="handleLoadError" />
+        <img :src="mediaUrl" :alt="fileName" @load="loading = false" @error="handleLoadError" />
       </div>
 
       <!-- PDF -->
@@ -37,14 +37,14 @@
 
       <!-- Video -->
       <div v-else-if="fileCategory === 'video'" class="preview-video">
-        <video :src="fileUrl" controls @loadeddata="loading = false" @error="handleLoadError">
+        <video :src="mediaUrl" controls @loadeddata="loading = false" @error="handleLoadError">
           您的浏览器不支持视频播放
         </video>
       </div>
 
       <!-- Audio -->
       <div v-else-if="fileCategory === 'audio'" class="preview-audio">
-        <audio :src="fileUrl" controls @canplay="loading = false" @error="handleLoadError">
+        <audio :src="mediaUrl" controls @canplay="loading = false" @error="handleLoadError">
           您的浏览器不支持音频播放
         </audio>
       </div>
@@ -99,6 +99,8 @@ const textContent = ref('')
 const officeSrc = ref(null)
 const pdfSrc = ref(null)
 const createdBlobUrls = ref([])
+/** 图片/视频/音频等需要 blob URL 的类型 */
+const mediaUrl = ref('')
 
 // --- Dialog v-model ---
 const dialogVisible = computed({
@@ -183,6 +185,7 @@ watch(
     textContent.value = ''
     officeSrc.value = null
     pdfSrc.value = null
+    mediaUrl.value = ''
 
     const category = fileCategory.value
 
@@ -203,9 +206,16 @@ watch(
         textContent.value = typeof resp.data === 'string' ? resp.data : JSON.stringify(resp.data, null, 2)
         loading.value = false
       } else if (category === 'image' || category === 'video' || category === 'audio') {
-        // Browser handles same-origin auth; rely on load events to clear loading
-        // Set a fallback timeout in case events don't fire
-        setTimeout(() => { loading.value = false }, 5000)
+        // 带 token 请求为 blob 再创建 ObjectURL，避免浏览器直接请求不带 Authorization
+        const resp = await axios.get(props.fileUrl, {
+          responseType: 'blob',
+          headers: getAuthHeaders()
+        })
+        const blobUrl = URL.createObjectURL(resp.data)
+        mediaUrl.value = blobUrl
+        // 注册到清理列表
+        createdBlobUrls.value.push(blobUrl)
+        loading.value = false
       } else {
         loading.value = false
       }
@@ -263,6 +273,10 @@ function revokeBlobUrls() {
 
 function handleClose() {
   revokeBlobUrls()
+  if (mediaUrl.value) {
+    try { URL.revokeObjectURL(mediaUrl.value) } catch (_) { /* ignore */ }
+    mediaUrl.value = ''
+  }
   textContent.value = ''
   officeSrc.value = null
   pdfSrc.value = null
@@ -271,9 +285,11 @@ function handleClose() {
 
 // --- Download fallback ---
 function downloadFile() {
-  if (!props.fileUrl) return
+  // 优先用已加载的 mediaUrl（图片/视频/音频 blob），回退到 API 下载接口
+  const url = mediaUrl.value || props.fileUrl
+  if (!url) return
   const a = document.createElement('a')
-  a.href = props.fileUrl
+  a.href = url
   a.download = props.fileName || ''
   document.body.appendChild(a)
   a.click()
