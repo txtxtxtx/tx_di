@@ -1,5 +1,5 @@
 import request from './request'
-import type { ApiRes, PageData, FileResponse, ListFilesRequest } from '@/types'
+import type { ApiRes, PageData, FileResponse, ListFilesRequest, PreviewUrlRes } from '@/types'
 
 /// 流式多文件上传（multipart/form-data）
 /// 注意：不要手动设置 Content-Type，浏览器会自动加上 boundary
@@ -20,4 +20,9 @@ export function deleteFile(fileId: string) {
 /// 分页查询文件列表
 export function listFiles(data: ListFilesRequest) {
   return request.post<ApiRes<PageData<FileResponse>>>('/api/file/list', data).then(r => r.data)
+}
+
+/// 获取文件预览地址
+export function getPreviewUrl(fileId: string) {
+  return request.get<ApiRes<PreviewUrlRes>>(`/api/file/pre/url/${fileId}`).then(r => r.data)
 }

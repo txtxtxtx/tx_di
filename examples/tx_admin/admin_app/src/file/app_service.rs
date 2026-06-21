@@ -15,7 +15,7 @@ use tx_di_file::storage::{guess_mime_type, extract_extension, FileStorageErr, Fi
 use tx_di_file::FilePlugin;
 use tx_error::{AppError, AppResult};
 
-use crate::file::dto::{file_to_response, DownloadFileStream};
+use crate::file::dto::{file_to_response, DownloadFileStream, PreviewUrlResponse};
 
 /// 轻量字节计数器 —— 只计数不限制（大小限制由 axum DefaultBodyLimit 负责）
 struct CountingReader<R> {
@@ -99,6 +99,23 @@ impl FileAppService {
             .find_by_id(id)
             .await?
             .ok_or_else(|| AppError::with_context(FileStorageErr::NotFound, "文件配置不存在"))
+    }
+
+    /// 获取本地文件服务的根目录
+    ///
+    /// 从主配置（或第一个配置）的 JSON `config` 字段中解析 `base_path`，
+    /// 回退到插件 TOML 配置的 `base_path`。
+    pub async fn serve_base_dir(&self) -> Option<String> {
+        // 优先 DB 主配置
+        if let Ok(Some(cfg)) = self.file_config_repo.find_master().await {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&cfg.config) {
+                if let Some(base) = json.get("base_path").and_then(|v| v.as_str()) {
+                    return Some(base.to_string());
+                }
+            }
+        }
+        // 回退到插件配置
+        Some(self.file_plugin.config.base_path.clone())
     }
 
     // ========================================================================
@@ -221,6 +238,58 @@ impl FileAppService {
             content_type,
             size: file.size as u64,
         })
+    }
+
+    // ========================================================================
+    // 预览 URL
+    // ========================================================================
+
+    /// 获取文件预览地址
+    ///
+    /// - 本地存储 (storage=0): 返回永久 URL → `/api/file/pre/serve/{path}`
+    /// - S3 存储   (storage=1): 返回预签名临时 URL + 过期时间
+    /// - 数据库     (storage=2): 暂存到本地 → 同本地
+    pub async fn get_preview_url(&self, file_id: u64) -> AppResult<PreviewUrlResponse> {
+        let file = self.file_service.get_file(file_id).await?;
+        let storage = self.get_storage(file.config_id).await?;
+
+        // 获取存储配置以判断类型
+        let storage_type = if let Some(cid) = file.config_id {
+            self.file_config_repo
+                .find_by_id(cid)
+                .await?
+                .map(|c| c.storage)
+                .unwrap_or(0)
+        } else {
+            0 // 默认本地
+        };
+
+        match storage_type {
+            1 => {
+                // S3: 生成预签名 URL（2 小时有效）
+                let url = storage.presigned_url(&file.path, 7200).await?;
+                let now = jiff::Timestamp::now();
+                let expires_at = now
+                    .saturating_add(jiff::SignedDuration::from_secs(7200))
+                    .unwrap_or(now)
+                    .to_string();
+                Ok(PreviewUrlResponse {
+                    url,
+                    url_type: "temporary".into(),
+                    expires_at: Some(expires_at),
+                })
+            }
+            _ => {
+                // 本地 / 数据库: 永久 URL，走 serve 路由
+                let safe_path = file.path.trim_start_matches('/');
+                let url = format!("/api/file/pre/serve/{}", safe_path);
+                Ok(PreviewUrlResponse {
+                    url,
+                    url_type: "permanent".into(),
+                    expires_at: None,
+                })
+            }
+        }
     }
 
     // ========================================================================

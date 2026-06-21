@@ -39,3 +39,15 @@ pub struct DownloadFileStream {
     /// 文件字节大小
     pub size: u64,
 }
+
+/// 预览 URL 信息
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PreviewUrlResponse {
+    /// 资源访问地址
+    pub url: String,
+    /// "permanent" | "temporary"
+    #[serde(rename = "type")]
+    pub url_type: String,
+    /// 过期时间（ISO 8601），permanent 时为 null
+    pub expires_at: Option<String>,
+}

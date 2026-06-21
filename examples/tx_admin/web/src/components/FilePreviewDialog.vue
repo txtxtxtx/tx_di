@@ -72,15 +72,16 @@ import VueOfficeDocx from '@vue-office/docx'
 import '@vue-office/docx/lib/index.css'
 import VueOfficeExcel from '@vue-office/excel'
 import '@vue-office/excel/lib/index.css'
+import { getPreviewUrl } from '@/api/file'
 
 const props = defineProps({
   visible: {
     type: Boolean,
     default: false
   },
-  fileUrl: {
-    type: String,
-    default: ''
+  fileId: {
+    type: [String, Number],
+    default: null
   },
   fileName: {
     type: String,
@@ -98,8 +99,7 @@ const loading = ref(false)
 const textContent = ref('')
 const officeSrc = ref(null)
 const pdfSrc = ref(null)
-const createdBlobUrls = ref([])
-/** 图片/视频/音频等需要 blob URL 的类型 */
+/** 图片/视频/音频直接用 URL，由后端 serve 路由或 S3 预签名提供 */
 const mediaUrl = ref('')
 
 // --- Dialog v-model ---
@@ -156,30 +156,11 @@ function getAuthHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-async function fetchAsArrayBuffer(url) {
-  const resp = await axios.get(url, {
-    responseType: 'arraybuffer',
-    headers: getAuthHeaders()
-  })
-  return resp.data
-}
-
-async function fetchAsBlobUrl(url, mime) {
-  const resp = await axios.get(url, {
-    responseType: 'blob',
-    headers: getAuthHeaders()
-  })
-  const blob = new Blob([resp.data], { type: mime })
-  const blobUrl = URL.createObjectURL(blob)
-  createdBlobUrls.value.push(blobUrl)
-  return blobUrl
-}
-
 // --- Load content when dialog opens ---
 watch(
   () => props.visible,
   async (val) => {
-    if (!val || !props.fileUrl) return
+    if (!val || !props.fileId) return
 
     loading.value = true
     textContent.value = ''
@@ -190,63 +171,36 @@ watch(
     const category = fileCategory.value
 
     try {
-      if (category === 'pdf') {
-        // Try direct URL first; vue-pdf-embed can fetch with credentials for same-origin
-        pdfSrc.value = props.fileUrl
+      // 获取预览地址
+      const previewRes = await getPreviewUrl(String(props.fileId))
+      const url = previewRes.data.url
+
+      if (category === 'image' || category === 'video' || category === 'audio') {
+        // 直接用 URL，浏览器自带缓存（本地永久 / S3 预签名内有效）
+        mediaUrl.value = url
+        loading.value = false
+      } else if (category === 'pdf') {
+        pdfSrc.value = url
       } else if (category === 'word' || category === 'excel') {
-        // @vue-office uses XHR; provide arraybuffer with auth
-        const buffer = await fetchAsArrayBuffer(props.fileUrl)
-        officeSrc.value = buffer
+        // @vue-office 需要 ArrayBuffer，走带 auth 的 axios 请求
+        const resp = await axios.get(url, {
+          responseType: 'arraybuffer',
+          headers: getAuthHeaders()
+        })
+        officeSrc.value = resp.data
         loading.value = false
       } else if (category === 'text') {
-        const resp = await axios.get(props.fileUrl, {
+        const resp = await axios.get(url, {
           responseType: 'text',
           headers: getAuthHeaders()
         })
         textContent.value = typeof resp.data === 'string' ? resp.data : JSON.stringify(resp.data, null, 2)
-        loading.value = false
-      } else if (category === 'image' || category === 'video' || category === 'audio') {
-        // 带 token 请求为 blob 再创建 ObjectURL，避免浏览器直接请求不带 Authorization
-        const resp = await axios.get(props.fileUrl, {
-          responseType: 'blob',
-          headers: getAuthHeaders()
-        })
-        const blobUrl = URL.createObjectURL(resp.data)
-        mediaUrl.value = blobUrl
-        // 注册到清理列表
-        createdBlobUrls.value.push(blobUrl)
         loading.value = false
       } else {
         loading.value = false
       }
     } catch (err) {
       console.error('文件加载失败:', err)
-      // For office files, try blob URL fallback
-      if (category === 'word') {
-        try {
-          const blobUrl = await fetchAsBlobUrl(props.fileUrl, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-          officeSrc.value = blobUrl
-        } catch (e) {
-          console.error('Word 文件加载失败:', e)
-        }
-      } else if (category === 'excel') {
-        try {
-          const mime = fileExtension.value === 'xls'
-            ? 'application/vnd.ms-excel'
-            : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-          const blobUrl = await fetchAsBlobUrl(props.fileUrl, mime)
-          officeSrc.value = blobUrl
-        } catch (e) {
-          console.error('Excel 文件加载失败:', e)
-        }
-      } else if (category === 'pdf') {
-        try {
-          const blobUrl = await fetchAsBlobUrl(props.fileUrl, 'application/pdf')
-          pdfSrc.value = blobUrl
-        } catch (e) {
-          console.error('PDF 文件加载失败:', e)
-        }
-      }
       loading.value = false
     }
   }
@@ -264,17 +218,8 @@ function handleOfficeError(err) {
 }
 
 // --- Cleanup ---
-function revokeBlobUrls() {
-  createdBlobUrls.value.forEach((url) => {
-    try { URL.revokeObjectURL(url) } catch (_) { /* ignore */ }
-  })
-  createdBlobUrls.value = []
-}
-
 function handleClose() {
-  revokeBlobUrls()
   if (mediaUrl.value) {
-    try { URL.revokeObjectURL(mediaUrl.value) } catch (_) { /* ignore */ }
     mediaUrl.value = ''
   }
   textContent.value = ''
@@ -285,11 +230,9 @@ function handleClose() {
 
 // --- Download fallback ---
 function downloadFile() {
-  // 优先用已加载的 mediaUrl（图片/视频/音频 blob），回退到 API 下载接口
-  const url = mediaUrl.value || props.fileUrl
-  if (!url) return
+  if (!props.fileId) return
   const a = document.createElement('a')
-  a.href = url
+  a.href = `/api/file/${props.fileId}/download`
   a.download = props.fileName || ''
   document.body.appendChild(a)
   a.click()

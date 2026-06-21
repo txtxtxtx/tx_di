@@ -86,7 +86,7 @@
     <!-- 文件预览 -->
     <FilePreviewDialog
       v-model:visible="previewVisible"
-      :file-url="previewFile.url"
+      :file-id="previewFile.id"
       :file-name="previewFile.name"
       :file-type="previewFile.fileType"
     />
@@ -117,14 +117,14 @@ const uploadRef = ref<UploadInstance>()
 const fileList = ref<UploadFile[]>([])
 
 const previewVisible = ref(false)
-const previewFile = reactive<{ url: string; name: string; fileType: string | null }>({
-  url: '',
+const previewFile = reactive<{ id: string | null; name: string; fileType: string | null }>({
+  id: null,
   name: '',
   fileType: null,
 })
 
 function handlePreview(row: FileResponse) {
-  previewFile.url = `/api/file/${row.id}/download`
+  previewFile.id = row.id
   previewFile.name = row.name
   previewFile.fileType = row.fileType
   previewVisible.value = true

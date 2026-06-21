@@ -7,6 +7,10 @@
 //! - `GET  /api/file/{id}/download`  流式下载
 //! - `POST /api/file/list`      分页查询
 //!
+//! 预览：
+//! - `GET  /api/file/pre/url/{id}`     获取预览地址
+//! - `GET  /api/file/pre/serve/{*path}` 本地文件静态服务
+//!
 //! 文件配置：
 //! - `GET  /api/file/config/list`       配置列表
 //! - `GET  /api/file/config/{id}`       配置详情
@@ -56,6 +60,11 @@ pub fn router(max_body_size: u64) -> Router {
         .route("/{file_id}/download", get(download_file))
         .route("/list", post(list_files));
 
+    // 预览路由
+    let pre_routes = Router::new()
+        .route("/url/{file_id}", get(get_preview_url))
+        .route("/serve/{*path}", get(serve_local_file));
+
     // 文件配置路由
     let config_routes = Router::new()
         .route("/list", get(list_configs))
@@ -65,7 +74,7 @@ pub fn router(max_body_size: u64) -> Router {
         .route("/{id}", delete(delete_config))
         .route("/{id}/master", put(set_master_config));
 
-    file_routes.nest("/config", config_routes)
+    file_routes.nest("/pre", pre_routes).nest("/config", config_routes)
 }
 
 // ============================================================================
@@ -302,4 +311,57 @@ async fn set_master_config(
         master: c.master,
         config: c.config,
     }))
+}
+
+// ============================================================================
+// 预览 URL
+// ============================================================================
+
+/// `GET /api/file/pre/url/{file_id}`
+async fn get_preview_url(
+    DiComp(file_svc): DiComp<FileAppService>,
+    Path(file_id): Path<u64>,
+) -> Result<ApiR<admin_app::file::dto::PreviewUrlResponse>, ApiErr> {
+    ensure_permission("file:download").await?;
+    let info = file_svc.get_preview_url(file_id).await?;
+    Ok(ApiR::success(info))
+}
+
+// ============================================================================
+// 本地文件静态服务（供预览 URL 使用，无鉴权——UUID 路径不可猜测）
+// ============================================================================
+
+/// `GET /api/file/pre/serve/{*path}`
+async fn serve_local_file(
+    DiComp(file_svc): DiComp<FileAppService>,
+    Path(path): Path<String>,
+) -> Result<impl IntoResponse, ApiErr> {
+    let base = file_svc.serve_base_dir().await.unwrap_or_else(|| "./uploads".into());
+    let safe_path = path.trim_start_matches('/');
+    let full = std::path::PathBuf::from(&base).join(safe_path);
+
+    // 防止路径穿越
+    let canonical = full.canonicalize().unwrap_or(full.clone());
+    let base_canonical = std::path::PathBuf::from(&base).canonicalize().unwrap_or(std::path::PathBuf::from(&base));
+    if !canonical.starts_with(&base_canonical) {
+        return Err(ApiErr::from(AppError::with_context(
+            FileStorageErr::NotFound,
+            "禁止的文件路径",
+        )));
+    }
+
+    match tokio::fs::File::open(&canonical).await {
+        Ok(file) => {
+            let mime = tx_di_file::storage::guess_mime_type(&path);
+            let metadata = file.metadata().await.unwrap();
+            let body = axum::body::Body::from_stream(ReaderStream::new(tokio::io::BufReader::new(file)));
+            Ok(Response::builder()
+                .header(header::CONTENT_TYPE, mime)
+                .header(header::CONTENT_LENGTH, metadata.len())
+                .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+                .body(body)
+                .unwrap())
+        }
+        Err(_) => Err(ApiErr::from(AppError::from_code(FileStorageErr::NotFound))),
+    }
 }

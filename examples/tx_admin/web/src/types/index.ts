@@ -487,6 +487,12 @@ export interface UpdateFileConfigRequest {
   config: string
 }
 
+export interface PreviewUrlRes {
+  url: string
+  type: string              // "permanent" | "temporary"
+  expiresAt: string | null  // ISO datetime, null for permanent
+}
+
 // ==================== 监控 (proto, camelCase) ====================
 export interface DiskInfo {
   name: string
