@@ -70,10 +70,6 @@ pub struct JobPlugin {
     /// Python 脚本执行器（内部构造，非 DI 注入）
     #[tx_cst(OnceLock::new())]
     pub python_executor: OnceLock<Arc<PythonJobExecutor>>,
-
-    /// 调度器句柄
-    #[tx_cst(OnceLock::new())]
-    pub scheduler_handle: OnceLock<tokio::task::JoinHandle<()>>,
 }
 
 impl JobPlugin {
@@ -626,27 +622,15 @@ impl CompInit for JobPlugin {
                 info!("JobPlugin: 调度器未启用，跳过启动");
                 return Ok(());
             }
+
             info!("JobPlugin: 启动调度器");
 
-            // 启动调度器主循环
-            let plugin_clone = plugin.clone();
-            let token_clone = token.clone();
-            let handle = tokio::spawn(async move {
-                if let Err(e) = plugin_clone.scheduler_loop(token_clone).await {
-                    error!(error = %e, "调度器主循环异常退出");
-                }
-            });
-
-            if plugin.scheduler_handle.set(handle).is_err() {
-                warn!("JobPlugin: 调度器已启动");
+            // 框架已将 async_run_impl 放入 tokio::spawn，此处直接占用当前任务执行调度循环
+            if let Err(e) = plugin.scheduler_loop(token).await {
+                error!(error = %e, "调度器主循环异常退出");
             }
 
-            info!("JobPlugin: 调度器启动完成");
-
-            // 等待关闭信号
-            token.cancelled().await;
-            info!("JobPlugin: 收到关闭信号，正在优雅关闭...");
-
+            info!("JobPlugin: 调度器已停止");
             Ok(())
         }
     );
