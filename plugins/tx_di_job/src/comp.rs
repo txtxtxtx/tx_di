@@ -99,7 +99,8 @@ impl JobPlugin {
             .expect("PythonJobExecutor 未初始化")
     }
 
-    async fn execute_by_type(
+    /// 根据 handler_name 自动识别执行器类型并执行任务（不依赖插件自身的任务表）
+    pub async fn execute_by_type(
         &self,
         job_id: i64,
         handler_name: &str,
