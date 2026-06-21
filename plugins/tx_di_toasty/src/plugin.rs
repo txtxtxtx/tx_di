@@ -132,11 +132,8 @@ impl ToastyPlugin {
         self.db.get()
     }
 
-    /// 将配置文件的
-    /// [toasty_config]
-    /// auto_schema = true 变为 false
+    /// 将配置文件的 `auto_schema = true` 改为 `false`（按行替换，保留注释与格式）
     fn change_auto_schema_closed(path: PathBuf) {
-        // 读取配置文件内容
         let content = match std::fs::read_to_string(&path) {
             Ok(c) => c,
             Err(e) => {
@@ -144,39 +141,20 @@ impl ToastyPlugin {
                 return;
             }
         };
-        // 备份原始的配置文件
-        let backup_path = path.with_extension("bak");
-        if let Err(e) = std::fs::copy(&path, &backup_path) {
-            tracing::error!(path = %path.display(), error = %e, "备份配置文件失败");
-        }
-        // 解析 TOML
-        let mut toml_value: toml::Value = match toml::from_str(&content) {
-            Ok(v) => v,
-            Err(e) => {
-                tracing::error!(path = %path.display(), error = %e, "解析 TOML 配置文件失败");
-                return;
-            }
-        };
 
-        // 获取或创建 [toasty_config] 节，并设置 auto_schema = false
-        let table = toml_value.as_table_mut();
-        if let Some(table) = table {
-            let toasty_config = table
-                .entry("toasty_config")
-                .or_insert_with(|| toml::Value::Table(toml::Table::new()));
-            if let Some(t) = toasty_config.as_table_mut() {
-                t.insert("auto_schema".to_string(), toml::Value::Boolean(false));
-            }
-        }
-
-        // 写回文件
-        let new_content = match toml::to_string(&toml_value) {
-            Ok(s) => s,
-            Err(e) => {
-                tracing::error!(path = %path.display(), error = %e, "序列化 TOML 配置失败");
-                return;
-            }
-        };
+        let new_content: String = content
+            .lines()
+            .map(|line| {
+                let normalized: String = line.chars().filter(|c| !c.is_whitespace()).collect();
+                if normalized == "auto_schema=true" {
+                    let indent = line.chars().take_while(|c| c.is_whitespace()).collect::<String>();
+                    format!("{}auto_schema = false", indent)
+                } else {
+                    line.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
 
         if let Err(e) = std::fs::write(&path, &new_content) {
             tracing::error!(path = %path.display(), error = %e, "写入配置文件失败");
