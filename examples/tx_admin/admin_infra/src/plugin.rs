@@ -1,46 +1,30 @@
 //! 基础设施层插件 - 模型注册与数据初始化
 //!
 //! 职责：
-//! 1. `InfraPlugin` — 注册所有 toasty 模型（在 DB 连接之前）
-//! 2. `DbInitPlugin` — 检测首次启动，执行种子数据初始化（在 DB 连接之后）
+//! 1. 模型注册 — `inner_init` 中注册所有 toasty 模型（在 DB 连接之前）
+//! 2. 种子数据 — `async_init` 中检测首次启动，执行种子数据初始化
 
 use std::sync::Arc;
 use tracing::{debug, info};
-use tx_di_core::{App, CancellationToken, CompInit, RIE, async_method, tx_comp};
-use tx_di_toasty::{ToastyConfig, ToastyDb, ToastyPlugin};
-
-/// 模型注册插件
-///
-/// 在 `ToastyPlugin` 连接数据库之前执行，将模型注册到 `ModelSet`。
-#[tx_comp(init)]
-pub struct InfraPlugin;
-
-impl CompInit for InfraPlugin {
-    async_method!(
-        fn async_init_impl(ctx: Arc<App>, _token: CancellationToken) -> RIE<()> {
-            let toasty_plugin = ctx.inject::<ToastyPlugin>();
-            toasty_plugin.register_models(crate::register_models());
-            // 注册 tx_di_job 插件模型
-            toasty_plugin.register_models(tx_di_job::register_models());
-            info!("infra: toasty 模型已注册");
-            Ok(())
-        }
-    );
-
-    fn init_sort() -> i32 {
-        // 必须在 ToastyPlugin（MAX-50）之前，确保模型在 DB 连接前注册
-        i32::MAX - 200
-    }
-}
+use tx_di_core::{App, CancellationToken, CompInit, RIE, async_method, tx_comp, InnerContext};
+use tx_di_toasty::{ToastyConfig, ToastyPlugin};
 
 /// 数据库初始化插件
 ///
-/// 在 `ToastyPlugin` 连接数据库之后执行，检测空数据库并初始化种子数据。
-/// 仅在 `auto_schema = true` 时执行种子初始化。
+/// `inner_init`：注册所有 toasty 模型（在 ToastyPlugin 连接数据库之前）
+/// `async_init`：检测空数据库并初始化种子数据（仅在 `auto_schema = true` 时）
 #[tx_comp(init)]
 pub struct DbInitPlugin;
 
 impl CompInit for DbInitPlugin {
+    fn inner_init(&mut self, ctx: &InnerContext) -> RIE<()> {
+        let toasty_plugin = tx_di_core::inject_from_store::<ToastyPlugin>(ctx);
+        toasty_plugin.register_models(crate::register_models());
+        toasty_plugin.register_models(tx_di_job::register_models());
+        info!("infra: toasty 模型已注册");
+        Ok(())
+    }
+
     async_method!(
         fn async_init_impl(ctx: Arc<App>, _token: CancellationToken) -> RIE<()> {
             // auto_schema = false 时跳过种子初始化（用户自行管理表结构）
@@ -59,7 +43,6 @@ impl CompInit for DbInitPlugin {
     );
 
     fn init_sort() -> i32 {
-        // 在 ToastyPlugin（MAX-50）之后，确保 DB 已连接
-        i32::MAX - 25
+        i32::MAX - 200
     }
 }
