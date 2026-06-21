@@ -34,10 +34,6 @@ pub enum RepositoryError {
     DatabaseFile,
     #[err(10009, "数据库异常")]
     DatabaseLog,
-    #[err(10010, "数据库异常")]
-    DatabaseJob,
-    #[err(10011, "数据库异常")]
-    DatabaseJobLog,
 
     // ── 记录不存在 (10101-10109) ──
     #[err(10101, "记录不存在")]
@@ -56,10 +52,6 @@ pub enum RepositoryError {
     NotFoundFile,
     #[err(10109, "记录不存在")]
     NotFoundLog,
-    #[err(10110, "记录不存在")]
-    NotFoundJob,
-    #[err(10111, "记录不存在")]
-    NotFoundJobLog,
 
     // ── 重复 (10201-10207) ──
     #[err(10201, "用户名已存在")]
