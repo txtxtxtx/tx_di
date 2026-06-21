@@ -10,6 +10,7 @@ repository.workspace = true
 [dependencies]
 admin_domain = { path = "../admin_domain" }
 tx_di_toasty = { path = "../../../plugins/tx_di_toasty", features = ["sqlite"] }
+tx_di_job = { path = "../../../plugins/tx_di_job" }
 tx-di-core = { path = "../../../tx-di-core" }
 tx_error = { path = "../../../common/tx_error" }
 tx_common = { path = "../../../common/crates/tx_common" }
