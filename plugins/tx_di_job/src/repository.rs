@@ -160,7 +160,7 @@ impl JobRepository {
 
         existing
             .update()
-            .end_time(log.end_time.clone())
+            .end_time(log.end_time)
             .duration(log.duration)
             .status(log.status)
             .result(log.result.clone())

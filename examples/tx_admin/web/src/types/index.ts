@@ -560,9 +560,9 @@ export interface JobLogResponse {
   handlerName: string
   handlerParam: string | null
   executeIndex: number
-  beginTime: string
-  endTime: string | null
-  duration: number | null   // 毫秒
+  beginTime: string          // Unix 毫秒时间戳（后端 FlexibleDisplayFromStr 序列化为字符串）
+  endTime: string | null     // Unix 毫秒时间戳
+  duration: number | null    // 毫秒
   status: number            // 0=失败(Failed), 1=成功(Success), 2=超时(Timeout), 3=重试中(Retrying)
   result: string | null
 }

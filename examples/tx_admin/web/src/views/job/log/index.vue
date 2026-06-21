@@ -33,9 +33,11 @@
         <el-table-column prop="jobId" label="任务ID" width="100" show-overflow-tooltip />
         <el-table-column prop="handlerName" label="处理器" min-width="160" show-overflow-tooltip />
         <el-table-column prop="executeIndex" label="执行次数" width="90" align="center" />
-        <el-table-column prop="beginTime" label="开始时间" width="180" />
+        <el-table-column label="开始时间" width="180">
+          <template #default="{ row }">{{ formatTime(row.beginTime) }}</template>
+        </el-table-column>
         <el-table-column label="结束时间" width="180">
-          <template #default="{ row }">{{ row.endTime || '-' }}</template>
+          <template #default="{ row }">{{ formatTime(row.endTime) }}</template>
         </el-table-column>
         <el-table-column label="执行时长" width="100" align="center">
           <template #default="{ row }">{{ formatDuration(row.duration) }}</template>
@@ -74,8 +76,8 @@
         <el-descriptions-item label="处理器">{{ detail.handlerName }}</el-descriptions-item>
         <el-descriptions-item label="处理器参数">{{ detail.handlerParam || '-' }}</el-descriptions-item>
         <el-descriptions-item label="执行次数">{{ detail.executeIndex }}</el-descriptions-item>
-        <el-descriptions-item label="开始时间">{{ detail.beginTime }}</el-descriptions-item>
-        <el-descriptions-item label="结束时间">{{ detail.endTime || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="开始时间">{{ formatTime(detail.beginTime) }}</el-descriptions-item>
+        <el-descriptions-item label="结束时间">{{ formatTime(detail.endTime) }}</el-descriptions-item>
         <el-descriptions-item label="执行时长">{{ formatDuration(detail.duration) }}</el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag :type="statusTagType(detail.status)">{{ statusLabel(detail.status) }}</el-tag>
@@ -131,6 +133,15 @@ function formatDuration(ms: number | null): string {
   if (ms == null) return '-'
   if (ms >= 1000) return (ms / 1000).toFixed(1) + 's'
   return ms + 'ms'
+}
+
+/** 将 Unix 毫秒时间戳格式化为 yyyy-MM-dd HH:mm:ss */
+function formatTime(ts: string | null): string {
+  if (ts == null || ts === '') return '-'
+  const d = new Date(Number(ts))
+  if (isNaN(d.getTime())) return '-'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 async function loadData() {

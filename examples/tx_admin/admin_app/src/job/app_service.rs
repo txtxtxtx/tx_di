@@ -197,6 +197,7 @@ impl JobAppService {
 
         // 2. 创建执行日志（开始执行）
         let now = jiff::Timestamp::now().to_string();
+        let now_ms = jiff::Timestamp::now().as_millisecond() as i64;
         let log_id = tx_common::id::next_id() as i64;
         let log = InfrustJobLog {
             id: log_id,
@@ -204,7 +205,7 @@ impl JobAppService {
             handler_name: job.handler_name.clone(),
             handler_param: job.handler_param.clone(),
             execute_index: 1,
-            begin_time: now.clone(),
+            begin_time: now_ms,
             end_time: None,
             duration: None,
             status: ExecutionStatus::Failed,
@@ -227,7 +228,7 @@ impl JobAppService {
 
         // 4. 更新执行日志
         let mut log = self.repo().get_job_log_by_id(log_id).await?;
-        let end_time = jiff::Timestamp::now().to_string();
+        let end_time_ms = jiff::Timestamp::now().as_millisecond() as i64;
 
         if result.status == ExecutionStatus::Success {
             log.status = ExecutionStatus::Success;
@@ -236,7 +237,7 @@ impl JobAppService {
             log.status = ExecutionStatus::Failed;
             log.result = result.error.or(Some("执行失败".to_string()));
         }
-        log.end_time = Some(end_time);
+        log.end_time = Some(end_time_ms);
         log.audit.updater = operator;
         log.audit.update_time = jiff::Timestamp::now().to_string();
 

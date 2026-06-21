@@ -343,6 +343,7 @@ impl JobPlugin {
     async fn execute_single_attempt(&self, job: &InfrustJob, execute_index: i16) -> RIE<JobResult> {
         let begin = Timestamp::now();
         let begin_str = begin.to_string();
+        let begin_ms = begin.as_millisecond() as i64;
 
         let log_id = tx_common::id::next_id() as i64;
         let mut log = InfrustJobLog {
@@ -351,7 +352,7 @@ impl JobPlugin {
             handler_name: job.handler_name.clone(),
             handler_param: job.handler_param.clone(),
             execute_index,
-            begin_time: begin_str.clone(),
+            begin_time: begin_ms,
             end_time: None,
             duration: None,
             status: ExecutionStatus::Failed,
@@ -374,7 +375,7 @@ impl JobPlugin {
         let end = Timestamp::now();
         let duration_ms = (end.as_millisecond() - begin.as_millisecond()) as i32;
 
-        log.end_time = Some(end.to_string());
+        log.end_time = Some(end.as_millisecond() as i64);
         log.duration = Some(duration_ms);
         log.status = result.status;
         log.result = result.result.clone();
