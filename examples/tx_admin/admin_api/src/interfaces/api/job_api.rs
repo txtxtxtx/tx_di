@@ -101,13 +101,13 @@ async fn change_job_status(
     Ok(ApiR::success(r))
 }
 
-/// POST /api/job/{id}/run — 手动执行定时任务（暂仅返回成功，调度逻辑后续实现）
+/// POST /api/job/{id}/run — 手动执行定时任务
 async fn run_job(
-    DiComp(_job_svc): DiComp<JobAppService>,
-    axum::extract::Path(_id): axum::extract::Path<u64>,
+    DiComp(job_svc): DiComp<JobAppService>,
+    axum::extract::Path(id): axum::extract::Path<u64>,
 ) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("job:update").await?;
-    // TODO: 接入调度器执行任务
+    job_svc.run_job(id).await?;
     Ok(ApiRes::ok().into_typed())
 }
 
