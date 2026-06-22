@@ -93,11 +93,11 @@ impl AuthAppService {
         // 记录登录日志
         let log_cmd = CreateLoginLogRequest {
             user_id: user.id,
-            user_type: 0,
+            user_type: if user.id > 0 { 1 } else { 0 },
             username: user.username.clone(),
             login_ip,
             login_type: "login".to_string(),
-            result: 0,
+            result: 1,
         };
         let _ = self.login_log_service.create_log(log_cmd).await;
 
@@ -237,11 +237,11 @@ impl AuthAppService {
         // 记录登出日志
         let log_cmd = CreateLoginLogRequest {
             user_id: req.user_id,
-            user_type: 0,
+            user_type: if user.id > 0 { 1 } else { 0 },
             username: user.username,
             login_ip: String::new(),
             login_type: "logout".to_string(),
-            result: 0, // 成功
+            result: 1, // 成功
         };
         let _ = self.login_log_service.create_log(log_cmd).await;
 
