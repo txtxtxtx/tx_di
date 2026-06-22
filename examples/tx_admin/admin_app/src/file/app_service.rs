@@ -71,7 +71,11 @@ impl FileAppService {
     async fn get_storage(&self, config_id: Option<i32>) -> AppResult<Arc<dyn FileStorage>> {
         // 尝试从 DB 获取配置
         let db_config = if let Some(cid) = config_id {
-            self.file_config_repo.find_by_id(cid).await?
+            // 先按指定 ID 查找；找不到则回退主配置（兼容旧数据 config_id=0/无效值）
+            match self.file_config_repo.find_by_id(cid).await? {
+                Some(cfg) => Some(cfg),
+                None => self.file_config_repo.find_master().await?,
+            }
         } else {
             self.file_config_repo.find_master().await?
         };
@@ -103,11 +107,16 @@ impl FileAppService {
 
     /// 获取本地文件服务的根目录
     ///
-    /// 从主配置（或第一个配置）的 JSON `config` 字段中解析 `base_path`，
-    /// 回退到插件 TOML 配置的 `base_path`。
-    pub async fn serve_base_dir(&self) -> Option<String> {
-        // 优先 DB 主配置
-        if let Ok(Some(cfg)) = self.file_config_repo.find_master().await {
+    /// - `config_id` 为 Some 时查找指定配置的 `base_path`
+    /// - 为 None 时查找主配置
+    /// - 回退到插件 TOML 配置的 `base_path`
+    pub async fn serve_base_dir(&self, config_id: Option<i32>) -> Option<String> {
+        let db_config = if let Some(cid) = config_id {
+            self.file_config_repo.find_by_id(cid).await.ok().flatten()
+        } else {
+            self.file_config_repo.find_master().await.ok().flatten()
+        };
+        if let Some(cfg) = db_config {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&cfg.config) {
                 if let Some(base) = json.get("base_path").and_then(|v| v.as_str()) {
                     return Some(base.to_string());
@@ -293,9 +302,13 @@ impl FileAppService {
                 })
             }
             _ => {
-                // 本地 / 数据库: 永久 URL，走 serve 路由
+                // 本地 / 数据库: 永久 URL，走 serve 路由（带 cid 定位正确的 base_path）
                 let safe_path = file.path.trim_start_matches('/');
-                let url = format!("/api/file/pre/serve/{}", safe_path);
+                let url = if let Some(cid) = file.config_id {
+                    format!("/api/file/pre/serve/{}?cid={}", safe_path, cid)
+                } else {
+                    format!("/api/file/pre/serve/{}", safe_path)
+                };
                 Ok(PreviewUrlResponse {
                     url,
                     url_type: "permanent".into(),

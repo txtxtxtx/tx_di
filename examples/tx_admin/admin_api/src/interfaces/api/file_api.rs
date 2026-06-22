@@ -342,8 +342,10 @@ async fn get_preview_url(
 async fn serve_local_file(
     DiComp(file_svc): DiComp<FileAppService>,
     Path(path): Path<String>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Result<impl IntoResponse, ApiErr> {
-    let base = file_svc.serve_base_dir().await.unwrap_or_else(|| "./uploads".into());
+    let config_id: Option<i32> = params.get("cid").and_then(|v| v.parse().ok());
+    let base = file_svc.serve_base_dir(config_id).await.unwrap_or_else(|| "./uploads".into());
     let safe_path = path.trim_start_matches('/');
     let full = std::path::PathBuf::from(&base).join(safe_path);
 
