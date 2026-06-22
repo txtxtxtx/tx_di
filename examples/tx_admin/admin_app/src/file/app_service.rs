@@ -133,6 +133,14 @@ impl FileAppService {
         // 1. 获取存储后端
         let storage = self.get_storage(config_id).await?;
 
+        // 1.1 解析实际使用的 config_id，保证落库不为 NULL
+        //     显式指定则直接使用，否则取当前主配置 ID
+        let resolved_config_id = if config_id.is_some() {
+            config_id
+        } else {
+            self.file_config_repo.find_master().await?.map(|c| c.id)
+        };
+
         // 2. 校验扩展名（从 DB 或 TOML 配置获取白名单）
         let allowed = self.get_allowed_extensions(config_id).await;
         if !allowed.is_empty() {
@@ -180,14 +188,14 @@ impl FileAppService {
             .await
             .unwrap_or_else(|_| storage_path.clone());
 
-        // 9. 持久化元数据到 DB
+        // 9. 持久化元数据到 DB（config_id 始终为实际使用的配置 ID，不会为 NULL）
         let cmd = FileUploadCommand {
             name: filename,
             path: storage_path,
             url,
             file_type: Some(mime),
             size: actual_size,
-            config_id,
+            config_id: resolved_config_id,
         };
         let file = self.file_service.upload_file(cmd, creator).await?;
         Ok(file_to_response(file))
@@ -254,6 +262,7 @@ impl FileAppService {
         let storage = self.get_storage(file.config_id).await?;
 
         // 获取存储配置以判断类型
+        // config_id 为空时回退到主配置，而非硬编码本地
         let storage_type = if let Some(cid) = file.config_id {
             self.file_config_repo
                 .find_by_id(cid)
@@ -261,7 +270,11 @@ impl FileAppService {
                 .map(|c| c.storage)
                 .unwrap_or(0)
         } else {
-            0 // 默认本地
+            self.file_config_repo
+                .find_master()
+                .await?
+                .map(|c| c.storage)
+                .unwrap_or(0)
         };
 
         match storage_type {
