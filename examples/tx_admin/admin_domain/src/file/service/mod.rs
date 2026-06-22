@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::file::model::aggregate::File;
+use crate::file::model::aggregate::{File, FileConfig};
 use crate::file::model::value_object::{FileDownloadInfo, FileQuery, FileUploadCommand};
 use crate::file::repository::{FileConfigRepository, FileRepository};
 use crate::shared::repository::RepositoryError;
@@ -190,6 +190,140 @@ impl FileService {
             content_type: content_type.to_string(),
             storage_path: file.path,
         })
+    }
+
+    // ========================================================================
+    // 配置 ID 解析 & 校验
+    // ========================================================================
+
+    /// 解析配置 ID：显式指定则直接使用，否则回退到主配置。
+    ///
+    /// 业务规则："未指定存储配置时默认使用主配置"。
+    pub async fn resolve_config_id(&self, config_id: Option<i32>) -> AppResult<Option<i32>> {
+        match config_id {
+            Some(id) => Ok(Some(id)),
+            None => Ok(self.file_config_repo.find_master().await?.map(|c| c.id)),
+        }
+    }
+
+    /// 从 DB 文件配置中读取允许的文件扩展名列表（不含插件 TOML 回退）。
+    ///
+    /// 业务规则由 app 层组合：DB 白名单 + 插件默认白名单 → 合并校验。
+    pub async fn get_allowed_extensions(&self, config_id: Option<i32>) -> AppResult<Vec<String>> {
+        let db_config = if let Some(cid) = config_id {
+            self.file_config_repo.find_by_id(cid).await?
+        } else {
+            self.file_config_repo.find_master().await?
+        };
+
+        Ok(db_config
+            .and_then(|cfg| {
+                serde_json::from_str::<serde_json::Value>(&cfg.config)
+                    .ok()
+                    .and_then(|json| {
+                        json.get("allowed_extensions")
+                            .and_then(|v| v.as_array())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|s| s.as_str().map(String::from))
+                                    .collect()
+                            })
+                    })
+            })
+            .unwrap_or_default())
+    }
+
+    // ========================================================================
+    // 文件配置 CRUD
+    // ========================================================================
+
+    /// 获取全部配置列表
+    pub async fn get_config_all(&self) -> AppResult<Vec<FileConfig>> {
+        self.file_config_repo.find_all().await
+    }
+
+    /// 按 ID 获取配置
+    pub async fn get_config(&self, id: i32) -> AppResult<FileConfig> {
+        Ok(self
+            .file_config_repo
+            .find_by_id(id)
+            .await?
+            .ok_or_else(|| RepositoryError::NotFoundFile)?)
+    }
+
+    /// 创建配置
+    pub async fn create_config(
+        &self,
+        name: String,
+        storage: i32,
+        remark: Option<String>,
+        config: String,
+        creator: Option<String>,
+    ) -> AppResult<FileConfig> {
+        let id = (jiff::Timestamp::now().as_millisecond() % i32::MAX as i64) as i32;
+        let agg = FileConfig::create(id, name, storage, remark, config, creator);
+        self.file_config_repo.insert(&agg).await?;
+        Ok(agg)
+    }
+
+    /// 更新配置
+    pub async fn update_config(
+        &self,
+        id: i32,
+        name: String,
+        storage: i32,
+        remark: Option<String>,
+        config: String,
+        updater: Option<String>,
+    ) -> AppResult<FileConfig> {
+        let mut agg = self
+            .file_config_repo
+            .find_by_id(id)
+            .await?
+            .ok_or_else(|| RepositoryError::NotFoundFile)?;
+        agg.update_info(name, storage, remark, config, updater);
+        self.file_config_repo.update(&agg).await?;
+        Ok(agg)
+    }
+
+    /// 软删除配置
+    pub async fn delete_config(&self, id: i32, updater: Option<String>) -> AppResult<()> {
+        let mut agg = self
+            .file_config_repo
+            .find_by_id(id)
+            .await?
+            .ok_or_else(|| RepositoryError::NotFoundFile)?;
+        agg.soft_delete(updater);
+        self.file_config_repo.update(&agg).await?;
+        Ok(())
+    }
+
+    /// 设为主配置（保证唯一主配置不变式）
+    ///
+    /// 业务规则：同一时刻最多存在一个主配置。切换时先取消当前主配置，
+    /// 再设置新主配置。
+    pub async fn set_master_config(
+        &self,
+        id: i32,
+        updater: Option<String>,
+    ) -> AppResult<FileConfig> {
+        // 1. 取消当前主配置
+        if let Some(mut current_master) = self.file_config_repo.find_master().await? {
+            if current_master.id != id {
+                current_master.unset_master(updater.clone());
+                self.file_config_repo.update(&current_master).await?;
+            }
+        }
+
+        // 2. 设置新主配置
+        let mut agg = self
+            .file_config_repo
+            .find_by_id(id)
+            .await?
+            .ok_or_else(|| RepositoryError::NotFoundFile)?;
+        agg.set_master(updater);
+        self.file_config_repo.update(&agg).await?;
+        Ok(agg)
     }
 }
 

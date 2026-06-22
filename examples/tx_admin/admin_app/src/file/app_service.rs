@@ -65,13 +65,12 @@ impl FileAppService {
 
     /// 获取存储后端 —— 优先 DB 配置，回退到插件默认配置
     ///
-    /// - `config_id` 为 Some 时查找指定配置
-    /// - 为 None 时查找主配置（master=1）
+    /// - `config_id` 为 Some 时查找指定配置；找不到则回退主配置
+    /// - 为 None 时查找主配置
     /// - DB 无配置时回退到 FilePlugin 的 TOML 配置
     async fn get_storage(&self, config_id: Option<i32>) -> AppResult<Arc<dyn FileStorage>> {
-        // 尝试从 DB 获取配置
+        // 尝试从 DB 获取配置：指定 ID → 回退主配置（兼容已删除配置的旧文件）
         let db_config = if let Some(cid) = config_id {
-            // 先按指定 ID 查找；找不到则回退主配置（兼容旧数据 config_id=0/无效值）
             match self.file_config_repo.find_by_id(cid).await? {
                 Some(cfg) => Some(cfg),
                 None => self.file_config_repo.find_master().await?,
@@ -82,7 +81,6 @@ impl FileAppService {
 
         if let Some(cfg) = db_config {
             if cfg.storage == 2 {
-                // Database 后端 — 由调用方处理，这里返回错误
                 return Err(AppError::with_context(
                     FileStorageErr::NotFound,
                     "数据库存储后端不适用此操作",
@@ -97,19 +95,7 @@ impl FileAppService {
         Ok(self.file_plugin.storage())
     }
 
-    /// 获取文件配置（带校验）
-    async fn get_config_or_err(&self, id: i32) -> AppResult<FileConfig> {
-        self.file_config_repo
-            .find_by_id(id)
-            .await?
-            .ok_or_else(|| AppError::with_context(FileStorageErr::NotFound, "文件配置不存在"))
-    }
-
     /// 获取本地文件服务的根目录
-    ///
-    /// - `config_id` 为 Some 时查找指定配置的 `base_path`
-    /// - 为 None 时查找主配置
-    /// - 回退到插件 TOML 配置的 `base_path`
     pub async fn serve_base_dir(&self, config_id: Option<i32>) -> Option<String> {
         let db_config = if let Some(cid) = config_id {
             self.file_config_repo.find_by_id(cid).await.ok().flatten()
@@ -142,15 +128,10 @@ impl FileAppService {
         // 1. 获取存储后端
         let storage = self.get_storage(config_id).await?;
 
-        // 1.1 解析实际使用的 config_id，保证落库不为 NULL
-        //     显式指定则直接使用，否则取当前主配置 ID
-        let resolved_config_id = if config_id.is_some() {
-            config_id
-        } else {
-            self.file_config_repo.find_master().await?.map(|c| c.id)
-        };
+        // 1.1 解析实际使用的 config_id（业务规则：未指定则用主配置）
+        let resolved_config_id = self.file_service.resolve_config_id(config_id).await?;
 
-        // 2. 校验扩展名（从 DB 或 TOML 配置获取白名单）
+        // 2. 校验扩展名 —— 领域层 DB 白名单 + 插件 TOML 回退
         let allowed = self.get_allowed_extensions(config_id).await;
         if !allowed.is_empty() {
             let ext = extract_extension(&filename).unwrap_or_default();
@@ -210,28 +191,20 @@ impl FileAppService {
         Ok(file_to_response(file))
     }
 
-    /// 获取允许的文件扩展名列表
+    /// 获取允许的文件扩展名列表（领域 DB 白名单 + 插件 TOML 回退）
     async fn get_allowed_extensions(&self, config_id: Option<i32>) -> Vec<String> {
-        let db_config = if let Some(cid) = config_id {
-            self.file_config_repo.find_by_id(cid).await.ok().flatten()
-        } else {
-            self.file_config_repo.find_master().await.ok().flatten()
-        };
+        // 先从领域层读取 DB 配置中的白名单
+        let mut allowed = self
+            .file_service
+            .get_allowed_extensions(config_id)
+            .await
+            .unwrap_or_default();
 
-        if let Some(cfg) = db_config {
-            // 从 JSON config 中解析 allowed_extensions
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&cfg.config) {
-                if let Some(arr) = json.get("allowed_extensions").and_then(|v| v.as_array()) {
-                    return arr
-                        .iter()
-                        .filter_map(|s| s.as_str().map(String::from))
-                        .collect();
-                }
-            }
+        // DB 无配置时回退到插件 TOML 默认值
+        if allowed.is_empty() {
+            allowed = self.file_plugin.config.allowed_extensions.clone();
         }
-
-        // 回退到插件配置
-        self.file_plugin.config.allowed_extensions.clone()
+        allowed
     }
 
     // ========================================================================
@@ -368,17 +341,17 @@ impl FileAppService {
     }
 
     // ========================================================================
-    // 文件配置 CRUD
+    // 文件配置 CRUD（委托领域服务）
     // ========================================================================
 
     /// 获取配置列表
     pub async fn get_config_all(&self) -> AppResult<Vec<FileConfig>> {
-        self.file_config_repo.find_all().await
+        self.file_service.get_config_all().await
     }
 
     /// 根据 ID 获取配置
     pub async fn get_config(&self, id: i32) -> AppResult<FileConfig> {
-        self.get_config_or_err(id).await
+        self.file_service.get_config(id).await
     }
 
     /// 创建配置
@@ -390,10 +363,9 @@ impl FileAppService {
         config: String,
         creator: Option<String>,
     ) -> AppResult<FileConfig> {
-        let id = (jiff::Timestamp::now().as_millisecond() % i32::MAX as i64) as i32;
-        let agg = FileConfig::create(id, name, storage, remark, config, creator);
-        self.file_config_repo.insert(&agg).await?;
-        Ok(agg)
+        self.file_service
+            .create_config(name, storage, remark, config, creator)
+            .await
     }
 
     /// 更新配置
@@ -406,34 +378,18 @@ impl FileAppService {
         config: String,
         updater: Option<String>,
     ) -> AppResult<FileConfig> {
-        let mut agg = self.get_config_or_err(id).await?;
-        agg.update_info(name, storage, remark, config, updater);
-        self.file_config_repo.update(&agg).await?;
-        Ok(agg)
+        self.file_service
+            .update_config(id, name, storage, remark, config, updater)
+            .await
     }
 
     /// 删除配置
     pub async fn delete_config(&self, id: i32, updater: Option<String>) -> AppResult<()> {
-        let mut agg = self.get_config_or_err(id).await?;
-        agg.soft_delete(updater);
-        self.file_config_repo.update(&agg).await?;
-        Ok(())
+        self.file_service.delete_config(id, updater).await
     }
 
-    /// 设为主配置（先取消当前主配置，再设置新主配置）
+    /// 设为主配置（业务不变式由领域服务保证）
     pub async fn set_master_config(&self, id: i32, updater: Option<String>) -> AppResult<FileConfig> {
-        // 取消当前主配置
-        if let Some(mut current_master) = self.file_config_repo.find_master().await? {
-            if current_master.id != id {
-                current_master.unset_master(updater.clone());
-                self.file_config_repo.update(&current_master).await?;
-            }
-        }
-
-        // 设置新主配置
-        let mut agg = self.get_config_or_err(id).await?;
-        agg.set_master(updater);
-        self.file_config_repo.update(&agg).await?;
-        Ok(agg)
+        self.file_service.set_master_config(id, updater).await
     }
 }
