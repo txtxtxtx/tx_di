@@ -90,6 +90,8 @@ pub struct SessionEctData {
     pub role_ids: Vec<u64>,
     /// 登录IP
     pub login_ip: String,
+    /// 用户名（供操作日志中间件提取）
+    pub username: String,
 }
 
 #[cfg(test)]
@@ -217,11 +219,13 @@ mod tests {
             dept_ids: vec![10, 20],
             role_ids: vec![1, 2, 3],
             login_ip: "192.168.1.1".into(),
+            username: "admin".into(),
         };
         assert_eq!(data.tenant_id, TenantId::new(1));
         assert_eq!(data.dept_ids, vec![10, 20]);
         assert_eq!(data.role_ids, vec![1, 2, 3]);
         assert_eq!(data.login_ip, "192.168.1.1");
+        assert_eq!(data.username, "admin");
     }
 
     #[test]
@@ -231,6 +235,7 @@ mod tests {
             dept_ids: vec![],
             role_ids: vec![],
             login_ip: "127.0.0.1".into(),
+            username: "test".into(),
         };
         assert!(data.dept_ids.is_empty());
         assert!(data.role_ids.is_empty());
@@ -243,6 +248,7 @@ mod tests {
             dept_ids: vec![1],
             role_ids: vec![2, 3],
             login_ip: "10.0.0.1".into(),
+            username: "alice".into(),
         };
         let json = serde_json::to_string(&data).unwrap();
         let back: SessionEctData = serde_json::from_str(&json).unwrap();

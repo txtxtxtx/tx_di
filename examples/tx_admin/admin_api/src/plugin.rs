@@ -33,19 +33,23 @@ impl CompInit for AdminPlugin {
             let op_log_svc_clone = op_log_svc.clone();
             tokio::spawn(async move {
                 while let Some(entry) = op_log_rx.recv().await {
+                    let user_id = entry.user_id.unwrap_or(0);
+                    let user_name = entry.user_name.unwrap_or_default();
+                    let tenant_id = entry.tenant_id.unwrap_or(0);
                     let req = CreateOperateLogRequest {
                         trace_id: String::new(),
-                        user_id: 0,
-                        user_type: 0,
+                        user_id,
+                        user_type: if user_id > 0 { 1 } else { 0 },
                         log_type: "http".to_string(),
                         sub_type: entry.method,
-                        biz_id: 0,
+                        biz_id: tenant_id,
                         action: entry.uri,
                         success: if entry.status < 400 { 1 } else { 0 },
                         extra: serde_json::json!({
                             "status": entry.status,
                             "latency_ms": format!("{:.2}", entry.latency_ms),
                             "user_ip": entry.user_ip,
+                            "user_name": user_name,
                             "user_agent": entry.user_agent,
                         }).to_string(),
                     };

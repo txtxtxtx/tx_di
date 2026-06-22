@@ -41,7 +41,8 @@ async fn login(
         login_ip,
         tenant_id: r.tenant_id.into(),
         role_ids: r.role_ids.clone(),
-        dept_ids: r.dept_ids.clone()
+        dept_ids: r.dept_ids.clone(),
+        username: r.username.clone(),
     });
     let _ = StpUtil::set_extra_data(&token, extra).await;
 

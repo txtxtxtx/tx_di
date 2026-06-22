@@ -54,6 +54,7 @@
 /// # Errors
 ///
 /// 本服务永远不会返回错误（`type Error = Infallible`）。
+use admin_domain::shared::model::value_object::SessionEctData;
 use axum::{
     body::Body,
     http::{Request, Response, header},
@@ -67,7 +68,8 @@ use std::{
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 use tower::{Layer, Service};
-use tracing::warn;
+use tracing::{debug, warn};
+use tx_di_sa_token::StpUtil;
 
 /// 有界 channel 容量：缓冲 4096 条日志，超出则丢弃（避免阻塞 HTTP 响应）
 pub const OPERATE_LOG_CHANNEL_CAP: usize = 4096;
@@ -81,6 +83,12 @@ pub struct OperateLogEntry {
     pub latency_ms: f64,
     pub user_ip: String,
     pub user_agent: String,
+    /// 登录用户 ID（从 SaToken 会话提取，未登录则为 None）
+    pub user_id: Option<u64>,
+    /// 登录用户名（从 SaToken extra_data 提取）
+    pub user_name: Option<String>,
+    /// 租户 ID（从 SaToken extra_data 提取）
+    pub tenant_id: Option<u64>,
 }
 
 /// 操作日志 Layer
@@ -159,6 +167,10 @@ impl Service<Request<Body>> for OperateLogMiddleware {
             let status = response.status().as_u16();
             let latency_ms = start.elapsed().as_secs_f64() * 1000.0;
 
+            // 提取当前登录用户信息（仅已认证路由有效）
+            let (user_id, user_name, tenant_id) =
+                extract_user_info().await;
+
             match tx.try_send(OperateLogEntry {
                 method,
                 uri,
@@ -166,6 +178,9 @@ impl Service<Request<Body>> for OperateLogMiddleware {
                 latency_ms,
                 user_ip,
                 user_agent,
+                user_id,
+                user_name,
+                tenant_id,
             }) {
                 Ok(()) => {}
                 Err(mpsc::error::TrySendError::Full(_)) => {
@@ -179,4 +194,57 @@ impl Service<Request<Body>> for OperateLogMiddleware {
             Ok(response)
         })
     }
+}
+
+/// 从 SaToken 会话中提取当前登录用户信息。
+///
+/// 仅在已通过 SaTokenLayer 认证的路由上有效；公开路由（如 /api/auth/login）
+/// 未通过认证层，`get_login_id_as_string()` 会返回错误，此时返回全 `None`。
+async fn extract_user_info() -> (Option<u64>, Option<String>, Option<u64>) {
+    // 1. 获取当前 login_id
+    let login_id = match StpUtil::get_login_id_as_string().await {
+        Ok(id) => id,
+        Err(_) => {
+            debug!("未登录请求，跳过用户信息提取");
+            return (None, None, None);
+        }
+    };
+
+    // 2. 解析 user_id
+    let user_id: Option<u64> = login_id.parse().ok();
+
+    // 3. 通过 login_id 获取 token 值
+    let token = match StpUtil::get_token_by_login_id(&login_id).await {
+        Ok(t) => t,
+        Err(_) => {
+            debug!("无法获取 token (login_id={})", login_id);
+            return (user_id, None, None);
+        }
+    };
+
+    // 4. 获取 token 信息，读取 extra_data
+    let token_info = match StpUtil::get_token_info(&token).await {
+        Ok(info) => info,
+        Err(e) => {
+            debug!("无法获取 token_info: {:?}", e);
+            return (user_id, None, None);
+        }
+    };
+
+    // 5. 反序列化 extra_data → SessionEctData
+    let extra = match token_info.extra_data {
+        Some(ref data) => match serde_json::from_value::<SessionEctData>(data.clone()) {
+            Ok(d) => Some(d),
+            Err(e) => {
+                debug!("extra_data 反序列化失败: {:?}", e);
+                None
+            }
+        },
+        None => None,
+    };
+
+    let user_name = extra.as_ref().map(|e| e.username.clone());
+    let tenant_id = extra.map(|e| e.tenant_id.into_inner());
+
+    (user_id, user_name, tenant_id)
 }
