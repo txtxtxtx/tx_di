@@ -47,7 +47,9 @@
         <el-table-column prop="requestMethod" label="请求方法" width="80" />
         <el-table-column prop="requestUrl" label="请求URL" width="200" show-overflow-tooltip />
         <el-table-column prop="userIp" label="IP" width="130" />
-        <el-table-column prop="createdAt" label="操作时间" width="180" />
+        <el-table-column prop="createdAt" label="操作时间" width="130">
+          <template #default="{ row }">{{ formatTimestamp(row.createdAt) }}</template>
+        </el-table-column>
       </el-table>
 
       <div class="pagination-wrap">
@@ -61,7 +63,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listOperateLogs, deleteOperateLogs, cleanOperateLogs } from '@/api/log'
-import { toPageData, dictLabel, dictColorType, dictToOptions } from '@/utils'
+import { toPageData, dictLabel, dictColorType, dictToOptions, formatTimestamp } from '@/utils'
 import { useDictStore } from '@/stores/dict'
 import type { OperateLogResponse } from '@/types'
 

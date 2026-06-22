@@ -424,6 +424,7 @@ export interface LoginLogResponse {
   loginType: string
   result: number
   msg: string | null
+  loginTime: string | null
 }
 
 // u64 fields as string

@@ -44,6 +44,9 @@
           </template>
         </el-table-column>
         <el-table-column prop="msg" label="消息" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="loginTime" label="登录时间" width="130">
+          <template #default="{ row }">{{ formatTimestamp(row.loginTime) }}</template>
+        </el-table-column>
       </el-table>
 
       <div class="pagination-wrap">
@@ -57,7 +60,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listLoginLogs, deleteLoginLogs, cleanLoginLogs } from '@/api/log'
-import { toPageData, dictLabel, dictColorType, dictToOptions } from '@/utils'
+import { toPageData, dictLabel, dictColorType, dictToOptions, formatTimestamp } from '@/utils'
 import { useDictStore } from '@/stores/dict'
 import type { LoginLogResponse } from '@/types'
 

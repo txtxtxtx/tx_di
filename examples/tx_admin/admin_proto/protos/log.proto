@@ -97,6 +97,7 @@ message LoginLogResponse {
   string login_type = 6;
   int32 result = 7;
   optional string msg = 8;
+  optional string login_time = 9;
 }
 
 message ListLoginLogsResponse {

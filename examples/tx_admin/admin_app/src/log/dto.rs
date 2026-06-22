@@ -16,7 +16,7 @@ pub fn operate_log_to_response(log: admin_domain::log::model::aggregate::Operate
         request_method: log.request_method,
         request_url: log.request_url,
         user_ip: log.user_ip,
-        created_at: Some(log.audit.create_time.to_string()),
+        created_at: Some(log.audit.create_time.as_millisecond().to_string()),
     }
 }
 
@@ -31,5 +31,6 @@ pub fn login_log_to_response(log: admin_domain::log::model::aggregate::LoginLog)
         login_type: log.login_type,
         result: log.result,
         msg: log.msg,
+        login_time: Some(log.login_time.as_millisecond().to_string()),
     }
 }
