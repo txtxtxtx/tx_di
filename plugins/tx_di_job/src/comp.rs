@@ -4,7 +4,7 @@ use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
-use tx_di_core::{App, CompInit, InnerContext, RIE, async_method, tx_comp};
+use tx_di_core::{App, CompInit, RIE, async_method, tx_comp};
 
 use crate::config::JobConfig;
 use crate::err::{JobErr, JobResult};

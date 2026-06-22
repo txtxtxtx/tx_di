@@ -5,7 +5,7 @@
 
 use crate::common::{Sex, Status, Deleted, StorageType};
 use crate::user::model::SysUser;
-use crate::role::model::{SysRole, SysRoleMenu};
+use crate::role::model::{SysRole};
 use crate::user::model::SysUserRole;
 use crate::department::model::SysDepartment;
 use crate::dictionary::model::{SysDictType, SysDictData};

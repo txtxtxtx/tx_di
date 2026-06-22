@@ -1,6 +1,6 @@
 //! 认证 HTTP API
 
-use crate::auth::{ADMIN_ROLE, ensure_permission};
+use crate::auth::{ADMIN_ROLE};
 use crate::error::ApiErr;
 use admin_app::auth::app_service::AuthAppService;
 use admin_domain::shared::model::value_object::SessionEctData;
