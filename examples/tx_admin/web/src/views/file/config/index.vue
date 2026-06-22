@@ -49,6 +49,9 @@
         <el-form-item label="备注">
           <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="备注信息（选填）" />
         </el-form-item>
+        <el-form-item label="主配置">
+          <el-switch v-model="form.master" active-text="是" inactive-text="否" />
+        </el-form-item>
         <el-form-item label="配置" prop="config">
           <el-input v-model="form.config" type="textarea" :rows="10" :placeholder="configPlaceholder" />
         </el-form-item>
@@ -85,6 +88,7 @@ const form = reactive({
   storage: 0,
   remark: '',
   config: '',
+  master: false,
 })
 
 const configExamples: Record<number, string> = {
@@ -125,12 +129,14 @@ function openDialog(row?: FileConfigResponse) {
     form.storage = row.storage
     form.remark = row.remark || ''
     form.config = row.config
+    form.master = row.master === 1
   } else {
     editingId.value = 0
     form.name = ''
     form.storage = 0
     form.remark = ''
     form.config = ''
+    form.master = false
   }
   dialogVisible.value = true
 }
@@ -140,22 +146,30 @@ async function handleSubmit() {
   if (!valid) return
   submitLoading.value = true
   try {
+    let configId: number
     if (isEdit.value) {
-      await updateFileConfig(editingId.value, {
+      const res = await updateFileConfig(editingId.value, {
+        id: editingId.value,
         name: form.name,
         storage: form.storage,
         remark: form.remark || undefined,
         config: form.config,
       })
+      configId = res.data.id
       ElMessage.success('更新成功')
     } else {
-      await createFileConfig({
+      const res = await createFileConfig({
         name: form.name,
         storage: form.storage,
         remark: form.remark || undefined,
         config: form.config,
       })
+      configId = res.data.id
       ElMessage.success('创建成功')
+    }
+    if (form.master) {
+      await setMasterFileConfig(configId)
+      ElMessage.success('已设为主配置')
     }
     dialogVisible.value = false
     loadData()

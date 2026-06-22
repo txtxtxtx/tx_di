@@ -481,6 +481,7 @@ export interface CreateFileConfigRequest {
 }
 
 export interface UpdateFileConfigRequest {
+  id: number
   name: string
   storage: number
   remark?: string
