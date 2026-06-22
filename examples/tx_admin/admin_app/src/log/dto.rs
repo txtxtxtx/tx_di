@@ -16,6 +16,7 @@ pub fn operate_log_to_response(log: admin_domain::log::model::aggregate::Operate
         request_method: log.request_method,
         request_url: log.request_url,
         user_ip: log.user_ip,
+        created_at: Some(log.audit.create_time.to_string()),
     }
 }
 

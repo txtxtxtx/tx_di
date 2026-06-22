@@ -47,6 +47,7 @@
         <el-table-column prop="requestMethod" label="请求方法" width="80" />
         <el-table-column prop="requestUrl" label="请求URL" width="200" show-overflow-tooltip />
         <el-table-column prop="userIp" label="IP" width="130" />
+        <el-table-column prop="createdAt" label="操作时间" width="180" />
       </el-table>
 
       <div class="pagination-wrap">

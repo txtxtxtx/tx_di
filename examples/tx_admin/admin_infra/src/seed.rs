@@ -55,8 +55,8 @@ const DICT_SEEDS: &[(&str, &str, &[(i32, &str, &str, &str)])] = &[
         (5, "仅本人数据", "5", ""),
     ]),
     ("sys_operate_result", "操作结果", &[
-        (1, "成功", "0", "success"),
-        (2, "失败", "1", "danger"),
+        (1, "成功", "1", "success"),
+        (2, "失败", "0", "danger"),
     ]),
     ("sys_keep_alive", "缓存策略", &[
         (1, "不缓存", "0", ""),

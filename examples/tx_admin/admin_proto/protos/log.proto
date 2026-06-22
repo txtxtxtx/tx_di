@@ -57,6 +57,7 @@ message OperateLogResponse {
   optional string request_method = 11;
   optional string request_url = 12;
   optional string user_ip = 13;
+  optional string created_at = 14;
 }
 
 message ListOperateLogsResponse {

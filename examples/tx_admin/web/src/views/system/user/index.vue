@@ -47,10 +47,10 @@
             <el-tag :type="dictColorType(dictStore.dictMap['sys_user_status'] || [], row.status) as any">{{ dictLabel(dictStore.dictMap['sys_user_status'] || [], row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" width="170">
+        <el-table-column prop="createTime" label="创建时间" width="130">
           <template #default="{ row }">{{ formatTimestamp(row.createTime) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="360" fixed="right">
+        <el-table-column label="操作" width="290" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openDialog(row)">编辑</el-button>
             <el-button link type="warning" size="small" @click="openResetPwd(row)">重置密码</el-button>

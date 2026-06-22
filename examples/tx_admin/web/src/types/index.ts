@@ -399,6 +399,7 @@ export interface OperateLogResponse {
   requestMethod: string | null
   requestUrl: string | null
   userIp: string | null
+  createdAt: string | null
 }
 
 // u64 fields as string

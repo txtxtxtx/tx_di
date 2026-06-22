@@ -71,7 +71,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
             .await
             .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
 
-        let filtered: Vec<&SysOperateLog> = all
+        let mut filtered: Vec<&SysOperateLog> = all
             .iter()
             .filter(|l| l.deleted == Deleted::No)
             .filter(|l| {
@@ -90,6 +90,9 @@ impl OperateLogRepository for ToastyOperateLogRepository {
                 true
             })
             .collect();
+
+        // 按 ID 倒序
+        filtered.sort_by(|a, b| b.id.cmp(&a.id));
 
         let total = filtered.len() as i64;
         let offset = page.offset() as usize;
@@ -214,7 +217,7 @@ impl LoginLogRepository for ToastyLoginLogRepository {
             .await
             .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
 
-        let filtered: Vec<&SysLoginLog> = all
+        let mut filtered: Vec<&SysLoginLog> = all
             .iter()
             .filter(|l| l.deleted == Deleted::No)
             .filter(|l| {
@@ -236,6 +239,9 @@ impl LoginLogRepository for ToastyLoginLogRepository {
                 true
             })
             .collect();
+
+        // 按 ID 倒序
+        filtered.sort_by(|a, b| b.id.cmp(&a.id));
 
         let total = filtered.len() as i64;
         let offset = page.offset() as usize;
