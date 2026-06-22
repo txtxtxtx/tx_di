@@ -87,7 +87,19 @@ impl AuthAppService {
         let login_user = self.user_service.build_login_user(&user).await?;
 
         // Record login
+        let login_ip = req.login_ip.clone();
         self.user_service.record_login(user.id, req.login_ip).await?;
+
+        // 记录登录日志
+        let log_cmd = CreateLoginLogRequest {
+            user_id: user.id,
+            user_type: 0,
+            username: user.username.clone(),
+            login_ip,
+            login_type: "login".to_string(),
+            result: 0,
+        };
+        let _ = self.login_log_service.create_log(log_cmd).await;
 
         // 查询角色编码列表
         let roles = self.role_service.get_roles_by_ids(&login_user.role_ids).await?;
