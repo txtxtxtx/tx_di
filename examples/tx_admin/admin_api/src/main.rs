@@ -1,4 +1,5 @@
 mod plugin;
+mod operate_log;
 mod interfaces;
 pub mod error;
 pub mod auth;
