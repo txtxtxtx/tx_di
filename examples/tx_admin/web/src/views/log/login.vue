@@ -33,8 +33,8 @@
 
       <el-table :data="tableData" v-loading="loading" border stripe @selection-change="onSelectionChange">
         <el-table-column type="selection" width="50" />
-        <el-table-column prop="id" label="ID" width="60" />
-        <el-table-column prop="userId" label="用户ID" width="80" />
+        <el-table-column prop="id" label="ID" width="60" show-overflow-tooltip />
+        <el-table-column prop="userId" label="用户ID" width="80" show-overflow-tooltip />
         <el-table-column prop="username" label="用户名" width="120" />
         <el-table-column prop="loginIp" label="登录IP" width="140" />
         <el-table-column prop="loginType" label="登录方式" width="100" />

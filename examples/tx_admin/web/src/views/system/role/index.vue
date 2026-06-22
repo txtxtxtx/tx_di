@@ -29,7 +29,7 @@
       </template>
 
       <el-table :data="tableData" v-loading="loading" border stripe>
-        <el-table-column prop="id" label="ID" width="60" />
+        <el-table-column prop="id" label="ID" width="60" show-overflow-tooltip />
         <el-table-column prop="name" label="角色名" width="150" />
         <el-table-column prop="code" label="角色编码" width="150" />
         <el-table-column prop="sort" label="排序" width="80" />
@@ -108,7 +108,7 @@
     <!-- 角色用户列表 -->
     <el-dialog v-model="roleUsersVisible" title="角色用户" width="600px" destroy-on-close>
       <el-table :data="roleUsers" border>
-        <el-table-column prop="id" label="ID" width="60" />
+        <el-table-column prop="id" label="ID" width="60" show-overflow-tooltip />
         <el-table-column prop="username" label="用户名" />
         <el-table-column prop="nickname" label="昵称" />
       </el-table>

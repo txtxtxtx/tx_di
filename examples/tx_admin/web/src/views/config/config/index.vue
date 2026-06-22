@@ -27,7 +27,7 @@
       </template>
 
       <el-table :data="tableData" v-loading="loading" border stripe>
-        <el-table-column prop="id" label="ID" width="60" />
+        <el-table-column prop="id" label="ID" width="60" show-overflow-tooltip />
         <el-table-column prop="name" label="名称" width="150" />
         <el-table-column prop="configKey" label="键名" width="200" show-overflow-tooltip />
         <el-table-column prop="value" label="值" min-width="200" show-overflow-tooltip />

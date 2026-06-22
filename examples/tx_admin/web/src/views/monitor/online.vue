@@ -9,7 +9,7 @@
       </template>
 
       <el-table :data="users" v-loading="loading" border stripe>
-        <el-table-column prop="userId" label="用户ID" width="100" />
+        <el-table-column prop="userId" label="用户ID" width="100" show-overflow-tooltip />
         <el-table-column prop="username" label="用户名" width="150" />
         <el-table-column prop="loginIp" label="登录IP" width="150" />
         <el-table-column prop="loginTime" label="登录时间" min-width="200" />

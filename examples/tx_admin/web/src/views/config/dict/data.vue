@@ -29,7 +29,7 @@
       </template>
 
       <el-table :data="tableData" v-loading="loading" border stripe>
-        <el-table-column prop="id" label="ID" width="60" />
+        <el-table-column prop="id" label="ID" width="60" show-overflow-tooltip />
         <el-table-column prop="label" label="标签" width="150" />
         <el-table-column prop="value" label="值" width="120" />
         <el-table-column prop="dictType" label="字典类型" width="180" />

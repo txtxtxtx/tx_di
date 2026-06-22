@@ -22,7 +22,7 @@
       <el-table :data="treeData" v-loading="loading" row-key="id" border default-expand-all :tree-props="{ children: 'children' }">
         <el-table-column prop="name" label="部门名称" min-width="200" />
         <el-table-column prop="sort" label="排序" width="80" />
-        <el-table-column prop="leaderUserId" label="负责人ID" width="100" />
+        <el-table-column prop="leaderUserId" label="负责人ID" width="100" show-overflow-tooltip />
         <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
             <el-tag :type="dictColorType(dictStore.dictMap['sys_status'] || [], row.status) as any">{{ dictLabel(dictStore.dictMap['sys_status'] || [], row.status) }}</el-tag>

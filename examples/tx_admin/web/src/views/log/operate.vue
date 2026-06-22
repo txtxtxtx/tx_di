@@ -33,9 +33,9 @@
 
       <el-table :data="tableData" v-loading="loading" border stripe @selection-change="onSelectionChange">
         <el-table-column type="selection" width="50" />
-        <el-table-column prop="id" label="ID" width="60" />
+        <el-table-column prop="id" label="ID" width="60" show-overflow-tooltip />
         <el-table-column prop="traceId" label="追踪ID" width="180" show-overflow-tooltip />
-        <el-table-column prop="userId" label="用户ID" width="80" />
+        <el-table-column prop="userId" label="用户ID" width="80" show-overflow-tooltip />
         <el-table-column prop="logType" label="日志类型" width="100" />
         <el-table-column prop="subType" label="子类型" width="100" />
         <el-table-column prop="action" label="操作" min-width="150" show-overflow-tooltip />
