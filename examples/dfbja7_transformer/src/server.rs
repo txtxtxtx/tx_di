@@ -111,6 +111,8 @@ impl TcpServer {
     }
 
     /// 计算帧长度
+    ///
+    /// length_zip 表示整个帧的字节数（包括开始标志、长度字节、数据、RSSI、CRC）
     fn calculate_frame_length(length_byte: u8) -> RIE<usize> {
         let actual_length = if length_byte > 128 {
             ((length_byte - 128) as usize) / 2 + 128
@@ -118,8 +120,8 @@ impl TcpServer {
             length_byte as usize
         };
 
-        // 加上开始标志(1字节)、长度字节(1字节)、RSSI(1字节)、CRC(2字节)
-        Ok(actual_length + 5)
+        // length_zip 就是整个帧的长度，不需要再加额外字节
+        Ok(actual_length)
     }
 
     /// 处理单个帧
