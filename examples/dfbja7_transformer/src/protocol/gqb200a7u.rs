@@ -1,4 +1,3 @@
-use crate::error::{AppError, AppResult};
 use crate::model::gqb200a7u::GQB200A7UModel;
 use crate::protocol::base::BaseMessage;
 use crate::util::{convert, ieee754};
@@ -8,14 +7,14 @@ pub struct GQB200A7UParser;
 
 impl GQB200A7UParser {
     /// 解析GQB200A7U消息
-    pub fn parse(message: &str) -> AppResult<GQB200A7UModel> {
+    pub fn parse(message: &str) -> anyhow::Result<GQB200A7UModel> {
         // 解析基础消息
         let base = BaseMessage::from_hex(message)?;
 
         // 解析数据部分
         let data = &base.data;
         if data.len() < 52 {
-            return Err(AppError::Protocol("GQB200A7U数据长度不足".to_string()));
+            return Err(anyhow::anyhow!("GQB200A7U数据长度不足"));
         }
 
         // 解析传感器数据 (每路2字节，共8字节)
@@ -124,7 +123,7 @@ fn generate_alarm_sp_descriptions(alarm_sp: &[usize]) -> Vec<String> {
 }
 
 /// 解析GQB200A7U消息的便捷函数
-pub fn parse(message: &str) -> AppResult<GQB200A7UModel> {
+pub fn parse(message: &str) -> anyhow::Result<GQB200A7UModel> {
     GQB200A7UParser::parse(message)
 }
 

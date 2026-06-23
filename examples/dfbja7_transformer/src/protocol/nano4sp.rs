@@ -1,4 +1,3 @@
-use crate::error::{AppError, AppResult};
 use crate::model::nano4sp::Nano4SPModel;
 use crate::protocol::base::BaseMessage;
 use crate::util::{convert, ieee754};
@@ -8,14 +7,14 @@ pub struct Nano4SPParser;
 
 impl Nano4SPParser {
     /// 解析Nano4SP消息
-    pub fn parse(message: &str) -> AppResult<Nano4SPModel> {
+    pub fn parse(message: &str) -> anyhow::Result<Nano4SPModel> {
         // 解析基础消息
         let base = BaseMessage::from_hex(message)?;
 
         // 解析数据部分
         let data = &base.data;
         if data.len() < 64 {
-            return Err(AppError::Protocol("Nano4SP数据长度不足".to_string()));
+            return Err(anyhow::anyhow!("Nano4SP数据长度不足"));
         }
 
         // 解析传感器数据 (每路2字节，共8字节)
@@ -136,7 +135,7 @@ fn generate_alarm_sp_descriptions(alarm_sp: &[usize]) -> Vec<String> {
 }
 
 /// 解析Nano4SP消息的便捷函数
-pub fn parse(message: &str) -> AppResult<Nano4SPModel> {
+pub fn parse(message: &str) -> anyhow::Result<Nano4SPModel> {
     Nano4SPParser::parse(message)
 }
 

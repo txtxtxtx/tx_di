@@ -1,5 +1,4 @@
 /// 转换工具模块
-use crate::error::{AppError, AppResult};
 
 /// 十六进制字符串转字节数组
 pub fn hex_to_bytes(hex: &str) -> Vec<u8> {
@@ -139,9 +138,9 @@ pub fn get_rssi_value(rssi_hex: &str) -> String {
 }
 
 /// 获取模板ID（设备类型标识）
-pub fn get_template_id(message: &str) -> AppResult<String> {
+pub fn get_template_id(message: &str) -> anyhow::Result<String> {
     if message.len() < 20 {
-        return Err(AppError::Protocol("消息长度不足".to_string()));
+        return Err(anyhow::anyhow!("消息长度不足"));
     }
 
     let payload_id = &message[4..6];

@@ -1,5 +1,3 @@
-use crate::error::{AppError, AppResult};
-
 /// 基础协议结构
 ///
 /// 协议格式：
@@ -36,50 +34,50 @@ pub struct BaseMessage {
 
 impl BaseMessage {
     /// 从十六进制字符串解析基础消息
-    pub fn from_hex(hex: &str) -> AppResult<Self> {
+    pub fn from_hex(hex: &str) -> anyhow::Result<Self> {
         if hex.len() < 20 {
-            return Err(AppError::Protocol("消息长度不足".to_string()));
+            return Err(anyhow::anyhow!("消息长度不足"));
         }
 
         // 解析各个字段
         let feed = u8::from_str_radix(&hex[0..2], 16)
-            .map_err(|_| AppError::Protocol("解析feed失败".to_string()))?;
+            .map_err(|_| anyhow::anyhow!("解析feed失败"))?;
 
         let length_zip = u8::from_str_radix(&hex[2..4], 16)
-            .map_err(|_| AppError::Protocol("解析length_zip失败".to_string()))?;
+            .map_err(|_| anyhow::anyhow!("解析length_zip失败"))?;
 
         let payload_id = u8::from_str_radix(&hex[4..6], 16)
-            .map_err(|_| AppError::Protocol("解析payload_id失败".to_string()))?;
+            .map_err(|_| anyhow::anyhow!("解析payload_id失败"))?;
 
         let uuid = u32::from_str_radix(&hex[6..14], 16)
-            .map_err(|_| AppError::Protocol("解析uuid失败".to_string()))?;
+            .map_err(|_| anyhow::anyhow!("解析uuid失败"))?;
 
         let sub_length_zip = u8::from_str_radix(&hex[14..16], 16)
-            .map_err(|_| AppError::Protocol("解析sub_length_zip失败".to_string()))?;
+            .map_err(|_| anyhow::anyhow!("解析sub_length_zip失败"))?;
 
         let cmd = u8::from_str_radix(&hex[16..18], 16)
-            .map_err(|_| AppError::Protocol("解析cmd失败".to_string()))?;
+            .map_err(|_| anyhow::anyhow!("解析cmd失败"))?;
 
         let ver = u8::from_str_radix(&hex[18..20], 16)
-            .map_err(|_| AppError::Protocol("解析ver失败".to_string()))?;
+            .map_err(|_| anyhow::anyhow!("解析ver失败"))?;
 
         // 数据部分: 从第20个字符到倒数第8个字符
         let data_end = hex.len() - 8;
         if data_end < 20 {
-            return Err(AppError::Protocol("数据部分长度不足".to_string()));
+            return Err(anyhow::anyhow!("数据部分长度不足"));
         }
         let data = hex[20..data_end].to_string();
 
         // 解析尾部字段
         let tail_start = hex.len() - 8;
         let id = u8::from_str_radix(&hex[tail_start..tail_start + 2], 16)
-            .map_err(|_| AppError::Protocol("解析id失败".to_string()))?;
+            .map_err(|_| anyhow::anyhow!("解析id失败"))?;
 
         let rssi = u8::from_str_radix(&hex[tail_start + 2..tail_start + 4], 16)
-            .map_err(|_| AppError::Protocol("解析rssi失败".to_string()))?;
+            .map_err(|_| anyhow::anyhow!("解析rssi失败"))?;
 
         let crc = u16::from_str_radix(&hex[tail_start + 4..tail_start + 8], 16)
-            .map_err(|_| AppError::Protocol("解析crc失败".to_string()))?;
+            .map_err(|_| anyhow::anyhow!("解析crc失败"))?;
 
         Ok(BaseMessage {
             feed,

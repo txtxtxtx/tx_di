@@ -2,64 +2,121 @@
 
 NANO4S设备协议解析与MQTT转发服务
 
+基于 [tx-di-core](../../tx-di-core) 依赖注入框架构建。
+
 ## 功能特性
 
 - 解析NANO4S私有协议（支持Nano4SP和GQB200A7U设备）
 - 将解析后的数据转换为JSON格式
 - 通过MQTT协议转发到指定broker
-- 支持环境变量配置
-- 可扩展的设备类型支持
+- 使用 tx-di-core 框架实现依赖注入
+- 集成 tx_di_log 日志插件（tracing）
+- TOML 配置文件管理
 
 ## 项目结构
 
 ```
-src/
-├── main.rs                 # 程序入口
-├── config.rs               # 配置模块
-├── error.rs                # 错误定义
-├── protocol/               # 协议解析模块
-│   ├── mod.rs
-│   ├── decoder.rs          # 协议解码器
-│   ├── base.rs             # 基础协议结构
-│   ├── nano4sp.rs          # Nano4SP设备协议
-│   └── gqb200a7u.rs        # GQB200A7U设备协议
-├── model/                  # 数据模型模块
-│   ├── mod.rs
-│   ├── nano4sp.rs          # Nano4SP数据模型
-│   └── gqb200a7u.rs        # GQB200A7U数据模型
-├── util/                   # 工具模块
-│   ├── mod.rs
-│   ├── crc32.rs            # CRC32计算
-│   ├── ieee754.rs          # IEEE754浮点数转换
-│   └── convert.rs          # 转换工具
-├── server/                 # TCP服务器模块
-│   ├── mod.rs
-│   └── tcp.rs              # TCP服务器实现
-└── mqtt/                   # MQTT客户端模块
-    ├── mod.rs
-    └── client.rs           # MQTT客户端实现
+dfbja7_transformer/
+├── Cargo.toml
+├── config/
+│   └── config.toml           # TOML 配置文件
+└── src/
+    ├── main.rs               # 程序入口（极简）
+    ├── config.rs             # AppConfig 配置组件
+    ├── mqtt.rs               # MqttClient 组件
+    ├── server.rs             # TcpServer 组件
+    ├── protocol/             # 协议解析模块
+    │   ├── mod.rs
+    │   ├── base.rs
+    │   ├── nano4sp.rs
+    │   └── gqb200a7u.rs
+    ├── model/                # 数据模型模块
+    │   ├── mod.rs
+    │   ├── nano4sp.rs
+    │   └── gqb200a7u.rs
+    └── util/                 # 工具模块
+        ├── mod.rs
+        ├── crc32.rs
+        ├── ieee754.rs
+        └── convert.rs
 ```
+
+## 架构设计
+
+### 组件依赖关系
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         main.rs                                 │
+│                    BuildContext::new()                           │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     AppConfig (配置组件)                          │
+│                   #[tx_comp(conf, init)]                         │
+│                    init_sort: i32::MIN + 1                       │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   MqttClient (MQTT客户端)                        │
+│                      #[tx_comp(init)]                            │
+│                    init_sort: 10000                              │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   ProtocolParser (协议解析器)                     │
+│                         #[tx_comp]                               │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   TcpServer (TCP服务器)                           │
+│                      #[tx_comp(init)]                            │
+│                    init_sort: i32::MAX                            │
+│    async_run_impl: 启动TCP监听                                    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 初始化顺序
+
+| 组件 | init_sort | 说明 |
+|------|-----------|------|
+| LogConfig | i32::MIN | 日志配置（tx_di_log 插件） |
+| LogPlugins | i32::MIN | 日志初始化（tx_di_log 插件） |
+| AppConfig | i32::MIN + 1 | 应用配置 |
+| MqttClient | 10000 | MQTT 客户端 |
+| ProtocolParser | 10000 | 协议解析器（无状态） |
+| TcpServer | i32::MAX | TCP 服务器（最后启动） |
 
 ## 配置说明
 
-### 环境变量
+### 配置文件
 
-复制 `.env.example` 为 `.env` 文件，然后根据实际情况修改配置：
+编辑 `config/config.toml` 文件：
 
-```bash
-cp .env.example .env
+```toml
+# 日志配置
+[log_config]
+level = "info"
+prefix = "dfbja7"
+dir = "./logs"
+console_output = true
+time_format = "local"
+
+# 应用配置
+[app_config]
+tcp_port = 10080
+tcp_timeout_secs = 150
+mqtt_broker = "localhost"
+mqtt_port = 1883
+mqtt_client_id = "dfbja7_transformer"
+mqtt_username = ""
+mqtt_password = ""
+mqtt_topic_prefix = "/device/"
 ```
-
-配置项说明：
-
-- `TCP_PORT`: TCP服务器监听端口（默认: 10080）
-- `MQTT_BROKER`: MQTT broker地址（默认: localhost）
-- `MQTT_PORT`: MQTT broker端口（默认: 1883）
-- `MQTT_CLIENT_ID`: MQTT客户端ID
-- `MQTT_USERNAME`: MQTT用户名（可选）
-- `MQTT_PASSWORD`: MQTT密码（可选）
-- `MQTT_TOPIC`: MQTT主题前缀（默认: /device/）
-- `RUST_LOG`: 日志级别（默认: info）
 
 ## 编译与运行
 
@@ -73,12 +130,6 @@ cargo build --release
 
 ```bash
 cargo run --release
-```
-
-或者直接运行编译后的二进制文件：
-
-```bash
-./target/release/dfbja7_transformer
 ```
 
 ## 协议说明
@@ -100,15 +151,7 @@ cargo run --release
 ### 支持设备类型
 
 1. **Nano4SP** (模板ID: 04_23_01)
-   - 4路传感器数据
-   - GPS经纬度
-   - 报警信息
-   - 电量信息
-
 2. **GQB200A7U** (模板ID: 07_1D_00)
-   - 4路传感器数据
-   - GPS经纬度
-   - 报警信息
 
 ## MQTT消息格式
 
@@ -158,12 +201,14 @@ cargo test
 
 ## 依赖项
 
+- tx-di-core: 依赖注入框架
+- tx_di_log: 日志插件
 - tokio: 异步运行时
 - rumqttc: MQTT客户端
 - serde/serde_json: 序列化
 - bytes: 字节处理
 - tracing: 日志
-- thiserror/anyhow: 错误处理
+- anyhow: 错误处理
 
 ## 许可证
 

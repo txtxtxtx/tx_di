@@ -1806,15 +1806,14 @@ dependencies = [
  "anyhow",
  "bytes",
  "chrono",
- "dotenvy",
  "rumqttc",
  "serde",
  "serde_json",
- "thiserror 2.0.18",
  "tokio",
  "tokio-util",
  "tracing",
- "tracing-subscriber",
+ "tx-di-core",
+ "tx_di_log",
 ]
 
 [[package]]
@@ -1876,12 +1875,6 @@ checksum = "442039f5147480ba31067cb00ada1adae6892028e40e45fc5de7b7df6dcc1b5f"
 dependencies = [
  "const-random",
 ]
-
-[[package]]
-name = "dotenvy"
-version = "0.15.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
 name = "downcast"

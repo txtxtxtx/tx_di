@@ -1,12 +1,11 @@
-pub mod decoder;
 pub mod base;
-pub mod nano4sp;
 pub mod gqb200a7u;
+pub mod nano4sp;
 
-use crate::error::{AppError, AppResult};
-use crate::model::nano4sp::Nano4SPModel;
 use crate::model::gqb200a7u::GQB200A7UModel;
+use crate::model::nano4sp::Nano4SPModel;
 use crate::util::convert;
+use tx_di_core::tx_comp;
 
 /// 设备类型枚举
 #[derive(Debug, Clone, PartialEq)]
@@ -34,15 +33,25 @@ pub enum DeviceData {
     GQB200A7U(GQB200A7UModel),
 }
 
-/// 协议解析器
+/// 协议解析器（无状态组件）
+///
+/// 负责解析设备上报的私有协议数据。
+/// 支持 Nano4SP 和 GQB200A7U 两种设备类型。
+#[tx_comp]
 pub struct ProtocolParser;
 
 impl ProtocolParser {
     /// 解析消息
-    pub fn parse(message: &str) -> AppResult<DeviceData> {
+    ///
+    /// # Arguments
+    /// * `message` - 十六进制格式的消息字符串
+    ///
+    /// # Returns
+    /// 解析后的设备数据
+    pub fn parse(message: &str) -> anyhow::Result<DeviceData> {
         // 验证消息
         if !convert::verify_message(message) {
-            return Err(AppError::Protocol("消息验证失败".to_string()));
+            return Err(anyhow::anyhow!("消息验证失败"));
         }
 
         // 获取设备类型
@@ -58,9 +67,7 @@ impl ProtocolParser {
                 let model = gqb200a7u::parse(message)?;
                 Ok(DeviceData::GQB200A7U(model))
             }
-            DeviceType::Unknown(id) => {
-                Err(AppError::UnknownDeviceType(id))
-            }
+            DeviceType::Unknown(id) => Err(anyhow::anyhow!("未知设备类型: {}", id)),
         }
     }
 }

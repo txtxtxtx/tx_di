@@ -1,58 +1,96 @@
-use std::env;
+use serde::Deserialize;
+use tx_di_core::{tx_comp, CompInit};
 
 /// 应用配置
-#[derive(Debug, Clone)]
-pub struct Config {
+///
+/// 从 TOML 配置文件的 `[app_config]` section 自动反序列化。
+///
+/// # 配置文件示例
+///
+/// ```toml
+/// [app_config]
+/// tcp_port = 10080
+/// tcp_timeout_secs = 150
+/// mqtt_broker = "localhost"
+/// mqtt_port = 1883
+/// mqtt_client_id = "dfbja7_transformer"
+/// mqtt_username = ""
+/// mqtt_password = ""
+/// mqtt_topic_prefix = "/device/"
+/// ```
+#[derive(Debug, Clone, Deserialize)]
+#[tx_comp(conf, init)]
+pub struct AppConfig {
     /// TCP服务器端口
+    #[serde(default = "default_tcp_port")]
     pub tcp_port: u16,
+
+    /// TCP超时时间（秒）
+    #[serde(default = "default_tcp_timeout")]
+    pub tcp_timeout_secs: u64,
+
     /// MQTT broker地址
+    #[serde(default = "default_mqtt_broker")]
     pub mqtt_broker: String,
+
     /// MQTT broker端口
+    #[serde(default = "default_mqtt_port")]
     pub mqtt_port: u16,
+
     /// MQTT客户端ID
+    #[serde(default = "default_mqtt_client_id")]
     pub mqtt_client_id: String,
+
     /// MQTT用户名（可选）
+    #[serde(default)]
     pub mqtt_username: Option<String>,
+
     /// MQTT密码（可选）
+    #[serde(default)]
     pub mqtt_password: Option<String>,
+
     /// MQTT主题前缀
+    #[serde(default = "default_mqtt_topic_prefix")]
     pub mqtt_topic_prefix: String,
 }
 
-impl Config {
-    /// 从环境变量加载配置
-    pub fn from_env() -> anyhow::Result<Self> {
-        // 加载.env文件（如果存在）
-        dotenvy::dotenv().ok();
+fn default_tcp_port() -> u16 {
+    10080
+}
+fn default_tcp_timeout() -> u64 {
+    150
+}
+fn default_mqtt_broker() -> String {
+    "localhost".to_string()
+}
+fn default_mqtt_port() -> u16 {
+    1883
+}
+fn default_mqtt_client_id() -> String {
+    "dfbja7_transformer".to_string()
+}
+fn default_mqtt_topic_prefix() -> String {
+    "/device/".to_string()
+}
 
-        let tcp_port = env::var("TCP_PORT")
-            .unwrap_or_else(|_| "10080".to_string())
-            .parse::<u16>()?;
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            tcp_port: default_tcp_port(),
+            tcp_timeout_secs: default_tcp_timeout(),
+            mqtt_broker: default_mqtt_broker(),
+            mqtt_port: default_mqtt_port(),
+            mqtt_client_id: default_mqtt_client_id(),
+            mqtt_username: None,
+            mqtt_password: None,
+            mqtt_topic_prefix: default_mqtt_topic_prefix(),
+        }
+    }
+}
 
-        let mqtt_broker = env::var("MQTT_BROKER")
-            .unwrap_or_else(|_| "localhost".to_string());
-
-        let mqtt_port = env::var("MQTT_PORT")
-            .unwrap_or_else(|_| "1883".to_string())
-            .parse::<u16>()?;
-
-        let mqtt_client_id = env::var("MQTT_CLIENT_ID")
-            .unwrap_or_else(|_| "dfbja7_transformer".to_string());
-
-        let mqtt_username = env::var("MQTT_USERNAME").ok();
-        let mqtt_password = env::var("MQTT_PASSWORD").ok();
-
-        let mqtt_topic_prefix = env::var("MQTT_TOPIC")
-            .unwrap_or_else(|_| "/device/".to_string());
-
-        Ok(Config {
-            tcp_port,
-            mqtt_broker,
-            mqtt_port,
-            mqtt_client_id,
-            mqtt_username,
-            mqtt_password,
-            mqtt_topic_prefix,
-        })
+impl CompInit for AppConfig {
+    /// 在日志之后初始化
+    fn init_sort() -> i32 {
+        i32::MIN + 1
     }
 }
