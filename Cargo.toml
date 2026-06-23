@@ -43,7 +43,7 @@ members = [
     "examples/tx_admin/admin_infra",
     "examples/tx_admin/admin_api",
     # 定时任务
-    "plugins/tx_di_job",
+    "plugins/tx_di_job", "examples/dfbja7_transformer",
 ]
 resolver = "3"
 [workspace.package]

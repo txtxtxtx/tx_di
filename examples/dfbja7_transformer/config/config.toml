@@ -1,0 +1,21 @@
+# 日志配置
+[log_config]
+level = "info"
+prefix = "dfbja7"
+dir = "./logs"
+console_output = true
+time_format = "local"
+
+# 应用配置
+[app_config]
+# TCP 服务器配置
+tcp_port = 10080
+tcp_timeout_secs = 150
+
+# MQTT 配置
+mqtt_broker = "192.168.0.90"
+mqtt_port = 1883
+mqtt_client_id = "dfbja7_transformer"
+mqtt_username = ""
+mqtt_password = ""
+mqtt_topic_prefix = "/device/"
