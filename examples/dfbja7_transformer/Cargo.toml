@@ -1,0 +1,30 @@
+[package]
+name = "dfbja7_transformer"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+
+[dependencies]
+# 异步运行时
+tokio = { workspace = true }
+tokio-util = { version = "0.7", features = ["codec"] }
+# 字节处理
+bytes = { workspace = true }
+# 序列化
+serde = { workspace = true }
+serde_json = { workspace = true }
+# MQTT客户端
+rumqttc = "0.24"
+# 错误处理
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+# 日志
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+# 配置
+dotenvy = { workspace = true }
+# 时间
+chrono = { workspace = true }

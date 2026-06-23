@@ -1,0 +1,130 @@
+use serde::{Deserialize, Serialize};
+
+/// GQB200A7U设备数据模型
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GQB200A7UModel {
+    /// 设备类型
+    pub device_model: String,
+
+    /// 设备编号
+    pub device_code: String,
+
+    /// 信号强度
+    pub rssi: String,
+
+    /// 第一路传感器
+    pub sensor1: String,
+
+    /// 第二路传感器
+    pub sensor2: String,
+
+    /// 第三路传感器
+    pub sensor3: String,
+
+    /// 第四路传感器
+    pub sensor4: String,
+
+    /// 经度
+    pub lng: String,
+
+    /// 纬度
+    pub lat: String,
+
+    /// 报警数据
+    pub alarm: Vec<u8>,
+
+    /// 报警描述
+    pub level: Vec<String>,
+
+    /// 特殊报警数据
+    pub alarm_sp: Vec<String>,
+}
+
+impl GQB200A7UModel {
+    /// 转换为JSON字符串
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
+
+    /// 从JSON字符串解析
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+
+    /// 转换为通用设备信息
+    pub fn to_device_info(&self) -> crate::model::DeviceInfo {
+        crate::model::DeviceInfo {
+            device_model: self.device_model.clone(),
+            device_code: self.device_code.clone(),
+            rssi: self.rssi.clone(),
+            sensors: crate::model::Sensors {
+                sensor1: self.sensor1.clone(),
+                sensor2: self.sensor2.clone(),
+                sensor3: self.sensor3.clone(),
+                sensor4: self.sensor4.clone(),
+            },
+            gps: crate::model::GpsData {
+                longitude: self.lng.clone(),
+                latitude: self.lat.clone(),
+            },
+            alarm: crate::model::AlarmInfo {
+                levels: self.alarm.clone(),
+                level_descriptions: self.level.clone(),
+                special: self.alarm_sp.clone(),
+            },
+            soc: None,
+            timestamp: chrono::Utc::now().to_rfc3339(),
+        }
+    }
+}
+
+impl std::fmt::Display for GQB200A7UModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "GQB200A7UModel {{ device_model: {}, device_code: {}, rssi: {}, sensors: [{}, {}, {}, {}], gps: ({}, {}), alarm: {:?}, level: {:?}, alarm_sp: {:?} }}",
+            self.device_model,
+            self.device_code,
+            self.rssi,
+            self.sensor1,
+            self.sensor2,
+            self.sensor3,
+            self.sensor4,
+            self.lng,
+            self.lat,
+            self.alarm,
+            self.level,
+            self.alarm_sp
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serialize_deserialize() {
+        let model = GQB200A7UModel {
+            device_model: "GQB200A7U".to_string(),
+            device_code: "12345678".to_string(),
+            rssi: "-75dBm".to_string(),
+            sensor1: "100".to_string(),
+            sensor2: "200".to_string(),
+            sensor3: "300".to_string(),
+            sensor4: "4.5".to_string(),
+            lng: "116.397128".to_string(),
+            lat: "39.916527".to_string(),
+            alarm: vec![1, 0, 2, 0],
+            level: vec!["通道1一级报警".to_string(), "通道3二级报警".to_string()],
+            alarm_sp: vec!["气泵一级报警".to_string()],
+        };
+
+        let json = model.to_json().unwrap();
+        let deserialized = GQB200A7UModel::from_json(&json).unwrap();
+
+        assert_eq!(model.device_model, deserialized.device_model);
+        assert_eq!(model.device_code, deserialized.device_code);
+        assert_eq!(model.sensor1, deserialized.sensor1);
+    }
+}
