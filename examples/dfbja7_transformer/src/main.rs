@@ -19,8 +19,8 @@ use tx_di_log;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let path = r"D:\proj\tx_di\examples\dfbja7_transformer\config\config.toml";
-    let app = BuildContext::new(Some(path))
+    // let path = r"D:\proj\tx_di\examples\dfbja7_transformer\config\config.toml";
+    let app = BuildContext::new(None::<String>)
         .build()?
         .ins_run()
         .await?;
