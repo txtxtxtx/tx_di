@@ -159,8 +159,6 @@ impl TcpServer {
         // 发送到MQTT
         mqtt_client.publish(&topic, json.as_bytes()).await?;
 
-        info!("消息已发送到MQTT: {}", topic);
-
         Ok(())
     }
 }
