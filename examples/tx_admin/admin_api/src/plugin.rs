@@ -110,11 +110,12 @@ impl CompInit for AdminPlugin {
             let grpc_addr: std::net::SocketAddr = format!("0.0.0.0:{}", grpc_port).parse()
                 .map_err(|e: std::net::AddrParseError| anyhow::anyhow!("gRPC 地址解析失败: {}", e))?;
 
-            let interceptor = grpc::auth_interceptor::GrpcAuthInterceptor::new();
+            // 使用 tower middleware 实现认证
+            let auth_layer = grpc::auth_interceptor::AuthLayer::new();
 
             // 构建 tonic Router，注册所有 gRPC 服务
             let grpc_router = tonic::transport::Server::builder()
-                .layer(tonic::service::interceptor(interceptor))
+                .layer(auth_layer)
                 .add_service(AuthServiceServer::new(AuthGrpcService { app: ctx.clone() }))
                 .add_service(UserServiceServer::new(UserGrpcService { app: ctx.clone() }))
                 .add_service(RoleServiceServer::new(RoleGrpcService { app: ctx.clone() }))

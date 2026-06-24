@@ -65,7 +65,7 @@ async fn test_login_wrong_password() {
     assert_eq!(
         status.code(),
         tonic::Code::Unauthenticated,
-        "错误码应为 Unauthenticated"
+        "错误码应为 Unauthenticated,{}", status.message()
     );
 
     println!("✅ 登录失败测试通过: {}", status.message());

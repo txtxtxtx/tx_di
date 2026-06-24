@@ -1,10 +1,15 @@
-//! gRPC 认证拦截器
+//! gRPC 认证中间件
 //!
-//! 从 gRPC metadata 提取 Bearer token，通过 sa-token 验证并注入 login_id。
+//! 使用 tower middleware 实现，从 metadata 提取 Bearer token，通过 sa-token 验证并注入 login_id。
 //! 公开方法（如 Login）跳过认证。
 
+use std::task::{Context, Poll};
+
+use futures::future::BoxFuture;
+use axum::http::{Request, Response};
 use sa_token_core::token::TokenValue;
-use tonic::{Request, Status};
+use tonic::Status;
+use tower::{Layer, Service};
 use tracing::warn;
 use tx_di_sa_token::StpUtil;
 
@@ -21,59 +26,101 @@ const OPEN_METHODS: &[&str] = &[
     "/admin.auth.AuthService/Login",
 ];
 
-/// gRPC 认证拦截器
-///
-/// 实现 tonic::service::Interceptor，从 metadata 提取 Bearer token 验证。
-#[derive(Clone)]
-pub struct GrpcAuthInterceptor;
+// ============================================================
+// Tower Middleware
+// ============================================================
 
-impl GrpcAuthInterceptor {
+/// 认证中间件服务，包装内部服务
+#[derive(Clone)]
+pub struct AuthMiddleware<S> {
+    inner: S,
+}
+
+impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for AuthMiddleware<S>
+where
+    S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
+    S::Future: Send + 'static,
+    S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+    ReqBody: Send + 'static,
+    ResBody: Send + Default + 'static,
+{
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
+        let mut inner = self.inner.clone();
+
+        Box::pin(async move {
+            // 1. 获取请求路径（URI）
+            let path = req.uri().path().to_string();
+
+            // 2. 检查是否为公开方法
+            if OPEN_METHODS.iter().any(|&m| path == m) {
+                return inner.call(req).await;
+            }
+
+            // 3. 提取 Bearer token
+            let token = match extract_bearer_token(&req) {
+                Ok(t) => t,
+                Err(e) => {
+                    // 返回错误响应
+                    let response = Response::new(ResBody::default());
+                    return Ok(response);
+                }
+            };
+
+            // 4. 异步验证 token
+            let login_id = match StpUtil::get_login_id(&token).await {
+                Ok(id) => id,
+                Err(e) => {
+                    warn!("gRPC 认证失败: {}", e);
+                    let response = Response::new(ResBody::default());
+                    return Ok(response);
+                }
+            };
+
+            // 5. 将 login_id 和 token 注入 request extensions
+            let mut req = req;
+            req.extensions_mut().insert(GrpcLoginId(login_id));
+            req.extensions_mut().insert(GrpcToken(token));
+
+            // 6. 调用内部服务
+            inner.call(req).await
+        })
+    }
+}
+
+/// 对应的 Layer，用于将中间件应用到服务
+#[derive(Clone)]
+pub struct AuthLayer;
+
+impl AuthLayer {
     pub fn new() -> Self {
         Self
     }
 }
 
-impl tonic::service::Interceptor for GrpcAuthInterceptor {
-    fn call(&mut self, mut req: Request<()>) -> Result<Request<()>, Status> {
-        // 获取请求方法名（gRPC 路径格式: /package.Service/Method）
-        let method = req
-            .metadata()
-            .get("uri")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
+impl<S> Layer<S> for AuthLayer {
+    type Service = AuthMiddleware<S>;
 
-        // 公开方法跳过认证
-        if OPEN_METHODS.iter().any(|&m| method.contains(m)) {
-            return Ok(req);
-        }
-
-        // 从 metadata 提取 Bearer token
-        let token = extract_bearer_token(&req)?;
-
-        // 通过 sa-token 验证 token
-        let login_id = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                StpUtil::get_login_id(&token).await
-            })
-        })
-        .map_err(|e| {
-            warn!("gRPC 认证失败: {}", e);
-            Status::unauthenticated(format!("认证失败: {}", e))
-        })?;
-
-        // 将 login_id 和 token 注入 request extensions
-        req.extensions_mut().insert(GrpcLoginId(login_id));
-        req.extensions_mut().insert(GrpcToken(token));
-
-        Ok(req)
+    fn layer(&self, inner: S) -> Self::Service {
+        AuthMiddleware { inner }
     }
 }
 
+// ============================================================
+// 辅助函数
+// ============================================================
+
 /// 从 gRPC metadata 提取 Bearer token
-fn extract_bearer_token(req: &Request<()>) -> Result<TokenValue, Status> {
+fn extract_bearer_token<B>(req: &Request<B>) -> Result<TokenValue, Status> {
     let auth_value = req
-        .metadata()
+        .headers()
         .get("authorization")
         .ok_or_else(|| Status::unauthenticated("缺少 authorization metadata"))?;
 
@@ -93,7 +140,7 @@ fn extract_bearer_token(req: &Request<()>) -> Result<TokenValue, Status> {
 /// 从 request extensions 获取 login_id
 ///
 /// 在 gRPC service 方法中调用，获取当前已认证用户的 login_id。
-pub fn get_login_id(req: &Request<impl std::any::Any>) -> Result<String, Status> {
+pub fn get_login_id(req: &tonic::Request<impl std::any::Any>) -> Result<String, Status> {
     req.extensions()
         .get::<GrpcLoginId>()
         .map(|id| id.0.clone())
@@ -101,7 +148,7 @@ pub fn get_login_id(req: &Request<impl std::any::Any>) -> Result<String, Status>
 }
 
 /// 从 request extensions 获取 login_id 为 u64
-pub fn get_login_id_u64(req: &Request<impl std::any::Any>) -> Result<u64, Status> {
+pub fn get_login_id_u64(req: &tonic::Request<impl std::any::Any>) -> Result<u64, Status> {
     let id_str = get_login_id(req)?;
     id_str
         .parse::<u64>()
@@ -109,7 +156,7 @@ pub fn get_login_id_u64(req: &Request<impl std::any::Any>) -> Result<u64, Status
 }
 
 /// 从 request extensions 获取原始 token
-pub fn get_token(req: &Request<impl std::any::Any>) -> Result<TokenValue, Status> {
+pub fn get_token(req: &tonic::Request<impl std::any::Any>) -> Result<TokenValue, Status> {
     req.extensions()
         .get::<GrpcToken>()
         .map(|t| t.0.clone())
@@ -137,9 +184,14 @@ pub async fn ensure_grpc_role(login_id: &str, role: &str) -> Result<(), Status> 
         .map_err(|e| Status::permission_denied(format!("缺少角色 {}: {}", role, e)))
 }
 
+// ============================================================
+// 测试
+// ============================================================
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use http::HeaderValue;
     use tonic::metadata::MetadataValue;
 
     /// 测试提取 Bearer token - 正常情况
@@ -148,9 +200,9 @@ mod tests {
     #[test]
     fn test_extract_bearer_token_success() {
         let mut req = Request::new(());
-        req.metadata_mut().insert(
+        req.headers_mut().insert(
             "authorization",
-            MetadataValue::from_static("Bearer abc123xyz"),
+            HeaderValue::from_static("Bearer abc123xyz"),
         );
 
         let result = extract_bearer_token(&req);
@@ -188,9 +240,9 @@ mod tests {
     #[test]
     fn test_extract_bearer_token_invalid_format() {
         let mut req = Request::new(());
-        req.metadata_mut().insert(
+        req.headers_mut().insert(
             "authorization",
-            MetadataValue::from_static("Basic abc123"),
+            HeaderValue::from_static("Basic abc123"),
         );
 
         let result = extract_bearer_token(&req);
