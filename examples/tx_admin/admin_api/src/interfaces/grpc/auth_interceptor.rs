@@ -19,6 +19,7 @@ pub struct GrpcLoginId(pub String);
 
 /// 请求扩展中存储原始 token 的 key（用于后续 logout 等操作）
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct GrpcToken(pub TokenValue);
 
 /// 不需要认证的 gRPC 方法全名列表
@@ -152,22 +153,6 @@ pub fn get_login_id(req: &tonic::Request<impl std::any::Any>) -> Result<String, 
         .ok_or_else(|| tonic::Status::unauthenticated("未找到登录信息"))
 }
 
-/// 从 request extensions 获取 login_id 为 u64
-pub fn get_login_id_u64(req: &tonic::Request<impl std::any::Any>) -> Result<u64, tonic::Status> {
-    let id_str = get_login_id(req)?;
-    id_str
-        .parse::<u64>()
-        .map_err(|_| tonic::Status::internal("login_id 格式无效"))
-}
-
-/// 从 request extensions 获取原始 token
-pub fn get_token(req: &tonic::Request<impl std::any::Any>) -> Result<TokenValue, tonic::Status> {
-    req.extensions()
-        .get::<GrpcToken>()
-        .map(|t| t.0.clone())
-        .ok_or_else(|| tonic::Status::unauthenticated("未找到 token"))
-}
-
 /// gRPC 权限检查
 ///
 /// 通过 sa-token 检查用户是否拥有指定权限。
@@ -182,13 +167,6 @@ pub async fn ensure_grpc_permission(login_id: &str, perm: &str) -> Result<(), to
         .map_err(|e| tonic::Status::permission_denied(format!("缺少权限 {}: {}", perm, e)))
 }
 
-/// gRPC 角色检查
-pub async fn ensure_grpc_role(login_id: &str, role: &str) -> Result<(), tonic::Status> {
-    StpUtil::check_role(login_id, role)
-        .await
-        .map_err(|e| tonic::Status::permission_denied(format!("缺少角色 {}: {}", role, e)))
-}
-
 // ============================================================
 // 测试
 // ============================================================
@@ -196,7 +174,7 @@ pub async fn ensure_grpc_role(login_id: &str, role: &str) -> Result<(), tonic::S
 #[cfg(test)]
 mod tests {
     use super::*;
-    use http::HeaderValue;
+    use tonic::codegen::http::HeaderValue;
 
     /// 测试提取 Bearer token - 正常情况
     ///

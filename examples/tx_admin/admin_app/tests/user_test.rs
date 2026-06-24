@@ -8,9 +8,8 @@
 //!   1.7 用户查询         ✅
 
 mod common;
-use admin_proto::{CreateUserRequest, UpdateUserRequest, AssignRolesRequest, AssignDeptsRequest, ListUsersRequest, PageRequest};
+use admin_proto::{CreateUserRequest, UpdateUserRequest, ListUsersRequest, PageRequest};
 use admin_domain::shared::model::value_object::DeletedStatus;
-use jiff::Timestamp;
 use admin_domain::user::model::value_object::{Sex, UserStatus};
 use admin_domain::user::repository::UserRepository;
 
@@ -439,12 +438,7 @@ async fn assign_roles_to_user() {
         .await
         .unwrap();
 
-    app.assign_roles(AssignRolesRequest {
-        user_id: user.id,
-        role_ids: vec![1, 2, 3],
-    })
-    .await
-    .unwrap();
+    app.assign_roles(user.id, vec![1, 2, 3]).await.unwrap();
 
     // 回查验证角色已持久化
     let found = app.get_user(user.id).await.unwrap();
@@ -475,12 +469,7 @@ async fn assign_roles_empty_should_clear() {
         .await
         .unwrap();
 
-    app.assign_roles(AssignRolesRequest {
-        user_id: user.id,
-        role_ids: vec![],
-    })
-    .await
-    .unwrap();
+    app.assign_roles(user.id, vec![]).await.unwrap();
 
     // 回查验证角色已清空
     let found = app.get_user(user.id).await.unwrap();
@@ -510,12 +499,7 @@ async fn assign_departments_to_user() {
         .await
         .unwrap();
 
-    app.assign_departments(AssignDeptsRequest {
-        user_id: user.id,
-        dept_ids: vec![100, 200],
-    })
-    .await
-    .unwrap();
+    app.assign_departments(user.id, vec![100, 200]).await.unwrap();
 
     // 回查验证部门已持久化
     let found = app.get_user(user.id).await.unwrap();
@@ -545,12 +529,7 @@ async fn assign_departments_empty_should_clear() {
         .await
         .unwrap();
 
-    app.assign_departments(AssignDeptsRequest {
-        user_id: user.id,
-        dept_ids: vec![],
-    })
-    .await
-    .unwrap();
+    app.assign_departments(user.id, vec![]).await.unwrap();
 
     // 回查验证部门已清空
     let found = app.get_user(user.id).await.unwrap();

@@ -4,9 +4,9 @@
 //!   - 部门 → 角色 → 用户 → 菜单 → 角色菜单 → 配置 → 字典 → 文件 → 日志 的完整链路
 
 mod common;
-use admin_app::auth::dto::*;
+use std::io::Cursor;
 use admin_proto::{CreateConfigRequest, ListConfigsRequest, CreateDictTypeRequest, CreateDictDataRequest};
-use admin_proto::{CreateUserRequest, UploadFileRequest, CreateOperateLogRequest};
+use admin_proto::{CreateUserRequest, CreateOperateLogRequest};
 use admin_app::department::dto::*;
 use admin_app::menu::dto::*;
 use admin_app::role::dto::*;
@@ -61,9 +61,7 @@ async fn full_crud_workflow() {
         parent_id: sys_menu.id, path: Some("/system/user".into()), icon: Some("user".into()),
         component: Some("system/user/index".into()), component_name: Some("UserMgmt".into()),
     }, Some("admin".into())).await.unwrap();
-    role_app.assign_menus(AssignMenusRequest {
-        role_id: admin_role.id, menu_ids: vec![sys_menu.id, user_menu.id],
-    }).await.unwrap();
+    role_app.assign_menus(admin_role.id, vec![sys_menu.id, user_menu.id]).await.unwrap();
 
     // 5. 创建系统配置
     let (config_app, _, _) = common::create_config_app().await;
@@ -90,12 +88,15 @@ async fn full_crud_workflow() {
     assert_eq!(items.len(), 2);
 
     // 7. 文件上传
-    let (file_app, _, _) = common::create_file_app().await;
-    let uploaded = file_app.upload_file(UploadFileRequest {
-        name: "avatar.png".into(), path: "/uploads/avatar.png".into(),
-        url: "https://cdn.example.com/uploads/avatar.png".into(),
-        file_type: Some("image/png".into()), size: 2048, config_id: None,
-    }, Some("admin".into())).await.unwrap();
+    let (file_app, _, _, _temp) = common::create_file_app().await;
+    let mut cursor = Cursor::new(b"test avatar content");
+    let uploaded = file_app.upload_file_stream(
+        "avatar.png".into(),
+        "image/png".into(),
+        &mut cursor,
+        None,
+        Some("admin".into()),
+    ).await.unwrap();
     assert_eq!(uploaded.name, "avatar.png");
 
     // 8. 日志记录

@@ -7,24 +7,26 @@ use crate::shared::repository::RepositoryError;
 use crate::role::model::aggregate::Role;
 use crate::role::model::value_object::RoleQuery;
 use crate::role::repository::RoleRepository;
-use crate::user::repository::UserRepository;
-use crate::user::model::value_object::UserStatus;
 
 /// Role domain service
+///
+/// 只持有 RoleRepository，不跨聚合依赖。
+/// 跨聚合操作（如添加用户到角色时的用户状态校验）
+/// 由 Application 层 `RoleAppService` 负责编排。
 #[tx_comp]
 pub struct RoleService {
     role_repo: Arc<dyn RoleRepository>,
-    user_repo: Arc<dyn UserRepository>,
 }
 
 impl RoleService {
     /// 创建 RoleService 的新实例
-    ///
-    /// # 参数
-    /// * `role_repo` - 角色仓库，用于角色相关的数据库操作
-    /// * `user_repo` - 用户仓库，用于校验用户状态
-    pub fn new(role_repo: Arc<dyn RoleRepository>, user_repo: Arc<dyn UserRepository>) -> Self {
-        Self { role_repo, user_repo }
+    pub fn new(role_repo: Arc<dyn RoleRepository>) -> Self {
+        Self { role_repo }
+    }
+
+    /// 获取 RoleRepository 引用（供 App 层跨聚合操作使用）
+    pub fn role_repo(&self) -> &Arc<dyn RoleRepository> {
+        &self.role_repo
     }
 
     /// 创建新角色
@@ -323,44 +325,23 @@ impl RoleService {
         self.role_repo.find_users_by_role_id(role_id).await
     }
 
-    /// 为角色添加用户
+    /// 为角色添加用户（仅校验角色状态，用户校验由 App 层完成）
     ///
     /// # 参数
     /// * `role_id` - 角色 ID
     /// * `user_ids` - 要添加的用户 ID 列表
     ///
     /// # 执行逻辑
-    /// 1. 根据角色 ID 查询角色，若不存在则返回未找到错误
-    /// 2. 校验角色状态必须为启用（status == 0），否则返回角色已禁用错误
-    /// 3. 遍历用户 ID 列表，逐个校验用户必须存在且状态为 Active
-    /// 4. 调用角色仓库绑定角色与用户的关联关系
+    /// 1. 校验角色存在且启用
+    /// 2. 绑定用户关联
     ///
-    /// # 返回
-    /// 成功返回 `()`
-    ///
-    /// # 错误
-    /// - `NotFoundRole` - 指定角色不存在
-    /// - `ValidationRoleDisabled` - 角色已禁用，无法添加用户
-    /// - `NotFoundUser` - 指定用户不存在
-    /// - `ValidationUserStatus` - 用户状态非 Active
-    /// - 数据库操作失败时返回错误
+    /// # 注意
+    /// 用户的合法性校验（存在、Active）由 `RoleAppService` 在调用前完成。
     pub async fn add_users_to_role(&self, role_id: u64, user_ids: Vec<u64>) -> AppResult<()> {
         let role = self.role_repo.find_by_id(role_id).await?.ok_or_else(|| RepositoryError::NotFoundRole)?;
 
-        // 角色必须为启用状态才能添加用户
         if role.status != 0 {
             return Err(RepositoryError::ValidationRoleDisabled)?;
-        }
-
-        // 校验每个用户存在且为 Active 状态
-        for &uid in &user_ids {
-            if let Some(user) = self.user_repo.find_by_id(uid).await? {
-                if user.status != UserStatus::Active {
-                    return Err(RepositoryError::ValidationUserStatus)?;
-                }
-            } else {
-                return Err(RepositoryError::NotFoundUser)?;
-            }
         }
 
         self.role_repo.bind_users(role_id, &user_ids).await

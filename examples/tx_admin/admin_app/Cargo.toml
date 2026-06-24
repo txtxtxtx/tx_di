@@ -17,6 +17,7 @@ tx-di-core  = { path = "../../../tx-di-core" }
 tx_di_file = { path = "../../../plugins/tx_di_file" }
 tx_di_job = { path = "../../../plugins/tx_di_job" }
 tx_di_toasty = { path = "../../../plugins/tx_di_toasty" }
+tx_di_sa_token = { path = "../../../plugins/tx_di_sa_token", default-features = false, features = ["memory"] }
 
 async-trait = { workspace = true }
 serde = { workspace = true }

@@ -27,7 +27,7 @@ use admin_app::log::app_service::LoginLogAppService;
 /// 返回 (auth_app, user_app, role_app, menu_app, user_repo, role_repo)
 async fn create_auth_test_env() -> (
     AuthAppService,
-    admin_app::user::app_service::UserAppService,
+    Arc<admin_app::user::app_service::UserAppService>,
     admin_app::role::app_service::RoleAppService,
     admin_app::menu::app_service::MenuAppService,
     Arc<ToastyUserRepository>,
@@ -41,16 +41,18 @@ async fn create_auth_test_env() -> (
     let dept_repo = Arc::new(ToastyDepartmentRepository::new(plugin.clone()));
     let login_log_repo = Arc::new(ToastyLoginLogRepository::new(plugin));
 
-    let user_svc = Arc::new(UserService::new(user_repo.clone(), role_repo.clone(), dept_repo, menu_repo.clone()));
-    let role_svc = Arc::new(RoleService::new(role_repo.clone(), user_repo.clone()));
-    let menu_svc = Arc::new(MenuService::new(menu_repo));
+    let user_svc = Arc::new(UserService::new(user_repo.clone()));
+    let role_svc = Arc::new(RoleService::new(role_repo.clone()));
+    let menu_svc = Arc::new(MenuService::new(menu_repo.clone()));
     let login_log_svc = Arc::new(LoginLogService::new(login_log_repo));
     let login_log_app = Arc::new(LoginLogAppService::new(login_log_svc));
 
-    let user_app = admin_app::user::app_service::UserAppService::new(user_svc.clone());
-    let role_app = admin_app::role::app_service::RoleAppService::new(role_svc.clone());
+    let user_app = Arc::new(admin_app::user::app_service::UserAppService::new(
+        user_svc.clone(), role_repo.clone(), dept_repo, menu_repo.clone(),
+    ));
+    let role_app = admin_app::role::app_service::RoleAppService::new(role_svc.clone(), user_repo.clone());
     let menu_app = admin_app::menu::app_service::MenuAppService::new(menu_svc.clone());
-    let auth_app = AuthAppService::new(user_svc, role_svc, menu_svc, login_log_app);
+    let auth_app = AuthAppService::new_for_test(user_app.clone(), role_svc, menu_svc, login_log_app);
 
     (auth_app, user_app, role_app, menu_app, user_repo, role_repo)
 }
@@ -97,8 +99,9 @@ async fn login_success() {
     assert_eq!(resp.user_id, user.id);
     assert_eq!(resp.username, "admin");
     assert_eq!(resp.nickname, "管理员");
-    assert!(!resp.permissions.is_empty());
+    // permissions 由 session 管理，login response 不再返回明文
     assert!(!resp.role_ids.is_empty());
+    assert!(!resp.role_codes.is_empty());
 }
 
 #[tokio::test]

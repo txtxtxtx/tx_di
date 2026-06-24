@@ -3,31 +3,51 @@ use std::sync::Arc;
 use crate::user::dto::*;
 use admin_proto::{
     CreateUserRequest, UpdateUserRequest, ChangePasswordRequest,
-    AssignRolesRequest, AssignDeptsRequest, ListUsersRequest,
+    ListUsersRequest,
 };
-use admin_domain::user::model::value_object::{Sex, UserQuery, UserStatus};
+use admin_domain::user::model::aggregate::User;
+use admin_domain::user::model::value_object::{LoginUser, Sex, UserQuery, UserStatus};
 use admin_domain::user::service::UserService;
+use admin_domain::role::repository::RoleRepository;
+use admin_domain::department::repository::DepartmentRepository;
+use admin_domain::menu::repository::MenuRepository;
 use admin_domain::shared::repository::RepositoryError;
 use tx_di_core::tx_comp;
 use tx_error::AppResult;
 use tx_common::page::Page;
 
-/// User application service - orchestrates domain operations
+/// User application service - 编排领域操作 + 跨聚合校验
 #[tx_comp]
 pub struct UserAppService {
     user_service: Arc<UserService>,
+    role_repo: Arc<dyn RoleRepository>,
+    dept_repo: Arc<dyn DepartmentRepository>,
+    menu_repo: Arc<dyn MenuRepository>,
 }
 
 impl UserAppService {
     /// 创建用户应用服务实例
-    pub fn new(user_service: Arc<UserService>) -> Self {
-        Self { user_service }
+    ///
+    /// # 参数
+    /// - `user_service` - 用户领域服务
+    /// - `role_repo` - 角色仓库（用于跨聚合校验）
+    /// - `dept_repo` - 部门仓库（用于跨聚合校验）
+    /// - `menu_repo` - 菜单仓库（用于构建登录用户权限）
+    pub fn new(
+        user_service: Arc<UserService>,
+        role_repo: Arc<dyn RoleRepository>,
+        dept_repo: Arc<dyn DepartmentRepository>,
+        menu_repo: Arc<dyn MenuRepository>,
+    ) -> Self {
+        Self { user_service, role_repo, dept_repo, menu_repo }
+    }
+
+    /// 获取 UserService 引用（供 AuthAppService 等编排者使用）
+    pub fn user_service(&self) -> &Arc<UserService> {
+        &self.user_service
     }
 
     /// 创建新用户
-    ///
-    /// proto3 的 `repeated` 字段无法区分"未设置"和"空列表"，
-    /// 因此 `role_ids`/`dept_ids` 为空 Vec 时视为未提供。
     pub async fn create_user(
         &self,
         req: CreateUserRequest,
@@ -57,7 +77,7 @@ impl UserAppService {
             .create_user(req.username, req.password, req.nickname, creator.clone())
             .await?;
 
-        // Set optional fields and persist to repository
+        // Set optional fields and persist
         if email.is_some() || mobile.is_some() || req.sex.is_some() || remark.is_some() {
             user.email = email;
             user.mobile = mobile;
@@ -77,15 +97,15 @@ impl UserAppService {
                 .await?;
         }
 
-        // Assign roles if provided (empty vec = not provided in proto3)
+        // Assign roles if provided
         if !req.role_ids.is_empty() {
-            self.user_service.assign_roles(user.id, req.role_ids.clone()).await?;
+            self.assign_roles(user.id, req.role_ids.clone()).await?;
             user.role_ids = req.role_ids;
         }
 
         // Assign departments if provided
         if !req.dept_ids.is_empty() {
-            self.user_service.assign_departments(user.id, req.dept_ids.clone()).await?;
+            self.assign_departments(user.id, req.dept_ids.clone()).await?;
             user.dept_ids = req.dept_ids;
         }
 
@@ -145,14 +165,69 @@ impl UserAppService {
         Ok(())
     }
 
-    /// 为用户分配角色
-    pub async fn assign_roles(&self, req: AssignRolesRequest) -> AppResult<()> {
-        self.user_service.assign_roles(req.user_id, req.role_ids).await
+    /// 为用户分配角色（跨聚合校验：校验角色存在且启用）
+    pub async fn assign_roles(&self, user_id: u64, role_ids: Vec<u64>) -> AppResult<()> {
+        let user = self
+            .user_service
+            .get_user(user_id)
+            .await?;
+
+        // 用户必须为 Active 状态
+        if user.status != UserStatus::Active {
+            return Err(RepositoryError::ValidationUserStatus)?;
+        }
+
+        // 校验每个角色存在且为启用状态（status == 0 即 Enabled）
+        let roles = self.role_repo.find_by_ids(&role_ids).await?;
+        for r in &roles {
+            if r.status != 0 {
+                return Err(RepositoryError::ValidationUserStatus)?;
+            }
+        }
+
+        self.user_service.user_repo().bind_roles(user_id, &role_ids).await?;
+        Ok(())
     }
 
-    /// 为用户分配部门
-    pub async fn assign_departments(&self, req: AssignDeptsRequest) -> AppResult<()> {
-        self.user_service.assign_departments(req.user_id, req.dept_ids).await
+    /// 为用户分配部门（跨聚合校验：校验部门存在且启用）
+    pub async fn assign_departments(&self, user_id: u64, dept_ids: Vec<u64>) -> AppResult<()> {
+        let user = self
+            .user_service
+            .get_user(user_id)
+            .await?;
+
+        // 用户必须为 Active 状态
+        if user.status != UserStatus::Active {
+            return Err(RepositoryError::ValidationUserStatus)?;
+        }
+
+        // 校验每个部门存在且为启用状态
+        let depts = self.dept_repo.find_by_ids(&dept_ids).await?;
+        for d in &depts {
+            if d.status != 0 {
+                return Err(RepositoryError::ValidationDeptDisabled)?;
+            }
+        }
+
+        self.user_service.user_repo().bind_departments(user_id, &dept_ids).await?;
+        Ok(())
+    }
+
+    /// 构建登录用户信息（跨聚合：查询角色/部门/权限）
+    pub async fn build_login_user(&self, user: &User) -> AppResult<LoginUser> {
+        let role_ids = self.user_service.user_repo().get_role_ids(user.id).await?;
+        let dept_ids = self.user_service.user_repo().get_dept_ids(user.id).await?;
+        let permissions = self.menu_repo.find_permission_codes_by_user_id(user.id).await?;
+
+        Ok(LoginUser {
+            user_id: user.id,
+            username: user.username.clone(),
+            nickname: user.nickname.clone(),
+            tenant_id: user.tenant_id,
+            role_ids,
+            permissions,
+            dept_ids,
+        })
     }
 
     /// 根据ID获取用户信息

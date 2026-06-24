@@ -106,7 +106,7 @@ impl RoleService for RoleGrpcService {
 
         let req = request.into_inner();
         let svc: Arc<admin_app::role::app_service::RoleAppService> = self.app.inject();
-        svc.assign_menus(req).await.map_err(err::to_status)?;
+        svc.assign_menus(req.role_id, req.menu_ids).await.map_err(err::to_status)?;
         Ok(Response::new(Empty {}))
     }
 

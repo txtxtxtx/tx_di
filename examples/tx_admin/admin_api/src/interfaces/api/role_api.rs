@@ -85,7 +85,7 @@ async fn assign_menus(
     Json(req): Json<AssignMenusRequest>,
 ) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("role:assign_menu").await?;
-    role.assign_menus(req).await?;
+    role.assign_menus(req.role_id, req.menu_ids).await?;
     Ok(ApiRes::ok().into_typed())
 }
 

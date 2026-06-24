@@ -1,6 +1,7 @@
 use jiff::Timestamp; // 引入jiff库中的Timestamp类型，用于处理时间
 use serde::{Deserialize, Serialize}; // 引入serde库中的Deserialize和Serialize trait，用于序列化和反序列化
 
+use crate::password;
 use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent}; // 引入共享模块中的相关模型和trait
 use crate::AggregateRoot;
 use crate::shared::model::value_object::{DeletedStatus, TenantId};
@@ -201,5 +202,13 @@ impl User {
     /// Check if user is locked
     pub fn is_locked(&self) -> bool {
         self.status == UserStatus::Locked
+    }
+
+    /// 验证密码是否匹配
+    ///
+    /// 将调用方从直接使用 `password::verify_password`
+    /// 改为通过 User 聚合根验证，封装密码哈希细节。
+    pub fn verify_password(&self, plain: &str) -> bool {
+        password::verify_password(plain, &self.password).unwrap_or(false)
     }
 }

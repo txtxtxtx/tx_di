@@ -8,9 +8,8 @@ mod common;
 use std::sync::Arc;
 
 use admin_proto::{CreateConfigRequest, CreateDictTypeRequest, CreateDictDataRequest};
-use admin_proto::{CreateUserRequest, ChangePasswordRequest, UploadFileRequest};
+use admin_proto::{CreateUserRequest, ChangePasswordRequest};
 use admin_proto::CreateRoleRequest;
-use admin_domain::user::model::value_object::Sex;
 use admin_domain::user::repository::UserRepository;
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -19,8 +18,13 @@ use admin_domain::user::repository::UserRepository;
 
 #[tokio::test]
 async fn test_change_password() {
-    let (user_svc, user_repo) = common::create_user_service().await;
-    let app = admin_app::user::app_service::UserAppService::new(user_svc.clone());
+    let plugin = common::create_db_plugin().await;
+    let user_repo = Arc::new(admin_infra::user::repository::ToastyUserRepository::new(plugin.clone()));
+    let role_repo = Arc::new(admin_infra::role::repository::ToastyRoleRepository::new(plugin.clone()));
+    let dept_repo = Arc::new(admin_infra::department::repository::ToastyDepartmentRepository::new(plugin.clone()));
+    let menu_repo = Arc::new(admin_infra::menu::repository::ToastyMenuRepository::new(plugin.clone()));
+    let user_svc = Arc::new(admin_domain::user::service::UserService::new(user_repo.clone()));
+    let app = admin_app::user::app_service::UserAppService::new(user_svc.clone(), role_repo, dept_repo, menu_repo);
 
     // Create a user with an initial password
     let user = app
@@ -147,10 +151,10 @@ async fn test_add_users_to_role_and_get_role_users() {
     let role_repo = Arc::new(admin_infra::role::repository::ToastyRoleRepository::new(plugin.clone()));
     let dept_repo = Arc::new(admin_infra::department::repository::ToastyDepartmentRepository::new(plugin.clone()));
     let menu_repo = Arc::new(admin_infra::menu::repository::ToastyMenuRepository::new(plugin.clone()));
-    let user_svc = Arc::new(admin_domain::user::service::UserService::new(user_repo.clone(), role_repo.clone(), dept_repo, menu_repo));
-    let role_svc = Arc::new(admin_domain::role::service::RoleService::new(role_repo, user_repo));
-    let user_app = admin_app::user::app_service::UserAppService::new(user_svc);
-    let role_app = admin_app::role::app_service::RoleAppService::new(role_svc);
+    let user_svc = Arc::new(admin_domain::user::service::UserService::new(user_repo.clone()));
+    let role_svc = Arc::new(admin_domain::role::service::RoleService::new(role_repo.clone()));
+    let user_app = admin_app::user::app_service::UserAppService::new(user_svc.clone(), role_repo.clone(), dept_repo, menu_repo);
+    let role_app = admin_app::role::app_service::RoleAppService::new(role_svc.clone(), user_repo);
 
     // Create a role
     let role = role_app
@@ -229,10 +233,10 @@ async fn test_remove_users_from_role() {
     let role_repo = Arc::new(admin_infra::role::repository::ToastyRoleRepository::new(plugin.clone()));
     let dept_repo = Arc::new(admin_infra::department::repository::ToastyDepartmentRepository::new(plugin.clone()));
     let menu_repo = Arc::new(admin_infra::menu::repository::ToastyMenuRepository::new(plugin.clone()));
-    let user_svc = Arc::new(admin_domain::user::service::UserService::new(user_repo.clone(), role_repo.clone(), dept_repo, menu_repo));
-    let role_svc = Arc::new(admin_domain::role::service::RoleService::new(role_repo, user_repo));
-    let user_app = admin_app::user::app_service::UserAppService::new(user_svc);
-    let role_app = admin_app::role::app_service::RoleAppService::new(role_svc);
+    let user_svc = Arc::new(admin_domain::user::service::UserService::new(user_repo.clone()));
+    let role_svc = Arc::new(admin_domain::role::service::RoleService::new(role_repo.clone()));
+    let user_app = admin_app::user::app_service::UserAppService::new(user_svc.clone(), role_repo.clone(), dept_repo, menu_repo);
+    let role_app = admin_app::role::app_service::RoleAppService::new(role_svc.clone(), user_repo);
 
     // Create role and users
     let role = role_app
@@ -488,56 +492,53 @@ async fn test_dict_data_get_by_dict_types() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 14. FileAppService::download_file
+// 14. FileAppService::download_file_stream
 // ══════════════════════════════════════════════════════════════════════════════
 
-#[tokio::test]
-async fn test_download_file() {
-    let (app, _, _) = common::create_file_app().await;
+use std::io::Cursor;
 
-    // Upload a file first
+#[tokio::test]
+async fn test_download_file_stream() {
+    let (app, _, _, _temp) = common::create_file_app().await;
+
+    // Upload a PDF file using stream API
+    let data = b"This is a test PDF content.";
+    let mut cursor = Cursor::new(data);
     let file = app
-        .upload_file(
-            UploadFileRequest {
-                name: "report.pdf".into(),
-                path: "/uploads/report.pdf".into(),
-                url: "https://cdn.example.com/report.pdf".into(),
-                file_type: Some("pdf".into()),
-                size: 1024,
-                config_id: None,
-            },
+        .upload_file_stream(
+            "report.pdf".into(),
+            "application/pdf".into(),
+            &mut cursor,
+            None,
             Some("admin".into()),
         )
         .await
         .unwrap();
 
-    // Download the file
-    let download = app.download_file(file.id).await.unwrap();
-    assert_eq!(download.url, "https://cdn.example.com/report.pdf");
+    // Download via stream API
+    let download = app.download_file_stream(file.id).await.unwrap();
     assert_eq!(download.filename, "report.pdf");
-    assert_eq!(download.size, 1024);
+    assert_eq!(download.size, data.len() as u64);
     assert_eq!(download.content_type, "application/pdf", "PDF files should have application/pdf content type");
 
     // Upload a PNG file and verify content type
+    let png_data = b"This is a test PNG content.";
+    let mut cursor = Cursor::new(png_data);
     let png_file = app
-        .upload_file(
-            UploadFileRequest {
-                name: "image.png".into(),
-                path: "/uploads/image.png".into(),
-                url: "https://cdn.example.com/image.png".into(),
-                file_type: Some("png".into()),
-                size: 2048,
-                config_id: None,
-            },
+        .upload_file_stream(
+            "image.png".into(),
+            "image/png".into(),
+            &mut cursor,
+            None,
             Some("admin".into()),
         )
         .await
         .unwrap();
 
-    let download = app.download_file(png_file.id).await.unwrap();
+    let download = app.download_file_stream(png_file.id).await.unwrap();
     assert_eq!(download.content_type, "image/png", "PNG files should have image/png content type");
 
     // Non-existent file should fail
-    let result = app.download_file(999999).await;
+    let result = app.download_file_stream(999999).await;
     assert!(result.is_err(), "Non-existent file download should return error");
 }

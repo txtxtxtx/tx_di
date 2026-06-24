@@ -6,7 +6,7 @@
 //!   2.3 权限分配     ❌ (未实现)
 
 mod common;
-use admin_proto::{CreateRoleRequest, UpdateRoleRequest, AssignMenusRequest, ListRolesRequest};
+use admin_proto::{CreateRoleRequest, UpdateRoleRequest, ListRolesRequest};
 
 // ── 2.1 角色 CRUD ──────────────────────────────────────────────────────────
 
@@ -130,7 +130,7 @@ async fn assign_menus_to_role() {
         name: "菜单角色".into(), code: "menu_role".into(), sort: 1, remark: None, menu_ids: vec![],
     }, Some("admin".into())).await.unwrap();
 
-    let result = app.assign_menus(AssignMenusRequest { role_id: role.id, menu_ids: vec![1, 2, 3, 4, 5] }).await.unwrap();
+    let result = app.assign_menus(role.id, vec![1, 2, 3, 4, 5]).await.unwrap();
     assert_eq!(result.menu_ids, vec![1, 2, 3, 4, 5]);
 }
 
@@ -142,6 +142,6 @@ async fn assign_menus_empty_should_clear() {
         remark: None, menu_ids: vec![1, 2],
     }, Some("admin".into())).await.unwrap();
 
-    let result = app.assign_menus(AssignMenusRequest { role_id: role.id, menu_ids: vec![] }).await.unwrap();
+    let result = app.assign_menus(role.id, vec![]).await.unwrap();
     assert!(result.menu_ids.is_empty());
 }

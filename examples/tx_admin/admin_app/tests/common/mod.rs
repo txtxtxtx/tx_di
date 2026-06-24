@@ -1,13 +1,17 @@
 //! Common test helpers — shared by all integration test files.
 //!
 //! 使用真实 toasty 内存数据库进行测试。
+//!
+//! NOTE: 每个测试文件是独立的二进制，因此部分函数只被特定文件引用。
+//! `allow(dead_code)` 避免跨文件共享时的假阳性警告。
+
+#![allow(dead_code)]
 
 use std::sync::{Arc, OnceLock, RwLock};
 
 use tx_di_toasty::ToastyPlugin;
 use toasty::ModelSet;
 
-use admin_app::auth::app_service::AuthAppService;
 use admin_app::config::app_service::ConfigAppService;
 use admin_app::department::app_service::DepartmentAppService;
 use admin_app::dictionary::app_service::{DictDataAppService, DictTypeAppService};
@@ -71,34 +75,38 @@ pub async fn create_db_plugin() -> Arc<ToastyPlugin> {
 
 pub async fn create_user_service() -> (Arc<UserService>, Arc<ToastyUserRepository>) {
     let plugin = create_db_plugin().await;
-    let user_repo = Arc::new(ToastyUserRepository::new(plugin.clone()));
-    let role_repo = Arc::new(ToastyRoleRepository::new(plugin.clone()));
-    let dept_repo = Arc::new(ToastyDepartmentRepository::new(plugin.clone()));
-    let menu_repo = Arc::new(ToastyMenuRepository::new(plugin));
-    let user_service = Arc::new(UserService::new(user_repo.clone(), role_repo, dept_repo, menu_repo));
+    let user_repo = Arc::new(ToastyUserRepository::new(plugin));
+    let user_service = Arc::new(UserService::new(user_repo.clone()));
     (user_service, user_repo)
 }
 
 pub async fn create_user_app() -> (UserAppService, Arc<UserService>, Arc<ToastyUserRepository>) {
-    let (svc, repo) = create_user_service().await;
-    let app = UserAppService::new(svc.clone());
-    (app, svc, repo)
+    let plugin = create_db_plugin().await;
+    let user_repo = Arc::new(ToastyUserRepository::new(plugin.clone()));
+    let role_repo = Arc::new(ToastyRoleRepository::new(plugin.clone()));
+    let dept_repo = Arc::new(ToastyDepartmentRepository::new(plugin.clone()));
+    let menu_repo = Arc::new(ToastyMenuRepository::new(plugin));
+    let svc = Arc::new(UserService::new(user_repo.clone()));
+    let app = UserAppService::new(svc.clone(), role_repo, dept_repo, menu_repo);
+    (app, svc, user_repo)
 }
 
 // ── Role helpers ───────────────────────────────────────────────────────────
 
 pub async fn create_role_service() -> (Arc<RoleService>, Arc<ToastyRoleRepository>) {
     let plugin = create_db_plugin().await;
-    let role_repo = Arc::new(ToastyRoleRepository::new(plugin.clone()));
-    let user_repo = Arc::new(ToastyUserRepository::new(plugin));
-    let role_service = Arc::new(RoleService::new(role_repo.clone(), user_repo));
+    let role_repo = Arc::new(ToastyRoleRepository::new(plugin));
+    let role_service = Arc::new(RoleService::new(role_repo.clone()));
     (role_service, role_repo)
 }
 
 pub async fn create_role_app() -> (RoleAppService, Arc<RoleService>, Arc<ToastyRoleRepository>) {
-    let (svc, repo) = create_role_service().await;
-    let app = RoleAppService::new(svc.clone());
-    (app, svc, repo)
+    let plugin = create_db_plugin().await;
+    let role_repo = Arc::new(ToastyRoleRepository::new(plugin.clone()));
+    let user_repo = Arc::new(ToastyUserRepository::new(plugin));
+    let role_service = Arc::new(RoleService::new(role_repo.clone()));
+    let app = RoleAppService::new(role_service.clone(), user_repo);
+    (app, role_service, role_repo)
 }
 
 // ── Menu helpers ───────────────────────────────────────────────────────────
@@ -181,19 +189,21 @@ use tx_di_file::FileConfig;
 use tx_di_file::StorageBackend;
 use tx_di_file::storage::{FileStorage, OpendalStorage};
 
-pub async fn create_file_service() -> (Arc<FileService>, Arc<ToastyFileRepository>) {
+pub async fn create_file_service() -> (
+    Arc<FileService>, Arc<ToastyFileRepository>, Arc<ToastyFileConfigRepository>,
+) {
     let plugin = create_db_plugin().await;
     let file_repo = Arc::new(ToastyFileRepository::new(plugin.clone()));
     let file_config_repo = Arc::new(ToastyFileConfigRepository::new(plugin));
-    let file_service = Arc::new(FileService::new(file_repo.clone(), file_config_repo));
-    (file_service, file_repo)
+    let file_service = Arc::new(FileService::new(file_repo.clone(), file_config_repo.clone()));
+    (file_service, file_repo, file_config_repo)
 }
 
 /// 创建带真实本地文件存储的 FileAppService，适用于集成测试
 ///
 /// 返回的 `TempDir` 必须被调用方持有（否则目录会被删除导致读取失败）。
 pub async fn create_file_app() -> (FileAppService, Arc<FileService>, Arc<ToastyFileRepository>, tempfile::TempDir) {
-    let (svc, repo) = create_file_service().await;
+    let (svc, repo, file_config_repo) = create_file_service().await;
 
     let temp_dir = tempfile::tempdir().expect("无法创建临时目录");
     let config = Arc::new(FileConfig {
@@ -213,7 +223,7 @@ pub async fn create_file_app() -> (FileAppService, Arc<FileService>, Arc<ToastyF
         storage: storage_lock,
     });
 
-    let app = FileAppService::new(svc.clone(), plugin);
+    let app = FileAppService::new(svc.clone(), plugin, file_config_repo);
     (app, svc, repo, temp_dir)
 }
 

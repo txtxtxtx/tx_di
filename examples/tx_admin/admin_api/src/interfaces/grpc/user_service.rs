@@ -136,7 +136,7 @@ impl UserService for UserGrpcService {
 
         let req = request.into_inner();
         let svc: Arc<admin_app::user::app_service::UserAppService> = self.app.inject();
-        svc.assign_roles(req).await.map_err(err::to_status)?;
+        svc.assign_roles(req.user_id, req.role_ids).await.map_err(err::to_status)?;
         Ok(Response::new(Empty {}))
     }
 
@@ -149,7 +149,7 @@ impl UserService for UserGrpcService {
 
         let req = request.into_inner();
         let svc: Arc<admin_app::user::app_service::UserAppService> = self.app.inject();
-        svc.assign_departments(req)
+        svc.assign_departments(req.user_id, req.dept_ids)
             .await
             .map_err(err::to_status)?;
         Ok(Response::new(Empty {}))

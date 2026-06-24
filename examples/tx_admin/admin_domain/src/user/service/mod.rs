@@ -5,42 +5,29 @@ use tx_di_core::tx_comp;
 use tx_error::AppResult;
 use crate::shared::repository::RepositoryError;
 use crate::user::model::aggregate::User;
-use crate::user::model::value_object::{LoginUser, Sex, UserQuery, UserStatus};
+use crate::user::model::value_object::{Sex, UserQuery, UserStatus};
 use crate::user::repository::UserRepository;
-use crate::role::repository::RoleRepository;
-use crate::department::repository::DepartmentRepository;
-use crate::menu::repository::MenuRepository;
 use crate::password;
 
 /// User domain service
+///
+/// 只持有 UserRepository，不跨聚合依赖。
+/// 跨聚合操作（角色校验、部门校验、权限查询）由 Application 层的
+/// `UserAppService` 负责编排。
 #[tx_comp]
 pub struct UserService {
     user_repo: Arc<dyn UserRepository>,
-    role_repo: Arc<dyn RoleRepository>,
-    dept_repo: Arc<dyn DepartmentRepository>,
-    menu_repo: Arc<dyn MenuRepository>,
 }
 
 impl UserService {
     /// 创建 UserService 的新实例
-    ///
-    /// # 参数
-    /// * `user_repo` - 用户仓库，用于用户相关的数据库操作
-    /// * `role_repo` - 角色仓库，用于角色状态校验
-    /// * `dept_repo` - 部门仓库，用于部门状态校验
-    /// * `menu_repo` - 菜单仓库，用于从菜单中提取权限码
-    pub fn new(
-        user_repo: Arc<dyn UserRepository>,
-        role_repo: Arc<dyn RoleRepository>,
-        dept_repo: Arc<dyn DepartmentRepository>,
-        menu_repo: Arc<dyn MenuRepository>,
-    ) -> Self {
-        Self {
-            user_repo,
-            role_repo,
-            dept_repo,
-            menu_repo,
-        }
+    pub fn new(user_repo: Arc<dyn UserRepository>) -> Self {
+        Self { user_repo }
+    }
+
+    /// 获取 UserRepository 引用（供 App 层跨聚合操作使用）
+    pub fn user_repo(&self) -> &Arc<dyn UserRepository> {
+        &self.user_repo
     }
 
     /// 检查邮箱是否已被注册
@@ -270,100 +257,6 @@ impl UserService {
         Ok(user)
     }
 
-    /// 为用户分配角色
-    ///
-    /// # 参数
-    /// * `user_id` - 用户 ID
-    /// * `role_ids` - 要分配的角色 ID 列表
-    ///
-    /// # 执行逻辑
-    /// 1. 根据用户 ID 查询用户，若不存在则返回未找到错误
-    /// 2. 校验用户状态必须为 Active，否则返回状态校验错误
-    /// 3. 批量查询角色列表，逐个校验每个角色必须存在且为启用状态（status == 0）
-    /// 4. 调用用户仓库绑定用户与角色的关联关系
-    ///
-    /// # 返回
-    /// 成功返回 `()`
-    ///
-    /// # 错误
-    /// - `NotFoundUser` - 指定用户不存在
-    /// - `ValidationUserStatus` - 用户状态非 Active 或角色状态非启用
-    /// - 数据库操作失败时返回错误
-    pub async fn assign_roles(
-        &self,
-        user_id: u64,
-        role_ids: Vec<u64>,
-    ) -> AppResult<()> {
-        let user = self
-            .user_repo
-            .find_by_id(user_id)
-            .await?
-            .ok_or_else(|| RepositoryError::NotFoundUser)?;
-
-        // 用户必须为 Active 状态才能分配角色
-        if user.status != UserStatus::Active {
-            return Err(RepositoryError::ValidationUserStatus)?;
-        }
-
-        // 校验每个角色存在且为启用状态（status == 0 即 Enabled）
-        let roles = self.role_repo.find_by_ids(&role_ids).await?;
-        for r in &roles {
-            if r.status != 0 {
-                return Err(RepositoryError::ValidationUserStatus)?;
-            }
-        }
-
-        self.user_repo.bind_roles(user_id, &role_ids).await?;
-        Ok(())
-    }
-
-    /// 为用户分配部门
-    ///
-    /// # 参数
-    /// * `user_id` - 用户 ID
-    /// * `dept_ids` - 要分配的部门 ID 列表
-    ///
-    /// # 执行逻辑
-    /// 1. 根据用户 ID 查询用户，若不存在则返回未找到错误
-    /// 2. 校验用户状态必须为 Active，否则返回状态校验错误
-    /// 3. 批量查询部门列表，逐个校验每个部门必须存在且为启用状态（status == 0）
-    /// 4. 调用用户仓库绑定用户与部门的关联关系
-    ///
-    /// # 返回
-    /// 成功返回 `()`
-    ///
-    /// # 错误
-    /// - `NotFoundUser` - 指定用户不存在
-    /// - `ValidationUserStatus` - 用户状态非 Active 或部门状态非启用
-    /// - 数据库操作失败时返回错误
-    pub async fn assign_departments(
-        &self,
-        user_id: u64,
-        dept_ids: Vec<u64>,
-    ) -> AppResult<()> {
-        let user = self
-            .user_repo
-            .find_by_id(user_id)
-            .await?
-            .ok_or_else(|| RepositoryError::NotFoundUser)?;
-
-        // 用户必须为 Active 状态才能分配部门
-        if user.status != UserStatus::Active {
-            return Err(RepositoryError::ValidationUserStatus)?;
-        }
-
-        // 校验每个部门存在且为启用状态
-        let depts = self.dept_repo.find_by_ids(&dept_ids).await?;
-        for d in &depts {
-            if d.status != 0 {
-                return Err(RepositoryError::ValidationDeptDisabled)?;
-            }
-        }
-
-        self.user_repo.bind_departments(user_id, &dept_ids).await?;
-        Ok(())
-    }
-
     /// 分页查询用户列表
     ///
     /// # 参数
@@ -411,38 +304,6 @@ impl UserService {
         user.role_ids = self.user_repo.get_role_ids(user.id).await?;
         user.dept_ids = self.user_repo.get_dept_ids(user.id).await?;
         Ok(user)
-    }
-
-    /// 构建登录用户信息（用于身份认证）
-    ///
-    /// # 参数
-    /// * `user` - 用户聚合根引用
-    ///
-    /// # 执行逻辑
-    /// 1. 查询用户关联的角色 ID 列表
-    /// 2. 查询用户关联的部门 ID 列表
-    /// 3. 查询用户拥有的权限列表
-    /// 4. 组装 `LoginUser` 对象，包含用户 ID、用户名、昵称、租户 ID、角色、权限和部门信息
-    ///
-    /// # 返回
-    /// 成功返回 `LoginUser` 对象，用于登录认证和权限校验
-    ///
-    /// # 错误
-    /// - 数据库查询异常时返回错误
-    pub async fn build_login_user(&self, user: &User) -> AppResult<LoginUser> {
-        let role_ids = self.user_repo.get_role_ids(user.id).await?;
-        let dept_ids = self.user_repo.get_dept_ids(user.id).await?;
-        let permissions = self.menu_repo.find_permission_codes_by_user_id(user.id).await?;
-
-        Ok(LoginUser {
-            user_id: user.id,
-            username: user.username.clone(),
-            nickname: user.nickname.clone(),
-            tenant_id: user.tenant_id,
-            role_ids,
-            permissions,
-            dept_ids,
-        })
     }
 
     /// 根据用户名查询用户（用于登录验证）
