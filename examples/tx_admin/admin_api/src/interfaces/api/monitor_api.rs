@@ -29,7 +29,9 @@ static SERVER_CACHE: OnceLock<RwLock<HeapRb<ServerInfo>>> = OnceLock::new();
 const CACHE_CAPACITY: usize = 5;
 
 /// 获取或初始化缓存，并启动后台采集任务
-fn get_cache() -> &'static RwLock<HeapRb<ServerInfo>> {
+///
+/// 供 gRPC monitor_service 复用
+pub fn get_cache() -> &'static RwLock<HeapRb<ServerInfo>> {
     SERVER_CACHE.get_or_init(|| {
         // 启动后台采集任务
         tokio::spawn(async {

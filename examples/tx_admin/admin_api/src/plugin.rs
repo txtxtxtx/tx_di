@@ -8,7 +8,38 @@ use admin_app::log::app_service::OperateLogAppService;
 use admin_proto::CreateOperateLogRequest;
 
 use crate::interfaces::api;
+use crate::interfaces::grpc;
 use crate::operate_log::{OperateLogLayer, OperateLogEntry, OPERATE_LOG_CHANNEL_CAP};
+
+use grpc::auth_service::AuthGrpcService;
+use grpc::user_service::UserGrpcService;
+use grpc::role_service::RoleGrpcService;
+use grpc::menu_service::MenuGrpcService;
+use grpc::dept_service::DeptGrpcService;
+use grpc::config_service::ConfigGrpcService;
+use grpc::dict_service::DictGrpcService;
+use grpc::log_service::LogGrpcService;
+use grpc::file_service::FileGrpcService;
+use grpc::monitor_service::MonitorGrpcService;
+use grpc::tool_service::ToolGrpcService;
+use grpc::job_service::{JobGrpcService, JobLogGrpcService};
+
+use admin_proto::admin::auth::auth_service_server::AuthServiceServer;
+use admin_proto::admin::user::user_service_server::UserServiceServer;
+use admin_proto::admin::role::role_service_server::RoleServiceServer;
+use admin_proto::admin::menu::menu_service_server::MenuServiceServer;
+use admin_proto::admin::dept::department_service_server::DepartmentServiceServer;
+use admin_proto::admin::config::config_service_server::ConfigServiceServer;
+use admin_proto::admin::dict::dict_service_server::DictServiceServer;
+use admin_proto::admin::log::log_service_server::LogServiceServer;
+use admin_proto::admin::file::file_service_server::FileServiceServer;
+use admin_proto::admin::monitor::monitor_service_server::MonitorServiceServer;
+use admin_proto::admin::tool::tool_service_server::ToolServiceServer;
+use admin_proto::admin::job::job_service_server::JobServiceServer;
+use admin_proto::admin::job::job_log_service_server::JobLogServiceServer;
+
+/// gRPC 默认端口
+const DEFAULT_GRPC_PORT: u16 = 50051;
 
 #[tx_comp(init)]
 pub struct AdminPlugin;
@@ -72,6 +103,40 @@ impl CompInit for AdminPlugin {
 
             WebPlugin::add_router(router);
             info!("admin HTTP 路由已注册（含认证）");
+
+            // ════════════════════ gRPC Server ════════════════════
+
+            let grpc_port = DEFAULT_GRPC_PORT;
+            let grpc_addr: std::net::SocketAddr = format!("0.0.0.0:{}", grpc_port).parse()
+                .map_err(|e: std::net::AddrParseError| anyhow::anyhow!("gRPC 地址解析失败: {}", e))?;
+
+            let interceptor = grpc::auth_interceptor::GrpcAuthInterceptor::new();
+
+            // 构建 tonic Router，注册所有 gRPC 服务
+            let grpc_router = tonic::transport::Server::builder()
+                .layer(tonic::service::interceptor(interceptor))
+                .add_service(AuthServiceServer::new(AuthGrpcService { app: ctx.clone() }))
+                .add_service(UserServiceServer::new(UserGrpcService { app: ctx.clone() }))
+                .add_service(RoleServiceServer::new(RoleGrpcService { app: ctx.clone() }))
+                .add_service(MenuServiceServer::new(MenuGrpcService { app: ctx.clone() }))
+                .add_service(DepartmentServiceServer::new(DeptGrpcService { app: ctx.clone() }))
+                .add_service(ConfigServiceServer::new(ConfigGrpcService { app: ctx.clone() }))
+                .add_service(DictServiceServer::new(DictGrpcService { app: ctx.clone() }))
+                .add_service(LogServiceServer::new(LogGrpcService { app: ctx.clone() }))
+                .add_service(FileServiceServer::new(FileGrpcService { app: ctx.clone() }))
+                .add_service(MonitorServiceServer::new(MonitorGrpcService { app: ctx.clone() }))
+                .add_service(ToolServiceServer::new(ToolGrpcService))
+                .add_service(JobServiceServer::new(JobGrpcService { app: ctx.clone() }))
+                .add_service(JobLogServiceServer::new(JobLogGrpcService { app: ctx.clone() }));
+
+            tokio::spawn(async move {
+                info!("gRPC server listening on {}", grpc_addr);
+                if let Err(e) = grpc_router.serve(grpc_addr).await {
+                    tracing::error!("gRPC server error: {}", e);
+                }
+            });
+            info!("admin gRPC 路由已注册（端口 {}）", grpc_port);
+
             Ok(())
         }
     );

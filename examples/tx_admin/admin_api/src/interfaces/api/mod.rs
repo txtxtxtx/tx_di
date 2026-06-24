@@ -11,7 +11,7 @@ mod config_api;
 mod dict_api;
 mod log_api;
 mod file_api;
-mod monitor_api;
+pub mod monitor_api;
 mod tool_api;
 mod job_api;
 
