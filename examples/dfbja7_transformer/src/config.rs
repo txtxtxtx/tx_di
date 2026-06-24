@@ -1,5 +1,26 @@
 use serde::Deserialize;
+use std::collections::HashMap;
 use tx_di_core::{tx_comp, CompInit};
+
+/// 传感器配置
+#[derive(Debug, Clone, Deserialize)]
+pub struct SensorConfig {
+    /// 传感器名称（如 O2、CO、H2S）
+    pub name: String,
+    /// 单位（如 %Vol、ppm）
+    pub unit: String,
+    /// 最小值
+    pub min: f64,
+    /// 最大值
+    pub max: f64,
+}
+
+/// 设备型号配置
+#[derive(Debug, Clone, Deserialize)]
+pub struct ModelConfig {
+    /// 传感器配置列表
+    pub sensors: Vec<SensorConfig>,
+}
 
 /// 应用配置
 ///
@@ -52,6 +73,10 @@ pub struct AppConfig {
     /// MQTT主题前缀
     #[serde(default = "default_mqtt_topic_prefix")]
     pub mqtt_topic_prefix: String,
+
+    /// 设备型号配置（按设备型号名称索引）
+    #[serde(default)]
+    pub model: HashMap<String, ModelConfig>,
 }
 
 fn default_tcp_port() -> u16 {
@@ -84,6 +109,7 @@ impl Default for AppConfig {
             mqtt_username: None,
             mqtt_password: None,
             mqtt_topic_prefix: default_mqtt_topic_prefix(),
+            model: HashMap::new(),
         }
     }
 }

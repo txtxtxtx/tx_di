@@ -135,25 +135,36 @@ impl TcpServer {
         // 解析消息
         let device_data = ProtocolParser::parse(frame)?;
 
-        // 转换为设备信息
-        let device_info = match device_data {
+        // 转换为设备载荷（需要从配置中获取传感器配置）
+        let empty_configs = vec![];
+        let device_payload = match device_data {
             crate::protocol::DeviceData::Nano4SP(model) => {
                 info!("解析Nano4SP数据: {}", model);
-                model.to_device_info()
+                let sensor_configs = config
+                    .model
+                    .get("Nano4SP")
+                    .map(|m| &m.sensors)
+                    .unwrap_or(&empty_configs);
+                model.to_payload(sensor_configs)
             }
             crate::protocol::DeviceData::GQB200A7U(model) => {
                 info!("解析GQB200A7U数据: {}", model);
-                model.to_device_info()
+                let sensor_configs = config
+                    .model
+                    .get("GQB200A7U")
+                    .map(|m| &m.sensors)
+                    .unwrap_or(&empty_configs);
+                model.to_payload(sensor_configs)
             }
         };
 
         // 序列化为JSON
-        let json = serde_json::to_string(&device_info)?;
+        let json = serde_json::to_string(&device_payload)?;
 
         // 生成MQTT主题
         let topic = format!(
             "{}{}/{}",
-            config.mqtt_topic_prefix, device_info.device_model, device_info.device_code
+            config.mqtt_topic_prefix, device_payload.device_model, device_payload.device_code
         );
 
         // 发送到MQTT

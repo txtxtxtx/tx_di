@@ -19,3 +19,28 @@ mqtt_client_id = "dfbja7_transformer"
 mqtt_username = ""
 mqtt_password = ""
 mqtt_topic_prefix = "/device/"
+
+# 设备型号传感器配置
+[app_config.model.GQB200A7U]
+sensors = [
+    # 可燃气体 10%LEL 低报点 20%LEL 高报点 
+    { name = "EX", unit = "%LEL", min = 0.0, max = 10.0 },
+    # 硫化氢 10ppm 低报点 20ppm 高报点
+    { name = "H2S", unit = "ppm", min = 0.0, max = 10.0 },
+    # 一氧化碳 50ppm 低报点 200ppm 高报点
+    { name = "CO", unit = "ppm", min = 0.0, max = 1000.0 },
+    # 氧气 低于 19.5% Vol 缺氧  高于 23.5% Vol 富氧
+    { name = "O2", unit = "%Vol", min = 19.5, max = 23.5 },
+]
+
+[app_config.model.Nano4SP]
+sensors = [
+    # 可燃气体 10%LEL 低报点 20%LEL 高报点 
+    { name = "EX", unit = "%LEL", min = 0.0, max = 10.0 },
+    # 硫化氢 10ppm 低报点 20ppm 高报点
+    { name = "H2S", unit = "ppm", min = 0.0, max = 10.0 },
+    # 一氧化碳 50ppm 低报点 200ppm 高报点
+    { name = "CO", unit = "ppm", min = 0.0, max = 1000.0 },
+    # 氧气 低于 19.5% Vol 缺氧  高于 23.5% Vol 富氧
+    { name = "O2", unit = "%Vol", min = 19.5, max = 23.5 },
+]

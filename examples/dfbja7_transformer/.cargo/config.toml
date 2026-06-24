@@ -1,0 +1,9 @@
+# 交叉编译配置
+# 安装目标: rustup target add x86_64-unknown-linux-musl
+# 使用: cargo build --release --target x86_64-unknown-linux-musl
+
+# 使用 zig cc 作为交叉编译链接器 (推荐)
+# 安装 zig: https://ziglang.org/download/ 或 winget install zig.zig
+# [target.x86_64-unknown-linux-musl]
+# linker = "./zig-cc-wrapper.bat"
+# rustflags = ["-C", "link-arg=-target", "-C", "link-arg=x86_64-linux-musl"]

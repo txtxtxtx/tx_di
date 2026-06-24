@@ -1,10 +1,11 @@
 pub mod nano4sp;
 pub mod gqb200a7u;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+use crate::config::SensorConfig;
 
 /// 设备数据模型
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(tag = "device_model")]
 pub enum DeviceModel {
     #[serde(rename = "Nano4SP")]
@@ -14,101 +15,63 @@ pub enum DeviceModel {
     GQB200A7U(gqb200a7u::GQB200A7UModel),
 }
 
-/// 通用设备信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DeviceInfo {
+/// MQTT 发送的设备数据载荷
+#[derive(Debug, Clone, Serialize)]
+pub struct DevicePayload {
+    /// 序列号（Unix 毫秒时间戳）
+    pub seq: i64,
+    /// 时间戳（Unix 秒）
+    pub timestamp: i64,
+    /// 传感器参数列表
+    pub params: Vec<Param>,
     /// 设备类型
     pub device_model: String,
     /// 设备编号
     pub device_code: String,
     /// 信号强度
     pub rssi: String,
-    /// 传感器数据
-    pub sensors: Sensors,
     /// GPS数据
     pub gps: GpsData,
-    /// 报警信息
-    pub alarm: AlarmInfo,
-    /// 电量信息
-    pub soc: Option<String>,
-    /// 时间戳
-    pub timestamp: String,
 }
 
-/// 传感器数据
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Sensors {
-    pub sensor1: String,
-    pub sensor2: String,
-    pub sensor3: String,
-    pub sensor4: String,
+/// 传感器参数
+#[derive(Debug, Clone, Serialize)]
+pub struct Param {
+    /// 传感器名称
+    pub name: String,
+    /// 单位
+    pub unit: String,
+    /// 最小值
+    pub min: f64,
+    /// 最大值
+    pub max: f64,
+    /// 当前值
+    pub value: f64,
 }
 
 /// GPS数据
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct GpsData {
     pub longitude: String,
     pub latitude: String,
 }
 
-/// 报警信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AlarmInfo {
-    pub levels: Vec<u8>,
-    pub level_descriptions: Vec<String>,
-    pub special: Vec<String>,
+/// 将传感器值字符串转换为 f64
+pub fn parse_sensor_value(s: &str) -> f64 {
+    s.parse::<f64>().unwrap_or(-1.0)
 }
 
-impl From<nano4sp::Nano4SPModel> for DeviceInfo {
-    fn from(model: nano4sp::Nano4SPModel) -> Self {
-        DeviceInfo {
-            device_model: model.device_model,
-            device_code: model.device_code,
-            rssi: model.rssi,
-            sensors: Sensors {
-                sensor1: model.sensor1,
-                sensor2: model.sensor2,
-                sensor3: model.sensor3,
-                sensor4: model.sensor4,
-            },
-            gps: GpsData {
-                longitude: model.lng,
-                latitude: model.lat,
-            },
-            alarm: AlarmInfo {
-                levels: model.alarm,
-                level_descriptions: model.level,
-                special: model.alarm_sp,
-            },
-            soc: Some(model.soc),
-            timestamp: chrono::Utc::now().to_rfc3339(),
-        }
-    }
-}
-
-impl From<gqb200a7u::GQB200A7UModel> for DeviceInfo {
-    fn from(model: gqb200a7u::GQB200A7UModel) -> Self {
-        DeviceInfo {
-            device_model: model.device_model,
-            device_code: model.device_code,
-            rssi: model.rssi,
-            sensors: Sensors {
-                sensor1: model.sensor1,
-                sensor2: model.sensor2,
-                sensor3: model.sensor3,
-                sensor4: model.sensor4,
-            },
-            gps: GpsData {
-                longitude: model.lng,
-                latitude: model.lat,
-            },
-            alarm: AlarmInfo {
-                levels: model.alarm,
-                level_descriptions: model.level,
-                special: model.alarm_sp,
-            },
-            soc: None,
-            timestamp: chrono::Utc::now().to_rfc3339(),
-        }
-    }
+/// 根据传感器配置和值列表生成 Param 列表
+pub fn build_params(sensor_values: &[String], sensor_configs: &[SensorConfig]) -> Vec<Param> {
+    sensor_configs
+        .iter()
+        .zip(sensor_values.iter())
+        .map(|(config, value)| Param {
+            name: config.name.clone(),
+            unit: config.unit.clone(),
+            min: config.min,
+            max: config.max,
+            value: parse_sensor_value(value),
+        })
+        .collect()
 }

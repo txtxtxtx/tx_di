@@ -1,3 +1,20 @@
+```shell
+# 可用
+cargo zigbuild --release --target x86_64-unknown-linux-musl
+
+rustup install nightly
+rustup target add x86_64-unknown-linux-musl --toolchain nightly
+cargo +nightly build --release --target x86_64-unknown-linux-musl
+
+cargo build --release
+
+# 交叉编译 amd64 linux (glibc: Ubuntu/Debian/CentOS)
+cargo build --release --target x86_64-unknown-linux-gnu
+
+# 交叉编译 amd64 linux (musl: Alpine)
+cargo build --release --target x86_64-unknown-linux-musl
+```
+
 ```json
 {
   "seq": 2055111111,
@@ -31,7 +48,14 @@
       "unit": "ppm",
       "value": 0.2222222
     }
-  ]
+  ],
+  "device_model": "GQB200A7U",
+  "device_code": "221090054",
+  "rssi": "-113dBm or less",
+  "gps": {
+  "longitude": "0",
+  "latitude": "0"
+  },
 }
 ```
 

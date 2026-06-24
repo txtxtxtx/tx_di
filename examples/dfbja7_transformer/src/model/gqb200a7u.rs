@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::config::SensorConfig;
 
 /// GQB200A7U设备数据模型
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,29 +52,28 @@ impl GQB200A7UModel {
         serde_json::from_str(json)
     }
 
-    /// 转换为通用设备信息
-    pub fn to_device_info(&self) -> crate::model::DeviceInfo {
-        crate::model::DeviceInfo {
+    /// 转换为 MQTT 发送的设备数据载荷
+    pub fn to_payload(&self, sensor_configs: &[SensorConfig]) -> crate::model::DevicePayload {
+        let sensor_values = vec![
+            self.sensor1.clone(),
+            self.sensor2.clone(),
+            self.sensor3.clone(),
+            self.sensor4.clone(),
+        ];
+
+        let now = chrono::Utc::now();
+
+        crate::model::DevicePayload {
+            seq: now.timestamp_millis(),
+            timestamp: now.timestamp(),
+            params: crate::model::build_params(&sensor_values, sensor_configs),
             device_model: self.device_model.clone(),
             device_code: self.device_code.clone(),
             rssi: self.rssi.clone(),
-            sensors: crate::model::Sensors {
-                sensor1: self.sensor1.clone(),
-                sensor2: self.sensor2.clone(),
-                sensor3: self.sensor3.clone(),
-                sensor4: self.sensor4.clone(),
-            },
             gps: crate::model::GpsData {
                 longitude: self.lng.clone(),
                 latitude: self.lat.clone(),
             },
-            alarm: crate::model::AlarmInfo {
-                levels: self.alarm.clone(),
-                level_descriptions: self.level.clone(),
-                special: self.alarm_sp.clone(),
-            },
-            soc: None,
-            timestamp: chrono::Utc::now().to_rfc3339(),
         }
     }
 }

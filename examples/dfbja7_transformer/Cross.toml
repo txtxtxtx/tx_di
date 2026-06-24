@@ -1,0 +1,13 @@
+# cross 配置文件
+# 确保使用 Docker 进行交叉编译
+
+[build]
+# 允许在 Docker 中使用网络
+xargo = false
+
+# 为 musl 目标指定镜像
+[target.x86_64-unknown-linux-musl]
+image = "ghcr.io/cross-rs/x86_64-unknown-linux-musl:main"
+
+[target.aarch64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:main"
