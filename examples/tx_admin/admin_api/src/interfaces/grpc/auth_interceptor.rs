@@ -3,12 +3,12 @@
 //! 使用 tower middleware 实现，从 metadata 提取 Bearer token，通过 sa-token 验证并注入 login_id。
 //! 公开方法（如 Login）跳过认证。
 
+use std::future::Future;
+use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use futures::future::BoxFuture;
 use axum::http::{Request, Response};
 use sa_token_core::token::TokenValue;
-use tonic::Status;
 use tower::{Layer, Service};
 use tracing::warn;
 use tx_di_sa_token::StpUtil;
@@ -40,13 +40,12 @@ impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for AuthMiddleware<S>
 where
     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Clone + Send + 'static,
     S::Future: Send + 'static,
-    S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
     ReqBody: Send + 'static,
     ResBody: Send + Default + 'static,
 {
     type Response = S::Response;
     type Error = S::Error;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
@@ -68,8 +67,12 @@ where
             let token = match extract_bearer_token(&req) {
                 Ok(t) => t,
                 Err(e) => {
-                    // 返回错误响应
-                    let response = Response::new(ResBody::default());
+                    warn!("gRPC 认证失败: {}", e);
+                    // 返回 401 响应
+                    let response = Response::builder()
+                        .status(401)
+                        .body(ResBody::default())
+                        .unwrap();
                     return Ok(response);
                 }
             };
@@ -79,7 +82,11 @@ where
                 Ok(id) => id,
                 Err(e) => {
                     warn!("gRPC 认证失败: {}", e);
-                    let response = Response::new(ResBody::default());
+                    // 返回 401 响应
+                    let response = Response::builder()
+                        .status(401)
+                        .body(ResBody::default())
+                        .unwrap();
                     return Ok(response);
                 }
             };
@@ -118,70 +125,68 @@ impl<S> Layer<S> for AuthLayer {
 // ============================================================
 
 /// 从 gRPC metadata 提取 Bearer token
-fn extract_bearer_token<B>(req: &Request<B>) -> Result<TokenValue, Status> {
+fn extract_bearer_token<B>(req: &Request<B>) -> Result<TokenValue, String> {
     let auth_value = req
         .headers()
         .get("authorization")
-        .ok_or_else(|| Status::unauthenticated("缺少 authorization metadata"))?;
+        .ok_or_else(|| "缺少 authorization metadata".to_string())?;
 
     let auth_str = auth_value
         .to_str()
-        .map_err(|_| Status::unauthenticated("authorization metadata 格式无效"))?;
+        .map_err(|_| "authorization metadata 格式无效".to_string())?;
 
     if let Some(token) = auth_str.strip_prefix("Bearer ") {
         Ok(TokenValue::new(token))
     } else {
-        Err(Status::unauthenticated(
-            "authorization 格式应为 'Bearer {token}'",
-        ))
+        Err("authorization 格式应为 'Bearer {token}'".to_string())
     }
 }
 
 /// 从 request extensions 获取 login_id
 ///
 /// 在 gRPC service 方法中调用，获取当前已认证用户的 login_id。
-pub fn get_login_id(req: &tonic::Request<impl std::any::Any>) -> Result<String, Status> {
+pub fn get_login_id(req: &tonic::Request<impl std::any::Any>) -> Result<String, tonic::Status> {
     req.extensions()
         .get::<GrpcLoginId>()
         .map(|id| id.0.clone())
-        .ok_or_else(|| Status::unauthenticated("未找到登录信息"))
+        .ok_or_else(|| tonic::Status::unauthenticated("未找到登录信息"))
 }
 
 /// 从 request extensions 获取 login_id 为 u64
-pub fn get_login_id_u64(req: &tonic::Request<impl std::any::Any>) -> Result<u64, Status> {
+pub fn get_login_id_u64(req: &tonic::Request<impl std::any::Any>) -> Result<u64, tonic::Status> {
     let id_str = get_login_id(req)?;
     id_str
         .parse::<u64>()
-        .map_err(|_| Status::internal("login_id 格式无效"))
+        .map_err(|_| tonic::Status::internal("login_id 格式无效"))
 }
 
 /// 从 request extensions 获取原始 token
-pub fn get_token(req: &tonic::Request<impl std::any::Any>) -> Result<TokenValue, Status> {
+pub fn get_token(req: &tonic::Request<impl std::any::Any>) -> Result<TokenValue, tonic::Status> {
     req.extensions()
         .get::<GrpcToken>()
         .map(|t| t.0.clone())
-        .ok_or_else(|| Status::unauthenticated("未找到 token"))
+        .ok_or_else(|| tonic::Status::unauthenticated("未找到 token"))
 }
 
 /// gRPC 权限检查
 ///
 /// 通过 sa-token 检查用户是否拥有指定权限。
 /// admin 角色（role_code="admin"）跳过权限检查。
-pub async fn ensure_grpc_permission(login_id: &str, perm: &str) -> Result<(), Status> {
+pub async fn ensure_grpc_permission(login_id: &str, perm: &str) -> Result<(), tonic::Status> {
     // admin 角色跳过权限检查
     if StpUtil::has_role(login_id, crate::auth::ADMIN_ROLE).await {
         return Ok(());
     }
     StpUtil::check_permission(login_id, perm)
         .await
-        .map_err(|e| Status::permission_denied(format!("缺少权限 {}: {}", perm, e)))
+        .map_err(|e| tonic::Status::permission_denied(format!("缺少权限 {}: {}", perm, e)))
 }
 
 /// gRPC 角色检查
-pub async fn ensure_grpc_role(login_id: &str, role: &str) -> Result<(), Status> {
+pub async fn ensure_grpc_role(login_id: &str, role: &str) -> Result<(), tonic::Status> {
     StpUtil::check_role(login_id, role)
         .await
-        .map_err(|e| Status::permission_denied(format!("缺少角色 {}: {}", role, e)))
+        .map_err(|e| tonic::Status::permission_denied(format!("缺少角色 {}: {}", role, e)))
 }
 
 // ============================================================
@@ -192,7 +197,6 @@ pub async fn ensure_grpc_role(login_id: &str, role: &str) -> Result<(), Status> 
 mod tests {
     use super::*;
     use http::HeaderValue;
-    use tonic::metadata::MetadataValue;
 
     /// 测试提取 Bearer token - 正常情况
     ///
@@ -222,14 +226,9 @@ mod tests {
         let result = extract_bearer_token(&req);
         assert!(result.is_err(), "缺少 authorization 应返回错误");
 
-        let status = result.unwrap_err();
-        assert_eq!(
-            status.code(),
-            tonic::Code::Unauthenticated,
-            "错误码应为 Unauthenticated"
-        );
+        let error = result.unwrap_err();
         assert!(
-            status.message().contains("缺少 authorization"),
+            error.contains("缺少 authorization"),
             "错误信息应提示缺少 authorization"
         );
     }
@@ -248,14 +247,9 @@ mod tests {
         let result = extract_bearer_token(&req);
         assert!(result.is_err(), "格式错误应返回错误");
 
-        let status = result.unwrap_err();
-        assert_eq!(
-            status.code(),
-            tonic::Code::Unauthenticated,
-            "错误码应为 Unauthenticated"
-        );
+        let error = result.unwrap_err();
         assert!(
-            status.message().contains("Bearer"),
+            error.contains("Bearer"),
             "错误信息应提示需要 Bearer 格式"
         );
     }

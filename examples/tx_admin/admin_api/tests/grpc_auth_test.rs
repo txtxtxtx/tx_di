@@ -96,10 +96,14 @@ async fn test_get_user_info() {
         .expect("登录失败")
         .into_inner();
 
-    // 获取用户信息
-    let user_info_request = Request::new(GetUserInfoRequest {
+    // 获取用户信息（需要携带 token）
+    let mut user_info_request = Request::new(GetUserInfoRequest {
         user_id: login_response.user_id,
     });
+    user_info_request.metadata_mut().insert(
+        "authorization",
+        format!("Bearer {}", login_response.token).parse().unwrap(),
+    );
 
     let user_info = client
         .get_user_info(user_info_request)
@@ -143,11 +147,16 @@ async fn test_logout() {
         .expect("登录失败")
         .into_inner();
 
+
+
     // 登出
-    let logout_request = Request::new(LogoutRequest {
+    let mut logout_request = Request::new(LogoutRequest {
         user_id: login_response.user_id,
     });
-
+    logout_request.metadata_mut().insert(
+        "authorization",
+        format!("Bearer {}", login_response.token).parse().unwrap(),
+    );
     let response = client
         .logout(logout_request)
         .await

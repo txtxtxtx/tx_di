@@ -21,6 +21,10 @@ pub fn to_status(e: impl std::fmt::Display) -> Status {
         || msg_lower.contains("unauthorized")
         || msg_lower.contains("未登录")
         || msg_lower.contains("认证")
+        || msg_lower.contains("密码")
+        || msg_lower.contains("password")
+        || msg_lower.contains("账号")
+        || msg_lower.contains("username")
     {
         return Status::unauthenticated(msg);
     }
