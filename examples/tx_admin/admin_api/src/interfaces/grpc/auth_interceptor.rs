@@ -35,12 +35,13 @@ impl GrpcAuthInterceptor {
 
 impl tonic::service::Interceptor for GrpcAuthInterceptor {
     fn call(&mut self, mut req: Request<()>) -> Result<Request<()>, Status> {
-        // 获取请求方法名
+        // 获取请求方法名（gRPC 路径格式: /package.Service/Method）
         let method = req
             .metadata()
             .get("uri")
             .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
+            .unwrap_or("")
+            .to_string();
 
         // 公开方法跳过认证
         if OPEN_METHODS.iter().any(|&m| method.contains(m)) {
@@ -134,4 +135,76 @@ pub async fn ensure_grpc_role(login_id: &str, role: &str) -> Result<(), Status> 
     StpUtil::check_role(login_id, role)
         .await
         .map_err(|e| Status::permission_denied(format!("缺少角色 {}: {}", role, e)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tonic::metadata::MetadataValue;
+
+    /// 测试提取 Bearer token - 正常情况
+    ///
+    /// 验证：从正确的 "Bearer {token}" 格式中提取 token
+    #[test]
+    fn test_extract_bearer_token_success() {
+        let mut req = Request::new(());
+        req.metadata_mut().insert(
+            "authorization",
+            MetadataValue::from_static("Bearer abc123xyz"),
+        );
+
+        let result = extract_bearer_token(&req);
+        assert!(result.is_ok(), "应该成功提取 token");
+
+        let token = result.unwrap();
+        assert_eq!(token.to_string(), "abc123xyz", "token 值应为 abc123xyz");
+    }
+
+    /// 测试提取 Bearer token - 缺少 authorization header
+    ///
+    /// 验证：没有 authorization header 时返回错误
+    #[test]
+    fn test_extract_bearer_token_missing() {
+        let req = Request::new(());
+
+        let result = extract_bearer_token(&req);
+        assert!(result.is_err(), "缺少 authorization 应返回错误");
+
+        let status = result.unwrap_err();
+        assert_eq!(
+            status.code(),
+            tonic::Code::Unauthenticated,
+            "错误码应为 Unauthenticated"
+        );
+        assert!(
+            status.message().contains("缺少 authorization"),
+            "错误信息应提示缺少 authorization"
+        );
+    }
+
+    /// 测试提取 Bearer token - 格式错误（没有 Bearer 前缀）
+    ///
+    /// 验证：authorization 值不是 "Bearer xxx" 格式时返回错误
+    #[test]
+    fn test_extract_bearer_token_invalid_format() {
+        let mut req = Request::new(());
+        req.metadata_mut().insert(
+            "authorization",
+            MetadataValue::from_static("Basic abc123"),
+        );
+
+        let result = extract_bearer_token(&req);
+        assert!(result.is_err(), "格式错误应返回错误");
+
+        let status = result.unwrap_err();
+        assert_eq!(
+            status.code(),
+            tonic::Code::Unauthenticated,
+            "错误码应为 Unauthenticated"
+        );
+        assert!(
+            status.message().contains("Bearer"),
+            "错误信息应提示需要 Bearer 格式"
+        );
+    }
 }
