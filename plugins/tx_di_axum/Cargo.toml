@@ -28,6 +28,6 @@ tower.workspace = true
 tower-http.workspace = true
 http.workspace = true
 tokio-util.workspace = true
-tx_common = { workspace = true }
+tx_common = { workspace = true, features = ["axum"] }
 aide = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }

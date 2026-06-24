@@ -70,6 +70,7 @@ dependencies = [
  "tx_common",
  "tx_di_file",
  "tx_di_job",
+ "tx_di_sa_token",
  "tx_di_toasty",
  "tx_error",
  "uuid",
