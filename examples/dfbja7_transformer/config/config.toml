@@ -18,7 +18,7 @@ mqtt_port = 1883
 mqtt_client_id = "dfbja7_transformer"
 mqtt_username = ""
 mqtt_password = ""
-mqtt_topic_prefix = "/device/"
+mqtt_topic_prefix = "SENSOR/GAS/SRV000"
 
 # 设备型号传感器配置
 [app_config.model.GQB200A7U]

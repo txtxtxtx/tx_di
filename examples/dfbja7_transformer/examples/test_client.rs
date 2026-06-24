@@ -26,7 +26,7 @@ const TEST_DATA_LIST: &[(&str, &str)] = &[
 
 
 /// 服务器地址
-const SERVER_ADDR: &str = "127.0.0.1:10080";
+const SERVER_ADDR: &str = "192.168.0.90:10080";
 
 /// 推送间隔（秒）
 const INTERVAL_SECS: u64 = 5;

@@ -163,8 +163,8 @@ impl TcpServer {
 
         // 生成MQTT主题
         let topic = format!(
-            "{}{}/{}",
-            config.mqtt_topic_prefix, device_payload.device_model, device_payload.device_code
+            "{}/{}",
+            config.mqtt_topic_prefix, device_payload.device_code
         );
 
         // 发送到MQTT
