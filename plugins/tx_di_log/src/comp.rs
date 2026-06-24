@@ -48,7 +48,7 @@ impl CompInit for LogPlugins{
         let file_appender = RollingFileAppender::builder()
             .rotation(Rotation::DAILY)
             .filename_prefix(&self.config.prefix)
-            .filename_suffix(".log")
+            .filename_suffix("log")
             .max_log_files(self.config.retention_days)
             .build(&self.config.dir)
             .map_err(|e| anyhow::Error::new(e))?;
