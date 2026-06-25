@@ -29,4 +29,4 @@ tokio-stream = { workspace = true }
 futures = { workspace = true }
 
 # 统一文件存储后端（OpenDAL）
-opendal = { workspace = true }
+opendal = { workspace = true, features = ["services-s3","layers-tracing"] }

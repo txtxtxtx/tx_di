@@ -100,7 +100,7 @@ futures-core = "0.3"
 futures = "0.3"
 
 # 统一文件存储抽象层（支持 local/s3/gcs/azblob 等）
-opendal = { version = "0.52", features = ["layers-tracing"] }
+opendal = { version = "0.57"}
 # 日志
 time = { version = "0.3" }
 log = { version = "0.4", features = ["serde"] }

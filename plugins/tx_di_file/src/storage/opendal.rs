@@ -40,8 +40,7 @@ impl OpendalStorage {
                 let mut builder = opendal::services::Fs::default();
                 builder = builder.root(&config.base_path);
                 Operator::new(builder)
-                    .map_err(|e| map_opendal_error(e, ""))?
-                    .layer(opendal::layers::TracingLayer)
+                    .map_err(|e| map_opendal_error(e, &config.base_path))?
                     .finish()
             }
             #[cfg(feature = "s3")]
@@ -67,7 +66,6 @@ impl OpendalStorage {
 
                 Operator::new(builder)
                     .map_err(|e| map_opendal_error(e, ""))?
-                    .layer(opendal::layers::TracingLayer)
                     .finish()
             }
             #[cfg(not(feature = "s3"))]
@@ -162,7 +160,7 @@ impl FileStorage for OpendalStorage {
     async fn read_stream(
         &self,
         path: &str,
-    ) -> AppResult<Pin<Box<dyn tokio::io::AsyncRead + Send + Unpin>>> {
+    ) -> AppResult<Pin<Box<dyn AsyncRead + Send + Unpin>>> {
         use tokio_util::io::StreamReader;
         use futures::StreamExt;
 
