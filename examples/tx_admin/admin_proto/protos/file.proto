@@ -22,7 +22,7 @@ message UploadFileRequest {
   string url = 3;
   optional string file_type = 4;
   int32 size = 5;
-  optional int32 config_id = 6;
+  optional uint64 config_id = 6;
 }
 
 message DeleteFileRequest {
@@ -36,14 +36,14 @@ message GetFileRequest {
 message ListFilesRequest {
   optional string name = 1;
   optional string file_type = 2;
-  optional int32 config_id = 3;
+  optional uint64 config_id = 3;
   int64 page = 4;
   int64 page_size = 5;
 }
 
 message FileResponse {
   uint64 id = 1;
-  optional int32 config_id = 2;
+  optional uint64 config_id = 2;
   string name = 3;
   string path = 4;
   string url = 5;
@@ -81,7 +81,7 @@ service FileConfigService {
 }
 
 message FileConfigResponse {
-  int32 id = 1;
+  uint64 id = 1;
   string name = 2;
   int32 storage = 3;         // 0=本地, 1=S3, 2=数据库
   optional string remark = 4;
@@ -94,7 +94,7 @@ message ListFileConfigsResponse {
 }
 
 message GetFileConfigRequest {
-  int32 id = 1;
+  uint64 id = 1;
 }
 
 message CreateFileConfigRequest {
@@ -105,7 +105,7 @@ message CreateFileConfigRequest {
 }
 
 message UpdateFileConfigRequest {
-  int32 id = 1;
+  uint64 id = 1;
   string name = 2;
   int32 storage = 3;
   optional string remark = 4;
@@ -113,9 +113,9 @@ message UpdateFileConfigRequest {
 }
 
 message DeleteFileConfigRequest {
-  int32 id = 1;
+  uint64 id = 1;
 }
 
 message SetMasterFileConfigRequest {
-  int32 id = 1;
+  uint64 id = 1;
 }
