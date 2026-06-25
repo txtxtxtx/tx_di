@@ -50,6 +50,8 @@ pub enum FilePluginErr {
     /// 存储后端初始化失败（配置错误或功能未启用）
     #[err(5003, "存储后端初始化失败")]
     StorageInitFailed,
+
+    /// 尝试获取默认存储后端，但默认后端不存在
     #[err(5004, "未找到默认存储后端")]
     DefaultStorageNotFound,
 }

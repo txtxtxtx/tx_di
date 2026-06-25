@@ -65,16 +65,26 @@ impl FileAppService {
     // 内部工具
     // ========================================================================
 
-    /// 获取存储后端 —— 优先 DB 配置，回退到插件默认配置
+    /// 获取存储后端 —— 优先缓存，其次 DB 配置，最后回退到插件默认配置
     ///
     /// - `config_id` 为 Some 时查找指定配置；找不到则回退主配置
     /// - 为 None 时查找主配置
     /// - DB 无配置时回退到 FilePlugin 的 TOML 配置
     async fn get_storage(&self, config_id: Option<i32>) -> AppResult<Arc<dyn FileStorage>> {
-        // 尝试从 DB 获取配置：指定 ID → 回退主配置（兼容已删除配置的旧文件）
+        // 1. 先尝试从插件缓存获取（避免每次请求都查 DB）
+        let cache_key = match config_id {
+            Some(cid) => user_key(&format!("db_{}", cid)),
+            None => user_key("db_master"),
+        };
+        if let Some(storage) = self.file_plugin.get_storage(&cache_key) {
+            return Ok(storage);
+        }
+
+        // 2. 未缓存，从 DB 加载配置
         let db_config = if let Some(cid) = config_id {
             match self.file_config_repo.find_by_id(cid).await? {
                 Some(cfg) => Some(cfg),
+                // 指定配置不存在时回退主配置（兼容已删除配置的旧文件）
                 None => self.file_config_repo.find_master().await?,
             }
         } else {
@@ -84,28 +94,22 @@ impl FileAppService {
         if let Some(cfg) = db_config {
             if cfg.storage == 2 {
                 return Err(AppError::with_context(
-                    FileStorageErr::NotFound,
+                    FilePluginErr::StorageNotFound,
                     "数据库存储后端不适用此操作",
                 ));
             }
 
-            // 尝试从插件缓存中获取
-            let key = user_key(&format!("db_{}", cfg.id()));
-            if let Some(storage) = self.file_plugin.get_storage(&key) {
-                return Ok(storage);
-            }
-
-            // 未缓存则从 DB 配置创建并注册到插件
+            // 从 DB 配置 JSON 创建存储后端并注册到插件缓存
             if let Ok(storage_cfg) = serde_json::from_str::<StorageConfig>(&cfg.config) {
                 if let Ok(storage) = OpendalStorage::from_storage_config(&storage_cfg) {
                     let storage = Arc::new(storage) as Arc<dyn FileStorage>;
-                    self.file_plugin.add_storage(key, storage.clone());
+                    self.file_plugin.add_storage(cache_key, storage.clone());
                     return Ok(storage);
                 }
             }
         }
 
-        // 回退到插件默认存储
+        // 3. 回退到插件默认存储
         self.file_plugin
             .default_storage()
             .ok_or_else(|| FilePluginErr::DefaultStorageNotFound.into())
