@@ -8,10 +8,11 @@ use admin_domain::file::model::aggregate::FileConfig;
 use admin_domain::file::model::value_object::{FileQuery, FileUploadCommand};
 use admin_domain::file::service::FileService;
 use admin_domain::file::repository::FileConfigRepository;
+use admin_domain::shared::model::Entity;
 use admin_proto::{ListFilesRequest, FileResponse};
 use tx_common::page::Page;
 use tx_di_core::tx_comp;
-use tx_di_file::{user_key, StorageConfig};
+use tx_di_file::{user_key, FilePluginErr, StorageConfig};
 use tx_di_file::storage::{guess_mime_type, extract_extension, FileStorageErr, FileStorage, OpendalStorage};
 use tx_di_file::FilePlugin;
 use tx_error::{AppError, AppResult};
@@ -107,7 +108,7 @@ impl FileAppService {
         // 回退到插件默认存储
         self.file_plugin
             .default_storage()
-            .ok_or_else(|| anyhow::anyhow!("默认存储后端不可用").into())
+            .ok_or_else(|| FilePluginErr::DefaultStorageNotFound.into())
     }
 
     /// 获取本地文件服务的根目录
