@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 pub struct FileQuery {
     pub name: Option<String>,
     pub file_type: Option<String>,
-    pub config_id: Option<i32>,
+    pub config_id: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -14,7 +14,7 @@ pub struct FileUploadCommand {
     pub url: String,
     pub file_type: Option<String>,
     pub size: i32,
-    pub config_id: Option<i32>,
+    pub config_id: Option<u64>,
 }
 
 /// 文件下载信息（含存储路径，用于流式下载定位物理文件）

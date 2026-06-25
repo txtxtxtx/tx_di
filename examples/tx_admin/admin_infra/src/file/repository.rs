@@ -192,7 +192,7 @@ impl ToastyFileConfigRepository {
 
 #[async_trait]
 impl FileConfigRepository for ToastyFileConfigRepository {
-    async fn find_by_id(&self, id: i32) -> AppResult<Option<FileConfig>> {
+    async fn find_by_id(&self, id: u64) -> AppResult<Option<FileConfig>> {
         let mut db = self.plugin.db().clone();
         match SysFileConfig::get_by_id(&mut db, id).await {
             Ok(c) if c.deleted == Deleted::No => Ok(Some(Self::to_domain(&c))),
@@ -266,7 +266,7 @@ impl FileConfigRepository for ToastyFileConfigRepository {
         Ok(())
     }
 
-    async fn soft_delete(&self, id: i32) -> AppResult<()> {
+    async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
         let mut config = SysFileConfig::get_by_id(&mut db, id)
             .await

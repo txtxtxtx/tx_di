@@ -71,12 +71,12 @@ mod file_service_tests {
     // ----------------------------------------------------------
 
     struct TestFileConfigRepo {
-        find_by_id_fn: Box<dyn Fn(i32) -> AppResult<Option<FileConfig>> + Send + Sync>,
+        find_by_id_fn: Box<dyn Fn(u64) -> AppResult<Option<FileConfig>> + Send + Sync>,
         find_master_fn: Box<dyn Fn() -> AppResult<Option<FileConfig>> + Send + Sync>,
         find_all_fn: Box<dyn Fn() -> AppResult<Vec<FileConfig>> + Send + Sync>,
         insert_fn: Box<dyn Fn(&FileConfig) -> AppResult<()> + Send + Sync>,
         update_fn: Box<dyn Fn(&FileConfig) -> AppResult<()> + Send + Sync>,
-        soft_delete_fn: Box<dyn Fn(i32) -> AppResult<()> + Send + Sync>,
+        soft_delete_fn: Box<dyn Fn(u64) -> AppResult<()> + Send + Sync>,
     }
 
     impl TestFileConfigRepo {
@@ -94,7 +94,7 @@ mod file_service_tests {
 
     #[async_trait]
     impl FileConfigRepository for TestFileConfigRepo {
-        async fn find_by_id(&self, id: i32) -> AppResult<Option<FileConfig>> {
+        async fn find_by_id(&self, id: u64) -> AppResult<Option<FileConfig>> {
             (self.find_by_id_fn)(id)
         }
         async fn find_master(&self) -> AppResult<Option<FileConfig>> {
@@ -109,7 +109,7 @@ mod file_service_tests {
         async fn update(&self, config: &FileConfig) -> AppResult<()> {
             (self.update_fn)(config)
         }
-        async fn soft_delete(&self, id: i32) -> AppResult<()> {
+        async fn soft_delete(&self, id: u64) -> AppResult<()> {
             (self.soft_delete_fn)(id)
         }
     }

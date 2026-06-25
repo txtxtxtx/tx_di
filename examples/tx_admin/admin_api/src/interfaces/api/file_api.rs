@@ -96,7 +96,7 @@ async fn upload_files(
     ensure_permission("file:upload").await?;
     let creator = StpUtil::get_login_id_as_string().await?;
 
-    let mut config_id: Option<i32> = None;
+    let mut config_id: Option<u64> = None;
     let mut results: Vec<FileResponse> = Vec::new();
 
     while let Some(field) = multipart.next_field().await.map_err(|e| {
@@ -236,7 +236,7 @@ async fn list_configs(
 /// `GET /api/file/config/{id}`
 async fn get_config(
     DiComp(file_svc): DiComp<FileAppService>,
-    Path(id): Path<i32>,
+    Path(id): Path<u64>,
 ) -> Result<ApiR<FileConfigResponse>, ApiErr> {
     ensure_permission("file:view").await?;
     let c = file_svc.get_config(id).await?;
@@ -273,7 +273,7 @@ async fn create_config(
 /// `PUT /api/file/config/{id}`
 async fn update_config(
     DiComp(file_svc): DiComp<FileAppService>,
-    Path(id): Path<i32>,
+    Path(id): Path<u64>,
     Json(req): Json<UpdateFileConfigRequest>,
 ) -> Result<ApiR<FileConfigResponse>, ApiErr> {
     ensure_permission("file:upload").await?;
@@ -294,7 +294,7 @@ async fn update_config(
 /// `DELETE /api/file/config/{id}`
 async fn delete_config(
     DiComp(file_svc): DiComp<FileAppService>,
-    Path(id): Path<i32>,
+    Path(id): Path<u64>,
 ) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("file:delete").await?;
     let updater = StpUtil::get_login_id_as_string().await.ok();
@@ -305,7 +305,7 @@ async fn delete_config(
 /// `PUT /api/file/config/{id}/master`
 async fn set_master_config(
     DiComp(file_svc): DiComp<FileAppService>,
-    Path(id): Path<i32>,
+    Path(id): Path<u64>,
 ) -> Result<ApiR<FileConfigResponse>, ApiErr> {
     ensure_permission("file:upload").await?;
     let updater = StpUtil::get_login_id_as_string().await.ok();
@@ -344,7 +344,7 @@ async fn serve_local_file(
     Path(path): Path<String>,
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Result<impl IntoResponse, ApiErr> {
-    let config_id: Option<i32> = params.get("cid").and_then(|v| v.parse().ok());
+    let config_id: Option<u64> = params.get("cid").and_then(|v| v.parse().ok());
     let base = file_svc.serve_base_dir(config_id).await.unwrap_or_else(|| "./uploads".into());
     let safe_path = path.trim_start_matches('/');
     let full = std::path::PathBuf::from(&base).join(safe_path);

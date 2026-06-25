@@ -284,7 +284,7 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
     // 5. 创建字典数据
     for (type_id, (dict_type, type_name, items)) in DICT_SEEDS.iter().enumerate() {
         SysDictType::create()
-            .id(type_id + 1)
+            .id((type_id + 1) as u64)
             .name(type_name.to_string())
             .dict_type(dict_type.to_string())
             .status(Status::Enabled)
@@ -297,7 +297,7 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
             .map_err(|e| anyhow::anyhow!("创建字典类型 {} 失败: {}", dict_type, e))?;
 
         for (item_idx, (sort, label, value, color_type)) in items.iter().enumerate() {
-            let data_id = type_id * 100 + item_idx + 1;
+            let data_id = (type_id * 100 + item_idx + 1) as u64;
             SysDictData::create()
                 .id(data_id)
                 .sort(*sort)

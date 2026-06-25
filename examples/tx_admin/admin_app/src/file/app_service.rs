@@ -70,7 +70,7 @@ impl FileAppService {
     /// - `config_id` 为 Some 时查找指定配置；找不到则回退主配置
     /// - 为 None 时查找主配置
     /// - DB 无配置时回退到 FilePlugin 的 TOML 配置
-    async fn get_storage(&self, config_id: Option<i32>) -> AppResult<Arc<dyn FileStorage>> {
+    async fn get_storage(&self, config_id: Option<u64>) -> AppResult<Arc<dyn FileStorage>> {
         // 1. 先尝试从插件缓存获取（避免每次请求都查 DB）
         let cache_key = match config_id {
             Some(cid) => user_key(&format!("db_{}", cid)),
@@ -116,7 +116,7 @@ impl FileAppService {
     }
 
     /// 获取本地文件服务的根目录
-    pub async fn serve_base_dir(&self, config_id: Option<i32>) -> Option<String> {
+    pub async fn serve_base_dir(&self, config_id: Option<u64>) -> Option<String> {
         let db_config = if let Some(cid) = config_id {
             self.file_config_repo.find_by_id(cid).await.ok().flatten()
         } else {
@@ -142,7 +142,7 @@ impl FileAppService {
         filename: String,
         content_type: String,
         reader: &mut (dyn AsyncRead + Unpin + Send),
-        config_id: Option<i32>,
+        config_id: Option<u64>,
         creator: Option<String>,
     ) -> AppResult<FileResponse> {
         // 1. 获取存储后端
@@ -212,7 +212,7 @@ impl FileAppService {
     }
 
     /// 获取允许的文件扩展名列表（领域 DB 白名单 + 插件 TOML 回退）
-    async fn get_allowed_extensions(&self, config_id: Option<i32>) -> Vec<String> {
+    async fn get_allowed_extensions(&self, config_id: Option<u64>) -> Vec<String> {
         // 先从领域层读取 DB 配置中的白名单
         let mut allowed = self
             .file_service
@@ -370,7 +370,7 @@ impl FileAppService {
     }
 
     /// 根据 ID 获取配置
-    pub async fn get_config(&self, id: i32) -> AppResult<FileConfig> {
+    pub async fn get_config(&self, id: u64) -> AppResult<FileConfig> {
         self.file_service.get_config(id).await
     }
 
@@ -391,7 +391,7 @@ impl FileAppService {
     /// 更新配置
     pub async fn update_config(
         &self,
-        id: i32,
+        id: u64,
         name: String,
         storage: i32,
         remark: Option<String>,
@@ -404,12 +404,12 @@ impl FileAppService {
     }
 
     /// 删除配置
-    pub async fn delete_config(&self, id: i32, updater: Option<String>) -> AppResult<()> {
+    pub async fn delete_config(&self, id: u64, updater: Option<String>) -> AppResult<()> {
         self.file_service.delete_config(id, updater).await
     }
 
     /// 设为主配置（业务不变式由领域服务保证）
-    pub async fn set_master_config(&self, id: i32, updater: Option<String>) -> AppResult<FileConfig> {
+    pub async fn set_master_config(&self, id: u64, updater: Option<String>) -> AppResult<FileConfig> {
         self.file_service.set_master_config(id, updater).await
     }
 }

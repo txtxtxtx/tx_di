@@ -199,7 +199,7 @@ impl FileService {
     /// 解析配置 ID：显式指定则直接使用，否则回退到主配置。
     ///
     /// 业务规则："未指定存储配置时默认使用主配置"。
-    pub async fn resolve_config_id(&self, config_id: Option<i32>) -> AppResult<Option<i32>> {
+    pub async fn resolve_config_id(&self, config_id: Option<u64>) -> AppResult<Option<u64>> {
         match config_id {
             Some(id) => Ok(Some(id)),
             None => Ok(self.file_config_repo.find_master().await?.map(|c| c.id)),
@@ -209,7 +209,7 @@ impl FileService {
     /// 从 DB 文件配置中读取允许的文件扩展名列表（不含插件 TOML 回退）。
     ///
     /// 业务规则由 app 层组合：DB 白名单 + 插件默认白名单 → 合并校验。
-    pub async fn get_allowed_extensions(&self, config_id: Option<i32>) -> AppResult<Vec<String>> {
+    pub async fn get_allowed_extensions(&self, config_id: Option<u64>) -> AppResult<Vec<String>> {
         let db_config = if let Some(cid) = config_id {
             self.file_config_repo.find_by_id(cid).await?
         } else {
@@ -243,7 +243,7 @@ impl FileService {
     }
 
     /// 按 ID 获取配置
-    pub async fn get_config(&self, id: i32) -> AppResult<FileConfig> {
+    pub async fn get_config(&self, id: u64) -> AppResult<FileConfig> {
         Ok(self
             .file_config_repo
             .find_by_id(id)
@@ -260,7 +260,7 @@ impl FileService {
         config: String,
         creator: Option<String>,
     ) -> AppResult<FileConfig> {
-        let id = (jiff::Timestamp::now().as_millisecond() % i32::MAX as i64) as i32;
+        let id = tx_common::id::next_id();
         let agg = FileConfig::create(id, name, storage, remark, config, creator);
         self.file_config_repo.insert(&agg).await?;
         Ok(agg)
@@ -269,7 +269,7 @@ impl FileService {
     /// 更新配置
     pub async fn update_config(
         &self,
-        id: i32,
+        id: u64,
         name: String,
         storage: i32,
         remark: Option<String>,
@@ -287,7 +287,7 @@ impl FileService {
     }
 
     /// 软删除配置
-    pub async fn delete_config(&self, id: i32, updater: Option<String>) -> AppResult<()> {
+    pub async fn delete_config(&self, id: u64, updater: Option<String>) -> AppResult<()> {
         let mut agg = self
             .file_config_repo
             .find_by_id(id)
@@ -304,7 +304,7 @@ impl FileService {
     /// 再设置新主配置。
     pub async fn set_master_config(
         &self,
-        id: i32,
+        id: u64,
         updater: Option<String>,
     ) -> AppResult<FileConfig> {
         // 1. 取消当前主配置

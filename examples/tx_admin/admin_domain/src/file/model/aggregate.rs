@@ -8,7 +8,7 @@ use crate::shared::model::value_object::DeletedStatus;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct File {
     pub id: u64,
-    pub config_id: Option<i32>,
+    pub config_id: Option<u64>,
     pub name: String,
     pub path: String,
     pub url: String,
@@ -41,7 +41,7 @@ impl File {
     /// 从持久化层恢复文件（不触发领域事件）
     pub fn restore(
         id: u64,
-        config_id: Option<i32>,
+        config_id: Option<u64>,
         name: String,
         path: String,
         url: String,
@@ -64,7 +64,7 @@ impl File {
 
     pub fn create(
         id: u64,
-        config_id: Option<i32>,
+        config_id: Option<u64>,
         name: String,
         path: String,
         url: String,
@@ -104,7 +104,7 @@ impl File {
 /// File config aggregate root
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileConfig {
-    pub id: i32,
+    pub id: u64,
     pub name: String,
     pub storage: i32,
     pub remark: Option<String>,
@@ -115,7 +115,7 @@ pub struct FileConfig {
 }
 
 impl Entity for FileConfig {
-    type Id = i32;
+    type Id = u64;
     fn id(&self) -> Self::Id {
         self.id
     }
@@ -136,7 +136,7 @@ impl AggregateRoot for FileConfig {
 impl FileConfig {
     /// 从持久化层恢复文件配置（不触发领域事件）
     pub fn restore(
-        id: i32,
+        id: u64,
         name: String,
         storage: i32,
         remark: Option<String>,
@@ -157,7 +157,7 @@ impl FileConfig {
     }
 
     pub fn create(
-        id: i32,
+        id: u64,
         name: String,
         storage: i32,
         remark: Option<String>,

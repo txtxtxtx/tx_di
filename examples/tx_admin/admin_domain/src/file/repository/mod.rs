@@ -22,10 +22,10 @@ pub trait FileRepository: Any + Send + Sync {
 
 #[async_trait]
 pub trait FileConfigRepository: Any + Send + Sync {
-    async fn find_by_id(&self, id: i32) -> AppResult<Option<FileConfig>>;
+    async fn find_by_id(&self, id: u64) -> AppResult<Option<FileConfig>>;
     async fn find_master(&self) -> AppResult<Option<FileConfig>>;
     async fn find_all(&self) -> AppResult<Vec<FileConfig>>;
     async fn insert(&self, config: &FileConfig) -> AppResult<()>;
     async fn update(&self, config: &FileConfig) -> AppResult<()>;
-    async fn soft_delete(&self, id: i32) -> AppResult<()>;
+    async fn soft_delete(&self, id: u64) -> AppResult<()>;
 }
