@@ -88,6 +88,7 @@ pub struct ToastyPlugin {
 impl ToastyPlugin {
     /// 注册数据库模型到插件的模型集合中
     ///
+    /// 建议在inner_init 中使用
     /// 此方法用于在 DI 容器构建之前将业务模型注册到 Toasty ORM。
     /// 支持多次调用，新注册的模型会与已有模型合并，相同 ModelId 的模型会被自动覆盖。
     ///
@@ -111,7 +112,9 @@ impl ToastyPlugin {
     /// - 如果同一个 ModelId 被多次注册，后注册的模型定义会覆盖之前的
     /// - 此方法是线程安全的，内部使用写锁保护
     pub fn register_models(&self, models: ModelSet) {
-        let mut inner_models = self.models.write().unwrap();
+        let mut inner_models = self.models
+            .write()
+            .expect("ToastyPlugin: 模型注册表 RwLock 被毒化");
 
         for model in models {
             inner_models.add(model);
@@ -187,7 +190,7 @@ impl CompInit for ToastyPlugin {
             }; // models guard 在这里 drop
             tracing::debug!(url = %config.database_url, "正在连接数据库...");
             // 构建 Builder 并应用配置
-            let mut builder = toasty::Db::builder();
+            let mut builder = ToastyDb::builder();
             tracing::debug!(model_count = models.len(), "注册模型到 Toasty Db");
             builder.models(models);
 
@@ -237,10 +240,8 @@ impl CompInit for ToastyPlugin {
                 }
             }
             // 写入 OnceLock
-            if plugin.db.set(db).is_err() {
-                tracing::warn!("ToastyPlugin: db concurrently initialized");
-            }
-            tracing::debug!("ToastyPlugin 数据库初始化完成");
+            plugin.db.set(db).expect(&ToastyErr::AlreadyInitialized.to_string());
+            tracing::info!("数据库初始化完成");
             Ok(())
         }
     );
@@ -334,7 +335,7 @@ impl ToastyPlugin {
     ///
     /// 适用于迁移生成器等工具场景。
     pub fn build_schema(models: toasty::ModelSet) -> RIE<toasty::schema::app::Schema> {
-        let mut builder = toasty::Db::builder();
+        let mut builder = ToastyDb::builder();
         builder.models(models);
         Ok(builder
             .build_app_schema()

@@ -5,7 +5,6 @@ use tx_error::CodeMsg;
 /// Toasty 插件业务错误码。
 #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
 #[err("TOASTY")]
-
 pub enum ToastyErr {
     /// 数据库连接失败
     #[err(-1, "数据库连接失败")]
@@ -19,4 +18,6 @@ pub enum ToastyErr {
     /// 模型注册表获取失败
     #[err(-4, "模型注册表获取失败")]
     ModelRegistryError,
+    #[err(-5, "数据库已经初始化了")]
+    AlreadyInitialized,
 }
