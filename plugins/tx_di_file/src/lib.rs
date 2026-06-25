@@ -124,7 +124,7 @@ pub const USER_PREFIX: &str = "user:";
 /// sys_key("s3-main") // => "sys:s3-main"
 /// ```
 #[inline]
-pub(crate) fn sys_key(name: &str) -> String {
+pub fn sys_key(name: &str) -> String {
     format!("{}{}", SYS_PREFIX, name)
 }
 
