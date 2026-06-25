@@ -28,7 +28,7 @@ impl ToastyFileRepository {
 
     fn to_domain(f: &SysFile) -> File {
         File::restore(
-            f.id as u64,
+            f.id,
             if f.config_id == 0 { None } else { Some(f.config_id) },
             f.name.clone(),
             f.file_path.clone(),
@@ -50,7 +50,7 @@ impl ToastyFileRepository {
 impl FileRepository for ToastyFileRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<File>> {
         let mut db = self.plugin.db().clone();
-        match SysFile::get_by_id(&mut db, id as i64).await {
+        match SysFile::get_by_id(&mut db, id).await {
             Ok(f) if f.deleted == Deleted::No => Ok(Some(Self::to_domain(&f))),
             _ => Ok(None),
         }
@@ -97,7 +97,7 @@ impl FileRepository for ToastyFileRepository {
     async fn insert(&self, file: &File) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
         SysFile::create()
-            .id(file.id as i64)
+            .id(file.id)
             .config_id(file.config_id.unwrap_or(0))
             .name(file.name.clone())
             .file_path(file.path.clone())
@@ -115,7 +115,7 @@ impl FileRepository for ToastyFileRepository {
 
     async fn update(&self, file: &File) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let mut existing = SysFile::get_by_id(&mut db, file.id as i64)
+        let mut existing = SysFile::get_by_id(&mut db, file.id)
             .await
             .map_err(|_| RepositoryError::NotFoundFile)?;
         existing
@@ -135,7 +135,7 @@ impl FileRepository for ToastyFileRepository {
 
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let mut file = SysFile::get_by_id(&mut db, id as i64)
+        let mut file = SysFile::get_by_id(&mut db, id)
             .await
             .map_err(|_| RepositoryError::NotFoundFile)?;
 
@@ -149,7 +149,7 @@ impl FileRepository for ToastyFileRepository {
 
     async fn find_file_path(&self, id: u64) -> AppResult<String> {
         let mut db = self.plugin.db().clone();
-        let file = SysFile::get_by_id(&mut db, id as i64)
+        let file = SysFile::get_by_id(&mut db, id)
             .await
             .map_err(|_| RepositoryError::NotFoundFile)?;
 

@@ -8,7 +8,7 @@ use crate::common::{Status, Deleted};
 pub struct SysRole {
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     #[default("".to_string())]
     pub name: String,
@@ -56,13 +56,13 @@ pub struct SysRole {
 pub struct SysRoleMenu {
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     #[index]
-    pub role_id: i64,
+    pub role_id: u64,
 
     #[index]
-    pub menu_id: i64,
+    pub menu_id: u64,
 
     #[auto]
     pub created_at: jiff::Timestamp,

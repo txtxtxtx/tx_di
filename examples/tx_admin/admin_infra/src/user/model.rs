@@ -8,7 +8,7 @@ use crate::common::{Sex, Status, Deleted};
 pub struct SysUser {
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     #[unique]
     pub username: String,
@@ -67,13 +67,13 @@ pub struct SysUser {
 pub struct SysUserRole {
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     #[index]
-    pub user_id: i64,
+    pub user_id: u64,
 
     #[index]
-    pub role_id: i64,
+    pub role_id: u64,
 
     #[auto]
     pub created_at: jiff::Timestamp,
@@ -85,13 +85,13 @@ pub struct SysUserRole {
 pub struct SysUserDept {
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     #[index]
-    pub user_id: i64,
+    pub user_id: u64,
 
     #[index]
-    pub dept_id: i64,
+    pub dept_id: u64,
 
     #[auto]
     pub created_at: jiff::Timestamp,

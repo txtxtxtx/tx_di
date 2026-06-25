@@ -8,7 +8,7 @@ use crate::common::{Status, Deleted};
 pub struct SysMenu {
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     #[default("".to_string())]
     pub name: String,
@@ -23,7 +23,7 @@ pub struct SysMenu {
     pub sort: i32,
 
     #[default(0)]
-    pub parent_id: i64,
+    pub parent_id: u64,
 
     #[default("".to_string())]
     pub route_path: String,

@@ -30,7 +30,7 @@ impl ToastyRoleRepository {
 
     fn to_domain(r: &SysRole, menu_ids: Vec<u64>) -> Role {
         Role::restore(
-            r.id as u64,
+            r.id,
             r.name.clone(),
             r.code.clone(),
             r.sort,
@@ -50,13 +50,13 @@ impl ToastyRoleRepository {
         )
     }
 
-    async fn fetch_menu_ids(&self, role_id: i64) -> AppResult<Vec<u64>> {
+    async fn fetch_menu_ids(&self, role_id: u64) -> AppResult<Vec<u64>> {
         let mut db = self.plugin.db().clone();
         let menus = SysRoleMenu::filter_by_role_id(role_id)
             .exec(&mut db)
             .await
             .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
-        Ok(menus.into_iter().map(|m| m.menu_id as u64).collect())
+        Ok(menus.into_iter().map(|m| m.menu_id).collect())
     }
 
     async fn to_full_domain(&self, r: &SysRole) -> AppResult<Role> {
@@ -66,7 +66,7 @@ impl ToastyRoleRepository {
 
     fn sys_user_to_domain(u: &SysUser) -> User {
         User::restore(
-            u.id as u64,
+            u.id,
             u.username.clone(),
             u.password_hash.clone(),
             u.nickname.clone(),
@@ -78,7 +78,7 @@ impl ToastyRoleRepository {
             admin_domain::user::model::value_object::UserStatus::from(u.status),
             if u.login_ip.is_empty() { None } else { Some(u.login_ip.clone()) },
             (u.login_date != jiff::Timestamp::UNIX_EPOCH).then(|| u.login_date),
-            admin_domain::shared::model::value_object::TenantId::new(u.tenant_id as u64),
+            admin_domain::shared::model::value_object::TenantId::new(u.tenant_id),
             AuditFields {
                 creator: if u.creator.is_empty() { None } else { Some(u.creator.clone()) },
                 create_time: u.created_at,
@@ -96,7 +96,7 @@ impl ToastyRoleRepository {
 impl RoleRepository for ToastyRoleRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Role>> {
         let mut db = self.plugin.db().clone();
-        match SysRole::get_by_id(&mut db, id as i64).await {
+        match SysRole::get_by_id(&mut db, id).await {
             Ok(r) if r.deleted == Deleted::No => Ok(Some(self.to_full_domain(&r).await?)),
             _ => Ok(None),
         }
@@ -124,7 +124,7 @@ impl RoleRepository for ToastyRoleRepository {
 
         let mut roles = Vec::new();
         for r in all {
-            if r.deleted == Deleted::No && ids.contains(&(r.id as u64)) {
+            if r.deleted == Deleted::No && ids.contains(&r.id) {
                 roles.push(self.to_full_domain(&r).await?);
             }
         }
@@ -193,7 +193,7 @@ impl RoleRepository for ToastyRoleRepository {
     async fn insert(&self, role: &Role) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
         let model = SysRole::create()
-            .id(role.id as i64)
+            .id(role.id)
             .name(role.name.clone())
             .code(role.code.clone())
             .sort(role.sort)
@@ -212,7 +212,7 @@ impl RoleRepository for ToastyRoleRepository {
         for &menu_id in &role.menu_ids {
             SysRoleMenu::create()
                 .role_id(model.id)
-                .menu_id(menu_id as i64)
+                .menu_id(menu_id)
                 .exec(&mut db)
                 .await
                 .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
@@ -223,7 +223,7 @@ impl RoleRepository for ToastyRoleRepository {
 
     async fn update(&self, role: &Role) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let mut existing = SysRole::get_by_id(&mut db, role.id as i64)
+        let mut existing = SysRole::get_by_id(&mut db, role.id)
             .await
             .map_err(|_| RepositoryError::NotFoundRole)?;
 
@@ -248,7 +248,7 @@ impl RoleRepository for ToastyRoleRepository {
 
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let mut role = SysRole::get_by_id(&mut db, id as i64)
+        let mut role = SysRole::get_by_id(&mut db, id)
             .await
             .map_err(|_| RepositoryError::NotFoundRole)?;
 
@@ -273,7 +273,7 @@ impl RoleRepository for ToastyRoleRepository {
 
     async fn bind_menus(&self, role_id: u64, menu_ids: &[u64]) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let old = SysRoleMenu::filter_by_role_id(role_id as i64)
+        let old = SysRoleMenu::filter_by_role_id(role_id)
             .exec(&mut db)
             .await
             .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
@@ -286,8 +286,8 @@ impl RoleRepository for ToastyRoleRepository {
 
         for &menu_id in menu_ids {
             SysRoleMenu::create()
-                .role_id(role_id as i64)
-                .menu_id(menu_id as i64)
+                .role_id(role_id)
+                .menu_id(menu_id)
                 .exec(&mut db)
                 .await
                 .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
@@ -297,21 +297,21 @@ impl RoleRepository for ToastyRoleRepository {
     }
 
     async fn get_menu_ids(&self, role_id: u64) -> AppResult<Vec<u64>> {
-        self.fetch_menu_ids(role_id as i64).await
+        self.fetch_menu_ids(role_id).await
     }
 
     async fn get_user_ids(&self, role_id: u64) -> AppResult<Vec<u64>> {
         let mut db = self.plugin.db().clone();
-        let user_roles = SysUserRole::filter_by_role_id(role_id as i64)
+        let user_roles = SysUserRole::filter_by_role_id(role_id)
             .exec(&mut db)
             .await
             .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
-        Ok(user_roles.into_iter().map(|ur| ur.user_id as u64).collect())
+        Ok(user_roles.into_iter().map(|ur| ur.user_id).collect())
     }
 
     async fn find_users_by_role_id(&self, role_id: u64) -> AppResult<Vec<User>> {
         let mut db = self.plugin.db().clone();
-        let user_roles = SysUserRole::filter_by_role_id(role_id as i64)
+        let user_roles = SysUserRole::filter_by_role_id(role_id)
             .exec(&mut db)
             .await
             .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
@@ -331,8 +331,8 @@ impl RoleRepository for ToastyRoleRepository {
         let mut db = self.plugin.db().clone();
         for &user_id in user_ids {
             SysUserRole::create()
-                .user_id(user_id as i64)
-                .role_id(role_id as i64)
+                .user_id(user_id)
+                .role_id(role_id)
                 .exec(&mut db)
                 .await
                 .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
@@ -342,13 +342,13 @@ impl RoleRepository for ToastyRoleRepository {
 
     async fn unbind_users(&self, role_id: u64, user_ids: &[u64]) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let user_roles = SysUserRole::filter_by_role_id(role_id as i64)
+        let user_roles = SysUserRole::filter_by_role_id(role_id)
             .exec(&mut db)
             .await
             .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
 
         for ur in user_roles {
-            if user_ids.contains(&(ur.user_id as u64)) {
+            if user_ids.contains(&ur.user_id) {
                 ur.delete().exec(&mut db)
                     .await
                     .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;

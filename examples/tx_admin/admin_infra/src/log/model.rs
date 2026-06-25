@@ -8,13 +8,13 @@ use crate::common::Deleted;
 pub struct SysOperateLog {
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     #[default("".to_string())]
     pub trace_id: String,
 
     #[default(0)]
-    pub user_id: i64,
+    pub user_id: u64,
 
     #[default(0)]
     pub user_type: i32,
@@ -26,7 +26,7 @@ pub struct SysOperateLog {
     pub sub_type: String,
 
     #[default(0)]
-    pub biz_id: i64,
+    pub biz_id: u64,
 
     #[default("".to_string())]
     pub action: String,
@@ -74,10 +74,10 @@ pub struct SysOperateLog {
 pub struct SysLoginLog {
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     #[default(0)]
-    pub user_id: i64,
+    pub user_id: u64,
 
     #[default(0)]
     pub user_type: i32,

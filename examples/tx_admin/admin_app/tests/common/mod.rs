@@ -209,7 +209,6 @@ pub async fn create_file_app() -> (FileAppService, Arc<FileService>, Arc<ToastyF
 
     let temp_dir = tempfile::tempdir().expect("无法创建临时目录");
     let config = Arc::new(FileConfig {
-        backend: StorageBackend::Local,
         base_path: temp_dir.path().to_string_lossy().to_string(),
         max_file_size: 10 * 1024 * 1024, // 10MB
         ..Default::default()

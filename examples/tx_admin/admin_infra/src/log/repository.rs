@@ -28,13 +28,13 @@ impl ToastyOperateLogRepository {
 
     fn to_domain(l: &SysOperateLog) -> OperateLog {
         OperateLog::restore(
-            l.id as u64,
+            l.id,
             l.trace_id.clone(),
-            l.user_id as u64,
+            l.user_id,
             l.user_type,
             l.log_type.clone(),
             l.sub_type.clone(),
-            l.biz_id as u64,
+            l.biz_id,
             l.action.clone(),
             l.success,
             l.extra.clone(),
@@ -58,7 +58,7 @@ impl ToastyOperateLogRepository {
 impl OperateLogRepository for ToastyOperateLogRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<OperateLog>> {
         let mut db = self.plugin.db().clone();
-        match SysOperateLog::get_by_id(&mut db, id as i64).await {
+        match SysOperateLog::get_by_id(&mut db, id).await {
             Ok(l) if l.deleted == Deleted::No => Ok(Some(Self::to_domain(&l))),
             _ => Ok(None),
         }
@@ -76,7 +76,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
             .filter(|l| l.deleted == Deleted::No)
             .filter(|l| {
                 if let Some(user_id) = query.user_id {
-                    if l.user_id != user_id as i64 { return false; }
+                    if l.user_id != user_id { return false; }
                 }
                 if let Some(ref log_type) = query.log_type {
                     if l.log_type != *log_type { return false; }
@@ -111,13 +111,13 @@ impl OperateLogRepository for ToastyOperateLogRepository {
     async fn insert(&self, log: &OperateLog) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
         SysOperateLog::create()
-            .id(log.id as i64)
+            .id(log.id)
             .trace_id(log.trace_id.clone())
-            .user_id(log.user_id as i64)
+            .user_id(log.user_id)
             .user_type(log.user_type)
             .log_type(log.log_type.clone())
             .sub_type(log.sub_type.clone())
-            .biz_id(log.biz_id as i64)
+            .biz_id(log.biz_id)
             .action(log.action.clone())
             .success(log.success)
             .extra(log.extra.clone())
@@ -138,7 +138,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
     async fn delete_by_ids(&self, ids: &[u64]) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
         for &id in ids {
-            if let Ok(log) = SysOperateLog::get_by_id(&mut db, id as i64).await {
+            if let Ok(log) = SysOperateLog::get_by_id(&mut db, id).await {
                 log.delete().exec(&mut db)
                     .await
                     .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
@@ -176,8 +176,8 @@ impl ToastyLoginLogRepository {
 
     fn to_domain(l: &SysLoginLog) -> LoginLog {
         LoginLog::restore(
-            l.id as u64,
-            l.user_id as u64,
+            l.id,
+            l.user_id,
             l.user_type,
             l.username.clone(),
             l.login_ip.clone(),
@@ -204,7 +204,7 @@ impl ToastyLoginLogRepository {
 impl LoginLogRepository for ToastyLoginLogRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<LoginLog>> {
         let mut db = self.plugin.db().clone();
-        match SysLoginLog::get_by_id(&mut db, id as i64).await {
+        match SysLoginLog::get_by_id(&mut db, id).await {
             Ok(l) if l.deleted == Deleted::No => Ok(Some(Self::to_domain(&l))),
             _ => Ok(None),
         }
@@ -222,7 +222,7 @@ impl LoginLogRepository for ToastyLoginLogRepository {
             .filter(|l| l.deleted == Deleted::No)
             .filter(|l| {
                 if let Some(user_id) = query.user_id {
-                    if l.user_id != user_id as i64 { return false; }
+                    if l.user_id != user_id { return false; }
                 }
                 if let Some(ref username) = query.username {
                     if !l.username.contains(username.as_str()) { return false; }
@@ -260,8 +260,8 @@ impl LoginLogRepository for ToastyLoginLogRepository {
     async fn insert(&self, log: &LoginLog) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
         SysLoginLog::create()
-            .id(log.id as i64)
-            .user_id(log.user_id as i64)
+            .id(log.id)
+            .user_id(log.user_id)
             .user_type(log.user_type)
             .username(log.username.clone())
             .login_ip(log.login_ip.clone())
@@ -285,7 +285,7 @@ impl LoginLogRepository for ToastyLoginLogRepository {
     async fn delete_by_ids(&self, ids: &[u64]) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
         for &id in ids {
-            if let Ok(log) = SysLoginLog::get_by_id(&mut db, id as i64).await {
+            if let Ok(log) = SysLoginLog::get_by_id(&mut db, id).await {
                 log.delete().exec(&mut db)
                     .await
                     .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;

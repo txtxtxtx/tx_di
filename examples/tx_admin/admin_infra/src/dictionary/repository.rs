@@ -28,7 +28,7 @@ impl ToastyDictTypeRepository {
 
     fn to_domain(d: &SysDictType) -> DictType {
         DictType::restore(
-            d.id as u64,
+            d.id,
             d.name.clone(),
             d.dict_type.clone(),
             i32::from(d.status),
@@ -48,7 +48,7 @@ impl ToastyDictTypeRepository {
 impl DictTypeRepository for ToastyDictTypeRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<DictType>> {
         let mut db = self.plugin.db().clone();
-        match SysDictType::get_by_id(&mut db, id as i64).await {
+        match SysDictType::get_by_id(&mut db, id).await {
             Ok(d) if d.deleted == Deleted::No => Ok(Some(Self::to_domain(&d))),
             _ => Ok(None),
         }
@@ -134,7 +134,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
     async fn insert(&self, dict_type: &DictType) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
         SysDictType::create()
-            .id(dict_type.id as i64)
+            .id(dict_type.id)
             .name(dict_type.name.clone())
             .dict_type(dict_type.dict_type.clone())
             .status(Status::from(dict_type.status))
@@ -150,7 +150,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
 
     async fn update(&self, dict_type: &DictType) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let mut existing = SysDictType::get_by_id(&mut db, dict_type.id as i64)
+        let mut existing = SysDictType::get_by_id(&mut db, dict_type.id)
             .await
             .map_err(|_| RepositoryError::NotFoundDict)?;
 
@@ -170,7 +170,7 @@ impl DictTypeRepository for ToastyDictTypeRepository {
 
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let mut dict_type = SysDictType::get_by_id(&mut db, id as i64)
+        let mut dict_type = SysDictType::get_by_id(&mut db, id)
             .await
             .map_err(|_| RepositoryError::NotFoundDict)?;
 
@@ -206,7 +206,7 @@ impl ToastyDictDataRepository {
 
     fn to_domain(d: &SysDictData) -> DictData {
         DictData::restore(
-            d.id as u64,
+            d.id,
             d.sort,
             d.label.clone(),
             d.value.clone(),
@@ -230,7 +230,7 @@ impl ToastyDictDataRepository {
 impl DictDataRepository for ToastyDictDataRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<DictData>> {
         let mut db = self.plugin.db().clone();
-        match SysDictData::get_by_id(&mut db, id as i64).await {
+        match SysDictData::get_by_id(&mut db, id).await {
             Ok(d) if d.deleted == Deleted::No => Ok(Some(Self::to_domain(&d))),
             _ => Ok(None),
         }
@@ -305,7 +305,7 @@ impl DictDataRepository for ToastyDictDataRepository {
     async fn insert(&self, data: &DictData) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
         SysDictData::create()
-            .id(data.id as i64)
+            .id(data.id)
             .sort(data.sort)
             .label(data.label.clone())
             .value(data.value.clone())
@@ -325,7 +325,7 @@ impl DictDataRepository for ToastyDictDataRepository {
 
     async fn update(&self, data: &DictData) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let mut existing = SysDictData::get_by_id(&mut db, data.id as i64)
+        let mut existing = SysDictData::get_by_id(&mut db, data.id)
             .await
             .map_err(|_| RepositoryError::NotFoundDict)?;
 
@@ -349,7 +349,7 @@ impl DictDataRepository for ToastyDictDataRepository {
 
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let mut data = SysDictData::get_by_id(&mut db, id as i64)
+        let mut data = SysDictData::get_by_id(&mut db, id)
             .await
             .map_err(|_| RepositoryError::NotFoundDict)?;
 

@@ -8,10 +8,10 @@ use crate::common::{Deleted, StorageType};
 pub struct SysFile {
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     #[default(0)]
-    pub config_id: i32,
+    pub config_id: u64,
 
     #[default("".to_string())]
     pub name: String,
@@ -50,7 +50,7 @@ pub struct SysFile {
 pub struct SysFileConfig {
     #[key]
     #[auto]
-    pub id: i32,
+    pub id: u64,
 
     #[default("".to_string())]
     pub name: String,

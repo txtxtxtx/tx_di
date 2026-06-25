@@ -28,7 +28,7 @@ impl ToastyConfigRepository {
 
     fn to_domain(c: &SysConfig) -> Config {
         Config::restore(
-            c.id as u64,
+            c.id,
             c.category.clone(),
             c.config_type,
             c.name.clone(),
@@ -51,7 +51,7 @@ impl ToastyConfigRepository {
 impl ConfigRepository for ToastyConfigRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Config>> {
         let mut db = self.plugin.db().clone();
-        match SysConfig::get_by_id(&mut db, id as i64).await {
+        match SysConfig::get_by_id(&mut db, id).await {
             Ok(c) if c.deleted == Deleted::No => Ok(Some(Self::to_domain(&c))),
             _ => Ok(None),
         }
@@ -151,7 +151,7 @@ impl ConfigRepository for ToastyConfigRepository {
     async fn insert(&self, config: &Config) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
         SysConfig::create()
-            .id(config.id as i64)
+            .id(config.id)
             .category(config.category.clone())
             .config_type(config.config_type)
             .name(config.name.clone())
@@ -170,7 +170,7 @@ impl ConfigRepository for ToastyConfigRepository {
 
     async fn update(&self, config: &Config) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let mut existing = SysConfig::get_by_id(&mut db, config.id as i64)
+        let mut existing = SysConfig::get_by_id(&mut db, config.id)
             .await
             .map_err(|_| RepositoryError::NotFoundConfig)?;
 
@@ -193,7 +193,7 @@ impl ConfigRepository for ToastyConfigRepository {
 
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let mut config = SysConfig::get_by_id(&mut db, id as i64)
+        let mut config = SysConfig::get_by_id(&mut db, id)
             .await
             .map_err(|_| RepositoryError::NotFoundConfig)?;
 

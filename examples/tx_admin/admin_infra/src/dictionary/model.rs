@@ -8,7 +8,7 @@ use crate::common::{Status, Deleted};
 pub struct SysDictType {
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     #[default("".to_string())]
     pub name: String,
@@ -44,7 +44,7 @@ pub struct SysDictType {
 pub struct SysDictData {
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     #[default(0)]
     pub sort: i32,

@@ -28,11 +28,11 @@ impl ToastyDepartmentRepository {
 
     fn to_domain(d: &SysDepartment) -> Department {
         Department::restore(
-            d.id as u64,
+            d.id,
             d.name.clone(),
-            d.parent_id as u64,
+            d.parent_id,
             d.sort,
-            if d.leader_user_id == 0 { None } else { Some(d.leader_user_id as u64) },
+            if d.leader_user_id == 0 { None } else { Some(d.leader_user_id) },
             if d.phone.is_empty() { None } else { Some(d.phone.clone()) },
             if d.email.is_empty() { None } else { Some(d.email.clone()) },
             i32::from(d.status),
@@ -52,7 +52,7 @@ impl ToastyDepartmentRepository {
 impl DepartmentRepository for ToastyDepartmentRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Department>> {
         let mut db = self.plugin.db().clone();
-        match SysDepartment::get_by_id(&mut db, id as i64).await {
+        match SysDepartment::get_by_id(&mut db, id).await {
             Ok(d) if d.deleted == Deleted::No => Ok(Some(Self::to_domain(&d))),
             _ => Ok(None),
         }
@@ -90,7 +90,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
 
         Ok(all
             .iter()
-            .filter(|d| d.deleted == Deleted::No && ids.contains(&(d.id as u64)))
+            .filter(|d| d.deleted == Deleted::No && ids.contains(&d.id))
             .map(Self::to_domain)
             .collect())
     }
@@ -104,7 +104,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
 
         Ok(all
             .iter()
-            .filter(|d| d.deleted == Deleted::No && d.parent_id == parent_id as i64)
+            .filter(|d| d.deleted == Deleted::No && d.parent_id == parent_id)
             .map(Self::to_domain)
             .collect())
     }
@@ -112,11 +112,11 @@ impl DepartmentRepository for ToastyDepartmentRepository {
     async fn insert(&self, dept: &Department) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
         SysDepartment::create()
-            .id(dept.id as i64)
+            .id(dept.id)
             .name(dept.name.clone())
-            .parent_id(dept.parent_id as i64)
+            .parent_id(dept.parent_id)
             .sort(dept.sort)
-            .leader_user_id(dept.leader_user_id.map(|id| id as i64).unwrap_or(0))
+            .leader_user_id(dept.leader_user_id.unwrap_or(0))
             .phone(dept.phone.clone().unwrap_or_default())
             .email(dept.email.clone().unwrap_or_default())
             .status(Status::from(dept.status))
@@ -132,16 +132,16 @@ impl DepartmentRepository for ToastyDepartmentRepository {
 
     async fn update(&self, dept: &Department) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let mut existing = SysDepartment::get_by_id(&mut db, dept.id as i64)
+        let mut existing = SysDepartment::get_by_id(&mut db, dept.id)
             .await
             .map_err(|_| RepositoryError::NotFoundDept)?;
 
         existing
             .update()
             .name(dept.name.clone())
-            .parent_id(dept.parent_id as i64)
+            .parent_id(dept.parent_id)
             .sort(dept.sort)
-            .leader_user_id(dept.leader_user_id.map(|id| id as i64).unwrap_or(0))
+            .leader_user_id(dept.leader_user_id.unwrap_or(0))
             .phone(dept.phone.clone().unwrap_or_default())
             .email(dept.email.clone().unwrap_or_default())
             .status(Status::from(dept.status))
@@ -156,7 +156,7 @@ impl DepartmentRepository for ToastyDepartmentRepository {
 
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let mut dept = SysDepartment::get_by_id(&mut db, id as i64)
+        let mut dept = SysDepartment::get_by_id(&mut db, id)
             .await
             .map_err(|_| RepositoryError::NotFoundDept)?;
 
@@ -175,12 +175,12 @@ impl DepartmentRepository for ToastyDepartmentRepository {
             .await
             .map_err(|e| db_err(e, RepositoryError::DatabaseDept))?;
 
-        Ok(all.iter().any(|d| d.deleted == Deleted::No && d.parent_id == parent_id as i64))
+        Ok(all.iter().any(|d| d.deleted == Deleted::No && d.parent_id == parent_id))
     }
 
     async fn has_users(&self, dept_id: u64) -> AppResult<bool> {
         let mut db = self.plugin.db().clone();
-        let user_depts = SysUserDept::filter_by_dept_id(dept_id as i64)
+        let user_depts = SysUserDept::filter_by_dept_id(dept_id)
             .exec(&mut db)
             .await
             .map_err(|e| db_err(e, RepositoryError::DatabaseDept))?;

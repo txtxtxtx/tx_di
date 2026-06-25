@@ -30,12 +30,12 @@ impl ToastyMenuRepository {
 
     fn to_domain(m: &SysMenu) -> Menu {
         Menu::restore(
-            m.id as u64,
+            m.id,
             m.name.clone(),
             m.permission.clone(),
             m.types,
             m.sort,
-            m.parent_id as u64,
+            m.parent_id,
             if m.route_path.is_empty() { None } else { Some(m.route_path.clone()) },
             if m.icon.is_empty() { None } else { Some(m.icon.clone()) },
             if m.component.is_empty() { None } else { Some(m.component.clone()) },
@@ -59,7 +59,7 @@ impl ToastyMenuRepository {
 impl MenuRepository for ToastyMenuRepository {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<Menu>> {
         let mut db = self.plugin.db().clone();
-        match SysMenu::get_by_id(&mut db, id as i64).await {
+        match SysMenu::get_by_id(&mut db, id).await {
             Ok(m) if m.deleted == Deleted::No => Ok(Some(Self::to_domain(&m))),
             _ => Ok(None),
         }
@@ -100,7 +100,7 @@ impl MenuRepository for ToastyMenuRepository {
 
         Ok(all
             .iter()
-            .filter(|m| m.deleted == Deleted::No && ids.contains(&(m.id as u64)))
+            .filter(|m| m.deleted == Deleted::No && ids.contains(&m.id))
             .map(Self::to_domain)
             .collect())
     }
@@ -114,7 +114,7 @@ impl MenuRepository for ToastyMenuRepository {
 
         Ok(all
             .iter()
-            .filter(|m| m.deleted == Deleted::No && m.parent_id == parent_id as i64)
+            .filter(|m| m.deleted == Deleted::No && m.parent_id == parent_id)
             .map(Self::to_domain)
             .collect())
     }
@@ -122,12 +122,12 @@ impl MenuRepository for ToastyMenuRepository {
     async fn insert(&self, menu: &Menu) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
         SysMenu::create()
-            .id(menu.id as i64)
+            .id(menu.id)
             .name(menu.name.clone())
             .permission(menu.permission.clone())
             .types(menu.types)
             .sort(menu.sort)
-            .parent_id(menu.parent_id as i64)
+            .parent_id(menu.parent_id)
             .route_path(menu.path.clone().unwrap_or_default())
             .icon(menu.icon.clone().unwrap_or_default())
             .component(menu.component.clone().unwrap_or_default())
@@ -147,7 +147,7 @@ impl MenuRepository for ToastyMenuRepository {
 
     async fn update(&self, menu: &Menu) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let mut existing = SysMenu::get_by_id(&mut db, menu.id as i64)
+        let mut existing = SysMenu::get_by_id(&mut db, menu.id)
             .await
             .map_err(|_| RepositoryError::NotFoundMenu)?;
 
@@ -157,7 +157,7 @@ impl MenuRepository for ToastyMenuRepository {
             .permission(menu.permission.clone())
             .types(menu.types)
             .sort(menu.sort)
-            .parent_id(menu.parent_id as i64)
+            .parent_id(menu.parent_id)
             .route_path(menu.path.clone().unwrap_or_default())
             .icon(menu.icon.clone().unwrap_or_default())
             .component(menu.component.clone().unwrap_or_default())
@@ -176,7 +176,7 @@ impl MenuRepository for ToastyMenuRepository {
 
     async fn soft_delete(&self, id: u64) -> AppResult<()> {
         let mut db = self.plugin.db().clone();
-        let mut menu = SysMenu::get_by_id(&mut db, id as i64)
+        let mut menu = SysMenu::get_by_id(&mut db, id)
             .await
             .map_err(|_| RepositoryError::NotFoundMenu)?;
 
@@ -195,7 +195,7 @@ impl MenuRepository for ToastyMenuRepository {
             .await
             .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
 
-        Ok(all.iter().any(|m| m.deleted == Deleted::No && m.parent_id == parent_id as i64))
+        Ok(all.iter().any(|m| m.deleted == Deleted::No && m.parent_id == parent_id))
     }
 
     async fn find_permission_codes_by_user_id(&self, user_id: u64) -> AppResult<HashSet<String>> {
@@ -203,11 +203,11 @@ impl MenuRepository for ToastyMenuRepository {
         let mut codes = HashSet::new();
 
         // 1. 获取用户的角色 ID 列表
-        let user_roles = SysUserRole::filter_by_user_id(user_id as i64)
+        let user_roles = SysUserRole::filter_by_user_id(user_id)
             .exec(&mut db)
             .await
             .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
-        let role_ids: Vec<i64> = user_roles.into_iter().map(|ur| ur.role_id).collect();
+        let role_ids: Vec<u64> = user_roles.into_iter().map(|ur| ur.role_id).collect();
 
         // 2. 遍历角色，从关联菜单中提取 types==2 的 permission 字段
         for role_id in role_ids {

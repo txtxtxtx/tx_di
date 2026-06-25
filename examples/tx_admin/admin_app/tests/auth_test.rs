@@ -8,6 +8,7 @@ mod common;
 use std::sync::Arc;
 use admin_proto::{LoginRequest, LogoutRequest, CreateRoleRequest, CreateMenuRequest, CreateUserRequest};
 use admin_app::auth::app_service::AuthAppService;
+use admin_domain::auth::service::AuthService;
 use admin_domain::user::service::UserService;
 use admin_domain::role::service::RoleService;
 use admin_domain::menu::service::MenuService;
@@ -52,7 +53,9 @@ async fn create_auth_test_env() -> (
     ));
     let role_app = admin_app::role::app_service::RoleAppService::new(role_svc.clone(), user_repo.clone());
     let menu_app = admin_app::menu::app_service::MenuAppService::new(menu_svc.clone());
-    let auth_app = AuthAppService::new_for_test(user_app.clone(), role_svc, menu_svc, login_log_app);
+
+    let auth_svc = Arc::new(AuthService::new(user_svc.clone()));
+    let auth_app = AuthAppService::new_for_test(auth_svc, user_app.clone(), role_svc, menu_svc, login_log_app);
 
     (auth_app, user_app, role_app, menu_app, user_repo, role_repo)
 }

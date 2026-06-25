@@ -8,7 +8,7 @@ use crate::common::Deleted;
 pub struct SysConfig {
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     #[default("".to_string())]
     pub category: String,

@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
 use admin_proto::{LoginRequest, LoginResponse, LogoutRequest, UserInfoResponse, CreateLoginLogRequest};
+use admin_domain::auth::service::AuthService;
 use admin_domain::menu::model::value_object::MenuTreeNode;
 use admin_domain::menu::model::value_object::MenuQuery;
 use admin_domain::shared::model::value_object::SessionEctData;
-use admin_domain::shared::repository::RepositoryError;
+use admin_domain::role::service::RoleService;
+use admin_domain::menu::service::MenuService;
 use crate::auth::session_service::AuthSessionService;
 use crate::log::app_service::LoginLogAppService;
 use crate::user::app_service::UserAppService;
-use admin_domain::role::service::RoleService;
-use admin_domain::menu::service::MenuService;
 use tx_di_core::tx_comp;
 use tx_error::AppResult;
 
@@ -21,6 +21,7 @@ use tx_error::AppResult;
 /// `session_service` 为 `Option` 以支持测试场景（测试中无 sa-token 运行时）。
 #[tx_comp]
 pub struct AuthAppService {
+    auth_service: Arc<AuthService>,
     user_app: Arc<UserAppService>,
     role_service: Arc<RoleService>,
     menu_service: Arc<MenuService>,
@@ -31,6 +32,7 @@ pub struct AuthAppService {
 impl AuthAppService {
     /// 生产环境构造（含 session 服务）
     pub fn new(
+        auth_service: Arc<AuthService>,
         user_app: Arc<UserAppService>,
         role_service: Arc<RoleService>,
         menu_service: Arc<MenuService>,
@@ -38,6 +40,7 @@ impl AuthAppService {
         session_service: Arc<AuthSessionService>,
     ) -> Self {
         Self {
+            auth_service,
             user_app,
             role_service,
             menu_service,
@@ -48,12 +51,14 @@ impl AuthAppService {
 
     /// 测试环境构造（不含 session 服务，token 返回空串）
     pub fn new_for_test(
+        auth_service: Arc<AuthService>,
         user_app: Arc<UserAppService>,
         role_service: Arc<RoleService>,
         menu_service: Arc<MenuService>,
         login_log_service: Arc<LoginLogAppService>,
     ) -> Self {
         Self {
+            auth_service,
             user_app,
             role_service,
             menu_service,
@@ -65,42 +70,23 @@ impl AuthAppService {
     /// 用户登录
     ///
     /// # 执行逻辑
-    /// 1. 根据用户名查找用户
-    /// 2. 校验用户激活状态
-    /// 3. 通过 User 聚合根验证密码
-    /// 4. 构建 LoginUser（角色/权限/部门）
-    /// 5. 记录登录 IP 和登录日志
-    /// 6. 通过 AuthSessionService 创建 session 并获取 token
+    /// 1. `AuthService::authenticate()` — 认证用户（存在性/状态/密码）
+    /// 2. `UserAppService::build_login_user()` — 构建跨聚合 LoginUser
+    /// 3. 记录旁路副作用（登录 IP / 登录日志）
+    /// 4. 通过 `AuthSessionService` 创建 session 并获取 token
     ///
     /// # 返回
     /// 成功返回 `LoginResponse`（含 token）
     pub async fn login(&self, req: LoginRequest) -> AppResult<LoginResponse> {
-        // Find user by username
-        let user = self
-            .user_app
-            .user_service()
-            .get_by_username(&req.username)
-            .await?
-            .ok_or_else(|| RepositoryError::NotFoundUser)?;
+        // ── 1. 认证（领域层封装，返回明确的 AuthError）────────
+        let user = self.auth_service.authenticate(&req.username, &req.password).await?;
 
-        // Check if user is active
-        if !user.is_active() {
-            return Err(RepositoryError::ValidationLogin)?;
-        }
-
-        // Verify password via User aggregate root
-        if !user.verify_password(&req.password) {
-            return Err(RepositoryError::ValidationPassword)?;
-        }
-
-        // Build login user info (cross-aggregate: roles + depts + permissions)
+        // ── 2. 构建跨聚合 LoginUser ──────────────────────────
         let login_user = self.user_app.build_login_user(&user).await?;
 
-        // Record login
+        // ── 3. 旁路副作用（发后即忘，不影响主流程）────────────
         let login_ip = req.login_ip.clone();
         let _ = self.user_app.user_service().record_login(user.id, login_ip.clone()).await;
-
-        // 记录登录日志
         let log_cmd = CreateLoginLogRequest {
             user_id: user.id,
             user_type: if user.id > 0 { 1 } else { 0 },
@@ -111,12 +97,12 @@ impl AuthAppService {
         };
         let _ = self.login_log_service.create_log(log_cmd).await;
 
-        // 查询角色编码列表
+        // ── 4. 查询角色编码（构建 session 所需）───────────────
         let roles = self.role_service.get_roles_by_ids(&login_user.role_ids).await?;
         let role_codes: Vec<String> = roles.into_iter().map(|r| r.code).collect();
-        let is_admin = role_codes.iter().any(|c| c == "admin");
+        let is_admin = RoleService::has_admin_role(&role_codes);
 
-        // 构建 Session 扩展数据
+        // ── 5. 创建 session → 获取 token ─────────────────────
         let session_extra = SessionEctData {
             login_ip,
             tenant_id: login_user.tenant_id,
@@ -125,7 +111,6 @@ impl AuthAppService {
             username: login_user.username.clone(),
         };
 
-        // 通过 AuthSessionService 创建 session → 获取 token
         let token = if let Some(ref session) = self.session_service {
             session
                 .login(

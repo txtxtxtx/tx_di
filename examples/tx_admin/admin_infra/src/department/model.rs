@@ -8,19 +8,19 @@ use crate::common::{Status, Deleted};
 pub struct SysDepartment {
     #[key]
     #[auto]
-    pub id: i64,
+    pub id: u64,
 
     #[default("".to_string())]
     pub name: String,
 
     #[default(0)]
-    pub parent_id: i64,
+    pub parent_id: u64,
 
     #[default(0)]
     pub sort: i32,
 
     #[default(0)]
-    pub leader_user_id: i64,
+    pub leader_user_id: u64,
 
     #[default("".to_string())]
     pub phone: String,

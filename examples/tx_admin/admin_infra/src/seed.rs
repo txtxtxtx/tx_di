@@ -89,7 +89,7 @@ const DICT_SEEDS: &[(&str, &str, &[(i32, &str, &str, &str)])] = &[
 /// types: 0=目录, 1=菜单, 2=按钮/权限
 /// visible: 0=显示, 1=隐藏
 /// keep_alive: 0=不缓存, 1=缓存
-const MENU_SEEDS: &[(i64, &str, &str, i32, i32, i64, &str, &str, &str, &str, i32, i32)] = &[
+const MENU_SEEDS: &[(u64, &str, &str, i32, i32, u64, &str, &str, &str, &str, i32, i32)] = &[
     // ── 目录 (2位) ──
     (11, "系统管理", "system:view", 0, 1, 0, "system", "Setting", "", "", 0, 0),
     (12, "系统配置", "config:view", 0, 2, 0, "config", "Tools", "", "", 0, 0),
@@ -284,7 +284,7 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
     // 5. 创建字典数据
     for (type_id, (dict_type, type_name, items)) in DICT_SEEDS.iter().enumerate() {
         SysDictType::create()
-            .id((type_id + 1) as i64)
+            .id(type_id + 1)
             .name(type_name.to_string())
             .dict_type(dict_type.to_string())
             .status(Status::Enabled)
@@ -297,7 +297,7 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
             .map_err(|e| anyhow::anyhow!("创建字典类型 {} 失败: {}", dict_type, e))?;
 
         for (item_idx, (sort, label, value, color_type)) in items.iter().enumerate() {
-            let data_id = (type_id * 100 + item_idx + 1) as i64;
+            let data_id = type_id * 100 + item_idx + 1;
             SysDictData::create()
                 .id(data_id)
                 .sort(*sort)
@@ -361,12 +361,12 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
     info!("已创建默认文件存储配置: 本地存储");
 
     // 8. 超级管理员关联所有菜单
-    let all_menu_ids: Vec<u64> = MENU_SEEDS.iter().map(|&(id, ..)| id as u64).collect();
+    let all_menu_ids: Vec<u64> = MENU_SEEDS.iter().map(|&(id, ..)| id).collect();
     for &menu_id in &all_menu_ids {
         crate::role::model::SysRoleMenu::create()
-            .id(menu_id as i64)
+            .id(menu_id)
             .role_id(1)
-            .menu_id(menu_id as i64)
+            .menu_id(menu_id)
             .exec(&mut db)
             .await
             .map_err(|e| anyhow::anyhow!("关联管理员菜单 {} 失败: {}", menu_id, e))?;
