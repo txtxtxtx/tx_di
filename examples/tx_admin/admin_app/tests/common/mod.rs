@@ -184,6 +184,8 @@ pub async fn create_dict_data_app() -> (DictDataAppService, Arc<DictDataService>
 
 // ── File helpers ───────────────────────────────────────────────────────────
 
+use dashmap::DashMap;
+use tx_di_file::sys_key;
 use tx_di_file::FilePlugin;
 use tx_di_file::FileConfig;
 use tx_di_file::StorageBackend;
@@ -214,13 +216,17 @@ pub async fn create_file_app() -> (FileAppService, Arc<FileService>, Arc<ToastyF
     });
 
     let storage: Arc<dyn FileStorage> =
-        Arc::new(OpendalStorage::new(&config).expect("无法创建测试文件存储"));
-    let storage_lock = std::sync::OnceLock::new();
-    storage_lock.set(storage).unwrap();
+        Arc::new(OpendalStorage::new_local(
+            &temp_dir.path().to_string_lossy(),
+            "",
+        ).expect("无法创建测试文件存储"));
+
+    let backends = DashMap::new();
+    backends.insert(sys_key("local"), storage);
 
     let plugin = Arc::new(FilePlugin {
         config,
-        storage: storage_lock,
+        backends,
     });
 
     let app = FileAppService::new(svc.clone(), plugin, file_config_repo);

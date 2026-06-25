@@ -1,10 +1,10 @@
 //! 文件存储配置
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tx_di_core::{tx_comp, CompInit, InnerContext, RIE};
 
 /// 存储后端类型
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum StorageBackend {
     /// 本地文件系统
@@ -26,7 +26,8 @@ impl From<i32> for StorageBackend {
         match v {
             1 => Self::S3,
             2 => Self::Database,
-            _ => Self::Local,
+            0 => Self::Local,
+            _ => unreachable!("只能是 0 1 2 "),
         }
     }
 }
@@ -42,7 +43,7 @@ impl From<StorageBackend> for i32 {
 }
 
 /// S3 存储后端配置
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct S3Config {
     /// S3 Bucket 名称
     #[serde(default)]
@@ -77,26 +78,61 @@ impl Default for S3Config {
     }
 }
 
+/// 单个存储后端的完整配置
+///
+/// 用于 TOML `[[file_config.extra_storages]]` 数组配置，
+/// 也用于从 DB JSON 反序列化创建动态后端。
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct StorageConfig {
+    /// 后端名称（映射为 `sys:<name>` 或 `user:<name>`）
+    pub name: String,
+    /// 存储后端类型
+    #[serde(default)]
+    pub backend: StorageBackend,
+    /// 本地存储根路径（backend = "local" 时生效）
+    #[serde(default)]
+    pub base_path: String,
+    /// 文件访问基础 URL
+    #[serde(default)]
+    pub base_url: String,
+    /// S3 配置（backend = "s3" 时生效）
+    #[serde(default)]
+    pub s3: S3Config,
+}
+
+impl Default for StorageConfig {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            backend: StorageBackend::Local,
+            base_path: "uploads".to_string(),
+            base_url: String::new(),
+            s3: S3Config::default(),
+        }
+    }
+}
+
 /// 文件存储统一配置
 ///
 /// ```toml
 /// [file_config]
-/// backend = "local"
 /// base_path = "./uploads"
+/// base_url = "http://localhost:8080/files"
 /// max_file_size = 10485760    # 10MB
 /// allowed_extensions = ["jpg", "png", "pdf"]
-/// [file_config.s3]
+///
+/// # 额外存储后端（可选，可多个）
+/// [[file_config.extra_storages]]
+/// name = "s3-main"
+/// backend = "s3"
 /// bucket = "my-bucket"
 /// region = "ap-southeast-1"
+/// endpoint = "http://localhost:9000"
 /// ```
 #[derive(Debug, Clone, Deserialize)]
 #[tx_comp(conf, init)]
 pub struct FileConfig {
-    /// 存储后端：`"local"` 或 `"s3"`
-    #[serde(default)]
-    pub backend: StorageBackend,
-
-    /// 本地存储根路径（backend = "local" 时生效）
+    /// 本地存储根路径（sys:local 使用）
     #[serde(default = "default_base_path")]
     pub base_path: String,
 
@@ -112,20 +148,19 @@ pub struct FileConfig {
     #[serde(default)]
     pub allowed_extensions: Vec<String>,
 
-    /// S3 配置（backend = "s3" 时生效）
+    /// 额外存储后端列表
     #[serde(default)]
-    pub s3: S3Config,
+    pub extra_storages: Vec<StorageConfig>,
 }
 
 impl Default for FileConfig {
     fn default() -> Self {
         Self {
-            backend: StorageBackend::Local,
             base_path: default_base_path(),
             base_url: String::new(),
             max_file_size: 0,
             allowed_extensions: Vec::new(),
-            s3: S3Config::default(),
+            extra_storages: vec![],
         }
     }
 }
@@ -133,7 +168,6 @@ impl Default for FileConfig {
 impl CompInit for FileConfig {
     fn inner_init(&mut self, _ctx: &InnerContext) -> RIE<()> {
         tracing::info!(
-            backend = ?self.backend,
             base_path = %self.base_path,
             max_file_size = self.max_file_size,
             "文件存储配置已加载"

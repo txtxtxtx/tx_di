@@ -3,8 +3,9 @@
 //! 通过 OpenDAL `Operator` 支持本地文件系统、S3 等多种后端，
 //! 配置切换仅需修改 TOML 中的 `backend` 字段。
 
-use super::{error::map_opendal_error, FileInfo, FileStorage, guess_mime_type};
-use crate::config::{FileConfig, StorageBackend};
+use super::{FileInfo, FileStorage, guess_mime_type};
+use crate::config::{FileConfig, S3Config, StorageBackend, StorageConfig};
+use crate::error::{map_opendal_error, FilePluginErr};
 use async_trait::async_trait;
 use futures::Stream;
 use opendal::Operator;
@@ -28,67 +29,114 @@ pub struct OpendalStorage {
 }
 
 impl OpendalStorage {
-    /// 从 `FileConfig` 构建存储实例
+    /// 从 `FileConfig` 构建本地存储实例（兼容旧代码）
     ///
-    /// 根据 `config.backend` 自动选择后端并初始化 OpenDAL Operator。
+    /// 仅提取 `base_path` 和 `base_url` 创建 `sys:local` 对应的后端。
+    /// 如需创建 S3 或其他后端，请使用 `from_storage_config` / `new_s3`。
     pub fn new(config: &FileConfig) -> AppResult<Self> {
-        let operator = match config.backend {
+        Self::new_local(&config.base_path, &config.base_url)
+    }
+
+    /// 从 `StorageConfig` 构建存储实例
+    ///
+    /// 根据 `cfg.backend` 自动选择后端并初始化 OpenDAL Operator。
+    pub fn from_storage_config(cfg: &StorageConfig) -> AppResult<Self> {
+        let operator = match cfg.backend {
             StorageBackend::Database => {
-                return Err(anyhow::anyhow!("数据库存储后端不支持 OpendalStorage，请使用 create_storage()").into());
+                return Err(AppError::with_context(
+                    FilePluginErr::StorageInitFailed,
+                    "数据库存储后端不支持 OpendalStorage",
+                ));
             }
             StorageBackend::Local => {
                 let mut builder = opendal::services::Fs::default();
-                builder = builder.root(&config.base_path);
+                builder = builder.root(&cfg.base_path);
                 Operator::new(builder)
-                    .map_err(|e| map_opendal_error(e, &config.base_path))?
+                    .map_err(|e| map_opendal_error(e, &cfg.base_path))?
                     .finish()
             }
             #[cfg(feature = "s3")]
-            StorageBackend::S3 => {
-                let mut builder = opendal::services::S3::default();
-                builder = builder.bucket(&config.s3.bucket).region(&config.s3.region);
-
-                if !config.s3.endpoint.is_empty() {
-                    builder = builder.endpoint(&config.s3.endpoint);
-                }
-
-                // 默认 path-style（MinIO 兼容），显式启用 virtual-host style 需设为 false
-                if !config.s3.force_path_style {
-                    builder = builder.enable_virtual_host_style();
-                }
-
-                // 凭证配置
-                if !config.s3.access_key.is_empty() && !config.s3.secret_key.is_empty() {
-                    builder = builder
-                        .access_key_id(&config.s3.access_key)
-                        .secret_access_key(&config.s3.secret_key);
-                }
-
-                Operator::new(builder)
-                    .map_err(|e| map_opendal_error(e, ""))?
-                    .finish()
-            }
+            StorageBackend::S3 => Self::build_s3_operator(&cfg.s3)?
+                .ok_or_else(|| AppError::with_context(
+                    FilePluginErr::StorageInitFailed,
+                    "S3 配置不完整",
+                ))?,
             #[cfg(not(feature = "s3"))]
             StorageBackend::S3 => {
-                return Err(AppError::from_anyhow(anyhow::anyhow!(
-                    "S3 存储后端需要启用 's3' feature flag"
-                )));
+                return Err(AppError::with_context(
+                    FilePluginErr::StorageInitFailed,
+                    "S3 存储后端需要启用 's3' feature flag",
+                ));
             }
         };
 
         tracing::info!(
-            backend = ?config.backend,
-            base_path = %config.base_path,
+            backend = ?cfg.backend,
+            name = %cfg.name,
             "OpenDAL 存储后端已初始化"
         );
 
         Ok(Self {
             operator,
-            base_url: config.base_url.clone(),
+            base_url: cfg.base_url.clone(),
         })
     }
 
-    /// 获取文件的公开访问 URL（仅本地存储）
+    /// 创建本地文件系统存储
+    pub fn new_local(base_path: &str, base_url: &str) -> AppResult<Self> {
+        let cfg = StorageConfig {
+            name: String::new(),
+            backend: StorageBackend::Local,
+            base_path: base_path.to_string(),
+            base_url: base_url.to_string(),
+            s3: S3Config::default(),
+        };
+        Self::from_storage_config(&cfg)
+    }
+
+    /// 创建 S3 存储
+    pub fn new_s3(s3_cfg: &S3Config, base_url: &str) -> AppResult<Self> {
+        let cfg = StorageConfig {
+            name: String::new(),
+            backend: StorageBackend::S3,
+            base_path: String::new(),
+            base_url: base_url.to_string(),
+            s3: s3_cfg.clone(),
+        };
+        Self::from_storage_config(&cfg)
+    }
+
+    /// 从 `FileConfig`（旧格式）构建 S3 Operator，兼容旧配置中的 `s3` 字段
+    fn build_s3_operator(s3: &S3Config) -> AppResult<Option<Operator>> {
+        if s3.bucket.is_empty() {
+            return Ok(None);
+        }
+        let mut builder = opendal::services::S3::default();
+        builder = builder.bucket(&s3.bucket).region(&s3.region);
+
+        if !s3.endpoint.is_empty() {
+            builder = builder.endpoint(&s3.endpoint);
+        }
+
+        // 默认 path-style（MinIO 兼容），显式启用 virtual-host style 需设为 false
+        if !s3.force_path_style {
+            builder = builder.enable_virtual_host_style();
+        }
+
+        // 凭证配置
+        if !s3.access_key.is_empty() && !s3.secret_key.is_empty() {
+            builder = builder
+                .access_key_id(&s3.access_key)
+                .secret_access_key(&s3.secret_key);
+        }
+
+        let op = Operator::new(builder)
+            .map_err(|e| map_opendal_error(e, ""))?
+            .finish();
+        Ok(Some(op))
+    }
+
+    /// 获取文件的公开访问 URL
     fn file_url(&self, path: &str) -> String {
         let safe_path = path.trim_start_matches('/');
         format!(

@@ -6,6 +6,15 @@
 //! - **AWS S3 / MinIO**（`s3` feature，可选）
 //! - 未来可扩展 GCS、Azure Blob、OBS 等
 //!
+//! # 多后端支持
+//!
+//! 插件支持同时管理多个存储后端，key 命名规范：
+//!
+//! | 前缀 | 来源 | 示例 | 可否移除 |
+//! |------|------|------|---------|
+//! | `sys:` | 配置文件自动注册 | `sys:local`, `sys:s3-main` | 否 |
+//! | `user:` | 运行时动态添加 | `user:my-oss` | 是 |
+//!
 //! # 快速开始
 //!
 //! ```toml
@@ -18,17 +27,36 @@
 //! ```toml
 //! # config/config.toml
 //! [file_config]
-//! backend = "local"              # "local" 或 "s3"
 //! base_path = "./uploads"
 //! base_url = "http://localhost:8080/files"
-//! # S3 配置（当 backend = "s3" 时生效）
-//! [file_config.s3]
+//!
+//! [[file_config.extra_storages]]
+//! name = "s3-images"
+//! backend = "s3"
 //! bucket = "my-bucket"
 //! region = "ap-southeast-1"
-//! endpoint = "http://localhost:9000"   # MinIO 等兼容端点
-//! access_key = "minioadmin"
-//! secret_key = "minioadmin"
-//! force_path_style = true
+//! endpoint = "http://localhost:9000"
+//! ```
+//!
+//! ```rust,ignore
+//! use tx_di_file::FilePlugin;
+//!
+//! let plugin = app.inject::<FilePlugin>();
+//!
+//! // 获取默认存储
+//! let local = plugin.default_storage().unwrap();
+//!
+//! // 获取指定后端
+//! let s3 = plugin.get_storage("sys:s3-images").unwrap();
+//!
+//! // 动态添加用户后端
+//! plugin.add_storage(
+//!     tx_di_file::user_key("my-oss"),
+//!     Arc::new(OpendalStorage::new_s3(&s3_cfg, "")?),
+//! );
+//!
+//! // 动态移除
+//! plugin.remove_storage("user:my-oss")?;
 //! ```
 //!
 //! # Feature Flags
@@ -56,69 +84,58 @@
 //! storage.upload("small.txt", b"hello", None).await?;
 //! let data = storage.download("small.txt").await?;
 //! ```
+//!
+//! # 迁移说明（从旧版单后端迁移）
+//!
+//! - `create_storage()` 函数已移除，请改用 `OpendalStorage::from_json_config()` 或 `FilePlugin::add_storage()`
+//! - `FilePlugin::storage()` 方法已移除，请改用 `get_storage()` / `default_storage()`
 
 mod config;
+mod error;
 mod plugin;
 pub mod storage;
 
-pub use config::{FileConfig, StorageBackend};
+pub use config::{FileConfig, S3Config, StorageBackend, StorageConfig};
+pub use error::{FilePluginErr, FileStorageErr};
 pub use plugin::FilePlugin;
-pub use storage::{FileInfo, FileStorage, FileStorageErr, OpendalStorage};
-
-/// 从数据库配置创建存储实例
-///
-/// - `backend`: 存储后端类型（0=Local, 1=S3, 2=Database）
-/// - `config_json`: 后端配置 JSON（Local 需要 base_path/base_url，S3 需要 bucket/region 等）
-///
-/// 对于 `Database` 后端，返回 `None`（由上层应用服务直接处理数据库存储）。
-pub fn create_storage(backend: i32, config_json: &str) -> Option<Arc<dyn FileStorage>> {
-    let backend = StorageBackend::from(backend);
-    match backend {
-        StorageBackend::Database => None,
-        _ => {
-            let mut config = FileConfig::default();
-            config.backend = backend;
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(config_json) {
-                if let Some(v) = json.get("base_path").and_then(|v| v.as_str()) {
-                    config.base_path = v.to_string();
-                }
-                if let Some(v) = json.get("base_url").and_then(|v| v.as_str()) {
-                    config.base_url = v.to_string();
-                }
-                if let Some(v) = json.get("max_file_size").and_then(|v| v.as_u64()) {
-                    config.max_file_size = v;
-                }
-                if let Some(v) = json.get("allowed_extensions").and_then(|v| v.as_array()) {
-                    config.allowed_extensions = v
-                        .iter()
-                        .filter_map(|s| s.as_str().map(String::from))
-                        .collect();
-                }
-                // S3 配置
-                if let Some(s3) = json.get("s3").and_then(|v| v.as_object()) {
-                    if let Some(v) = s3.get("bucket").and_then(|v| v.as_str()) {
-                        config.s3.bucket = v.to_string();
-                    }
-                    if let Some(v) = s3.get("region").and_then(|v| v.as_str()) {
-                        config.s3.region = v.to_string();
-                    }
-                    if let Some(v) = s3.get("endpoint").and_then(|v| v.as_str()) {
-                        config.s3.endpoint = v.to_string();
-                    }
-                    if let Some(v) = s3.get("access_key").and_then(|v| v.as_str()) {
-                        config.s3.access_key = v.to_string();
-                    }
-                    if let Some(v) = s3.get("secret_key").and_then(|v| v.as_str()) {
-                        config.s3.secret_key = v.to_string();
-                    }
-                    if let Some(v) = s3.get("force_path_style").and_then(|v| v.as_bool()) {
-                        config.s3.force_path_style = v;
-                    }
-                }
-            }
-            OpendalStorage::new(&config).ok().map(|s| Arc::new(s) as Arc<dyn FileStorage>)
-        }
-    }
-}
+pub use storage::{FileInfo, FileStorage, OpendalStorage};
 
 use std::sync::Arc;
+
+// ============================================================================
+// 常量与辅助方法
+// ============================================================================
+
+/// 系统存储后端 key 前缀
+///
+/// 由配置文件自动注册的后端使用此前缀，不可通过 `remove_storage` 移除。
+pub const SYS_PREFIX: &str = "sys:";
+
+/// 用户自定义存储后端 key 前缀
+///
+/// 运行时通过 `add_storage` 动态添加的后端使用此前缀，可通过 `remove_storage` 移除。
+pub const USER_PREFIX: &str = "user:";
+
+/// 创建系统存储后端 key（内部使用）
+///
+/// # 示例
+/// ```rust,ignore
+/// sys_key("local")  // => "sys:local"
+/// sys_key("s3-main") // => "sys:s3-main"
+/// ```
+#[inline]
+pub(crate) fn sys_key(name: &str) -> String {
+    format!("{}{}", SYS_PREFIX, name)
+}
+
+/// 创建用户自定义存储后端 key
+///
+/// # 示例
+/// ```rust,ignore
+/// user_key("my-oss")     // => "user:my-oss"
+/// user_key("backup-bk")  // => "user:backup-bk"
+/// ```
+#[inline]
+pub fn user_key(name: &str) -> String {
+    format!("{}{}", USER_PREFIX, name)
+}

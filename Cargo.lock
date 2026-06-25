@@ -7206,6 +7206,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bytes",
+ "dashmap",
  "futures",
  "mime_guess",
  "opendal",

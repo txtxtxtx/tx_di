@@ -1,14 +1,20 @@
-//! 文件存储错误类型
+//! 文件插件统一错误类型
 //!
-//! 业务错误码通过 `#[derive(CodeMsg)]` 定义，
-//! 动态信息（如路径、大小等）通过 `AppError::with_context` 附加。
+//! 所有插件层面的错误码集中在此模块：
+//!
+//! | 错误码 | 说明 |
+//! |--------|------|
+//! | FILE-4001 | 文件未找到 |
+//! | FILE-4002 | 文件已存在 |
+//! | FILE-4003 | 文件大小超限 |
+//! | FILE-4004 | 不允许的文件类型 |
+//! | FILE-5001 | 存储后端不存在 |
+//! | FILE-5002 | 系统存储后端不允许移除 |
+//! | FILE-5003 | 存储后端初始化失败 |
 
 use tx_error::{AppError, CodeMsg};
 
-/// 文件存储业务错误码
-///
-/// 使用 `#[derive(CodeMsg)]` 自动生成 `CodeMsg` trait 实现，
-/// 从而可无缝转为 `AppError`。
+/// 文件存储业务错误码（底层 I/O 操作相关）
 #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
 #[err("FILE")]
 pub enum FileStorageErr {
@@ -27,6 +33,23 @@ pub enum FileStorageErr {
     /// 扩展名不允许
     #[err(4004, "不允许的文件类型")]
     InvalidExtension,
+}
+
+/// 文件插件业务错误码（后端管理相关）
+#[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
+#[err("FILE")]
+pub enum FilePluginErr {
+    /// 指定的存储后端 key 不存在
+    #[err(5001, "存储后端不存在")]
+    StorageNotFound,
+
+    /// 尝试移除系统存储后端（`sys:` 前缀）
+    #[err(5002, "系统存储后端不允许移除")]
+    CannotRemoveSystemStorage,
+
+    /// 存储后端初始化失败（配置错误或功能未启用）
+    #[err(5003, "存储后端初始化失败")]
+    StorageInitFailed,
 }
 
 /// 将 OpenDAL 错误映射为 `AppError`

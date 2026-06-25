@@ -11,7 +11,8 @@ use admin_domain::file::repository::FileConfigRepository;
 use admin_proto::{ListFilesRequest, FileResponse};
 use tx_common::page::Page;
 use tx_di_core::tx_comp;
-use tx_di_file::storage::{guess_mime_type, extract_extension, FileStorageErr, FileStorage};
+use tx_di_file::{user_key, StorageConfig};
+use tx_di_file::storage::{guess_mime_type, extract_extension, FileStorageErr, FileStorage, OpendalStorage};
 use tx_di_file::FilePlugin;
 use tx_error::{AppError, AppResult};
 
@@ -86,13 +87,27 @@ impl FileAppService {
                     "数据库存储后端不适用此操作",
                 ));
             }
-            if let Some(storage) = tx_di_file::create_storage(cfg.storage, &cfg.config) {
+
+            // 尝试从插件缓存中获取
+            let key = user_key(&format!("db_{}", cfg.id()));
+            if let Some(storage) = self.file_plugin.get_storage(&key) {
                 return Ok(storage);
+            }
+
+            // 未缓存则从 DB 配置创建并注册到插件
+            if let Ok(storage_cfg) = serde_json::from_str::<StorageConfig>(&cfg.config) {
+                if let Ok(storage) = OpendalStorage::from_storage_config(&storage_cfg) {
+                    let storage = Arc::new(storage) as Arc<dyn FileStorage>;
+                    self.file_plugin.add_storage(key, storage.clone());
+                    return Ok(storage);
+                }
             }
         }
 
         // 回退到插件默认存储
-        Ok(self.file_plugin.storage())
+        self.file_plugin
+            .default_storage()
+            .ok_or_else(|| anyhow::anyhow!("默认存储后端不可用").into())
     }
 
     /// 获取本地文件服务的根目录

@@ -3,10 +3,10 @@
 //! 定义 `FileStorage` trait 及基于 OpenDAL 的统一后端实现。
 //! 支持本地文件系统、S3 及任何 OpenDAL 支持的后端。
 
-mod error;
 mod opendal;
 
-pub use error::{FileStorageErr, map_opendal_error};
+// 错误类型已提升至 crate::error
+pub use super::error::{FileStorageErr, map_opendal_error};
 pub use opendal::OpendalStorage;
 
 use async_trait::async_trait;
