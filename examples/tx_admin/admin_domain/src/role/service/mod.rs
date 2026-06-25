@@ -287,6 +287,13 @@ impl RoleService {
         self.role_repo.find_by_ids(ids).await
     }
 
+    /// 判断角色编码列表中是否包含超级管理员
+    ///
+    /// `"admin"` 角色编码具有系统最高权限，此方法封装了该业务规则。
+    pub fn has_admin_role(role_codes: &[String]) -> bool {
+        role_codes.iter().any(|c| c == "admin")
+    }
+
     /// 获取所有角色列表
     ///
     /// # 参数
