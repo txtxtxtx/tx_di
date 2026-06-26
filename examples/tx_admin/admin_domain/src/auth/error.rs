@@ -21,6 +21,6 @@ pub enum AuthError {
     UserDisabled,
 
     /// 用户不存在
-    #[err(2003, "用户不存在")]
+    #[err(2003, "用户名或密码错误")]
     UserNotFound,
 }

@@ -22,6 +22,7 @@ use admin_infra::department::repository::ToastyDepartmentRepository;
 use admin_infra::log::repository::ToastyLoginLogRepository;
 use admin_domain::log::service::LoginLogService;
 use admin_app::log::app_service::LoginLogAppService;
+use admin_app::auth::session_service::AuthSessionService;
 
 /// 创建认证测试环境
 ///
@@ -55,7 +56,8 @@ async fn create_auth_test_env() -> (
     let menu_app = admin_app::menu::app_service::MenuAppService::new(menu_svc.clone());
 
     let auth_svc = Arc::new(AuthService::new(user_svc.clone()));
-    let auth_app = AuthAppService::new_for_test(auth_svc, user_app.clone(), role_svc, menu_svc, login_log_app);
+    let session_svc = Arc::new(AuthSessionService::new());
+    let auth_app = AuthAppService::new(auth_svc, user_app.clone(), role_svc, menu_svc, login_log_app, session_svc);
 
     (auth_app, user_app, role_app, menu_app, user_repo, role_repo)
 }

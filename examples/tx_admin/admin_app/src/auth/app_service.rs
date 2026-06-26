@@ -17,8 +17,6 @@ use tx_error::AppResult;
 ///
 /// 编排登录/登出所需的多个领域服务和会话服务。
 /// Session 管理由 `AuthSessionService` 封装，不再暴露到 API 层。
-///
-/// `session_service` 为 `Option` 以支持测试场景（测试中无 sa-token 运行时）。
 #[tx_comp]
 pub struct AuthAppService {
     auth_service: Arc<AuthService>,
@@ -26,7 +24,7 @@ pub struct AuthAppService {
     role_service: Arc<RoleService>,
     menu_service: Arc<MenuService>,
     login_log_service: Arc<LoginLogAppService>,
-    session_service: Option<Arc<AuthSessionService>>,
+    session_service: Arc<AuthSessionService>,
 }
 
 impl AuthAppService {
@@ -45,25 +43,7 @@ impl AuthAppService {
             role_service,
             menu_service,
             login_log_service,
-            session_service: Some(session_service),
-        }
-    }
-
-    /// 测试环境构造（不含 session 服务，token 返回空串）
-    pub fn new_for_test(
-        auth_service: Arc<AuthService>,
-        user_app: Arc<UserAppService>,
-        role_service: Arc<RoleService>,
-        menu_service: Arc<MenuService>,
-        login_log_service: Arc<LoginLogAppService>,
-    ) -> Self {
-        Self {
-            auth_service,
-            user_app,
-            role_service,
-            menu_service,
-            login_log_service,
-            session_service: None,
+            session_service,
         }
     }
 
@@ -111,20 +91,15 @@ impl AuthAppService {
             username: login_user.username.clone(),
         };
 
-        let token = if let Some(ref session) = self.session_service {
-            session
-                .login(
-                    login_user.user_id,
-                    is_admin,
-                    session_extra,
-                    login_user.permissions.into_iter().collect(),
-                    role_codes.clone(),
-                )
-                .await?
-        } else {
-            // 测试环境：无 sa-token 运行时，返回空 token
-            String::new()
-        };
+        let token = self.session_service
+            .login(
+                login_user.user_id,
+                is_admin,
+                session_extra,
+                login_user.permissions.into_iter().collect(),
+                role_codes.clone(),
+            )
+            .await?;
 
         Ok(LoginResponse {
             user_id: login_user.user_id,
@@ -230,8 +205,8 @@ impl AuthAppService {
     }
 
     /// 获取 AuthSessionService 引用（供 API 层登出时销毁 session）
-    pub fn session_service(&self) -> Option<&Arc<AuthSessionService>> {
-        self.session_service.as_ref()
+    pub fn session_service(&self) -> &Arc<AuthSessionService> {
+        &self.session_service
     }
 
     /// 获取 UserAppService 引用

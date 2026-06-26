@@ -100,8 +100,6 @@ pub use error::{FilePluginErr, FileStorageErr};
 pub use plugin::FilePlugin;
 pub use storage::{FileInfo, FileStorage, OpendalStorage};
 
-use std::sync::Arc;
-
 // ============================================================================
 // 常量与辅助方法
 // ============================================================================

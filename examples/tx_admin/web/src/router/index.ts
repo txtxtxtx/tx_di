@@ -156,12 +156,21 @@ router.beforeEach(async (to, _from, next) => {
       // 动态路由已注册，用 replace 重新导航到目标路径
       // 使用 fullPath 确保完整路径匹配（to.path 可能缺少子路径）
       next({ path: to.fullPath, replace: true })
-    } catch {
-      // 获取菜单失败（token 过期等），清空状态跳登录
-      const { useUserStore } = await import('@/stores/user')
-      const userStore = useUserStore()
-      userStore.logout()
-      next('/login')
+    } catch (err) {
+      // 区分：菜单接口本身失败 vs 动态路由注册失败
+      // 只有菜单接口失败（token 过期等）才清空状态跳登录
+      console.error('[router] 加载菜单或注册动态路由失败:', err)
+      if (!menuStore.loaded) {
+        // fetchMenus 就失败了 → token 可能过期，清空跳登录
+        const { useUserStore } = await import('@/stores/user')
+        const userStore = useUserStore()
+        userStore.logout()
+        next('/login')
+      } else {
+        // fetchMenus 成功但 addDynamicRoutes 失败 → 菜单数据有问题，仍然放行到首页
+        console.warn('[router] 动态路由注册失败，将使用静态路由')
+        next({ path: to.fullPath, replace: true })
+      }
     }
     return
   }

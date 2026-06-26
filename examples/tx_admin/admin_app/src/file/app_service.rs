@@ -8,7 +8,6 @@ use admin_domain::file::model::aggregate::FileConfig;
 use admin_domain::file::model::value_object::{FileQuery, FileUploadCommand};
 use admin_domain::file::service::FileService;
 use admin_domain::file::repository::FileConfigRepository;
-use admin_domain::shared::model::Entity;
 use admin_proto::{ListFilesRequest, FileResponse};
 use tx_common::page::Page;
 use tx_di_core::tx_comp;

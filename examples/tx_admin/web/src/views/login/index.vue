@@ -49,13 +49,16 @@ async function handleLogin() {
   try {
     // 获取客户端 IP（简单处理）
     const loginIp = '127.0.0.1'
-    await userStore.login({
+    const loginRes = await userStore.login({
       username: form.username,
       password: form.password,
       loginIp: loginIp,
     })
+    console.log('[login] 登录成功, token:', loginRes.data.token?.substring(0, 8) + '...')
     ElMessage.success('登录成功')
-    router.push('/')
+    router.push('/').catch(err => {
+      console.error('[login] router.push 失败:', err)
+    })
   } catch {
     // error handled by interceptor
   } finally {
