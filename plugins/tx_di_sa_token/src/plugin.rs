@@ -4,7 +4,6 @@ use crate::config::SaTokenConf;
 use std::sync::Arc;
 use tx_di_core::{tx_comp, CompInit, InnerContext, RIE};
 use tracing::info;
-use sa_token_plugin_axum::StpUtil;
 
 /// sa-token 插件
 ///
@@ -73,8 +72,6 @@ impl CompInit for SaTokenPlugin {
         // 使用 Builder 模式构建 SaTokenState
         let builder = sa_token_plugin_axum::SaTokenStateBuilder::default();
         let state = config.apply_to_builder(builder).build();
-        // 初始化 StpUtil 全局 Manager（供 AuthSessionService 等直接调用 StpUtil 使用）
-        StpUtil::init_manager((*state.manager).clone());
         // 写入 OnceLock
         if self.state.set(state).is_err() {
             tracing::warn!("SaTokenPlugin: state concurrently initialized");
