@@ -17,7 +17,7 @@ use syn::{
     Token, Type,
 };
 
-use crate::utils::{camel_to_screaming_snake, camel_to_snake, is_option_type, strip_arc_type};
+use crate::utils::{camel_to_screaming_snake, camel_to_snake, is_option_type, is_arc_dyn_trait, extract_trait_from_option_arc, strip_arc_type};
 
 /// `#[derive(Component)]` 入口
 pub fn derive_component(input: TokenStream) -> TokenStream {
@@ -52,6 +52,7 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
     // 字段分类
     enum FieldKind {
         Inject { ty: Type },
+        TraitInject { ty: Type },
         Custom { expr: Expr },
         Optional { ty: Type },
         Skip,
@@ -73,6 +74,9 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
         let inject_expr = extract_inject_expr(&field.attrs)?;
         let kind = if has_skip_attr(&field.attrs) {
             FieldKind::Skip
+        } else if is_arc_dyn_trait(&field.ty) {
+            // Option<Arc<dyn Trait>> — trait object 注入
+            FieldKind::TraitInject { ty: field.ty.clone() }
         } else if is_option_type(&field.ty) {
             FieldKind::Optional { ty: field.ty.clone() }
         } else if let Some(expr) = inject_expr {
@@ -85,12 +89,28 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
 
     // ── 生成 Deps 类型和 build 方法 ──────────────────────────────────────
 
+    // inject_fields: 普通组件注入（Arc<T>）
     let inject_fields: Vec<(syn::Ident, Type)> = fields_info
         .iter()
         .filter_map(|(name, kind)| {
             if let FieldKind::Inject { ty } = kind {
                 let inner_ty = strip_arc_type(ty);
                 Some((name.clone(), inner_ty))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // trait_inject_fields: trait object 注入（Option<Arc<dyn Trait>>）
+    // 存储字段名 + 提取出的 dyn Trait 类型
+    let trait_inject_fields: Vec<(syn::Ident, Type)> = fields_info
+        .iter()
+        .filter_map(|(name, kind)| {
+            if let FieldKind::TraitInject { ty } = kind {
+                let trait_ty = extract_trait_from_option_arc(ty)
+                    .expect("is_arc_dyn_trait 已验证，提取 trait 类型不应失败");
+                Some((name.clone(), trait_ty))
             } else {
                 None
             }
@@ -111,7 +131,7 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
         quote! { (#(std::sync::Arc<#dep_types>),*) }
     };
 
-    // 生成 build 方法体
+    // 生成 build 方法体（不含 trait inject 字段，那些在 inner_init 中填充）
     let build_fields: Vec<TokenStream2> = fields_info
         .iter()
         .map(|(fname, kind)| match kind {
@@ -126,6 +146,10 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
                 let idx_lit = Literal::usize_unsuffixed(idx);
                 quote! { #fname: deps.#idx_lit.clone() }
             }
+            FieldKind::TraitInject { ty } => {
+                // trait inject 字段：用 None 占位，在 inner_init 中填充
+                quote! { #fname: None }
+            }
             FieldKind::Custom { expr } => quote! { #fname: #expr },
         })
         .collect();
@@ -135,6 +159,18 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
     let dep_type_id_fns: Vec<TokenStream2> = dep_types
         .iter()
         .map(|ty| quote! { || std::any::TypeId::of::<#ty>() })
+        .collect();
+
+    // trait 依赖也需要加入 dep_type_ids（用于拓扑排序）
+    let trait_dep_type_id_fns: Vec<TokenStream2> = trait_inject_fields
+        .iter()
+        .map(|(_, ty)| quote! { || std::any::TypeId::of::<#ty>() })
+        .collect();
+
+    // 合并普通依赖和 trait 依赖
+    let all_dep_type_id_fns: Vec<TokenStream2> = dep_type_id_fns
+        .into_iter()
+        .chain(trait_dep_type_id_fns.into_iter())
         .collect();
 
     let scope_const = match &comp_attr.scope {
@@ -171,7 +207,7 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
                 #( #build_fields ),*
             }
         };
-        (deps_type, build_body, dep_type_id_fns)
+        (deps_type, build_body, all_dep_type_id_fns)
     };
 
     // ── 生成 factory 函数 ───────────────────────────────────────────────
@@ -248,6 +284,28 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
         (vec![], vec![])
     };
 
+    // ── 生成 inner_init 覆盖（如果有 trait inject 字段）──────────────────
+
+    let inner_init_impl = if trait_inject_fields.is_empty() {
+        quote! {}
+    } else {
+        let trait_inject_assigns: Vec<TokenStream2> = trait_inject_fields
+            .iter()
+            .map(|(fname, ty)| {
+                quote! {
+                    self.#fname = Some(::tx_di_core::inject_trait_from_store::<#ty>(store));
+                }
+            })
+            .collect();
+
+        quote! {
+            fn inner_init(&mut self, store: &::tx_di_core::Store) -> Result<(), ::tx_di_core::IE> {
+                #( #trait_inject_assigns )*
+                Ok(())
+            }
+        }
+    };
+
     // ── 生成最终代码 ────────────────────────────────────────────────────
     // 注意：derive 宏只追加 impl 和 linkme 注册，不重新输出结构体
 
@@ -261,6 +319,9 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
             }
 
             const SCOPE: ::tx_di_core::Scope = #scope_const;
+
+            // 如果有 trait inject 字段，覆盖 inner_init
+            #inner_init_impl
         }
 
         // ── linkme 注册条目 ───────────────────────────────────────────────

@@ -1,5 +1,8 @@
 //! tx-di-core 性能基准测试
 //!
+//! ```shell
+//! cargo bench -p tx-di-core --bench di_bench
+//! ```
 //! 覆盖场景：
 //! 1. 拓扑排序 (topo_sort) — 不同规模和依赖深度
 //! 2. 依赖注入 (inject) — Singleton 缓存 vs Prototype 工厂
@@ -11,7 +14,10 @@ use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion
 use dashmap::DashMap;
 use std::any::{Any, TypeId};
 use std::sync::Arc;
-use tx_di_core::{CompRef, ComponentMeta, Scope, inject_from_store, topo_sort};
+use tx_di_core::{
+    BoxFuture, CompRef, ComponentMeta, RIE, Scope, Store, CancellationToken,
+    inject_from_store, topo_sort,
+};
 
 // ── 生成唯一 marker 类型 ─────────────────────────────────────────────────────
 
@@ -43,87 +49,97 @@ struct LargeObject {
     _count: u64,
 }
 
-/// init_sort_fn 实现：固定返回 0
-fn zero_sort() -> i32 {
-    0
-}
+/// 空闲的 TraitImplEntry 切片
+static EMPTY_TRAIT_IMPLS: &[tx_di_core::store::TraitImplEntry] = &[];
 
 // ── 辅助函数 ─────────────────────────────────────────────────────────────────
 
+/// 空的 inner_init fn
+fn noop_inner_init(_store: &Store) -> RIE<()> { Ok(()) }
+/// 空的 init fn
+fn noop_init(_app: &Arc<tx_di_core::App>) -> RIE<()> { Ok(()) }
+/// 空的 async_init fn
+fn noop_async_init(_app: &Arc<tx_di_core::App>) -> BoxFuture<RIE<()>> {
+    Box::pin(async { Ok(()) })
+}
+/// 空的 async_run fn
+fn noop_async_run(_app: &Arc<tx_di_core::App>, _token: CancellationToken) -> BoxFuture<RIE<()>> {
+    Box::pin(async { Ok(()) })
+}
+/// 空的 shutdown fn
+fn noop_shutdown(_store: &Store) {}
+/// init_sort 返回 0
+fn zero_sort() -> i32 { 0 }
+
+/// 空的 factory fn（返回空 Box）
+fn noop_factory(_store: &Store) -> Box<dyn Any + Send + Sync> {
+    Box::new(())
+}
+
 /// 构建 n 个无依赖的 ComponentMeta
-/// 用静态 fn 指针数组 MARKER_FNS 循环分配唯一 TypeId
 fn make_independent_metas(n: usize) -> Vec<ComponentMeta> {
     (0..n)
         .map(|i| {
             let type_id_fn = MARKER_FNS[i % MARKER_FNS.len()];
             ComponentMeta {
                 type_id: type_id_fn,
-                deps: &[],
                 name: "bench",
+                dep_type_ids: &[],
+                factory: noop_factory,
                 scope: Scope::Singleton,
-                factory_fn: None,
-                init_sort_fn: zero_sort,
-                init_fn: None,
-                async_init_fn: None,
-                async_run_fn: None,
                 impl_traits: &[],
                 trait_impls: &[],
+                init_sort_fn: zero_sort,
+                inner_init_fn: noop_inner_init,
+                init_fn: noop_init,
+                async_init_fn: noop_async_init,
+                async_run_fn: noop_async_run,
+                shutdown_fn: noop_shutdown,
             }
         })
         .collect()
 }
 
 /// 构建线性依赖链：dep[i] = type_id[i-1]
-/// 这里用 static 数组存储 deps 的函数指针
 fn make_chain_metas(n: usize) -> Vec<ComponentMeta> {
     assert!(n <= MARKER_FNS.len(), "chain length exceeds marker count");
 
-    let type_ids: Vec<fn() -> TypeId> = (0..n)
-        .map(|i| MARKER_FNS[i])
-        .collect();
+    let type_ids: Vec<fn() -> TypeId> = (0..n).map(|i| MARKER_FNS[i]).collect();
 
-    // 构建 deps: meta[i] 依赖 type_ids[i-1]
-    // 由于 deps 是 &'static [fn() -> TypeId]，需要 leak 或者用全局
-    // 这里为每个 meta 单独 leak 一个小数组
     let mut deps_vecs: Vec<&'static [fn() -> TypeId]> = Vec::with_capacity(n);
     for i in 0..n {
         if i == 0 {
             deps_vecs.push(&[]);
         } else {
-            // leak 一个包含单个 fn 指针的 slice
             let dep_fn = type_ids[i - 1];
-            let leaked: &'static mut [fn() -> TypeId] =
-                Box::leak(Box::new([dep_fn]));
+            let leaked: &'static [fn() -> TypeId] = Box::leak(Box::new([dep_fn]));
             deps_vecs.push(leaked);
         }
     }
 
     (0..n)
-        .map(|i| {
-            ComponentMeta {
-                type_id: type_ids[i],
-                deps: deps_vecs[i],
-                name: "bench",
-                scope: Scope::Singleton,
-                factory_fn: None,
-                init_sort_fn: zero_sort,
-                init_fn: None,
-                async_init_fn: None,
-                async_run_fn: None,
-                impl_traits: &[],
-                trait_impls: &[],
-            }
+        .map(|i| ComponentMeta {
+            type_id: type_ids[i],
+            name: "bench",
+            dep_type_ids: deps_vecs[i],
+            factory: noop_factory,
+            scope: Scope::Singleton,
+            impl_traits: &[],
+            trait_impls: &[],
+            init_sort_fn: zero_sort,
+            inner_init_fn: noop_inner_init,
+            init_fn: noop_init,
+            async_init_fn: noop_async_init,
+            async_run_fn: noop_async_run,
+            shutdown_fn: noop_shutdown,
         })
         .collect()
 }
 
-/// 快速构建 DashMap store，放入一个 Cached 实例
-fn make_store_with<T: Any + Send + Sync + 'static>(value: T) -> DashMap<TypeId, CompRef> {
-    let store = DashMap::<TypeId, CompRef>::new();
-    store.insert(
-        TypeId::of::<T>(),
-        CompRef::Cached(Arc::new(value) as Arc<dyn Any + Send + Sync>),
-    );
+/// 快速构建 Store，放入一个 Cached 实例
+fn make_store_with<T: Any + Send + Sync + 'static>(value: T) -> Store {
+    let store = Store::new();
+    store.insert_cached(value);
     store
 }
 
@@ -134,7 +150,6 @@ fn make_store_with<T: Any + Send + Sync + 'static>(value: T) -> DashMap<TypeId, 
 fn bench_topo_sort(c: &mut Criterion) {
     let mut group = c.benchmark_group("topo_sort");
 
-    // ── 1.1 无依赖拓扑排序（纯 O(V+E) 开销） ──
     for &n in &[10usize, 50, 100] {
         let label = format!("no_deps_{n}");
         group.bench_function(&label, |b| {
@@ -146,7 +161,6 @@ fn bench_topo_sort(c: &mut Criterion) {
         });
     }
 
-    // ── 1.2 链式拓扑排序（深度 = n） ──
     for &n in &[10usize, 50, 100] {
         let label = format!("chain_{n}");
         group.bench_function(&label, |b| {
@@ -168,16 +182,22 @@ fn bench_topo_sort(c: &mut Criterion) {
 fn bench_inject(c: &mut Criterion) {
     let mut group = c.benchmark_group("inject");
 
-    // ── 2.1 Singleton 注入（从 Cached 取小对象） ──
+    // 2.1 Singleton 注入（小对象）
     group.bench_function("singleton_u64", |b| {
         let store = make_store_with(42u64);
         b.iter(|| {
-            let val = inject_from_store::<u64>(black_box(&store));
-            black_box(val);
+            let store = store.inner();
+            let tid = TypeId::of::<u64>();
+            if let Some(entry) = store.get(&tid) {
+                if let CompRef::Cached(arc) = &*entry {
+                    let _ = arc.clone();
+                }
+            }
+            black_box(());
         });
     });
 
-    // ── 2.2 Singleton 注入（大对象） ──
+    // 2.2 Singleton 注入（大对象）
     group.bench_function("singleton_large_object", |b| {
         let large = LargeObject {
             _data: vec![0u8; 4096],
@@ -186,52 +206,71 @@ fn bench_inject(c: &mut Criterion) {
         };
         let store = make_store_with(large);
         b.iter(|| {
-            let val = inject_from_store::<LargeObject>(black_box(&store));
-            black_box(val);
+            let store = store.inner();
+            let tid = TypeId::of::<LargeObject>();
+            if let Some(entry) = store.get(&tid) {
+                if let CompRef::Cached(arc) = &*entry {
+                    let _ = arc.clone();
+                }
+            }
+            black_box(());
         });
     });
 
-    // ── 2.3 Prototype 注入（每次调用工厂闭包） ──
+    // 2.3 Prototype 注入（每次调用工厂闭包）
     group.bench_function("prototype_factory", |b| {
-        let store = DashMap::<TypeId, CompRef>::new();
-        let closure = |_store: &DashMap<TypeId, CompRef>| -> Arc<dyn Any + Send + Sync> {
+        let store = Store::new();
+        let closure = |_store: &Store| -> Arc<dyn Any + Send + Sync> {
             Arc::new(0u64)
         };
-        store.insert(TypeId::of::<u64>(), CompRef::Factory(Arc::new(closure)));
+        store.inner().insert(
+            TypeId::of::<u64>(),
+            CompRef::Factory(Arc::new(closure)),
+        );
 
         b.iter(|| {
-            let val = inject_from_store::<u64>(black_box(&store));
-            black_box(val);
+            let tid = TypeId::of::<u64>();
+            if let Some(entry) = store.inner().get(&tid) {
+                if let CompRef::Factory(f) = &*entry {
+                    let _ = f(&store);
+                }
+            }
+            black_box(());
         });
     });
 
-    // ── 2.4 注入 miss（key 不存在时的 get 开销） ──
+    // 2.4 注入 miss（key 不存在时的 get 开销）
     group.bench_function("lookup_miss", |b| {
-        let store = DashMap::<TypeId, CompRef>::new();
+        let store = Store::new();
         b.iter(|| {
             let tid = TypeId::of::<u64>();
-            let result = store.get(&tid);
+            let result = store.inner().get(&tid);
             black_box(result);
         });
     });
 
-    // ── 2.5 多类型 store 中查找（10 个 key） ──
+    // 2.5 多类型 store 中查找（10 个 key）
     group.bench_function("multi_type_10_keys", |b| {
-        let store = DashMap::<TypeId, CompRef>::new();
-        store.insert(TypeId::of::<u8>(), CompRef::Cached(Arc::new(1u8)));
-        store.insert(TypeId::of::<u16>(), CompRef::Cached(Arc::new(2u16)));
-        store.insert(TypeId::of::<u32>(), CompRef::Cached(Arc::new(3u32)));
-        store.insert(TypeId::of::<u64>(), CompRef::Cached(Arc::new(4u64)));
-        store.insert(TypeId::of::<i8>(), CompRef::Cached(Arc::new(5i8)));
-        store.insert(TypeId::of::<i16>(), CompRef::Cached(Arc::new(6i16)));
-        store.insert(TypeId::of::<i32>(), CompRef::Cached(Arc::new(7i32)));
-        store.insert(TypeId::of::<i64>(), CompRef::Cached(Arc::new(8i64)));
-        store.insert(TypeId::of::<f32>(), CompRef::Cached(Arc::new(9.0f32)));
-        store.insert(TypeId::of::<f64>(), CompRef::Cached(Arc::new(10.0f64)));
+        let store = Store::new();
+        store.insert_cached(1u8);
+        store.insert_cached(2u16);
+        store.insert_cached(3u32);
+        store.insert_cached(4u64);
+        store.insert_cached(5i8);
+        store.insert_cached(6i16);
+        store.insert_cached(7i32);
+        store.insert_cached(8i64);
+        store.insert_cached(9.0f32);
+        store.insert_cached(10.0f64);
 
         b.iter(|| {
-            let val = inject_from_store::<u64>(black_box(&store));
-            black_box(val);
+            let tid = TypeId::of::<u64>();
+            if let Some(entry) = store.inner().get(&tid) {
+                if let CompRef::Cached(arc) = &*entry {
+                    let _ = arc.clone();
+                }
+            }
+            black_box(());
         });
     });
 
@@ -245,7 +284,7 @@ fn bench_inject(c: &mut Criterion) {
 fn bench_concurrent(c: &mut Criterion) {
     let mut group = c.benchmark_group("concurrent");
 
-    // ── 3.1 并发读（多线程读同一 key） ──
+    // 3.1 并发读
     for &tc in &[2u32, 4, 8] {
         group.bench_function(format!("read_only/{tc}_threads"), |b| {
             let store = Arc::new(make_store_with(42u64));
@@ -255,8 +294,13 @@ fn bench_concurrent(c: &mut Criterion) {
                     let store = store.clone();
                     handles.push(std::thread::spawn(move || {
                         for _ in 0..1000 {
-                            let val = inject_from_store::<u64>(&store);
-                            black_box(val);
+                            let inner = store.inner();
+                            let tid = TypeId::of::<u64>();
+                            if let Some(entry) = inner.get(&tid) {
+                                if let CompRef::Cached(arc) = &*entry {
+                                    let _ = arc.clone();
+                                }
+                            }
                         }
                     }));
                 }
@@ -267,7 +311,7 @@ fn bench_concurrent(c: &mut Criterion) {
         });
     }
 
-    // ── 3.2 读写混合 ──
+    // 3.2 读写混合
     for &tc in &[2u32, 4, 8] {
         group.bench_function(format!("read_write/{tc}_threads"), |b| {
             b.iter_batched(
@@ -275,26 +319,26 @@ fn bench_concurrent(c: &mut Criterion) {
                 |store| {
                     let mut handles = Vec::new();
 
-                    // 读线程
                     for _ in 0..tc {
                         let store = store.clone();
                         handles.push(std::thread::spawn(move || {
                             for _ in 0..500 {
-                                let val = inject_from_store::<u64>(&store);
-                                black_box(val);
+                                let inner = store.inner();
+                                let tid = TypeId::of::<u64>();
+                                if let Some(entry) = inner.get(&tid) {
+                                    if let CompRef::Cached(arc) = &*entry {
+                                        let _ = arc.clone();
+                                    }
+                                }
                             }
                         }));
                     }
 
-                    // 写线程
                     for i in 0..tc {
                         let store = store.clone();
                         handles.push(std::thread::spawn(move || {
                             for _ in 0..100 {
-                                store.insert(
-                                    TypeId::of::<u64>(),
-                                    CompRef::Cached(Arc::new(i as u64)),
-                                );
+                                store.insert_cached(i as u64);
                             }
                         }));
                     }
@@ -318,7 +362,6 @@ fn bench_concurrent(c: &mut Criterion) {
 fn bench_comp_ref(c: &mut Criterion) {
     let mut group = c.benchmark_group("comp_ref");
 
-    // ── 4.1 Cached clone ──
     group.bench_function("cached_clone", |b| {
         let comp_ref = CompRef::Cached(Arc::new(42u64));
         b.iter(|| {
@@ -327,7 +370,6 @@ fn bench_comp_ref(c: &mut Criterion) {
         });
     });
 
-    // ── 4.2 Cached downcast ──
     group.bench_function("cached_downcast", |b| {
         let comp_ref = CompRef::Cached(Arc::new(42u64));
         b.iter(|| {
@@ -338,13 +380,12 @@ fn bench_comp_ref(c: &mut Criterion) {
         });
     });
 
-    // ── 4.3 Factory 调用 ──
     group.bench_function("factory_call", |b| {
-        let closure = |_store: &DashMap<TypeId, CompRef>| -> Arc<dyn Any + Send + Sync> {
+        let closure = |_store: &Store| -> Arc<dyn Any + Send + Sync> {
             Arc::new(0u64)
         };
         let comp_ref = CompRef::Factory(Arc::new(closure));
-        let store = DashMap::<TypeId, CompRef>::new();
+        let store = Store::new();
 
         b.iter(|| {
             if let CompRef::Factory(f) = &comp_ref {
@@ -354,27 +395,19 @@ fn bench_comp_ref(c: &mut Criterion) {
         });
     });
 
-    // ── 4.4 DashMap insert + get ──
     group.bench_function("dashmap_insert_get", |b| {
-        let store = DashMap::<TypeId, CompRef>::new();
+        let store = Store::new();
         b.iter(|| {
-            store.insert(
-                TypeId::of::<u64>(),
-                CompRef::Cached(Arc::new(42u64)),
-            );
-            let _ = store.get(&TypeId::of::<u64>());
+            store.insert_cached(42u64);
+            let _ = store.inner().get(&TypeId::of::<u64>());
         });
     });
 
-    // ── 4.5 DashMap get 预填充 ──
     group.bench_function("dashmap_get_existing", |b| {
-        let store = DashMap::<TypeId, CompRef>::new();
-        store.insert(
-            TypeId::of::<u64>(),
-            CompRef::Cached(Arc::new(42u64)),
-        );
+        let store = Store::new();
+        store.insert_cached(42u64);
         b.iter(|| {
-            let _ = store.get(&TypeId::of::<u64>());
+            let _ = store.inner().get(&TypeId::of::<u64>());
         });
     });
 
@@ -390,7 +423,6 @@ fn bench_async(c: &mut Criterion) {
 
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    // ── 5.1 tokio::spawn ──
     group.bench_function("tokio_spawn", |b| {
         b.iter(|| {
             rt.block_on(async {
@@ -402,24 +434,21 @@ fn bench_async(c: &mut Criterion) {
         });
     });
 
-    // ── 5.2 CancellationToken clone ──
     group.bench_function("cancellation_token_clone", |b| {
-        let token = tx_di_core::CancellationToken::new();
+        let token = CancellationToken::new();
         b.iter(|| {
             let cloned = token.clone();
             black_box(cloned);
         });
     });
 
-    // ── 5.3 CancellationToken check ──
     group.bench_function("cancellation_check", |b| {
-        let token = tx_di_core::CancellationToken::new();
+        let token = CancellationToken::new();
         b.iter(|| {
             black_box(token.is_cancelled());
         });
     });
 
-    // ── 5.4 Arc clone contention ──
     for &tc in &[1u32, 2, 4] {
         let store = Arc::new(make_store_with(42u64));
         group.bench_function(format!("arc_clone/{tc}_threads"), |b| {
@@ -429,8 +458,13 @@ fn bench_async(c: &mut Criterion) {
                     let store = store.clone();
                     handles.push(std::thread::spawn(move || {
                         for _ in 0..1000 {
-                            let val = inject_from_store::<u64>(&store);
-                            black_box(val);
+                            let inner = store.inner();
+                            let tid = TypeId::of::<u64>();
+                            if let Some(entry) = inner.get(&tid) {
+                                if let CompRef::Cached(arc) = &*entry {
+                                    let _ = arc.clone();
+                                }
+                            }
                         }
                     }));
                 }

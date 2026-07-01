@@ -153,6 +153,11 @@ impl BuildContext {
         self.store.try_inject::<T>()
     }
 
+    /// 获取 Store 引用
+    pub fn store(&self) -> &Store {
+        &self.store
+    }
+
     // ── 调试辅助 ────────────────────────────────────────────────────────
 
     /// 已注册组件数量
