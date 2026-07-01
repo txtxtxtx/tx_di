@@ -1,38 +1,74 @@
 //! # tx-di-core
 //!
-//! 编译期依赖注入框架的核心运行时支撑层。
+//! 类型驱动的 Rust 依赖注入框架。
 //!
 //! ## 核心概念
 //!
-//! ### Scope（作用域）
-//! - **Singleton**：全局共享，工厂调用一次，缓存 `Arc<T>`
-//! - **Prototype**：每次注入调用工厂，构造新实例
+//! - **Component trait** — 每个被 DI 管理的类型实现此 trait，用 associated type 声明依赖
+//! - **ComponentMeta** — 瘦注册条目，linkme 编译期收集，运行期拓扑排序
+//! - **Store** — 类型擦除的组件存储（DashMap<TypeId, CompRef>），运行期解析依赖
+//! - **AOP** — Interceptor trait + proc_macro 代理，零运行时开销
 //!
-//! ### 设计原则
-//! - **scope 标记在被注入的组件上**，消费者字段写裸类型
-//! - 字段类型 `T` 或 `Arc<T>` 均可，框架通过 `TypeId` 找到对应的工厂
-//! - 统一通过 `ctx.inject::<T>()` 注入，自动根据组件自身 scope 决定行为
+//! ## 设计原则
+//!
+//! 1. 类型驱动：依赖在 `type Deps` 中声明，编译期可知
+//! 2. 编译期收集：linkme 零开销注册
+//! 3. 运行期解析：拓扑排序 + DashMap 存储
+//! 4. 可扩展：ComponentMeta 只存核心字段，生命周期钩子在 trait 默认方法中
 
-mod di;
+pub mod aop;
+pub mod component;
+pub mod config;
+pub mod error;
+pub mod lifecycle;
+pub mod registry;
+pub mod scope;
+pub mod store;
+pub mod topology;
 
-pub use linkme;
+// ── 第三方 re-export ──────────────────────────────────────────────────────
 pub use dashmap;
 pub use dashmap::DashMap;
+pub use linkme;
 pub use toml;
 pub use toml::Value;
 pub use toml::map;
 
-pub use tx_di_macros::{tx_comp, tx_cst};
-pub use tx_error::{CodeMsg, AppErrCode, AppError, AppResult, DiErr};
-/// 兼容旧代码：RIE<T> = AppResult<T>
+// ── 内部模块 re-export ────────────────────────────────────────────────────
+// 注意：derive 宏 `Component` 和 trait `Component` 同名但不同命名空间，可以共存
+// `tx_cst` 和 `component` 是 derive 辅助属性，不需要单独 re-export
+pub use tx_di_macros::Component;   // derive 宏（宏命名空间）
+pub use tx_error::{AppErrCode, AppError, AppResult, CodeMsg, DiErr};
+pub use tx_common::{ApiR, ApiRes, FormattedDateTime, RCode};
+
+/// RIE<T> = AppResult<T>
 pub type RIE<T> = AppResult<T>;
-/// 兼容旧代码：IE = AppError
+/// IE = AppError
 pub type IE = AppError;
-pub use tx_common::{ApiR, ApiRes, RCode, FormattedDateTime};
-pub use di::{BuildContext, scopes::Scope, App, InnerContext,
-             comp::{ComponentMeta, topo_sort, COMPONENT_REGISTRY, config::AppAllConfig},
-             comp::comp_ref::{CompRef, ComponentDescriptor, CompInit, BoxFuture, inject_from_store, inject_trait_from_store, inject_all_traits_from_store, TraitImplEntry, TraitImplMap, TRAIT_IMPL_MAP},
-};
+
 pub use tokio_util::sync::CancellationToken;
 
-pub use di::{set_sys_config,get_sys_config,CONFIG_PATH };
+// ── 核心 re-export ────────────────────────────────────────────────────────
+pub use component::{BoxFuture, Component, DepsTuple};
+pub use config::AppAllConfig;
+pub use error::{InjectError, RegistryError};
+pub use lifecycle::{App, BuildContext, InnerContext, get_sys_config, set_sys_config, CONFIG_PATH};
+pub use registry::{ComponentMeta, COMPONENT_REGISTRY};
+pub use scope::Scope;
+pub use store::{Store, CompRef, TraitImplEntry, TraitImplMap, TRAIT_IMPL_MAP, inject_from_store, inject_trait_from_store, inject_all_traits_from_store};
+pub use topology::topo_sort;
+pub use aop::{CallContext, CallResult, Interceptor, Next};
+
+/// 简化异步方法实现的宏
+#[macro_export]
+macro_rules! async_method {
+    (
+        $(#[$meta:meta])*
+        $vis:vis fn $name:ident($($param:ident: $ty:ty),* $(,)?) -> $ret:ty $body:block
+    ) => {
+        $(#[$meta])*
+        $vis fn $name($($param: $ty),*) -> impl ::std::future::Future<Output = $ret> + Send {
+            async move $body
+        }
+    };
+}

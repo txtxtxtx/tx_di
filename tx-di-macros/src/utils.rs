@@ -6,7 +6,7 @@ use syn::{
     Type,
 };
 
-/// 如果 `ty` 是 `Arc<T>`，返回 T；否则返回 ty 本身。
+/// 如果 `ty` 是 `Arc<T>`，返回 T 的 TokenStream；否则返回 ty 本身。
 pub fn strip_arc(ty: &Type) -> TokenStream2 {
     let path = match ty {
         Type::Path(tp) => &tp.path,
@@ -23,6 +23,25 @@ pub fn strip_arc(ty: &Type) -> TokenStream2 {
         }
     }
     quote! { #ty }
+}
+
+/// 如果 `ty` 是 `Arc<T>`，返回 T 的 Type；否则返回 ty 本身。
+pub fn strip_arc_type(ty: &Type) -> Type {
+    let path = match ty {
+        Type::Path(tp) => &tp.path,
+        _ => return ty.clone(),
+    };
+    let segs = &path.segments;
+    if segs.len() == 1 && segs[0].ident == "Arc" {
+        if let PathArguments::AngleBracketed(ab) = &segs[0].arguments {
+            if ab.args.len() == 1 {
+                if let GenericArgument::Type(inner) = &ab.args[0] {
+                    return inner.clone();
+                }
+            }
+        }
+    }
+    ty.clone()
 }
 
 /// 将驼峰命名法字符串转换为蛇形命名法。
