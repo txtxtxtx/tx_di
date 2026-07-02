@@ -7,7 +7,7 @@ use std::any::TypeId;
 use std::future::Future;
 use std::sync::Arc;
 
-use crate::error::InjectError;
+use crate::error::AppError;
 use crate::scope::Scope;
 use crate::store::Store;
 
@@ -101,7 +101,7 @@ pub trait Component: Send + Sync + 'static {
 /// 从 Store 解析所有依赖，返回元组。
 pub trait DepsTuple: Sized {
     /// 从 Store 解析所有依赖
-    fn resolve(store: &Store) -> Result<Self, InjectError>;
+    fn resolve(store: &Store) -> Result<Self, AppError>;
 
     /// 返回依赖的 TypeId 列表（用于拓扑排序）
     fn dep_type_ids() -> Vec<TypeId>;
@@ -110,7 +110,7 @@ pub trait DepsTuple: Sized {
 // ── 为元组自动实现 DepsTuple ──────────────────────────────────────────────
 
 impl DepsTuple for () {
-    fn resolve(_store: &Store) -> Result<Self, InjectError> {
+    fn resolve(_store: &Store) -> Result<Self, AppError> {
         Ok(())
     }
 
@@ -122,7 +122,7 @@ impl DepsTuple for () {
 macro_rules! impl_deps_tuple {
     ($($T:ident),+) => {
         impl<$($T: Component),+> DepsTuple for ($(Arc<$T>,)+) {
-            fn resolve(store: &Store) -> Result<Self, InjectError> {
+            fn resolve(store: &Store) -> Result<Self, AppError> {
                 Ok(($(
                     store.inject::<$T>()?
                 ,)+))

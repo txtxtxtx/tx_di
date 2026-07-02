@@ -11,7 +11,7 @@ use tracing::debug;
 
 use crate::registry::{ComponentMeta, COMPONENT_REGISTRY};
 use crate::store::TRAIT_IMPL_MAP;
-use crate::error::RegistryError;
+use crate::error::{AppError, DiErr};
 
 /// 对组件元数据进行拓扑排序，返回排序后的 TypeId 列表
 ///
@@ -19,7 +19,7 @@ use crate::error::RegistryError;
 ///
 /// - 某个组件依赖的类型未在注册表中找到
 /// - 检测到循环依赖
-pub fn topo_sort(metas: &[&ComponentMeta]) -> Result<Vec<TypeId>, RegistryError> {
+pub fn topo_sort(metas: &[&ComponentMeta]) -> Result<Vec<TypeId>, AppError> {
     let start = std::time::Instant::now();
 
     let n = metas.len();
@@ -54,11 +54,18 @@ pub fn topo_sort(metas: &[&ComponentMeta]) -> Result<Vec<TypeId>, RegistryError>
                 }
             } else {
                 let registered: Vec<&str> = metas.iter().map(|m| m.name).collect();
-                return Err(RegistryError::MissingDependency {
-                    component: meta.name.to_string(),
-                    missing_type_id: one_type_id,
-                    registered: registered.iter().map(|s| s.to_string()).collect(),
-                });
+                return Err(AppError::with_context(
+                    DiErr::RegistryError,
+                    format!(
+                        "组件 '{}' 依赖的 TypeId {:?} 未注册。\n\
+                         请确认该依赖组件已标注 #[derive(Component)] 且其 crate 已引入。\n\
+                         已注册组件 ({} 个): [{}]",
+                        meta.name,
+                        one_type_id,
+                        registered.len(),
+                        registered.join(", ")
+                    ),
+                ));
             }
         }
     }
@@ -101,9 +108,14 @@ pub fn topo_sort(metas: &[&ComponentMeta]) -> Result<Vec<TypeId>, RegistryError>
             })
             .collect();
 
-        return Err(RegistryError::CircularDependency {
-            cycle: cycle_details,
-        });
+        return Err(AppError::with_context(
+            DiErr::RegistryError,
+            format!(
+                "检测到循环依赖！以下组件形成环路:\n{}\n\
+                 请检查这些组件之间是否存在相互依赖，打破环中任意一条边即可。",
+                cycle_details.join("\n")
+            ),
+        ));
     }
 
     let sorted_names: Vec<&str> = result

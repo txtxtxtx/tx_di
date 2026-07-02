@@ -19,7 +19,7 @@
 pub mod aop;
 pub mod component;
 pub mod config;
-pub mod error;
+pub(crate) mod error;
 pub mod lifecycle;
 pub mod registry;
 pub mod scope;
@@ -51,7 +51,8 @@ pub use tokio_util::sync::CancellationToken;
 // ── 核心 re-export ────────────────────────────────────────────────────────
 pub use component::{BoxFuture, Component, DepsTuple};
 pub use config::AppAllConfig;
-pub use error::{InjectError, RegistryError};
+// 内部错误模块：直接复用 tx_error 提供的统一错误类型
+// 详见 src/error.rs
 pub use lifecycle::{App, BuildContext, InnerContext, get_sys_config, set_sys_config, CONFIG_PATH};
 pub use registry::{ComponentMeta, COMPONENT_REGISTRY};
 pub use scope::Scope;

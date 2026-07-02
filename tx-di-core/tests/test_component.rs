@@ -343,12 +343,12 @@ fn test_store_inject_returns_error() {
     let ctx = BuildContext::new::<std::path::PathBuf>(None);
     let result = ctx.store().inject::<Unregistered2>();
     assert!(result.is_err());
-    match result.unwrap_err() {
-        tx_di_core::InjectError::NotRegistered { type_name, .. } => {
-            assert!(type_name.contains("Unregistered"));
-        }
-        _ => panic!("期望 NotRegistered 错误"),
-    }
+    let err = result.unwrap_err();
+    assert_eq!(err.domain(), "DI");
+    assert_eq!(err.code(), -4);
+    let ctx_msg = err.context().expect("应携带 context");
+    assert!(ctx_msg.contains("Unregistered"));
+    assert!(ctx_msg.contains("未注册"));
 }
 
 // ── 7. BuildContext & App ────────────────────────────────────────────────
@@ -503,7 +503,7 @@ fn test_metrics_interceptor() {
 // ── 10. 错误处理 ─────────────────────────────────────────────────────────
 
 #[test]
-#[should_panic(expected = "注入失败")]
+#[should_panic(expected = "DI:-4")]
 fn test_inject_unregistered_panics() {
     struct Ghost;
     impl Component for Ghost {

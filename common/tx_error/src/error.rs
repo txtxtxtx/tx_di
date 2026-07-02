@@ -225,6 +225,8 @@ pub enum DiErr {
     AsyncInitError,
     #[err(-3, "任务 panic")]
     TaskPanic,
+    #[err(-4, "组件注入错误")]
+    InjectError,
 }
 
 // ═══════════════════════════════════════════════════════════════

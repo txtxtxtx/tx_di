@@ -9,7 +9,7 @@ use std::sync::Arc;
 use dashmap::DashMap;
 
 use crate::component::Component;
-use crate::error::InjectError;
+use crate::error::{AppError, DiErr};
 
 /// 存储单元：
 /// - `Factory(Arc<dyn Fn>)` → 存工厂闭包，prototype 每次注入时调用
@@ -82,7 +82,7 @@ impl Store {
     /// # Panics
     ///
     /// 组件未注册时 panic（编程错误，不是运行时错误）。
-    pub fn inject<T: Component>(&self) -> Result<Arc<T>, InjectError> {
+    pub fn inject<T: Component>(&self) -> Result<Arc<T>, AppError> {
         let tid = TypeId::of::<T>();
         let type_name = std::any::type_name::<T>();
 
@@ -92,20 +92,30 @@ impl Store {
                     CompRef::Cached(arc) => arc.clone(),
                     CompRef::Factory(f) => f(self),
                 };
-                any_arc
-                    .downcast::<T>()
-                    .map_err(|bad_arc| InjectError::DowncastFailed {
-                        expected: type_name,
-                        actual: (&*bad_arc).type_id(),
-                    })
+                any_arc.downcast::<T>().map_err(|bad_arc| {
+                    let actual = (&*bad_arc).type_id();
+                    AppError::with_context(
+                        DiErr::InjectError,
+                        format!(
+                            "downcast 失败: 期望 `{}`, 实际 TypeId={:?}",
+                            type_name, actual
+                        ),
+                    )
+                })
             }
             None => {
                 let registered: Vec<TypeId> = self.inner.iter().map(|e| *e.key()).collect();
-                Err(InjectError::NotRegistered {
-                    type_name,
-                    type_id: tid,
-                    registered,
-                })
+                Err(AppError::with_context(
+                    DiErr::InjectError,
+                    format!(
+                        "组件 `{}` (TypeId={:?}) 未注册。\n\
+                         请确认:\n\
+                         1. 该结构体已标注 #[derive(Component)]\n\
+                         2. 所在 crate 已在 Cargo.toml 中引入\n\
+                         已注册组件 ({} 个): {:?}",
+                        type_name, tid, registered.len(), registered
+                    ),
+                ))
             }
         }
     }

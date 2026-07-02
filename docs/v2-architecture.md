@@ -32,7 +32,7 @@
    ├── lifecycle.rs    # BuildContext + App
    ├── config.rs       # AppAllConfig
    ├── scope.rs        # Scope enum
-   ├── error.rs        # InjectError + RegistryError
+   ├── error.rs        # 统一 re-export tx_error::AppError + DiErr
    └── aop.rs          # Interceptor trait + 常用拦截器
    ```
 
