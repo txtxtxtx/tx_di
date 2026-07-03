@@ -135,7 +135,6 @@ static INIT_COUNTER: AtomicU32 = AtomicU32::new(0);
 static SHUTDOWN_COUNTER: AtomicU32 = AtomicU32::new(0);
 
 #[derive(Component)]
-#[component(init)]
 pub struct LifecycleComponent {
     pub db: Arc<DbPool>,
 }

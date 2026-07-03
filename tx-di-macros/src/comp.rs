@@ -2,7 +2,8 @@
 //!
 //! 支持的属性：
 //! - `#[component(scope = Prototype)]` — 原型作用域
-//! - `#[component(init)]` — 有自定义 init 实现
+//! - `#[component(init)]` — 有自定义 init 实现（inner_init 回调 `__di_component_init`）
+//! - `#[component(init_sort = N)]` — 自定义初始化排序（如 `init_sort = -2147483648`）
 //! - `#[component(conf)]` / `#[component(conf = "key")]` — 配置组件
 //! - `#[component(as_trait = dyn Trait)]` — Trait 实现注册
 //! - `#[component(for(Type1, Type2))]` — 泛型具体化
@@ -321,10 +322,10 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
         (vec![], vec![])
     };
 
-    // ── 生成 inner_init 覆盖（如果有 trait inject 字段）──────────────────
+    // ── 生成 inner_init 覆盖（trait inject 字段 | #[component(init)]）──────
 
     let has_trait_inject = !trait_inject_fields.is_empty() || !required_trait_fields.is_empty();
-    let inner_init_impl = if has_trait_inject {
+    let inner_init_impl = if has_trait_inject || comp_attr.has_init {
         let optional_assigns: Vec<TokenStream2> = trait_inject_fields
             .iter()
             .map(|(fname, ty)| {
@@ -348,16 +349,35 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
             })
             .collect();
 
-        quote! {
-            fn inner_init(&mut self, store: &::tx_di_core::Store) -> ::tx_di_core::RIE<()> {
-                #( #optional_assigns )*
-                #( #required_assigns )*
-                Ok(())
+        if comp_attr.has_init {
+            quote! {
+                fn inner_init(&mut self, store: &::tx_di_core::Store) -> ::tx_di_core::RIE<()> {
+                    #( #optional_assigns )*
+                    #( #required_assigns )*
+                    __di_component_init(self, store)
+                }
+            }
+        } else {
+            quote! {
+                fn inner_init(&mut self, store: &::tx_di_core::Store) -> ::tx_di_core::RIE<()> {
+                    #( #optional_assigns )*
+                    #( #required_assigns )*
+                    Ok(())
+                }
             }
         }
     } else {
         quote! {}
     };
+
+    // ── 生成 init_sort 覆盖（如果有 init_sort 属性）────────────────────
+
+    let init_sort_override = comp_attr.init_sort.map(|val| {
+        let lit = Literal::i32_suffixed(val);
+        quote! {
+            fn init_sort() -> i32 { #lit }
+        }
+    });
 
     // ── 生成最终代码 ────────────────────────────────────────────────────
     // 注意：derive 宏只追加 impl 和 linkme 注册，不重新输出结构体
@@ -373,8 +393,11 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
 
             const SCOPE: ::tx_di_core::Scope = #scope_const;
 
-            // 如果有 trait inject 字段，覆盖 inner_init
+            // inner_init: trait inject 字段填充 | #[component(init)] 回调
             #inner_init_impl
+
+            // init_sort: #[component(init_sort = N)] 自定义排序
+            #init_sort_override
         }
 
         // ── linkme 注册条目 ───────────────────────────────────────────────
@@ -439,6 +462,7 @@ fn parse_component_attr_from_attributes(attrs: &[Attribute]) -> SynResult<Option
 struct CompAttr {
     scope: ScopeAttr,
     has_init: bool,
+    init_sort: Option<i32>,
     conf: Option<Option<String>>,
     as_trait: Option<Type>,
 }
@@ -447,6 +471,7 @@ struct CompAttr {
 struct CompAttrArgs {
     scope: ScopeAttr,
     has_init: bool,
+    init_sort: Option<i32>,
     conf: Option<Option<String>>,
     as_trait: Option<Type>,
 }
@@ -455,6 +480,7 @@ impl Parse for CompAttrArgs {
     fn parse(input: ParseStream) -> SynResult<Self> {
         let mut scope = ScopeAttr::Singleton;
         let mut has_init = false;
+        let mut init_sort = None;
         let mut conf = None;
         let mut as_trait = None;
 
@@ -492,6 +518,44 @@ impl Parse for CompAttrArgs {
                 }
             } else if key == "init" {
                 has_init = true;
+            } else if key == "init_sort" {
+                if input.peek(Token![=]) {
+                    let _eq: Token![=] = input.parse()?;
+                    let value: Expr = input.parse()?;
+                    let raw = match &value {
+                        // 正数：init_sort = 100
+                        Expr::Lit(lit) => {
+                            if let syn::Lit::Int(i) = &lit.lit {
+                                i.base10_parse::<i64>().map(|v| v as i32)
+                            } else {
+                                return Err(syn::Error::new_spanned(&value, "init_sort 值必须是整数"));
+                            }
+                        }
+                        // 负数：init_sort = -2147483648
+                        Expr::Unary(u) => {
+                            if let syn::UnOp::Neg(_) = &u.op {
+                                if let Expr::Lit(lit) = &*u.expr {
+                                    if let syn::Lit::Int(i) = &lit.lit {
+                                        let v: i64 = i.base10_parse::<i64>().map_err(|e| {
+                                            syn::Error::new_spanned(&value, e)
+                                        })?;
+                                        Ok((-v) as i32)
+                                    } else {
+                                        return Err(syn::Error::new_spanned(&value, "init_sort 值必须是整数"));
+                                    }
+                                } else {
+                                    return Err(syn::Error::new_spanned(&value, "init_sort 值必须是整数"));
+                                }
+                            } else {
+                                return Err(syn::Error::new_spanned(&value, "init_sort 值必须是整数"));
+                            }
+                        }
+                        _ => return Err(syn::Error::new_spanned(&value, "init_sort 值必须是整数")),
+                    };
+                    init_sort = Some(raw.map_err(|e| syn::Error::new_spanned(&value, e))?);
+                } else {
+                    return Err(syn::Error::new_spanned(&key, "init_sort 必须指定值，如 init_sort = -2147483648"));
+                }
             } else if key == "conf" {
                 if input.peek(Token![=]) {
                     let _eq: Token![=] = input.parse()?;
@@ -538,7 +602,7 @@ impl Parse for CompAttrArgs {
             } else {
                 return Err(syn::Error::new_spanned(
                     key,
-                    "#[component] 支持 scope / init / conf / as_trait / intercept / for 参数",
+                    "#[component] 支持 scope / init / init_sort / conf / as_trait / intercept / for 参数",
                 ));
             }
 
@@ -552,6 +616,7 @@ impl Parse for CompAttrArgs {
         Ok(CompAttrArgs {
             scope,
             has_init,
+            init_sort,
             conf,
             as_trait,
         })
@@ -563,6 +628,7 @@ impl From<CompAttrArgs> for CompAttr {
         CompAttr {
             scope: args.scope,
             has_init: args.has_init,
+            init_sort: args.init_sort,
             conf: args.conf,
             as_trait: args.as_trait,
         }

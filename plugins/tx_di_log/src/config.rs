@@ -3,62 +3,41 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{env, fmt};
 use time::format_description;
-use time::format_description::{OwnedFormatItem};
+use time::format_description::OwnedFormatItem;
 use tracing_subscriber::fmt::format::Writer;
 use tracing_subscriber::fmt::time::{FormatTime, LocalTime, UtcTime};
-use tx_di_core::{CompInit, tx_comp, RIE};
+use tx_di_core::Component;
 
 /// 日志配置结构体
 ///
-/// 用于配置应用程序的日志级别，通过 TOML 配置文件自动反序列化。
+/// 通过 TOML 配置文件自动反序列化（配置键：`log_config`）。
 ///
-/// # 配置文件示例
+/// # 示例
 ///
 /// ```toml
 /// [log_config]
-/// level = "info"  # 可选值: "off", "error", "warn", "info", "debug", "trace"（不区分大小写）
+/// level = "info"
 /// ```
-#[derive(Debug, Clone, Deserialize)]
-#[tx_comp(conf, init)]
+#[derive(Debug, Clone, Deserialize, Component)]
+#[component(conf = "log_config")]
 pub struct LogConfig {
     /// 全局日志级别过滤器
-    ///
-    /// 控制日志输出的详细程度。支持的值为：
-    /// - `"off"`: 完全禁用日志
-    /// - `"error"`: 仅记录错误
-    /// - `"warn"`: 记录警告和错误
-    /// - `"info"`: 记录信息、警告和错误（默认值）
-    /// - `"debug"`: 记录调试信息及更高级别
-    /// - `"trace"`: 记录所有日志，包括最详细的跟踪信息
-    ///
-    /// 该字段在 TOML 配置文件中对应 `log_config.level`，
-    /// 字符串值不区分大小写。
     #[serde(default = "default_level")]
     pub level: log::LevelFilter,
 
     /// 模块级别的日志覆盖配置
-    /// Key: 模块路径 (如 "my_crate::module")
-    /// Value: 日志级别 (如 "debug", "trace")
     #[serde(default)]
     pub modules: HashMap<String, log::LevelFilter>,
 
     /// 日志输出格式
-    ///
-    /// 默认为 `"{date} {time} [{level}] {target}: {message}"`。
-    ///
-    /// 该字段在 TOML 配置文件中对应 `log_config.format`。
     #[serde(default = "default_format")]
     pub format: String,
 
-    /// 日志输出位置
-    ///
-    /// 默认为 `"stdout"`。
-    ///
-    /// 该字段在 TOML 配置文件中对应 `log_config.target`。
+    /// 日志文件输出目录
     #[serde(default = "default_dir")]
     pub dir: PathBuf,
 
-    /// 日志保留天数，默认为 90 2400 天 6年多
+    /// 日志保留天数
     #[serde(default = "default_retention_days")]
     pub retention_days: usize,
 
@@ -71,48 +50,18 @@ pub struct LogConfig {
     pub prefix: String,
 
     /// 时间格式类型
-    ///
-    /// 支持两种模式：
-    /// - `"utc"`: 使用 UTC 时间（协调世界时），格式如 `2026-04-22T06:30:45.123456789Z`
-    /// - `"local"`: 使用本地时间（系统时区），格式如 `2026-04-22T14:30:45.123456789+08:00`
-    ///
-    /// 默认为 `"utc"`。
-    ///
-    /// 该字段在 TOML 配置文件中对应 `log_config.time_format`。
     #[serde(default)]
     pub time_format: TimeFormat,
+
     #[serde(default = "time_format_str")]
     pub time_format_str: String,
 }
 
 fn time_format_str() -> String {
-    // [year][month padding:zero][day padding:zero] [hour]:[minute]:[second].[subsecond digits:3]
-    // 文件名已经包含了日期所以只需要时间
     "[hour]:[minute]:[second].[subsecond digits:3]".to_string()
 }
-impl Default for LogConfig {
-    fn default() -> Self {
-        Self {
-            level: default_level(),
-            modules: HashMap::new(),
-            format: default_format(),
-            dir: default_dir(),
-            retention_days: default_retention_days(),
-            console_output: false,
-            prefix: default_prefix(),
-            time_format: TimeFormat::default(),
-            time_format_str: time_format_str(),
-        }
-    }
-}
 
-impl CompInit for LogConfig {
-    fn init_sort() -> i32 {
-        i32::MIN
-    }
-}
-
-#[derive(Debug, Clone, Deserialize,Default)]
+#[derive(Debug, Clone, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum TimeFormat {
     /// UTC 时间（协调世界时）
@@ -130,8 +79,7 @@ pub enum TimerWrapper {
 }
 
 impl TimeFormat {
-    /// 将 TimeFormat 转换为对应的计时器实例
-    pub fn to_timer(&self, format: &str) -> RIE<TimerWrapper> {
+    pub fn to_timer(&self, format: &str) -> Result<TimerWrapper, anyhow::Error> {
         let format = format_description::parse_owned::<2>(format)
             .map_err(|e| anyhow::anyhow!(e))?;
         match self {
@@ -149,6 +97,7 @@ impl FormatTime for TimerWrapper {
         }
     }
 }
+
 impl fmt::Display for TimeFormat {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -158,26 +107,20 @@ impl fmt::Display for TimeFormat {
     }
 }
 
-/// 提供默认的日志级别
 fn default_level() -> log::LevelFilter {
     log::LevelFilter::Info
 }
 
-/// 提供默认的日志格式
 fn default_format() -> String {
-    "".to_string()
+    String::new()
 }
 
-/// 默认的日志目录
 fn default_dir() -> PathBuf {
-    // 获取可执行文件所在目录
     if let Ok(exe_path) = env::current_exe()
         && let Some(parent) = exe_path.parent()
     {
         return parent.join("logs");
     }
-
-    // 降级方案：使用当前工作目录
     PathBuf::from("./logs")
 }
 
