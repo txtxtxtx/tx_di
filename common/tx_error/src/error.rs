@@ -213,22 +213,6 @@ pub fn log_err<E: CodeMsg>(e: impl fmt::Display, err: E) -> E {
     err
 }
 
-// ── DI 框架业务错误码 ──────────────────────────────────────
-
-/// DI 框架自身的业务错误码。
-#[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
-#[err("DI")]
-pub enum DiErr {
-    #[err(-1, "组件注册表错误")]
-    RegistryError,
-    #[err(-2, "async_init_fn 错误")]
-    AsyncInitError,
-    #[err(-3, "任务 panic")]
-    TaskPanic,
-    #[err(-4, "组件注入错误")]
-    InjectError,
-}
-
 // ═══════════════════════════════════════════════════════════════
 // Tests
 // ═══════════════════════════════════════════════════════════════
@@ -296,14 +280,7 @@ mod tests {
         assert!(!a.is_same_kind(&b));
         assert!(!a.is_same_kind(&c));
     }
-
-    #[test]
-    fn test_di_err() {
-        let err: AppError = DiErr::RegistryError.into();
-        assert_eq!(err.domain(), "DI");
-        assert_eq!(err.code(), -1);
-    }
-
+    
     #[test]
     fn test_io_error_conversion() {
         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
