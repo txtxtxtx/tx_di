@@ -24,7 +24,12 @@ use tx_di_core::aop::{Interceptor, CallContext, CallResult, InterceptorChain};
 // ── 1. 基础组件 ─────────────────────────────────────────────────────────
 
 #[derive(Component, Default)]
-pub struct DbPool;
+pub struct DbPool{
+    #[tx_cst(AtomicU32::new(0))]
+    pub counter: AtomicU32, // 用于验证生命周期钩子
+    #[tx_cst("sqlite".to_string())]
+    pub url: String,
+}
 
 #[derive(Component, Default)]
 pub struct RedisClient;
@@ -167,6 +172,7 @@ pub struct ManyDeps {
 fn test_basic_inject() {
     let ctx = BuildContext::new::<std::path::PathBuf>(None);
     let db = ctx.inject::<DbPool>();
+
     let _ = db;
 }
 
@@ -174,7 +180,9 @@ fn test_basic_inject() {
 fn test_single_dependency() {
     let ctx = BuildContext::new::<std::path::PathBuf>(None);
     let svc = ctx.inject::<UserService>();
-    let _ = svc.db;
+    // 验证依赖注入正确，DbPool 字段值来自 #[tx_cst]
+    assert_eq!(svc.db.url, "sqlite");
+    assert_eq!(svc.db.counter.load(Ordering::Relaxed), 0);
 }
 
 #[test]
