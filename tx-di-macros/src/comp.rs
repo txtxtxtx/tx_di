@@ -299,7 +299,7 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
             .collect();
 
         quote! {
-            fn inner_init(&mut self, store: &::tx_di_core::Store) -> Result<(), ::tx_di_core::IE> {
+            fn inner_init(&mut self, store: &::tx_di_core::Store) -> ::tx_di_core::RIE<()> {
                 #( #trait_inject_assigns )*
                 Ok(())
             }

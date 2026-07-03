@@ -54,7 +54,7 @@ pub trait Component: Send + Sync + 'static {
     ///
     /// 可以访问 Store 注入额外依赖，但主要依赖应通过 `Deps` 声明。
     #[allow(unused_variables)]
-    fn inner_init(&mut self, store: &Store) -> Result<(), crate::IE> {
+    fn inner_init(&mut self, store: &Store) -> crate::RIE<()> {
         Ok(())
     }
 
@@ -62,19 +62,19 @@ pub trait Component: Send + Sync + 'static {
     ///
     /// 可以访问整个 App，用于跨组件协作初始化。
     #[allow(unused_variables)]
-    fn init(app: &Arc<crate::App>) -> Result<(), crate::IE> {
+    fn init(app: &Arc<crate::App>) -> crate::RIE<()> {
         Ok(())
     }
 
     /// 异步初始化（在 tokio runtime 里调用）
     #[allow(unused_variables)]
-    fn async_init(app: &Arc<crate::App>) -> BoxFuture<Result<(), crate::IE>> {
+    fn async_init(app: &Arc<crate::App>) -> BoxFuture<crate::RIE<()>> {
         Box::pin(async { Ok(()) })
     }
 
     /// 异步运行（在独立 task 里调用，直到 CancellationToken 触发）
     #[allow(unused_variables)]
-    fn async_run(app: &Arc<crate::App>, token: crate::CancellationToken) -> BoxFuture<Result<(), crate::IE>> {
+    fn async_run(app: &Arc<crate::App>, token: crate::CancellationToken) -> BoxFuture<crate::RIE<()>> {
         Box::pin(async { Ok(()) })
     }
 
@@ -110,7 +110,7 @@ pub trait DepsTuple: Sized {
 // ── 为元组自动实现 DepsTuple ──────────────────────────────────────────────
 
 impl DepsTuple for () {
-    fn resolve(_store: &Store) -> Result<Self, AppError> {
+    fn resolve(_store: &Store) -> crate::RIE<Self> {
         Ok(())
     }
 

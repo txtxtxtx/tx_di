@@ -22,7 +22,7 @@ use crate::registry::{ComponentMeta, COMPONENT_REGISTRY};
 use crate::scope::Scope;
 use crate::store::{CompRef, Store, TRAIT_IMPL_MAP};
 use crate::topology::{all_metas, topo_sort};
-use crate::{IE, RIE};
+use crate::RIE;
 
 /// 内部上下文类型别名
 pub type InnerContext = DashMap<TypeId, CompRef>;
@@ -181,7 +181,7 @@ impl BuildContext {
             .map(|(i, m)| ((m.type_id)(), (i, m.name)))
             .collect();
         let ans = topo_sort(&metas).map_err(|e| {
-            IE::Internal(anyhow::anyhow!("{}", e))
+            crate::AppError::Internal(anyhow::anyhow!("{}", e))
         })?;
 
         debug!("组件注册表（拓扑排序后）：");
@@ -189,7 +189,7 @@ impl BuildContext {
         for tid in ans.iter() {
             let meta = metas[id_to_idx
                 .get(tid)
-                .ok_or_else(|| IE::Internal(anyhow::anyhow!("RegistryError")))?
+                .ok_or_else(|| crate::AppError::Internal(anyhow::anyhow!("RegistryError")))?
                 .0];
             let dep_names: Vec<&str> = meta
                 .dep_type_ids

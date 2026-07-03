@@ -9,7 +9,7 @@ use std::sync::Arc;
 use crate::component::BoxFuture;
 use crate::scope::Scope;
 use crate::store::{Store, TraitImplEntry};
-use crate::{IE, RIE, App, CancellationToken};
+use crate::{RIE, App, CancellationToken};
 
 /// linkme 分布式切片：收集所有 `#[derive(Component)]` 标注的组件
 #[linkme::distributed_slice]

@@ -43,8 +43,6 @@ pub use tx_common::{ApiR, ApiRes, FormattedDateTime, RCode};
 
 /// RIE<T> = AppResult<T>
 pub type RIE<T> = AppResult<T>;
-/// IE = AppError
-pub type IE = AppError;
 
 pub use tokio_util::sync::CancellationToken;
 
