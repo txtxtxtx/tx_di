@@ -41,8 +41,8 @@ pub struct LogConfig {
     #[serde(default = "default_retention_days")]
     pub retention_days: usize,
 
-    /// 是否输出到控制台，默认为 false
-    #[serde(default)]
+    /// 是否输出到控制台，默认为 true（开发时直观，生产环境可配置关闭）
+    #[serde(default = "default_console_output")]
     pub console_output: bool,
 
     /// 日志文件前缀
@@ -130,4 +130,8 @@ fn default_retention_days() -> usize {
 
 fn default_prefix() -> String {
     "tx_di".to_string()
+}
+
+fn default_console_output() -> bool {
+    true
 }

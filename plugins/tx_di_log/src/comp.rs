@@ -145,12 +145,23 @@ mod tests {
     fn test_log_plugins_build() {
         // LogPlugins 可以正常构建，inner_init 设置 tracing
         let ctx = BuildContext::new::<&str>(None);
-        let _ = ctx.inject::<LogPlugins>();
+        let plugin = ctx.inject::<LogPlugins>();
 
-        // 日志子系统已初始化，写入一条测试日志
+        // 验证配置已注入
+        assert_eq!(plugin.config.level, log::LevelFilter::Info);
+        assert!(plugin.config.console_output, "console_output 默认应为 true");
+
+        // 日志子系统已初始化，写入测试日志
         tracing::info!("[test] 日志插件测试消息");
         tracing::warn!("[test] 这是一条警告消息");
         tracing::error!("[test] 这是一条错误消息");
+
+        // 验证日志文件已生成
+        assert!(
+            plugin.config.dir.exists(),
+            "日志目录应已创建: {:?}",
+            plugin.config.dir
+        );
 
         // 到达此处说明构建和初始化未 panic
     }
