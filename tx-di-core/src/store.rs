@@ -63,15 +63,17 @@ impl Store {
     }
 
     /// 注册工厂闭包（Prototype）
-    pub fn insert_factory<F>(&self, factory: F)
+    ///
+    /// 每次注入时调用工厂，构造新实例。
+    /// `T` 为组件类型，`TypeId` 通过 `TypeId::of::<T>()` 自动获取。
+    pub fn insert_factory<T: Any + Send + Sync, F>(&self, factory: F)
     where
-        F: Fn(&Store) -> Arc<dyn Any + Send + Sync> + Send + Sync + 'static,
+        F: Fn(&Store) -> Arc<T> + Send + Sync + 'static,
     {
-        let type_id = TypeId::of::<Arc<dyn Any + Send + Sync>>(); // placeholder
-        // 注意：这个方法需要调用方提供 TypeId
-        // 实际使用中，工厂注册由 registry 自动完成
-        let _ = type_id;
-        // todo 此方法保留给未来扩展
+        let type_id = TypeId::of::<T>();
+        self.inner.insert(type_id, CompRef::Factory(Arc::new(move |store| {
+            factory(store) as Arc<dyn Any + Send + Sync>
+        })));
     }
 
     /// 注入组件实例（类型安全）

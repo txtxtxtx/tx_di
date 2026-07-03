@@ -28,6 +28,14 @@ pub fn derive_component(input: TokenStream) -> TokenStream {
     }
 }
 
+/// 核心实现函数：解析 struct 的字段并生成：
+///
+/// 1. `impl Component for ...` — 包含 `type Deps`、`build()`、生命周期钩子等
+/// 2. `linkme::#[distributed_slice(COMPONENT_REGISTRY)]` — 编译期注册条目
+///
+/// # 参数
+///
+/// * `input` — 解析后的 struct AST，包含字段、属性、泛型参数等
 fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
     let struct_name = &input.ident;
     let vis = &input.vis;
@@ -54,7 +62,7 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
         Inject { ty: Type },
         TraitInject { ty: Type },
         Custom { expr: Expr },
-        Optional { ty: Type },
+        Optional { _ty: Type },
         Skip,
     }
 
@@ -78,7 +86,7 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
             // Option<Arc<dyn Trait>> — trait object 注入
             FieldKind::TraitInject { ty: field.ty.clone() }
         } else if is_option_type(&field.ty) {
-            FieldKind::Optional { ty: field.ty.clone() }
+            FieldKind::Optional { _ty: field.ty.clone() }
         } else if let Some(expr) = inject_expr {
             FieldKind::Custom { expr }
         } else {
@@ -530,23 +538,55 @@ impl Default for ScopeAttr {
 
 const TX_CST: &str = "tx_cst";
 
+/// 从属性列表中提取注入表达式
+///
+/// 该函数遍历给定的属性列表，查找标识为"TX_CST"的属性，
+/// 如果找到，则解析该属性的参数为一个表达式并返回，
+/// 如果未找到，则返回None。
+///
+/// # 参数
+/// * `attrs` - 属性切片，表示要检查的属性列表
+///
+/// # 返回值
+/// * `SynResult<Option<Expr>>` - 返回一个Result，其中包含一个Option<Expr>
+///   - 如果找到TX_CST属性，则返回Some(Expr)
+///   - 如果未找到，则返回None
+///   - 如果解析过程中发生错误，则返回Err
+///
 fn extract_inject_expr(attrs: &[Attribute]) -> SynResult<Option<Expr>> {
+    // 遍历属性列表
     for attr in attrs {
+        // 检查当前属性的路径是否为"TX_CST"
         if attr.path().is_ident(TX_CST) {
+            // 将属性的参数解析为表达式
             let expr: Expr = attr.parse_args()?;
+            // 返回解析得到的表达式
             return Ok(Some(expr));
         }
     }
+    // 如果遍历完所有属性都未找到TX_CST，则返回None
     Ok(None)
 }
 
+/// 检查属性列表中是否包含带有 "skip" 标识的 TX_CST 属性
+///
+/// # 参数
+/// * `attrs` - 需要检查的属性切片
+///
+/// # 返回值
+/// * 如果找到匹配的 "skip" 标识则返回 true，否则返回 false
 fn has_skip_attr(attrs: &[Attribute]) -> bool {
+    // 遍历属性列表，检查是否存在符合条件的属性
     attrs.iter().any(|attr| {
+        // 检查属性路径是否为 TX_CST
         if attr.path().is_ident(TX_CST) {
+            // 尝试解析属性参数为标识符
             if let Ok(ident) = attr.parse_args::<Ident>() {
+                // 检查标识符是否为 "skip"
                 return ident == "skip";
             }
         }
+        // 如果不匹配条件则返回 false
         false
     })
 }
