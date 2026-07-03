@@ -239,6 +239,26 @@ pub fn is_option_type(ty: &Type) -> bool {
     extract_option_inner(ty).is_some()
 }
 
+/// 从 `Arc<dyn Trait>` 中提取 `dyn Trait` 的 Type
+///
+/// 用于 required trait inject 字段的内联注入。
+pub fn extract_trait_from_arc(ty: &Type) -> Option<Type> {
+    let path = match ty {
+        Type::Path(tp) => &tp.path,
+        _ => return None,
+    };
+    let segs = &path.segments;
+    if segs.len() != 1 || segs[0].ident != "Arc" {
+        return None;
+    }
+    if let PathArguments::AngleBracketed(ab) = &segs[0].arguments {
+        if let Some(GenericArgument::Type(trait_ty @ Type::TraitObject(_))) = ab.args.first() {
+            return Some(trait_ty.clone());
+        }
+    }
+    None
+}
+
 /// 从 `Option<Arc<dyn Trait>>` 中提取 `dyn Trait` 的 Type
 ///
 /// 用于 trait inject 字段的 inner_init 生成。
@@ -265,4 +285,9 @@ pub fn extract_trait_from_option_arc(ty: &Type) -> Option<Type> {
 /// 检查类型是否为 `Option<Arc<dyn Trait>>` 形式
 pub fn is_arc_dyn_trait(ty: &Type) -> bool {
     extract_trait_from_option_arc(ty).is_some()
+}
+
+/// 检查类型是否为 `Arc<dyn Trait>` 形式（无 Option 包裹）
+pub fn is_plain_arc_dyn_trait(ty: &Type) -> bool {
+    extract_trait_from_arc(ty).is_some()
 }

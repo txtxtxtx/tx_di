@@ -17,7 +17,7 @@ use syn::{
     Token, Type,
 };
 
-use crate::utils::{camel_to_screaming_snake, camel_to_snake, is_option_type, is_arc_dyn_trait, extract_trait_from_option_arc, strip_arc_type};
+use crate::utils::{camel_to_screaming_snake, camel_to_snake, is_option_type, is_arc_dyn_trait, is_plain_arc_dyn_trait, extract_trait_from_arc, extract_trait_from_option_arc, strip_arc_type};
 
 /// `#[derive(Component)]` 入口
 pub fn derive_component(input: TokenStream) -> TokenStream {
@@ -60,7 +60,8 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
     // 字段分类
     enum FieldKind {
         Inject { ty: Type },
-        TraitInject { ty: Type },
+        TraitInject { ty: Type },          // Option<Arc<dyn Trait>> — 可选 trait 注入
+        TraitInjectRequired { ty: Type },  // Arc<dyn Trait>       — 必选 trait 注入
         Custom { expr: Expr },
         Optional { _ty: Type },
         Skip,
@@ -82,8 +83,11 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
         let inject_expr = extract_inject_expr(&field.attrs)?;
         let kind = if has_skip_attr(&field.attrs) {
             FieldKind::Skip
+        } else if is_plain_arc_dyn_trait(&field.ty) {
+            // Arc<dyn Trait> — 必选 trait object 注入
+            FieldKind::TraitInjectRequired { ty: field.ty.clone() }
         } else if is_arc_dyn_trait(&field.ty) {
-            // Option<Arc<dyn Trait>> — trait object 注入
+            // Option<Arc<dyn Trait>> — 可选 trait object 注入
             FieldKind::TraitInject { ty: field.ty.clone() }
         } else if is_option_type(&field.ty) {
             FieldKind::Optional { _ty: field.ty.clone() }
@@ -110,14 +114,27 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
         })
         .collect();
 
-    // trait_inject_fields: trait object 注入（Option<Arc<dyn Trait>>）
-    // 存储字段名 + 提取出的 dyn Trait 类型
+    // trait_inject_fields: 可选 trait object 注入（Option<Arc<dyn Trait>>）
     let trait_inject_fields: Vec<(syn::Ident, Type)> = fields_info
         .iter()
         .filter_map(|(name, kind)| {
             if let FieldKind::TraitInject { ty } = kind {
                 let trait_ty = extract_trait_from_option_arc(ty)
                     .expect("is_arc_dyn_trait 已验证，提取 trait 类型不应失败");
+                Some((name.clone(), trait_ty))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // required_trait_fields: 必选 trait object 注入（Arc<dyn Trait>）
+    let required_trait_fields: Vec<(syn::Ident, Type)> = fields_info
+        .iter()
+        .filter_map(|(name, kind)| {
+            if let FieldKind::TraitInjectRequired { ty } = kind {
+                let trait_ty = extract_trait_from_arc(ty)
+                    .expect("is_plain_arc_dyn_trait 已验证，提取 trait 类型不应失败");
                 Some((name.clone(), trait_ty))
             } else {
                 None
@@ -154,9 +171,17 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
                 let idx_lit = Literal::usize_unsuffixed(idx);
                 quote! { #fname: deps.#idx_lit.clone() }
             }
-            FieldKind::TraitInject { ty } => {
-                // trait inject 字段：用 None 占位，在 inner_init 中填充
+            FieldKind::TraitInject { .. } => {
+                // 可选 trait inject：用 None 占位，在 inner_init 中填充
                 quote! { #fname: None }
+            }
+            FieldKind::TraitInjectRequired { .. } => {
+                // 必选 trait inject：用零值占位，inner_init 中通过 ptr::write 覆盖（避免 drop）
+                // SAFETY: zeroed Arc<dyn Trait> 是托管内存的无效状态，
+                // 但 inner_init 紧接着就会用 ptr::write 写入真实值，不会读取或 drop 该占位值。
+                quote! {
+                    #fname: unsafe { ::core::mem::zeroed() }
+                }
             }
             FieldKind::Custom { expr } => quote! { #fname: #expr },
         })
@@ -170,7 +195,11 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
         .collect();
 
     // trait 依赖也需要加入 dep_type_ids（用于拓扑排序）
-    let trait_dep_type_id_fns: Vec<TokenStream2> = trait_inject_fields
+    let all_trait_fields: Vec<&(syn::Ident, Type)> = trait_inject_fields
+        .iter()
+        .chain(required_trait_fields.iter())
+        .collect();
+    let trait_dep_type_id_fns: Vec<TokenStream2> = all_trait_fields
         .iter()
         .map(|(_, ty)| quote! { || std::any::TypeId::of::<#ty>() })
         .collect();
@@ -294,10 +323,9 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
 
     // ── 生成 inner_init 覆盖（如果有 trait inject 字段）──────────────────
 
-    let inner_init_impl = if trait_inject_fields.is_empty() {
-        quote! {}
-    } else {
-        let trait_inject_assigns: Vec<TokenStream2> = trait_inject_fields
+    let has_trait_inject = !trait_inject_fields.is_empty() || !required_trait_fields.is_empty();
+    let inner_init_impl = if has_trait_inject {
+        let optional_assigns: Vec<TokenStream2> = trait_inject_fields
             .iter()
             .map(|(fname, ty)| {
                 quote! {
@@ -305,13 +333,30 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
                 }
             })
             .collect();
+        let required_assigns: Vec<TokenStream2> = required_trait_fields
+            .iter()
+            .map(|(fname, ty)| {
+                quote! {
+                    // 用 ptr::write 覆盖零值占位，避免 drop 无效 Arc
+                    unsafe {
+                        ::core::ptr::write(
+                            &mut self.#fname,
+                            ::tx_di_core::inject_trait_from_store::<#ty>(store),
+                        );
+                    }
+                }
+            })
+            .collect();
 
         quote! {
             fn inner_init(&mut self, store: &::tx_di_core::Store) -> ::tx_di_core::RIE<()> {
-                #( #trait_inject_assigns )*
+                #( #optional_assigns )*
+                #( #required_assigns )*
                 Ok(())
             }
         }
+    } else {
+        quote! {}
     };
 
     // ── 生成最终代码 ────────────────────────────────────────────────────
