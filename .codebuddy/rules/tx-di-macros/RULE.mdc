@@ -1,0 +1,111 @@
+---
+description: tx-di-macros Component derive 宏的使用规范与开发约束
+alwaysApply: false
+enabled: true
+updatedAt: 2026-07-04T22:22:00.000Z
+---
+
+# tx-di-macros 使用规范
+
+## 概述
+
+`tx-di-macros` 是 `tx-di` DI 框架的 proc-macro crate，提供 `#[derive(Component)]` 宏。该宏为 Rust 结构体自动生成 `Component` trait 实现和编译期注册条目（基于 `linkme`）。
+
+## 模块结构
+
+```
+tx-di-macros/src/
+├── lib.rs              # proc_macro 入口
+├── attr/               # 属性解析
+│   ├── comp_attr.rs    # #[component(...)] 解析
+│   └── field_attr.rs   # #[tx_cst(...)] 解析
+├── classify/           # 字段分类
+│   └── fields.rs       # FieldKind 枚举
+├── codegen/            # 代码生成
+│   ├── mod.rs          # CodeGenContext + 编排
+│   ├── component_impl.rs
+│   ├── factory.rs
+│   ├── inner_init.rs
+│   └── meta_entry.rs
+├── type_utils.rs       # 类型检测工具
+└── name_utils.rs       # 命名转换工具
+```
+
+数据流：`属性解析 → 字段分类 → CodeGenContext → 各 codegen 子模块生成片段 → 组装`
+
+## 宏 API 说明
+
+### `#[derive(Component)]`
+
+在结构体上使用，自动生成 `Component trait impl` 和 `ComponentMeta` 注册条目。
+
+**约束：**
+- 只支持**具名字段**的结构体（不支持元组结构体、单元结构体）
+- 不支持**泛型结构体**（必须用 `#[component(for(...))]` 指定具体类型，但该功能暂未实现）
+- 字段类型决定了注入行为（见下方分类规则）
+
+### `#[component(...)]` — 结构体属性
+
+| 参数 | 类型 | 说明 | 默认值 |
+|------|------|------|--------|
+| `scope = Singleton / Prototype` | 枚举 | 作用域 | `Singleton` |
+| `init` | flag | 启用自定义 `__di_component_init` 回调 | 无 |
+| `init_sort = N` | i32 | 初始化排序（值越小越先执行） | `10000` |
+| `conf` / `conf = "key"` | 可选字符串 | 配置组件（从配置反序列化） | 无 |
+| `as_trait = dyn Trait` | Type | Trait 实现注册 | 无 |
+| `intercept(...)` | 占位 | AOP 拦截器（未实现） | 跳过 |
+| `for(...)` | 占位 | 泛型具体化（未实现） | 跳过 |
+
+### `#[tx_cst(...)]` — 字段属性
+
+| 写法 | 说明 |
+|------|------|
+| `#[tx_cst(expr)]` | 用表达式赋值，不从容器注入 |
+| `#[tx_cst(skip)]` | 跳过注入，使用 `Default::default()` |
+
+### 字段类型 → 注入行为分类
+
+| 字段类型 | FieldKind | 行为 |
+|----------|-----------|------|
+| `Arc<T>` | `Inject` | 从 Deps 元组解构，普通组件注入 |
+| `Arc<dyn Trait>` | `TraitInjectRequired` | inner_init 中用 `ptr::write` 覆盖零值占位 |
+| `Option<Arc<dyn Trait>>` | `TraitInject` | build 时 `None`，inner_init 中填充 |
+| `Option<T>` | `Optional` | build 时填 `None` |
+| `#[tx_cst(skip)]` | `Skip` | 使用 `Default::default()` |
+| `#[tx_cst(expr)]` | `Custom` | 使用指定表达式赋值 |
+| 其他 | `Inject` | 视为 `Arc<T>` 注入类型 |
+
+## 架构约束
+
+### 代码生成职责划分
+
+每个 codegen 子模块只能生成一个 `quote! {}` 片段，通过 `CodeGenContext` 读取数据：
+
+```
+CodeGenContext
+  ├── component_impl() → impl Component { Deps / build / SCOPE / inner_init / init_sort }
+  ├── factory() → factory 闭包
+  └── meta_entry(factory_fn) → ComponentMeta 静态变量
+```
+
+### 注意事项
+
+1. **不输出 struct 定义**：derive 宏只追加 impl 块和注册条目，不重新输出结构体
+2. **配置组件不生成 dep_type_ids**：配置组件 `Deps = ()`，依赖为空
+3. **`inner_init` 已由 factory 调用**：对于 Singleton，factory 函数中已调用 `inner_init`，meta_entry 中的 `inner_init_fn` 只是占位
+4. **必选 trait inject 的占位值**：用 `mem::zeroed()` 创建无效 `Arc<dyn Trait>`，inner_init 中用 `ptr::write` 覆盖（避免 drop）
+5. **`clean_fields` 是死代码**：清理 `#[tx_cst]` 属性的代码 `clean_input` 从未输出，已删除
+
+### 测试覆盖
+
+- `tx-di-core/tests/test_component.rs` 含 38 个测试
+- 覆盖路径：基本注入、深层依赖链、作用域、配置组件、trait 注入、拦截器、跳过字段、自定义表达式、并发
+
+## 开发规范
+
+1. **新增 `#[component(...)]` 参数**：`CompAttr` 加字段 → `CompAttrArgs` 加字段 → `parse()` 加分支 → codegen 使用
+2. **新增注入类型**：`FieldKind` 加变体 → `classify_fields` 加规则 → component_impl + inner_init + meta_entry 各子模块对应处理
+3. **类型检测函数**统一放在 `type_utils.rs`
+4. **命名转换函数**统一放在 `name_utils.rs`
+5. 每个文件不超过 200 行，保持单一职责
+6. 不引入外部 crate 依赖（proc-macro crate 的限制）

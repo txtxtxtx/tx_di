@@ -2,9 +2,20 @@
 //!
 //! 提供 `#[derive(Component)]` 宏。
 //! `#[tx_cst]` 和 `#[component]` 是 derive 辅助属性。
+//!
+//! # 模块结构
+//!
+//! - `attr` — 属性解析（`#[component(...)]`、`#[tx_cst(...)]`）
+//! - `classify` — 字段分类（`FieldKind`）
+//! - `codegen` — 代码生成（`impl Component` + linkme 注册条目）
+//! - `type_utils` — 类型检测工具（`Arc<T>`、`Option<T>`、`Arc<dyn Trait>`）
+//! - `name_utils` — 命名转换工具（驼峰 ↔ 蛇形）
 
-mod comp;
-mod utils;
+mod attr;
+mod classify;
+mod codegen;
+mod name_utils;
+mod type_utils;
 
 use proc_macro::TokenStream;
 
@@ -51,5 +62,5 @@ use proc_macro::TokenStream;
 /// ```
 #[proc_macro_derive(Component, attributes(component, tx_cst))]
 pub fn derive_component(input: TokenStream) -> TokenStream {
-    comp::derive_component(input)
+    codegen::derive_component(input)
 }
