@@ -9,6 +9,7 @@ use std::cmp::Reverse;
 
 use tracing::debug;
 
+use crate::RIE;
 use crate::registry::{ComponentMeta, COMPONENT_REGISTRY};
 use crate::store::TRAIT_IMPL_MAP;
 use crate::error::{AppError, DiErr};
@@ -19,7 +20,7 @@ use crate::error::{AppError, DiErr};
 ///
 /// - 某个组件依赖的类型未在注册表中找到
 /// - 检测到循环依赖
-pub fn topo_sort(metas: &[&ComponentMeta]) -> Result<Vec<TypeId>, AppError> {
+pub fn topo_sort(metas: &[&ComponentMeta]) -> RIE<Vec<TypeId>> {
     let start = std::time::Instant::now();
 
     let n = metas.len();

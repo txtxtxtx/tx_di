@@ -22,7 +22,7 @@
 //! }
 //! ```
 
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// 调用上下文 — 传递给拦截器的上下文信息
 #[derive(Debug, Clone)]
@@ -195,20 +195,20 @@ impl Interceptor for LoggingInterceptor {
 
 /// 指标拦截器 — 统计方法调用次数
 pub struct MetricsInterceptor {
-    pub counter: std::sync::atomic::AtomicU64,
+    pub counter: AtomicU64,
 }
 
 impl MetricsInterceptor {
     /// 创建新的指标拦截器
     pub fn new() -> Self {
         MetricsInterceptor {
-            counter: std::sync::atomic::AtomicU64::new(0),
+            counter: AtomicU64::new(0),
         }
     }
 
     /// 获取调用次数
     pub fn count(&self) -> u64 {
-        self.counter.load(std::sync::atomic::Ordering::Relaxed)
+        self.counter.load(Ordering::Relaxed)
     }
 }
 

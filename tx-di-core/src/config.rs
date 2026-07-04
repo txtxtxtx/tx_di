@@ -3,7 +3,6 @@
 //! 从 TOML 配置文件加载配置，支持点分路径访问。
 //! 配置组件通过 `#[component(conf = "key")]` 自动反序列化。
 
-use std::any::TypeId;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -12,7 +11,6 @@ use toml::Value::Table;
 
 use crate::component::Component;
 use crate::scope::Scope;
-use crate::store::{CompRef, Store};
 
 /// 全局配置文件
 pub struct AppAllConfig {
