@@ -4,37 +4,32 @@ members = [
     "tx-di-core",
     # 宏
     "tx-di-macros",
-    # 示例/测试
-    #    "di-example",
-    # 插件
-    # web
-    "plugins/tx_di_axum",
-    # sip
-    "plugins/tx_di_sip",
-    # 日志
-    "plugins/tx_di_log",
-    # gb28181
-    "plugins/tx_di_gb28181",
-    # can todo 暂时未审查代码，ai生成
-    "plugins/tx_di_can",
-    # app
-    # 国标设备模拟
-    #    "examples/gb_cams",
-    # 国标服务
-    "examples/gb28181_admin",
-    # 国标公共模块
-    "common/tx_gb28181",
     # 统一错误
     "common/tx_error",
     # 通用工具
     "common/crates/tx_common",
+    
+    # 插件
+    # web
+    "plugins/tx_di_axum",
+    # sip，todo 先忽略，以后更新
+    # "plugins/tx_di_sip",
+    # 日志
+    "plugins/tx_di_log",
+    # gb28181,todo 先忽略，以后更新
+    # "plugins/tx_di_gb28181",
+    # can, todo 先忽略，以后更新
+    # "plugins/tx_di_can",
     # 数据库orm
     "plugins/tx_di_toasty",
     # 认证授权
     "plugins/tx_di_sa_token",
-    "examples/tx_di_meeting",
     # 文件存储
     "plugins/tx_di_file",
+    # 定时任务
+    "plugins/tx_di_job",
+    # 会议系统,todo 先忽略，以后更新
+    # "examples/tx_di_meeting",
     # 后台管理系统
     # "examples/admin_server",
     "examples/tx_admin/admin_app",
@@ -42,8 +37,16 @@ members = [
     "examples/tx_admin/admin_macros",
     "examples/tx_admin/admin_infra",
     "examples/tx_admin/admin_api",
-    # 定时任务
-    "plugins/tx_di_job", "examples/dfbja7_transformer",
+
+    # yctd a7->mqtt
+    "examples/dfbja7_transformer",
+    # app
+    # 国标设备模拟
+    #    "examples/gb_cams",
+    # 国标服务,todo 先忽略，以后更新
+    # "examples/gb28181_admin",
+    # 国标公共模块，todo 先忽略，以后更新
+    # "common/tx_gb28181",
 ]
 resolver = "3"
 [workspace.package]
