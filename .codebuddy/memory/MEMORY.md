@@ -31,8 +31,8 @@
 - `#[tx_comp(conf, init)]` → `#[derive(Component)] #[component(conf = "key", init)]`
 - `#[tx_comp(init)]` → `#[derive(Component)] #[component(init)]`
 - `impl CompInit for T { fn inner_init(...) }` → `fn init(this: &mut T, _store: &Store) -> RIE<()>`（模块级自由函数）
-- `impl CompInit for T { async_method!(fn async_init_impl(ctx, token) { ... }) }` → `#[component(app_async_init)]` + `async_method!(fn app_async_init(comp: Arc<T>, app: Arc<App>) -> RIE<()> { ... })`
-- `impl CompInit for T { async_method!(fn async_run_impl(ctx, token) { ... }) }` → `#[component(app_async_run)]` + `async_method!(fn app_async_run(comp: Arc<T>, app: Arc<App>, token) -> RIE<()> { ... })`
+- `impl CompInit for T { async_method!(fn async_init_impl(ctx, token) { ... }) }` → `#[component(app_async_init)]` + `async fn app_async_init(comp: Arc<T>, app: Arc<App>) -> RIE<()>`
+- `impl CompInit for T { async_method!(fn async_run_impl(ctx, token) { ... }) }` → `#[component(app_async_run)]` + `async fn app_async_run(comp: Arc<T>, app: Arc<App>, token: CancellationToken) -> RIE<()>`
 - `impl CompInit for T { fn init_sort() -> i32 { N } }` → `#[component(init_sort = N)]`
 - `InnerContext` → `Store`（init 回调参数）
 - `ctx.inject::<T>()` → `comp.field`（直接访问字段）或 `app.inject::<T>()`
@@ -40,7 +40,7 @@
 ### 保留不变
 - `#[tx_cst(expr)]` 字段自定义构造器仍受支持
 - `RIE<T>` 类型别名不变
-- `async_method!` 宏仍存在，改为返回 `$crate::BoxFuture`（而非 `impl Future`）
+- `async_method!` 宏已移除，`BoxFuture` 包装由 `#[derive(Component)]` 生成代码自动处理
 
 ### 回调函数签名
 
@@ -48,11 +48,11 @@
 |------|---------|
 | `init` | `fn init(this: &mut T, _store: &Store) -> RIE<()>` |
 | `app_init` | `fn app_init(comp: Arc<T>, app: &Arc<App>) -> RIE<()>` |
-| `app_async_init` | `fn app_async_init(comp: Arc<T>, app: Arc<App>) -> RIE<()>`（使用 `async_method!`） |
-| `app_async_run` | `fn app_async_run(comp: Arc<T>, app: Arc<App>, token: CancellationToken) -> RIE<()>`（使用 `async_method!`） |
+| `app_async_init` | `async fn app_async_init(comp: Arc<T>, app: Arc<App>) -> RIE<()>` |
+| `app_async_run` | `async fn app_async_run(comp: Arc<T>, app: Arc<App>, token: CancellationToken) -> RIE<()>` |
 | `shutdown` | `fn shutdown(&self)` |
 
 ### 注意事项
 - `DepsTuple` 必须在所有使用 `#[derive(Component)]` 有依赖的模块中 `use tx_di_core::DepsTuple`
-- `async_method!` 的 doc comment 必须在宏内部（第一行）
 - `app` 参数在异步回调中必须是 `Arc<App>`（非 `&Arc<App>`），因为 `BoxFuture` 要求 `'static`
+- 异步回调直接写 `async fn`，无需 `async_method!` 或手动 `Box::pin`

@@ -36,67 +36,63 @@ pub struct WebPlugin {
     pub router: OnceLock<axum::Router>,
 }
 
-tx_di_core::async_method!(
-    /// `#[component(app_async_init)]` 回调：构建路由、应用中间件
-    fn app_async_init(comp: Arc<WebPlugin>, app: Arc<App>) -> RIE<()> {
-        let config = app.inject::<WebConfig>();
+/// `#[component(app_async_init)]` 回调：构建路由、应用中间件
+async fn app_async_init(comp: Arc<WebPlugin>, app: Arc<App>) -> RIE<()> {
+    let config = app.inject::<WebConfig>();
 
-        // ═══ 中间件内的路由（API 接口） ═══
-        let mut api_router = WebPlugin::merge_routers();
-        let app_status = AppStatus { app: app.clone() };
-        api_router = api_router
-            .layer(tower::ServiceBuilder::new()
-                .map_request(move |mut req: Request<_>| {
-                    req.extensions_mut().insert(app_status.clone());
-                    req
-                })
-                .into_inner());
-        // 应用中间件（日志、CORS、超时等）
-        api_router = WebPlugin::layer_with_router(api_router);
+    // ═══ 中间件内的路由（API 接口） ═══
+    let mut api_router = WebPlugin::merge_routers();
+    let app_status = AppStatus { app: app.clone() };
+    api_router = api_router
+        .layer(tower::ServiceBuilder::new()
+            .map_request(move |mut req: Request<_>| {
+                req.extensions_mut().insert(app_status.clone());
+                req
+            })
+            .into_inner());
+    // 应用中间件（日志、CORS、超时等）
+    api_router = WebPlugin::layer_with_router(api_router);
 
-        // 应用请求体大小限制（multipart 上传需要）
-        api_router = api_router.layer(axum::extract::DefaultBodyLimit::max(config.max_body_size));
+    // 应用请求体大小限制（multipart 上传需要）
+    api_router = api_router.layer(axum::extract::DefaultBodyLimit::max(config.max_body_size));
 
-        // ═══ 中间件外的路由（静态资源、文档） ═══
-        let mut outer_router = axum::Router::new();
+    // ═══ 中间件外的路由（静态资源、文档） ═══
+    let mut outer_router = axum::Router::new();
 
-        // 静态文件服务
-        let static_dir = config.static_dir();
-        if static_dir.exists() {
-            info!("静态文件目录已配置: {:?}", static_dir);
-            outer_router = outer_router.nest_service(
-                "/static",
-                tower_http::services::ServeDir::new(&static_dir)
-                    .precompressed_gzip()
-                    .precompressed_br()
-            );
-        } else {
-            debug!("静态文件目录不存在，跳过静态文件服务: {:?}", static_dir);
-        }
-
-        // SPA 应用
-        outer_router = WebPlugin::setup_spa_apps(outer_router, &config);
-
-        // API 文档端点（/docs, /api-docs/openapi.json）
-        outer_router = WebPlugin::setup_doc_routes(outer_router);
-
-        // 合并：中间件外的路由优先匹配
-        let router = outer_router.merge(api_router);
-
-        comp.router.set(router).map_err(|_| "已经设置过路由了")?;
-        Ok(())
+    // 静态文件服务
+    let static_dir = config.static_dir();
+    if static_dir.exists() {
+        info!("静态文件目录已配置: {:?}", static_dir);
+        outer_router = outer_router.nest_service(
+            "/static",
+            tower_http::services::ServeDir::new(&static_dir)
+                .precompressed_gzip()
+                .precompressed_br()
+        );
+    } else {
+        debug!("静态文件目录不存在，跳过静态文件服务: {:?}", static_dir);
     }
-);
 
-tx_di_core::async_method!(
-    /// `#[component(app_async_run)]` 回调：启动 Web 服务器
-    fn app_async_run(comp: Arc<WebPlugin>, app: Arc<App>, token: CancellationToken) -> RIE<()> {
-        let config = app.inject::<WebConfig>();
-        let router = comp.router.get().unwrap().clone();
-        start_server(config, router, token).await?;
-        Ok(())
-    }
-);
+    // SPA 应用
+    outer_router = WebPlugin::setup_spa_apps(outer_router, &config);
+
+    // API 文档端点（/docs, /api-docs/openapi.json）
+    outer_router = WebPlugin::setup_doc_routes(outer_router);
+
+    // 合并：中间件外的路由优先匹配
+    let router = outer_router.merge(api_router);
+
+    comp.router.set(router).map_err(|_| "已经设置过路由了")?;
+    Ok(())
+}
+
+/// `#[component(app_async_run)]` 回调：启动 Web 服务器
+async fn app_async_run(comp: Arc<WebPlugin>, app: Arc<App>, token: CancellationToken) -> RIE<()> {
+    let config = app.inject::<WebConfig>();
+    let router = comp.router.get().unwrap().clone();
+    start_server(config, router, token).await?;
+    Ok(())
+}
 
 
 impl WebPlugin {

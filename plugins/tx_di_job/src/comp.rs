@@ -569,55 +569,51 @@ fn cron_part_match(part: &str, value: u32, min: u32, _max: u32) -> bool {
     }
 }
 
-tx_di_core::async_method!(
-    /// `#[component(app_async_init)]` 回调：初始化执行器和 Repository
-    fn app_async_init(comp: Arc<JobPlugin>, app: Arc<App>) -> RIE<()> {
-        info!("JobPlugin: 异步初始化开始");
-        // 获取数据库实例
-        let toasty_plugin = app.inject::<ToastyPlugin>();
+/// `#[component(app_async_init)]` 回调：初始化执行器和 Repository
+async fn app_async_init(comp: Arc<JobPlugin>, app: Arc<App>) -> RIE<()> {
+    info!("JobPlugin: 异步初始化开始");
+    // 获取数据库实例
+    let toasty_plugin = app.inject::<ToastyPlugin>();
 
-        // 创建数据访问层（内部构造，非 DI 注入）
-        let repository = Arc::new(JobRepository::new(toasty_plugin));
+    // 创建数据访问层（内部构造，非 DI 注入）
+    let repository = Arc::new(JobRepository::new(toasty_plugin));
 
-        // 创建执行器（内部构造，非 DI 注入）
-        let shell_executor = Arc::new(ShellJobExecutor::new(comp.config.shell_timeout()));
-        let python_executor = Arc::new(PythonJobExecutor::new(
-            comp.config.python_path.clone(),
-            comp.config.python_timeout(),
-        ));
+    // 创建执行器（内部构造，非 DI 注入）
+    let shell_executor = Arc::new(ShellJobExecutor::new(comp.config.shell_timeout()));
+    let python_executor = Arc::new(PythonJobExecutor::new(
+        comp.config.python_path.clone(),
+        comp.config.python_timeout(),
+    ));
 
-        // 设置到 JobPlugin 的 OnceLock 字段
-        comp.repository
-            .set(repository)
-            .map_err(|_| JobErr::RepositoryAlreadyInit)?;
-        comp.shell_executor
-            .set(shell_executor)
-            .map_err(|_| JobErr::ShellExecutorAlreadyInit)?;
-        comp.python_executor
-            .set(python_executor)
-            .map_err(|_| JobErr::PythonExecutorAlreadyInit)?;
+    // 设置到 JobPlugin 的 OnceLock 字段
+    comp.repository
+        .set(repository)
+        .map_err(|_| JobErr::RepositoryAlreadyInit)?;
+    comp.shell_executor
+        .set(shell_executor)
+        .map_err(|_| JobErr::ShellExecutorAlreadyInit)?;
+    comp.python_executor
+        .set(python_executor)
+        .map_err(|_| JobErr::PythonExecutorAlreadyInit)?;
 
-        info!("JobPlugin: 异步初始化完成");
-        Ok(())
+    info!("JobPlugin: 异步初始化完成");
+    Ok(())
+}
+
+/// `#[component(app_async_run)]` 回调：启动调度器主循环
+async fn app_async_run(comp: Arc<JobPlugin>, _app: Arc<App>, token: CancellationToken) -> RIE<()> {
+    if !comp.config.enabled {
+        info!("JobPlugin: 调度器未启用，跳过启动");
+        return Ok(());
     }
-);
 
-tx_di_core::async_method!(
-    /// `#[component(app_async_run)]` 回调：启动调度器主循环
-    fn app_async_run(comp: Arc<JobPlugin>, _app: Arc<App>, token: CancellationToken) -> RIE<()> {
-        if !comp.config.enabled {
-            info!("JobPlugin: 调度器未启用，跳过启动");
-            return Ok(());
-        }
+    info!("JobPlugin: 启动调度器");
 
-        info!("JobPlugin: 启动调度器");
-
-        // 框架已将 async_run 放入 tokio::spawn，此处直接占用当前任务执行调度循环
-        if let Err(e) = comp.scheduler_loop(token).await {
-            error!(error = %e, "调度器主循环异常退出");
-        }
-
-        info!("JobPlugin: 调度器已停止");
-        Ok(())
+    // 框架已将 async_run 放入 tokio::spawn，此处直接占用当前任务执行调度循环
+    if let Err(e) = comp.scheduler_loop(token).await {
+        error!(error = %e, "调度器主循环异常退出");
     }
-);
+
+    info!("JobPlugin: 调度器已停止");
+    Ok(())
+}
