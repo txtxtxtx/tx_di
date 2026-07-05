@@ -18,7 +18,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tx_di_core::{
     BoxFuture, BuildContext, CancellationToken, CompRef, Component, ComponentMeta, DepsTuple, RIE,
-    Scope, Store, inject_from_store, topo_sort,
+    Scope, Store, TraitImplMap, inject_from_store, topo_sort,
 };
 
 // ── 生成唯一 marker 类型 ─────────────────────────────────────────────────────
@@ -56,8 +56,6 @@ static EMPTY_TRAIT_IMPLS: &[tx_di_core::store::TraitImplEntry] = &[];
 
 // ── 辅助函数 ─────────────────────────────────────────────────────────────────
 
-/// 空的 inner_init fn
-fn noop_inner_init(_store: &Store) -> RIE<()> { Ok(()) }
 /// 空的 init fn
 fn noop_init(_app: &Arc<tx_di_core::App>) -> RIE<()> { Ok(()) }
 /// 空的 async_init fn
@@ -92,7 +90,6 @@ fn make_independent_metas(n: usize) -> Vec<ComponentMeta> {
                 impl_traits: &[],
                 trait_impls: &[],
                 init_sort_fn: zero_sort,
-                inner_init_fn: noop_inner_init,
                 init_fn: noop_init,
                 async_init_fn: noop_async_init,
                 async_run_fn: noop_async_run,
@@ -129,7 +126,6 @@ fn make_chain_metas(n: usize) -> Vec<ComponentMeta> {
             impl_traits: &[],
             trait_impls: &[],
             init_sort_fn: zero_sort,
-            inner_init_fn: noop_inner_init,
             init_fn: noop_init,
             async_init_fn: noop_async_init,
             async_run_fn: noop_async_run,
@@ -151,6 +147,8 @@ fn make_store_with<T: Any + Send + Sync + 'static>(value: T) -> Store {
 
 fn bench_topo_sort(c: &mut Criterion) {
     let mut group = c.benchmark_group("topo_sort");
+    // 拓扑排序需要一个 TraitImplMap 引用，所有基准组件都不涉及 trait 依赖
+    let empty_trait_impls = TraitImplMap::new();
 
     for &n in &[10usize, 50, 100] {
         let label = format!("no_deps_{n}");
@@ -158,7 +156,7 @@ fn bench_topo_sort(c: &mut Criterion) {
             let metas = make_independent_metas(n);
             let refs: Vec<&ComponentMeta> = metas.iter().collect();
             b.iter(|| {
-                black_box(topo_sort(black_box(&refs)));
+                black_box(topo_sort(black_box(&refs), &empty_trait_impls));
             });
         });
     }
@@ -169,7 +167,7 @@ fn bench_topo_sort(c: &mut Criterion) {
             let metas = make_chain_metas(n);
             let refs: Vec<&ComponentMeta> = metas.iter().collect();
             b.iter(|| {
-                black_box(topo_sort(black_box(&refs)));
+                black_box(topo_sort(black_box(&refs), &empty_trait_impls));
             });
         });
     }

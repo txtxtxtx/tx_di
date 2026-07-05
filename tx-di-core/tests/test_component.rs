@@ -909,7 +909,7 @@ fn test_inject_all_traits_from_store() {
 
     let reporters: Vec<Arc<dyn Reporter>> = inject_all_traits_from_store(store);
 
-    // TRAIT_IMPL_MAP 是全局静态，跨测试累计，不检查长度只检查内容
+    // trait_impls 是 Store 实例字段，每个 BuildContext 独立填充，此处只检查内容
     assert!(!reporters.is_empty(), "应有至少一个 Reporter 实现");
 
     let data: Vec<&str> = reporters.iter().map(|r| r.report()).collect();

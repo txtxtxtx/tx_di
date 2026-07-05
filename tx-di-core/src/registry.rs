@@ -49,9 +49,6 @@ pub struct ComponentMeta {
     /// 初始化排序值（值越小越先执行）
     pub init_sort_fn: fn() -> i32,
 
-    /// 从 Store 获取实例并调用 inner_init（build 阶段）
-    pub inner_init_fn: fn(&Store) -> RIE<()>,
-
     /// 同步初始化（App 阶段）
     pub init_fn: fn(&Arc<App>) -> RIE<()>,
 

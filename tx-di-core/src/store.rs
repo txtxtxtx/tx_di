@@ -25,6 +25,8 @@ pub enum CompRef {
 /// 组件存储 — 类型安全的注入入口
 pub struct Store {
     inner: DashMap<TypeId, CompRef>,
+    /// trait 实现的映射表（trait TypeId → 实现列表）
+    pub trait_impls: TraitImplMap,
 }
 
 impl Store {
@@ -32,12 +34,16 @@ impl Store {
     pub fn new() -> Self {
         Store {
             inner: DashMap::new(),
+            trait_impls: DashMap::new(),
         }
     }
 
-    /// 从 DashMap 创建 Store
+    /// 从 DashMap 创建 Store（trait_impls 为空，需后续填充）
     pub fn from_dashmap(inner: DashMap<TypeId, CompRef>) -> Self {
-        Store { inner }
+        Store {
+            inner,
+            trait_impls: DashMap::new(),
+        }
     }
 
     /// 获取内部 DashMap 的引用
@@ -187,13 +193,9 @@ pub struct TraitImplEntry {
 /// trait TypeId → 实现列表的映射表类型
 pub type TraitImplMap = DashMap<TypeId, Vec<TraitImplEntry>>;
 
-/// 全局 trait 实现映射表，在 `auto_register_all` 阶段填充
-pub static TRAIT_IMPL_MAP: std::sync::LazyLock<TraitImplMap> =
-    std::sync::LazyLock::new(DashMap::new);
-
 /// 从 Store 中注入 trait object（返回第一个实现）
 ///
-/// 通过 `TRAIT_IMPL_MAP` 查找 trait 的具体实现。
+/// 通过 `store.trait_impls` 查找 trait 的具体实现。
 ///
 /// # Panics
 ///
@@ -204,7 +206,8 @@ pub fn inject_trait_from_store<T: ?Sized + Any + Send + Sync + 'static>(
     let tid = TypeId::of::<T>();
     let type_name = std::any::type_name::<T>();
 
-    TRAIT_IMPL_MAP
+    store
+        .trait_impls
         .get(&tid)
         .and_then(|entries| entries.first().cloned())
         .map(|entry| {
@@ -244,7 +247,8 @@ pub fn inject_all_traits_from_store<T: ?Sized + Any + Send + Sync + 'static>(
 ) -> Vec<Arc<T>> {
     let tid = TypeId::of::<T>();
 
-    TRAIT_IMPL_MAP
+    store
+        .trait_impls
         .get(&tid)
         .map(|entries| {
             entries

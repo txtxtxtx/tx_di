@@ -55,7 +55,7 @@ pub use config::AppAllConfig;
 pub use lifecycle::{App, BuildContext, InnerContext, get_sys_config, set_sys_config, CONFIG_PATH};
 pub use registry::{ComponentMeta, COMPONENT_REGISTRY};
 pub use scope::Scope;
-pub use store::{Store, CompRef, TraitImplEntry, TraitImplMap, TRAIT_IMPL_MAP, inject_from_store, inject_trait_from_store, inject_all_traits_from_store};
+pub use store::{Store, CompRef, TraitImplEntry, TraitImplMap, inject_from_store, inject_trait_from_store, inject_all_traits_from_store};
 pub use topology::topo_sort;
 pub use aop::{CallContext, CallResult, Interceptor, Next};
 

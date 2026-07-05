@@ -11,16 +11,21 @@ use tracing::debug;
 
 use crate::RIE;
 use crate::registry::{ComponentMeta, COMPONENT_REGISTRY};
-use crate::store::TRAIT_IMPL_MAP;
+use crate::store::TraitImplMap;
 use crate::error::{AppError, DiErr};
 
 /// 对组件元数据进行拓扑排序，返回排序后的 TypeId 列表
+///
+/// # 参数
+///
+/// * `metas` - 组件元数据引用列表
+/// * `trait_impls` - trait 实现映射表（用于解析 trait 依赖）
 ///
 /// # Panics
 ///
 /// - 某个组件依赖的类型未在注册表中找到
 /// - 检测到循环依赖
-pub fn topo_sort(metas: &[&ComponentMeta]) -> RIE<Vec<TypeId>> {
+pub fn topo_sort(metas: &[&ComponentMeta], trait_impls: &TraitImplMap) -> RIE<Vec<TypeId>> {
     let start = std::time::Instant::now();
 
     let n = metas.len();
@@ -44,8 +49,8 @@ pub fn topo_sort(metas: &[&ComponentMeta]) -> RIE<Vec<TypeId>> {
                 // 直接匹配具体类型
                 adj[j_idx].push(i);
                 in_degree[i] += 1;
-            } else if let Some(entries) = TRAIT_IMPL_MAP.get(&one_type_id) {
-                // 依赖是 trait：通过 TRAIT_IMPL_MAP 解析出具体实现
+            } else if let Some(entries) = trait_impls.get(&one_type_id) {
+                // 依赖是 trait：通过 trait_impls 解析出具体实现
                 for entry in entries.iter() {
                     let concrete_id = (entry.concrete_tid)();
                     if let Some(&(j_idx, _j_name)) = id_to_idx.get(&concrete_id) {

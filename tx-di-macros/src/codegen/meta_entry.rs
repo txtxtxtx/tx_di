@@ -82,14 +82,6 @@ pub fn gen_meta_entry(ctx: &CodeGenContext, factory_fn: TokenStream2) -> TokenSt
             trait_impls: &[ #( #trait_impls_arr ),* ],
             // ── 生命周期函数指针 ──────────────────────────────────────────
             init_sort_fn: <#struct_name as ::tx_di_core::Component>::init_sort,
-            inner_init_fn: |store: &::tx_di_core::Store| -> ::tx_di_core::RIE<()> {
-                let arc = ::tx_di_core::inject_from_store::<#struct_name>(store);
-                let mut guard = arc;
-                // 对于 Singleton，实例已经被 factory 放入 store
-                // inner_init 在 factory 函数中已经调用
-                // 这里仅作为占位
-                Ok(())
-            },
             init_fn: |app: &std::sync::Arc<::tx_di_core::App>| -> ::tx_di_core::RIE<()> {
                 <#struct_name as ::tx_di_core::Component>::init(app)
             },

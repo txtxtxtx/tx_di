@@ -20,7 +20,7 @@ use crate::component::Component;
 use crate::config::AppAllConfig;
 use crate::registry::{ComponentMeta, COMPONENT_REGISTRY};
 use crate::scope::Scope;
-use crate::store::{CompRef, Store, TRAIT_IMPL_MAP};
+use crate::store::{CompRef, Store, TraitImplEntry};
 use crate::topology::{all_metas, topo_sort};
 use crate::RIE;
 
@@ -84,12 +84,13 @@ impl BuildContext {
 
     /// 自动注册所有通过 `#[derive(Component)]` 标记的组件
     fn auto_register_all(&mut self) {
-        // 1. 填充 TRAIT_IMPL_MAP
+        // 1. 填充 trait_impls（每个 Store 拥有独立的 trait 映射，无全局污染）
         for meta in COMPONENT_REGISTRY.iter() {
             if !meta.trait_impls.is_empty() {
                 for trait_fn in meta.impl_traits {
                     let trait_tid = trait_fn();
-                    TRAIT_IMPL_MAP
+                    self.store
+                        .trait_impls
                         .entry(trait_tid)
                         .or_default()
                         .extend(meta.trait_impls.to_vec());
@@ -100,7 +101,7 @@ impl BuildContext {
 
         // 2. 拓扑排序
         let metas: Vec<&'static ComponentMeta> = COMPONENT_REGISTRY.iter().collect();
-        let sorted_ids = topo_sort(&metas).unwrap_or_else(|e| {
+        let sorted_ids = topo_sort(&metas, &self.store.trait_impls).unwrap_or_else(|e| {
             panic!("{}", e);
         });
 
@@ -180,7 +181,22 @@ impl BuildContext {
             .enumerate()
             .map(|(i, m)| ((m.type_id)(), (i, m.name)))
             .collect();
-        let ans = topo_sort(&metas).map_err(|e| {
+
+        // 构建临时 trait_impls 用于拓扑排序（无 Store 环境）
+        let temp_trait_impls: DashMap<TypeId, Vec<TraitImplEntry>> = DashMap::new();
+        for meta in COMPONENT_REGISTRY.iter() {
+            if !meta.trait_impls.is_empty() {
+                for trait_fn in meta.impl_traits {
+                    let trait_tid = trait_fn();
+                    temp_trait_impls
+                        .entry(trait_tid)
+                        .or_default()
+                        .extend(meta.trait_impls.to_vec());
+                }
+            }
+        }
+
+        let ans = topo_sort(&metas, &temp_trait_impls).map_err(|e| {
             crate::AppError::Internal(anyhow::anyhow!("{}", e))
         })?;
 
