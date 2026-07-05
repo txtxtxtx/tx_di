@@ -2,10 +2,14 @@
 //!
 //! 支持的参数：
 //! - `scope = Prototype` / `scope = Singleton` — 作用域
-//! - `init` — 有自定义 init 实现（回调 `__di_component_init`）
+//! - `init` — 有自定义 inner_init 实现（回调 `__di_component_init`)
 //! - `init_sort = N` — 自定义初始化排序
 //! - `conf` / `conf = "key"` — 配置组件
 //! - `as_trait = dyn Trait` — Trait 实现注册
+//! - `app_init` — 覆写 `init` 生命周期（回调 `__di_component_app_init`)
+//! - `app_async_init` — 覆写 `async_init` 生命周期（回调 `__di_component_async_init`)
+//! - `app_async_run` — 覆写 `async_run` 生命周期（回调 `__di_component_async_run`)
+//! - `shutdown` — 覆写 `shutdown` 生命周期（回调 `__di_component_shutdown`)
 //! - `intercept(...)` / `for(...)` — 占位（后续实现）
 
 use proc_macro2::TokenStream as TokenStream2;
@@ -31,6 +35,10 @@ pub fn parse_component_attr_from_attributes(attrs: &[Attribute]) -> SynResult<Op
 pub struct CompAttr {
     pub scope: ScopeAttr,
     pub has_init: bool,
+    pub has_app_init: bool,
+    pub has_app_async_init: bool,
+    pub has_app_async_run: bool,
+    pub has_shutdown: bool,
     pub init_sort: Option<i32>,
     pub conf: Option<Option<String>>,
     pub as_trait: Option<Type>,
@@ -40,6 +48,16 @@ impl CompAttr {
     /// 是否为配置组件
     pub fn is_config_component(&self) -> bool {
         self.conf.is_some()
+    }
+
+    /// 是否有任何生命周期覆写被启用
+    #[allow(dead_code)]
+    pub fn has_any_lifecycle(&self) -> bool {
+        self.has_init
+            || self.has_app_init
+            || self.has_app_async_init
+            || self.has_app_async_run
+            || self.has_shutdown
     }
 
     /// 生成 scope 对应的 TokenStream
@@ -56,6 +74,10 @@ impl CompAttr {
 struct CompAttrArgs {
     scope: ScopeAttr,
     has_init: bool,
+    has_app_init: bool,
+    has_app_async_init: bool,
+    has_app_async_run: bool,
+    has_shutdown: bool,
     init_sort: Option<i32>,
     conf: Option<Option<String>>,
     as_trait: Option<Type>,
@@ -66,6 +88,10 @@ impl From<CompAttrArgs> for CompAttr {
         CompAttr {
             scope: args.scope,
             has_init: args.has_init,
+            has_app_init: args.has_app_init,
+            has_app_async_init: args.has_app_async_init,
+            has_app_async_run: args.has_app_async_run,
+            has_shutdown: args.has_shutdown,
             init_sort: args.init_sort,
             conf: args.conf,
             as_trait: args.as_trait,
@@ -90,6 +116,10 @@ impl Parse for CompAttrArgs {
     fn parse(input: ParseStream) -> SynResult<Self> {
         let mut scope = ScopeAttr::Singleton;
         let mut has_init = false;
+        let mut has_app_init = false;
+        let mut has_app_async_init = false;
+        let mut has_app_async_run = false;
+        let mut has_shutdown = false;
         let mut init_sort = None;
         let mut conf = None;
         let mut as_trait = None;
@@ -128,6 +158,14 @@ impl Parse for CompAttrArgs {
                 }
             } else if key == "init" {
                 has_init = true;
+            } else if key == "app_init" {
+                has_app_init = true;
+            } else if key == "app_async_init" {
+                has_app_async_init = true;
+            } else if key == "app_async_run" {
+                has_app_async_run = true;
+            } else if key == "shutdown" {
+                has_shutdown = true;
             } else if key == "init_sort" {
                 if input.peek(Token![=]) {
                     let _eq: Token![=] = input.parse()?;
@@ -208,7 +246,7 @@ impl Parse for CompAttrArgs {
             } else {
                 return Err(syn::Error::new_spanned(
                     key,
-                    "#[component] 支持 scope / init / init_sort / conf / as_trait / intercept / for 参数",
+                    "#[component] 支持 scope / init / app_init / app_async_init / app_async_run / shutdown / init_sort / conf / as_trait / intercept / for 参数",
                 ));
             }
 
@@ -222,6 +260,10 @@ impl Parse for CompAttrArgs {
         Ok(CompAttrArgs {
             scope,
             has_init,
+            has_app_init,
+            has_app_async_init,
+            has_app_async_run,
+            has_shutdown,
             init_sort,
             conf,
             as_trait,

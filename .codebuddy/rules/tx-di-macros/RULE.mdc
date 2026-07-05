@@ -26,6 +26,7 @@ tx-di-macros/src/
 │   ├── component_impl.rs
 │   ├── factory.rs
 │   ├── inner_init.rs
+│   ├── lifecycle.rs    # 生命周期覆写（init/async_init/async_run/shutdown）
 │   └── meta_entry.rs
 ├── type_utils.rs       # 类型检测工具
 └── name_utils.rs       # 命名转换工具
@@ -50,6 +51,10 @@ tx-di-macros/src/
 |------|------|------|--------|
 | `scope = Singleton / Prototype` | 枚举 | 作用域 | `Singleton` |
 | `init` | flag | 启用自定义 `__di_component_init` 回调 | 无 |
+| `app_init` | flag | 启用 `__di_component_app_init` 回调（覆写 `init`） | 无 |
+| `app_async_init` | flag | 启用 `__di_component_async_init` 回调（覆写 `async_init`） | 无 |
+| `app_async_run` | flag | 启用 `__di_component_async_run` 回调（覆写 `async_run`） | 无 |
+| `shutdown` | flag | 启用 `__di_component_shutdown` 回调（覆写 `shutdown`） | 无 |
 | `init_sort = N` | i32 | 初始化排序（值越小越先执行） | `10000` |
 | `conf` / `conf = "key"` | 可选字符串 | 配置组件（从配置反序列化） | 无 |
 | `as_trait = dyn Trait` | Type | Trait 实现注册 | 无 |
@@ -74,6 +79,23 @@ tx-di-macros/src/
 | `#[tx_cst(skip)]` | `Skip` | 使用 `Default::default()` |
 | `#[tx_cst(expr)]` | `Custom` | 使用指定表达式赋值 |
 | 其他 | `Inject` | 视为 `Arc<T>` 注入类型 |
+
+### 生命周期回调（标记 `#[component(...)]` 标志后实现）
+
+每个生命周期标志对应一个同名的回调函数，使用 `comp: Arc<Self>` 传入组件实例（`shutdown` 除外，它直接用 `&self`）。
+
+| 标志 | 回调函数签名 | 覆写 trait 方法 | 获取组件方式 |
+|------|-------------|-----------------|------------|
+| `init` | `fn __di_component_init(&mut self, store: &Store) -> RIE<()>` | `inner_init` | `&mut self`（方法接收器） |
+| `app_init` | `fn __di_component_app_init(comp: Arc<Self>, app: &Arc<App>) -> RIE<()>` | `init` | `inject_from_store(&app.store)` |
+| `app_async_init` | `fn __di_component_async_init(comp: Arc<Self>, app: &Arc<App>) -> BoxFuture<RIE<()>>` | `async_init` | `inject_from_store(&app.store)` |
+| `app_async_run` | `fn __di_component_async_run(comp: Arc<Self>, app: &Arc<App>, token: CancellationToken) -> BoxFuture<RIE<()>>` | `async_run` | `inject_from_store(&app.store)` |
+| `shutdown` | `fn __di_component_shutdown(&self)` | `shutdown` | `&self`（方法接收器） |
+
+> 注意：`app_init`、`app_async_init`、`app_async_run` 的回调都需要**自由函数**形式（非方法），
+> 因为 `Component::init` 是关联函数（无 `&self`）。它们通过 `comp: Arc<Self>` 参数访问组件状态。
+
+实现示例见 `tx-di-macros/src/lib.rs` 文档。
 
 ## 架构约束
 

@@ -77,22 +77,50 @@ pub struct RequestContext {
 
 默认作用域为 `Singleton`（单例）。支持 `Singleton` 和 `Prototype` 两种。
 
-### 3. 配置组件
+### 3. 生命周期回调
+
+每个生命周期都通过一个 `#[component(...)]` 标志和一个自定义函数实现：
+
+| `#[component(...)]` | 回调函数签名 | 覆写 trait 方法 | 阶段 |
+|---|---|---|---|
+| `init` | `fn __di_component_init(&mut self, store: &Store) -> RIE<()>` | `inner_init` | build 后 |
+| `app_init` | `fn __di_component_app_init(comp: Arc<Self>, app: &Arc<App>) -> RIE<()>` | `init` | 同步初始化 |
+| `app_async_init` | `fn __di_component_async_init(comp: Arc<Self>, app: &Arc<App>) -> BoxFuture<RIE<()>>` | `async_init` | 异步初始化 |
+| `app_async_run` | `fn __di_component_async_run(comp: Arc<Self>, app: &Arc<App>, token: CancellationToken) -> BoxFuture<RIE<()>>` | `async_run` | 后台运行 |
+| `shutdown` | `fn __di_component_shutdown(&self)` | `shutdown` | 优雅关闭 |
 
 ```rust
-// 从配置文件自动反序列化
-#[derive(Component, Deserialize)]
-#[component(conf = "server")]
-pub struct ServerConfig {
-    pub host: String,
-    pub port: u16,
+use tx_di_core::{Component, App, Store, RIE, BoxFuture, CancellationToken};
+use std::sync::Arc;
+
+#[derive(Component)]
+#[component(init, app_init, app_async_run, shutdown)]
+pub struct DatabaseService {
+    pool: Arc<DbPool>,
+}
+
+fn __di_component_init(&mut self, store: &Store) -> RIE<()> {
+    Ok(())
+}
+
+fn __di_component_app_init(comp: Arc<Self>, app: &Arc<App>) -> RIE<()> {
+    println!("connected: {}", comp.pool.is_connected());
+    Ok(())
+}
+
+fn __di_component_async_run(comp: Arc<Self>, app: &Arc<App>, token: CancellationToken) -> BoxFuture<RIE<()>> {
+    Box::pin(async move {
+        loop { tokio::select! { _ = token.cancelled() => break, } }
+        Ok(())
+    })
+}
+
+fn __di_component_shutdown(&self) {
+    self.pool.close();
 }
 ```
 
-- `#[component(conf)]`：使用结构体蛇形名称作为配置 key
-- `#[component(conf = "custom_key")]`：自定义 key
-- 要求结构体实现 `serde::Deserialize`
-- 配置 key 不存在时尝试空表反序列化（字段加 `#[serde(default)]`）
+### 4. 配置组件
 
 ### 4. Trait 实现注册
 

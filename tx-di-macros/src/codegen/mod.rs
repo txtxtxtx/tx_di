@@ -9,6 +9,7 @@
 pub mod component_impl;
 pub mod factory;
 pub mod inner_init;
+pub mod lifecycle;
 pub mod meta_entry;
 
 use proc_macro::TokenStream;

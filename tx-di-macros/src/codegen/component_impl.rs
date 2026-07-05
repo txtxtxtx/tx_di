@@ -1,7 +1,8 @@
 //! 生成 `impl Component for T` 块
 //!
 //! 包含：`type Deps`、`build()` 方法体、`SCOPE` 常量、
-//! `inner_init` 方法（委托 `inner_init` 模块）、`init_sort` 方法。
+//! `inner_init` 方法（委托 `inner_init` 模块）、`init_sort` 方法、
+//! 以及生命周期覆写（委托 `lifecycle` 模块）。
 
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
@@ -9,6 +10,7 @@ use syn::Type;
 
 use crate::classify::fields::FieldKind;
 use crate::codegen::inner_init::gen_inner_init;
+use crate::codegen::lifecycle::{gen_lifecycle_overrides, LifecycleOverrides};
 use crate::codegen::CodeGenContext;
 
 /// 生成 `impl ::tx_di_core::Component for #struct_name { ... }`
@@ -92,6 +94,14 @@ pub fn gen_component_impl(ctx: &CodeGenContext) -> TokenStream2 {
         }
     });
 
+    // ── 生命周期覆写（app_init / app_async_init / app_async_run / shutdown）─
+    let LifecycleOverrides {
+        app_init,
+        app_async_init,
+        app_async_run,
+        shutdown,
+    } = gen_lifecycle_overrides(ctx);
+
     quote! {
         // ── Component trait 实现 ──────────────────────────────────────────
         impl ::tx_di_core::Component for #struct_name {
@@ -105,6 +115,12 @@ pub fn gen_component_impl(ctx: &CodeGenContext) -> TokenStream2 {
 
             // inner_init: trait inject 字段填充 | #[component(init)] 回调
             #inner_init_impl
+
+            // 生命周期覆写: #[component(app_init / app_async_init / app_async_run / shutdown)]
+            #app_init
+            #app_async_init
+            #app_async_run
+            #shutdown
 
             // init_sort: #[component(init_sort = N)] 自定义排序
             #init_sort_override
