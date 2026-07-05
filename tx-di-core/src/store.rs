@@ -25,8 +25,8 @@ pub enum CompRef {
 /// 组件存储 — 类型安全的注入入口
 pub struct Store {
     inner: DashMap<TypeId, CompRef>,
-    /// trait 实现的映射表（trait TypeId → 实现列表）
-    pub trait_impls: TraitImplMap,
+    /// trait 实现的映射表（trait TypeId → 实现列表），由 BuildContext 在构建时填充
+    pub(crate) trait_impls: TraitImplMap,
 }
 
 impl Store {
@@ -112,7 +112,7 @@ impl Store {
                 })
             }
             None => {
-                let registered: Vec<TypeId> = self.inner.iter().map(|e| *e.key()).collect();
+                let count = self.inner.len();
                 Err(AppError::with_context(
                     DiErr::InjectError,
                     format!(
@@ -120,8 +120,8 @@ impl Store {
                          请确认:\n\
                          1. 该结构体已标注 #[derive(Component)]\n\
                          2. 所在 crate 已在 Cargo.toml 中引入\n\
-                         已注册组件 ({} 个): {:?}",
-                        type_name, tid, registered.len(), registered
+                         当前已注册 {} 个组件",
+                        type_name, tid, count
                     ),
                 ))
             }

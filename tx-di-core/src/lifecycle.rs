@@ -368,8 +368,8 @@ impl App {
         let app_clone = app.clone();
         let app_handler = tokio::spawn(async move {
             if let Err(e) = App::run(app_clone.clone(), app_clone.shutdown_token.clone()).await {
-                tracing::error!("[di] App 运行失败: {:?}", e);
-                std::process::exit(1);
+                tracing::error!("[di] App 运行失败: {:?}，将执行 shutdown", e);
+                app_clone.shutdown().await;
             }
         });
 

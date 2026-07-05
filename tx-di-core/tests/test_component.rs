@@ -23,7 +23,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::Duration;
 
 use tx_di_core::{
-    App, BoxFuture, BuildContext, CompRef, Component, DepsTuple, RIE, Scope,
+    App, AppError, BoxFuture, BuildContext, CompRef, Component, DepsTuple, DiErr, RIE, Scope,
     Store, inject_all_traits_from_store, inject_from_store, inject_trait_from_store,
 };
 use tx_di_core::aop::{CallContext, CallResult, Interceptor, InterceptorChain};
@@ -501,11 +501,11 @@ fn test_interceptor_before_after() {
     }
 
     impl Interceptor for TestInterceptor {
-        fn before(&self, _ctx: &mut CallContext) -> RIE<()> {
+        fn before(&self, _ctx: &CallContext) -> RIE<()> {
             self.before_called.store(true, Ordering::SeqCst);
             Ok(())
         }
-        fn after(&self, _ctx: &CallContext, _result: &CallResult) {
+        fn after(&self, _ctx: &CallContext, _result: &mut CallResult) {
             self.after_called.store(true, Ordering::SeqCst);
         }
     }
@@ -518,9 +518,10 @@ fn test_interceptor_before_after() {
         after_called: after.clone(),
     };
 
-    let mut ctx = CallContext::new("test_method");
-    interceptor.before(&mut ctx).unwrap();
-    interceptor.after(&ctx, &CallResult::Ok);
+    let ctx = CallContext::new("test_method");
+    let mut result = CallResult::Ok;
+    interceptor.before(&ctx).unwrap();
+    interceptor.after(&ctx, &mut result);
 
     assert!(before.load(Ordering::SeqCst));
     assert!(after.load(Ordering::SeqCst));
@@ -535,11 +536,11 @@ fn test_interceptor_chain() {
     }
 
     impl Interceptor for CountingInterceptor {
-        fn before(&self, _ctx: &mut CallContext) -> RIE<()> {
+        fn before(&self, _ctx: &CallContext) -> RIE<()> {
             self.counter.fetch_add(1, Ordering::SeqCst);
             Ok(())
         }
-        fn after(&self, _ctx: &CallContext, _result: &CallResult) {
+        fn after(&self, _ctx: &CallContext, _result: &mut CallResult) {
             self.counter.fetch_add(1, Ordering::SeqCst);
         }
     }
@@ -549,13 +550,12 @@ fn test_interceptor_chain() {
     chain.push(CountingInterceptor { counter: counter.clone() });
     chain.push(CountingInterceptor { counter: counter.clone() });
 
-    let mut ctx = CallContext::new("test");
-    chain.before_all(&mut ctx).unwrap();
-    // 2 个拦截器各调一次 before = 2
+    let ctx = CallContext::new("test");
+    chain.before_all(&ctx).unwrap();
     assert_eq!(counter.load(Ordering::SeqCst), 2);
 
-    chain.after_all(&ctx, &CallResult::Ok);
-    // 2 个拦截器各调一次 after = 2，总计 4
+    let mut result = CallResult::Ok;
+    chain.after_all(&ctx, &mut result);
     assert_eq!(counter.load(Ordering::SeqCst), 4);
 }
 
@@ -564,11 +564,12 @@ fn test_logging_interceptor() {
     use tx_di_core::aop::LoggingInterceptor;
 
     let interceptor = LoggingInterceptor;
-    let mut ctx = CallContext::new("test_method").with_arg("param1".into());
-    // 不 panic 即通过
-    interceptor.before(&mut ctx).unwrap();
-    interceptor.after(&ctx, &CallResult::Ok);
-    interceptor.after(&ctx, &CallResult::Err("test error".into()));
+    let ctx = CallContext::new("test_method").with_arg("param1".into());
+    let mut result = CallResult::Ok;
+    interceptor.before(&ctx).unwrap();
+    interceptor.after(&ctx, &mut result);
+    let mut err_result = CallResult::Err("test error".into());
+    interceptor.after(&ctx, &mut err_result);
 }
 
 #[test]
@@ -576,13 +577,56 @@ fn test_metrics_interceptor() {
     use tx_di_core::aop::MetricsInterceptor;
 
     let interceptor = MetricsInterceptor::new();
-    let mut ctx = CallContext::new("counted_method");
+    let ctx = CallContext::new("counted_method");
 
     assert_eq!(interceptor.count(), 0);
-    interceptor.before(&mut ctx).unwrap();
+    interceptor.before(&ctx).unwrap();
     assert_eq!(interceptor.count(), 1);
-    interceptor.before(&mut ctx).unwrap();
+    interceptor.before(&ctx).unwrap();
     assert_eq!(interceptor.count(), 2);
+}
+
+#[test]
+fn test_interceptor_before_reject() {
+    struct RejectInterceptor;
+
+    impl Interceptor for RejectInterceptor {
+        fn before(&self, _ctx: &CallContext) -> RIE<()> {
+            Err(AppError::with_context(
+                DiErr::InjectError,
+                "rejected".to_string(),
+            ))
+        }
+    }
+
+    let mut chain = InterceptorChain::new();
+    chain.push(RejectInterceptor);
+    let ctx = CallContext::new("test");
+    let result = chain.before_all(&ctx);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_interceptor_after_modify_result() {
+    struct ErrEnricher;
+
+    impl Interceptor for ErrEnricher {
+        fn after(&self, _ctx: &CallContext, result: &mut CallResult) {
+            if let CallResult::Err(msg) = result {
+                *msg = format!("enriched: {}", msg);
+            }
+        }
+    }
+
+    let mut chain = InterceptorChain::new();
+    chain.push(ErrEnricher);
+    let ctx = CallContext::new("test");
+    let mut result = CallResult::Err("fail".into());
+    chain.after_all(&ctx, &mut result);
+    match &result {
+        CallResult::Err(msg) => assert_eq!(msg, "enriched: fail"),
+        _ => panic!("expected Err"),
+    }
 }
 
 // ── 10. 错误处理 ─────────────────────────────────────────────────────────
@@ -1123,14 +1167,15 @@ fn test_inject_or_panic_unregistered() {
 #[test]
 fn test_interceptor_chain_default() {
     let chain = InterceptorChain::default();
-    let mut ctx = CallContext::new("test");
+    let ctx = CallContext::new("test");
     // 空链不应 panic
-    chain.before_all(&mut ctx).unwrap();
-    chain.after_all(&ctx, &CallResult::Ok);
+    chain.before_all(&ctx).unwrap();
+    let mut result = CallResult::Ok;
+    chain.after_all(&ctx, &mut result);
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// 24. ArgValue From 转换 + raw_args
+// 24. ArgValue From 转换
 // ══════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -1141,25 +1186,4 @@ fn test_arg_value_conversions() {
     let _ = ArgValue::from("hello");
     let _ = ArgValue::from("world".to_string());
     let _ = ArgValue::from(true);
-}
-
-#[test]
-fn test_raw_args_in_call_context() {
-    let mut ctx = CallContext::new("test")
-        .with_arg(tx_di_core::aop::ArgValue::Other("42".into()))
-        .with_raw(42u64)
-        .with_arg(tx_di_core::aop::ArgValue::Str("hello".into()))
-        .with_raw("hello".to_string());
-
-    // 验证可以 downcast 读取
-    let val: &mut u64 = ctx.get_raw_mut(0).unwrap();
-    assert_eq!(*val, 42);
-    // 验证可以覆写
-    *val = 100;
-    let val: &mut u64 = ctx.get_raw_mut(0).unwrap();
-    assert_eq!(*val, 100);
-
-    // 验证字符串参数
-    let s: &mut String = ctx.get_raw_mut(1).unwrap();
-    assert_eq!(s, "hello");
 }

@@ -1,25 +1,25 @@
 //! `#[intercept]` 属性宏实现
 //!
 //! 标记在 Component 的方法上，生成包裹代码：
-//! 1. 构建 `CallContext`（含 Debug 参数 + 原始参数引用）
-//! 2. 调用 `Self::interceptor_chain().before_all(&mut ctx)`
-//! 3. 提取被拦截器覆写后的参数
-//! 4. 执行业务逻辑
-//! 5. 调用 `Self::interceptor_chain().after_all(&ctx, &result)`
+//! 1. 构建 `CallContext`（含 Debug 参数）
+//! 2. 调用 `Self::interceptor_chain().before_all(&ctx)`
+//! 3. 执行业务逻辑
+//! 4. 调用 `Self::interceptor_chain().after_all(&ctx, &mut result)`
+//!
+//! 支持 `async fn` 和非 `Result` 返回类型。
+//! 不支持 `unsafe`、`extern` 函数。
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{parse_macro_input, ItemFn};
 
-/// `#[intercept]` 属性宏入口
 pub fn intercept_impl(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
     let output = generate_intercepted_fn(&input_fn);
     output.into()
 }
 
-/// 生成拦截包裹函数
 fn generate_intercepted_fn(input_fn: &ItemFn) -> TokenStream2 {
     let fn_name = &input_fn.sig.ident;
     let vis = &input_fn.vis;
@@ -28,95 +28,84 @@ fn generate_intercepted_fn(input_fn: &ItemFn) -> TokenStream2 {
     let generics = &input_fn.sig.generics;
     let output = &input_fn.sig.output;
     let body = &input_fn.block;
+    let is_async = input_fn.sig.asyncness.is_some();
 
-    // 分离 self 参数和普通参数
-    let mut regular_params: Vec<(syn::Pat, &syn::Type)> = Vec::new();
-
+    // 分离 self 和普通参数
+    let mut regular_params: Vec<syn::Pat> = Vec::new();
     for param in &input_fn.sig.inputs {
-        match param {
-            syn::FnArg::Receiver(_) => {}
-            syn::FnArg::Typed(pat_type) => {
-                let pat = pat_type.pat.as_ref().clone();
-                let ty = &pat_type.ty;
-                regular_params.push((pat, ty));
-            }
+        if let syn::FnArg::Typed(pat_type) = param {
+            regular_params.push(pat_type.pat.as_ref().clone());
         }
     }
 
-    // 生成 mut 重声明（让参数可被覆写）
-    let param_mut_decls: Vec<TokenStream2> = regular_params
-        .iter()
-        .map(|(pat, _)| {
-            quote! { let mut #pat = #pat; }
-        })
-        .collect();
+    // 生成 with_arg 调用（只传 Debug 字符串，不传 raw）
+    let arg_calls: Vec<TokenStream2> = regular_params.iter().map(|pat| {
+        quote! {
+            .with_arg(::tx_di_core::aop::ArgValue::Other(
+                ::std::format!("{:?}", &#pat)
+            ))
+        }
+    }).collect();
 
-    // 生成 with_arg + with_raw 调用
-    let arg_raw_calls: Vec<TokenStream2> = regular_params
-        .iter()
-        .map(|(pat, _)| {
-            quote! {
-                .with_arg(::tx_di_core::aop::ArgValue::Other(
-                    ::core::format_args!("{:?}", &#pat).to_string()
-                ))
-                .with_raw(#pat.clone())
-            }
-        })
-        .collect();
-
-    // 生成参数提取代码（拦截器覆写后回写）
-    let extraction_code: Vec<TokenStream2> = regular_params
-        .iter()
-        .enumerate()
-        .map(|(i, (pat, ty))| {
-            let idx = syn::Index::from(i);
-            quote! {
-                if let Some(v) = ctx.get_raw_mut::<#ty>(#idx) {
-                    #pat = ::std::mem::take(v);
-                }
-            }
-        })
-        .collect();
-
-    // 方法参数列表
     let params = &input_fn.sig.inputs;
 
-    // 生成包裹函数
-    let result = quote! {
-        #vis #constness #unsafety fn #fn_name #generics (#params) #output {
-            #(#param_mut_decls)*
+    // 生成包裹函数体
+    let (await_kw, _is_async) = if is_async {
+        (quote! { .await }, true)
+    } else {
+        (quote! {}, false)
+    };
 
-            // Phase 1: before 拦截
-            let mut ctx = ::tx_di_core::aop::CallContext::new(stringify!(#fn_name))
-                #(#arg_raw_calls)*;
+    // 检测返回类型是否为 Result（简化处理：总是尝试 Ok/Err 匹配）
+    let is_result_ret = is_result_return_type(&input_fn.sig.output);
 
-            Self::interceptor_chain().before_all(&mut ctx)
-                .unwrap_or_else(|e| {
-                    panic!("[di] 拦截器拒绝 method={}: {}", stringify!(#fn_name), e)
-                });
-
-            // 提取被拦截器覆写后的参数
-            #(#extraction_code)*
-
-            // Phase 2: 执行业务逻辑
-            let __result = #body;
-
-            // Phase 3: after 拦截
-            let __ctx = ::tx_di_core::aop::CallContext::new(stringify!(#fn_name));
-            match &__result {
-                Ok(_) => Self::interceptor_chain().after_all(
-                    &__ctx,
-                    &::tx_di_core::aop::CallResult::Ok,
-                ),
-                Err(e) => Self::interceptor_chain().after_all(
-                    &__ctx,
-                    &::tx_di_core::aop::CallResult::Err(e.to_string()),
-                ),
-            }
-
-            __result
+    let after_block = if is_result_ret {
+        quote! {
+            let mut __cr = match &__result {
+                Ok(_) => ::tx_di_core::aop::CallResult::Ok,
+                Err(e) => ::tx_di_core::aop::CallResult::Err(::std::format!("{}", e)),
+            };
+            Self::interceptor_chain().after_all(&__ctx, &mut __cr);
+        }
+    } else {
+        quote! {
+            let mut __cr = ::tx_di_core::aop::CallResult::Ok;
+            Self::interceptor_chain().after_all(&__ctx, &mut __cr);
         }
     };
 
-    result
+    let async_prefix = if is_async { quote! { async } } else { quote! {} };
+
+    quote! {
+        #vis #constness #unsafety #async_prefix fn #fn_name #generics (#params) #output {
+            // Phase 1: before 拦截
+            let __ctx = ::tx_di_core::aop::CallContext::new(stringify!(#fn_name))
+                #(#arg_calls)*;
+
+            Self::interceptor_chain().before_all(&__ctx).unwrap_or_else(|e| {
+                panic!("[di] 拦截器拒绝 method={}: {}", stringify!(#fn_name), e)
+            });
+
+            // Phase 2: 执行业务逻辑
+            let __result = #body #await_kw;
+
+            // Phase 3: after 拦截（可加工 CallResult）
+            #after_block
+
+            __result
+        }
+    }
+}
+
+/// 粗略判断返回类型是否为 Result
+fn is_result_return_type(output: &syn::ReturnType) -> bool {
+    match output {
+        syn::ReturnType::Type(_, ty) => {
+            let s = quote! { #ty }.to_string();
+            s.starts_with("Result ") || s.starts_with("Result<")
+                || s.starts_with("::std::result::Result ")
+                || s.starts_with("::core::result::Result ")
+        }
+        _ => false,
+    }
 }
