@@ -50,16 +50,19 @@ use proc_macro::TokenStream;
 ///
 /// 所有回调都是**可选的**——只有标记对应属性后才需要实现。不标记则使用 trait 默认实现。
 ///
+/// 回调函数名与 `#[component(...)]` 属性名**保持一致**，便于记忆：
+///
 /// | `#[component(...)]` | 回调函数签名 | 覆写的 trait 方法 | 阶段 |
 /// |---|---|---|---|
-/// | `init` | `fn __di_component_init(&mut self, store: &Store) -> RIE<()>` | `inner_init` | build 后、注册前 |
-/// | `app_init` | `fn __di_component_app_init(comp: Arc<Self>, app: &Arc<App>) -> RIE<()>` | `init` | 同步初始化 |
-/// | `app_async_init` | `fn __di_component_async_init(comp: Arc<Self>, app: &Arc<App>) -> BoxFuture<RIE<()>>` | `async_init` | 异步初始化 |
-/// | `app_async_run` | `fn __di_component_async_run(comp: Arc<Self>, app: &Arc<App>, token: CancellationToken) -> BoxFuture<RIE<()>>` | `async_run` | 后台运行 |
-/// | `shutdown` | `fn __di_component_shutdown(&self)` | `shutdown` | 优雅关闭 |
+/// | `init` | `fn init(&mut self, store: &Store) -> RIE<()>` | `inner_init` | build 后、注册前 |
+/// | `app_init` | `fn app_init(comp: Arc<Self>, app: &Arc<App>) -> RIE<()>` | `init` | 同步初始化 |
+/// | `app_async_init` | `fn app_async_init(comp: Arc<Self>, app: &Arc<App>) -> BoxFuture<RIE<()>>` | `async_init` | 异步初始化 |
+/// | `app_async_run` | `fn app_async_run(comp: Arc<Self>, app: &Arc<App>, token: CancellationToken) -> BoxFuture<RIE<()>>` | `async_run` | 后台运行 |
+/// | `shutdown` | `fn shutdown(&self)` | `shutdown` | 优雅关闭 |
 ///
-/// > **注意**：`app_init` / `app_async_init` / `app_async_run` 的回调都通过 `comp: Arc<Self>` 传入
-/// > 组件实例（从 App.store 中取出），可以直接操作组件的成员。
+/// > **注意**：宏生成的覆写方法都带有 `#[inline]` 属性。如果回调函数为空或仅含简单逻辑，
+/// > 编译器会直接内联消除调用开销。同时，生成的代码使用 `self::` 前缀调用回调，
+/// > 即使 `init` / `shutdown` 与 trait 方法同名也不会冲突。
 ///
 /// # 完整示例
 ///
@@ -80,20 +83,20 @@ use proc_macro::TokenStream;
 /// }
 ///
 /// // ── inner_init：build 后立即调用 ──
-/// fn __di_component_init(&mut self, store: &Store) -> RIE<()> {
+/// fn init(&mut self, store: &Store) -> RIE<()> {
 ///     // self 可写，可访问 store 做额外注入
 ///     Ok(())
 /// }
 ///
 /// // ── init：同步初始化阶段 ──
-/// fn __di_component_app_init(comp: Arc<Self>, app: &Arc<App>) -> RIE<()> {
+/// fn app_init(comp: Arc<Self>, app: &Arc<App>) -> RIE<()> {
 ///     // comp 是 Arc<Self>，可通过 comp.field 访问成员
 ///     tracing::info!("init: pool size = {}", comp.pool.size());
 ///     Ok(())
 /// }
 ///
 /// // ── async_init：异步初始化阶段 ──
-/// fn __di_component_async_init(comp: Arc<Self>, app: &Arc<App>) -> BoxFuture<RIE<()>> {
+/// fn app_async_init(comp: Arc<Self>, app: &Arc<App>) -> BoxFuture<RIE<()>> {
 ///     Box::pin(async move {
 ///         comp.pool.connect().await?;
 ///         Ok(())
@@ -101,7 +104,7 @@ use proc_macro::TokenStream;
 /// }
 ///
 /// // ── async_run：后台长期任务 ──
-/// fn __di_component_async_run(comp: Arc<Self>, app: &Arc<App>, token: CancellationToken) -> BoxFuture<RIE<()>> {
+/// fn app_async_run(comp: Arc<Self>, app: &Arc<App>, token: CancellationToken) -> BoxFuture<RIE<()>> {
 ///     Box::pin(async move {
 ///         loop {
 ///             tokio::select! {
@@ -114,7 +117,7 @@ use proc_macro::TokenStream;
 /// }
 ///
 /// // ── shutdown：优雅关闭 ──
-/// fn __di_component_shutdown(&self) {
+/// fn shutdown(&self) {
 ///     self.pool.close();
 /// }
 /// ```

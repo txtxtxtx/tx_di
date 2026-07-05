@@ -4,7 +4,7 @@
 //! `inner_init` 实现：
 //! - 可选 trait inject 字段：`self.field = Some(inject_trait_from_store(...))`
 //! - 必选 trait inject 字段：`ptr::write` 覆盖零值占位
-//! - `#[component(init)]`：调用用户定义的 `__di_component_init`
+//! - `#[component(init)]`：调用用户定义的 `init` 函数
 
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
@@ -50,14 +50,16 @@ pub fn gen_inner_init(ctx: &CodeGenContext) -> TokenStream2 {
 
     if ctx.comp_attr.has_init {
         quote! {
+            #[inline]
             fn inner_init(&mut self, store: &::tx_di_core::Store) -> ::tx_di_core::RIE<()> {
                 #( #optional_assigns )*
                 #( #required_assigns )*
-                __di_component_init(self, store)
+                self::init(self, store)
             }
         }
     } else {
         quote! {
+            #[inline]
             fn inner_init(&mut self, store: &::tx_di_core::Store) -> ::tx_di_core::RIE<()> {
                 #( #optional_assigns )*
                 #( #required_assigns )*

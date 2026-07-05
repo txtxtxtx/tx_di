@@ -83,11 +83,11 @@ pub struct RequestContext {
 
 | `#[component(...)]` | 回调函数签名 | 覆写 trait 方法 | 阶段 |
 |---|---|---|---|
-| `init` | `fn __di_component_init(&mut self, store: &Store) -> RIE<()>` | `inner_init` | build 后 |
-| `app_init` | `fn __di_component_app_init(comp: Arc<Self>, app: &Arc<App>) -> RIE<()>` | `init` | 同步初始化 |
-| `app_async_init` | `fn __di_component_async_init(comp: Arc<Self>, app: &Arc<App>) -> BoxFuture<RIE<()>>` | `async_init` | 异步初始化 |
-| `app_async_run` | `fn __di_component_async_run(comp: Arc<Self>, app: &Arc<App>, token: CancellationToken) -> BoxFuture<RIE<()>>` | `async_run` | 后台运行 |
-| `shutdown` | `fn __di_component_shutdown(&self)` | `shutdown` | 优雅关闭 |
+| `init` | `fn init(&mut self, store: &Store) -> RIE<()>` | `inner_init` | build 后 |
+| `app_init` | `fn app_init(comp: Arc<Self>, app: &Arc<App>) -> RIE<()>` | `init` | 同步初始化 |
+| `app_async_init` | `fn app_async_init(comp: Arc<Self>, app: &Arc<App>) -> BoxFuture<RIE<()>>` | `async_init` | 异步初始化 |
+| `app_async_run` | `fn app_async_run(comp: Arc<Self>, app: &Arc<App>, token: CancellationToken) -> BoxFuture<RIE<()>>` | `async_run` | 后台运行 |
+| `shutdown` | `fn shutdown(&self)` | `shutdown` | 优雅关闭 |
 
 ```rust
 use tx_di_core::{Component, App, Store, RIE, BoxFuture, CancellationToken};
@@ -99,23 +99,23 @@ pub struct DatabaseService {
     pool: Arc<DbPool>,
 }
 
-fn __di_component_init(&mut self, store: &Store) -> RIE<()> {
+fn init(&mut self, store: &Store) -> RIE<()> {
     Ok(())
 }
 
-fn __di_component_app_init(comp: Arc<Self>, app: &Arc<App>) -> RIE<()> {
+fn app_init(comp: Arc<Self>, app: &Arc<App>) -> RIE<()> {
     println!("connected: {}", comp.pool.is_connected());
     Ok(())
 }
 
-fn __di_component_async_run(comp: Arc<Self>, app: &Arc<App>, token: CancellationToken) -> BoxFuture<RIE<()>> {
+fn app_async_run(comp: Arc<Self>, app: &Arc<App>, token: CancellationToken) -> BoxFuture<RIE<()>> {
     Box::pin(async move {
         loop { tokio::select! { _ = token.cancelled() => break, } }
         Ok(())
     })
 }
 
-fn __di_component_shutdown(&self) {
+fn shutdown(&self) {
     self.pool.close();
 }
 ```

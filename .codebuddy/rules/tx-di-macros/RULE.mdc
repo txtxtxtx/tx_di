@@ -50,11 +50,11 @@ tx-di-macros/src/
 | 参数 | 类型 | 说明 | 默认值 |
 |------|------|------|--------|
 | `scope = Singleton / Prototype` | 枚举 | 作用域 | `Singleton` |
-| `init` | flag | 启用自定义 `__di_component_init` 回调 | 无 |
-| `app_init` | flag | 启用 `__di_component_app_init` 回调（覆写 `init`） | 无 |
-| `app_async_init` | flag | 启用 `__di_component_async_init` 回调（覆写 `async_init`） | 无 |
-| `app_async_run` | flag | 启用 `__di_component_async_run` 回调（覆写 `async_run`） | 无 |
-| `shutdown` | flag | 启用 `__di_component_shutdown` 回调（覆写 `shutdown`） | 无 |
+| `init` | flag | 启用 `fn init(&mut self, store)` 回调（覆写 `inner_init`） | 无 |
+| `app_init` | flag | 启用 `fn app_init(comp, app)` 回调（覆写 `init`） | 无 |
+| `app_async_init` | flag | 启用 `fn app_async_init(comp, app)` 回调（覆写 `async_init`） | 无 |
+| `app_async_run` | flag | 启用 `fn app_async_run(comp, app, token)` 回调（覆写 `async_run`） | 无 |
+| `shutdown` | flag | 启用 `fn shutdown(&self)` 回调（覆写 `shutdown`） | 无 |
 | `init_sort = N` | i32 | 初始化排序（值越小越先执行） | `10000` |
 | `conf` / `conf = "key"` | 可选字符串 | 配置组件（从配置反序列化） | 无 |
 | `as_trait = dyn Trait` | Type | Trait 实现注册 | 无 |
@@ -86,14 +86,15 @@ tx-di-macros/src/
 
 | 标志 | 回调函数签名 | 覆写 trait 方法 | 获取组件方式 |
 |------|-------------|-----------------|------------|
-| `init` | `fn __di_component_init(&mut self, store: &Store) -> RIE<()>` | `inner_init` | `&mut self`（方法接收器） |
-| `app_init` | `fn __di_component_app_init(comp: Arc<Self>, app: &Arc<App>) -> RIE<()>` | `init` | `inject_from_store(&app.store)` |
-| `app_async_init` | `fn __di_component_async_init(comp: Arc<Self>, app: &Arc<App>) -> BoxFuture<RIE<()>>` | `async_init` | `inject_from_store(&app.store)` |
-| `app_async_run` | `fn __di_component_async_run(comp: Arc<Self>, app: &Arc<App>, token: CancellationToken) -> BoxFuture<RIE<()>>` | `async_run` | `inject_from_store(&app.store)` |
-| `shutdown` | `fn __di_component_shutdown(&self)` | `shutdown` | `&self`（方法接收器） |
+| `init` | `fn init(&mut self, store: &Store) -> RIE<()>` | `inner_init` | `&mut self`（方法接收器） |
+| `app_init` | `fn app_init(comp: Arc<Self>, app: &Arc<App>) -> RIE<()>` | `init` | `inject_from_store(&app.store)` |
+| `app_async_init` | `fn app_async_init(comp: Arc<Self>, app: &Arc<App>) -> BoxFuture<RIE<()>>` | `async_init` | `inject_from_store(&app.store)` |
+| `app_async_run` | `fn app_async_run(comp: Arc<Self>, app: &Arc<App>, token: CancellationToken) -> BoxFuture<RIE<()>>` | `async_run` | `inject_from_store(&app.store)` |
+| `shutdown` | `fn shutdown(&self)` | `shutdown` | `&self`（方法接收器） |
 
-> 注意：`app_init`、`app_async_init`、`app_async_run` 的回调都需要**自由函数**形式（非方法），
-> 因为 `Component::init` 是关联函数（无 `&self`）。它们通过 `comp: Arc<Self>` 参数访问组件状态。
+> 注意：回调函数名与 `#[component(...)]` 属性名**保持一致**（如 `app_init` 回调就叫 `app_init`）。
+> 生成的覆写方法使用 `self::` 前缀调用回调，即使 `init` / `shutdown` 与 trait 方法同名也不会冲突。
+> 所有生成的覆写方法均带有 `#[inline]`，编译器可消除空回调的调用开销。
 
 实现示例见 `tx-di-macros/src/lib.rs` 文档。
 

@@ -18,7 +18,7 @@ fn is_log_initialized() -> bool {
 }
 
 #[derive(Component)]
-#[component(init, init_sort = -2147483648)]
+#[component(init, init_sort = i32::MIN)]
 pub struct LogPlugins{
     /// 日志配置
     pub config: Arc<LogConfig>,
