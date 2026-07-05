@@ -2,14 +2,14 @@
 //!
 //! 支持的参数：
 //! - `scope = Prototype` / `scope = Singleton` — 作用域
-//! - `init` — 有自定义 inner_init 实现（回调 `__di_component_init`)
+//! - `init` — 自定义 `inner_init` 实现（回调 `fn init(&mut self, store)`)
 //! - `init_sort = N` — 自定义初始化排序
 //! - `conf` / `conf = "key"` — 配置组件
 //! - `as_trait = dyn Trait` — Trait 实现注册
-//! - `app_init` — 覆写 `init` 生命周期（回调 `__di_component_app_init`)
-//! - `app_async_init` — 覆写 `async_init` 生命周期（回调 `__di_component_async_init`)
-//! - `app_async_run` — 覆写 `async_run` 生命周期（回调 `__di_component_async_run`)
-//! - `shutdown` — 覆写 `shutdown` 生命周期（回调 `__di_component_shutdown`)
+//! - `app_init` — 覆写 `init` 生命周期（回调 `fn app_init(comp, app)`)
+//! - `app_async_init` — 覆写 `async_init` 生命周期（回调 `fn app_async_init(comp, app)`)
+//! - `app_async_run` — 覆写 `async_run` 生命周期（回调 `fn app_async_run(comp, app, token)`)
+//! - `shutdown` — 覆写 `shutdown` 生命周期（回调 `fn shutdown(&self)`)
 //! - `intercept(...)` / `for(...)` — 占位（后续实现）
 
 use proc_macro2::TokenStream as TokenStream2;
