@@ -18,7 +18,7 @@ async fn upload_bytes(
     filename: &str,
     content_type: &str,
     data: &[u8],
-    config_id: Option<i32>,
+    config_id: Option<u64>,
 ) -> admin_proto::FileResponse {
     let mut cursor = Cursor::new(data);
     app.upload_file_stream(

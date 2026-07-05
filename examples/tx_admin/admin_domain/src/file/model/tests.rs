@@ -251,9 +251,9 @@ mod file_tests {
     }
 
     #[test]
-    fn test_file_config_create_with_negative_id() {
-        let fc = FileConfig::create(-1, "neg".into(), 0, None, "{}".into(), None);
-        assert_eq!(fc.id, -1);
+    fn test_file_config_create_with_max_id() {
+        let fc = FileConfig::create(u64::MAX, "neg".into(), 0, None, "{}".into(), None);
+        assert_eq!(fc.id, u64::MAX);
     }
 
     // ============================================================

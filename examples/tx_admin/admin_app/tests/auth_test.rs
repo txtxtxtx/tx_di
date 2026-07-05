@@ -23,10 +23,12 @@ use admin_infra::log::repository::ToastyLoginLogRepository;
 use admin_domain::log::service::LoginLogService;
 use admin_app::log::app_service::LoginLogAppService;
 use admin_app::auth::session_service::AuthSessionService;
+use std::sync::OnceLock;
+use tx_di_sa_token::{SaTokenConf, SaTokenStateBuilder};
 
 /// 创建认证测试环境
 ///
-/// 返回 (auth_app, user_app, role_app, menu_app, user_repo, role_repo)
+/// 初始化 SaToken 全局状态（仅一次），确保 `StpUtil` 可用。
 async fn create_auth_test_env() -> (
     AuthAppService,
     Arc<admin_app::user::app_service::UserAppService>,
@@ -35,6 +37,14 @@ async fn create_auth_test_env() -> (
     Arc<ToastyUserRepository>,
     Arc<ToastyRoleRepository>,
 ) {
+    // 初始化 SaToken 全局状态（仅执行一次）
+    static SA_TOKEN_INIT: OnceLock<()> = OnceLock::new();
+    SA_TOKEN_INIT.get_or_init(|| {
+        let config = SaTokenConf::default();
+        let builder = SaTokenStateBuilder::default();
+        let _state = config.apply_to_builder(builder).build();
+    });
+
     let plugin = common::create_db_plugin().await;
 
     let user_repo = Arc::new(ToastyUserRepository::new(plugin.clone()));

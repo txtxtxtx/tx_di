@@ -25,6 +25,11 @@ pub struct AuthService {
 }
 
 impl AuthService {
+    /// 创建 AuthService 的新实例
+    pub fn new(user_service: Arc<UserService>) -> Self {
+        Self { user_service }
+    }
+
     /// 认证用户登录
     ///
     /// # 流程

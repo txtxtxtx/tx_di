@@ -237,4 +237,69 @@ mod user_service_tests {
         let result = svc.get_by_username("nobody").await.unwrap();
         assert!(result.is_none());
     }
+
+    // ── exists_by_mobile ──
+
+    /// 手机号已存在返回 true。
+    #[tokio::test]
+    async fn test_exists_by_mobile_true() {
+        let mut repo = TestUserRepo::new();
+        repo.exists_by_mobile_fn = Box::new(|_| Ok(true));
+        let svc = UserService::new(Arc::new(repo));
+        assert!(svc.exists_by_mobile("13800138000").await.unwrap());
+    }
+
+    /// 手机号不存在返回 false。
+    #[tokio::test]
+    async fn test_exists_by_mobile_false() {
+        let mut repo = TestUserRepo::new();
+        repo.exists_by_mobile_fn = Box::new(|_| Ok(false));
+        let svc = UserService::new(Arc::new(repo));
+        assert!(!svc.exists_by_mobile("13900000000").await.unwrap());
+    }
+
+    // ── change_password ──
+
+    /// 修改密码成功，校验 password 已更新。
+    #[tokio::test]
+    async fn test_change_password_success() {
+        let mut repo = TestUserRepo::new();
+        repo.find_by_id_fn = Box::new(|_| Ok(Some(make_user())));
+        repo.update_fn = Box::new(|_| Ok(()));
+
+        let svc = UserService::new(Arc::new(repo));
+        let result = svc.change_password(1, "new_pwd".into(), None).await;
+        assert!(result.is_ok());
+        assert!(result.unwrap().verify_password("new_pwd"));
+    }
+
+    /// 修改密码时用户不存在应失败。
+    #[tokio::test]
+    async fn test_change_password_not_found() {
+        let mut repo = TestUserRepo::new();
+        repo.find_by_id_fn = Box::new(|_| Ok(None));
+
+        let svc = UserService::new(Arc::new(repo));
+        assert!(svc.change_password(999, "pwd".into(), None).await.is_err());
+    }
+
+    // ── get_user_page ──
+
+    /// 分页查询用户成功。
+    #[tokio::test]
+    async fn test_get_user_page_success() {
+        let mut repo = TestUserRepo::new();
+        let users = vec![make_user()];
+        repo.find_page_fn = Box::new(move |_, mut p| {
+            p.list = users.clone();
+            Ok(p)
+        });
+
+        let svc = UserService::new(Arc::new(repo));
+        let query = crate::user::model::value_object::UserQuery::default();
+        let page = Page::request(1, 10);
+        let result = svc.get_user_page(&query, page).await.unwrap();
+        assert_eq!(result.list.len(), 1);
+        assert_eq!(result.page, 1);
+    }
 }
