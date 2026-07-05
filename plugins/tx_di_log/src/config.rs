@@ -19,7 +19,7 @@ use tx_di_core::Component;
 /// level = "info"
 /// ```
 #[derive(Debug, Clone, Deserialize, Component)]
-#[component(conf = "log_config")]
+#[component(conf = "log")]
 pub struct LogConfig {
     /// 全局日志级别过滤器
     #[serde(default = "default_level")]

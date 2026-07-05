@@ -87,10 +87,9 @@ pub fn gen_component_impl(ctx: &CodeGenContext) -> TokenStream2 {
 
     // ── inner_init 与 init_sort 覆盖 ─────────────────────────────────
     let inner_init_impl = gen_inner_init(ctx);
-    let init_sort_override = ctx.comp_attr.init_sort.map(|val| {
-        let lit = proc_macro2::Literal::i32_suffixed(val);
+    let init_sort_override = ctx.comp_attr.init_sort.as_ref().map(|val| {
         quote! {
-            fn init_sort() -> i32 { #lit }
+            fn init_sort() -> i32 { #val }
         }
     });
 

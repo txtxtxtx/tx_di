@@ -39,7 +39,8 @@ pub struct CompAttr {
     pub has_app_async_init: bool,
     pub has_app_async_run: bool,
     pub has_shutdown: bool,
-    pub init_sort: Option<i32>,
+    /// 初始化排序表达式（原样输出到生成的代码中）
+    pub init_sort: Option<Expr>,
     pub conf: Option<Option<String>>,
     pub as_trait: Option<Type>,
 }
@@ -78,7 +79,7 @@ struct CompAttrArgs {
     has_app_async_init: bool,
     has_app_async_run: bool,
     has_shutdown: bool,
-    init_sort: Option<i32>,
+    init_sort: Option<Expr>,
     conf: Option<Option<String>>,
     as_trait: Option<Type>,
 }
@@ -170,39 +171,9 @@ impl Parse for CompAttrArgs {
                 if input.peek(Token![=]) {
                     let _eq: Token![=] = input.parse()?;
                     let value: Expr = input.parse()?;
-                    let raw = match &value {
-                        // 正数：init_sort = 100
-                        Expr::Lit(lit) => {
-                            if let syn::Lit::Int(i) = &lit.lit {
-                                i.base10_parse::<i64>().map(|v| v as i32)
-                            } else {
-                                return Err(syn::Error::new_spanned(&value, "init_sort 值必须是整数"));
-                            }
-                        }
-                        // 负数：init_sort = -2147483648
-                        Expr::Unary(u) => {
-                            if let syn::UnOp::Neg(_) = &u.op {
-                                if let Expr::Lit(lit) = &*u.expr {
-                                    if let syn::Lit::Int(i) = &lit.lit {
-                                        let v: i64 = i.base10_parse::<i64>().map_err(|e| {
-                                            syn::Error::new_spanned(&value, e)
-                                        })?;
-                                        Ok((-v) as i32)
-                                    } else {
-                                        return Err(syn::Error::new_spanned(&value, "init_sort 值必须是整数"));
-                                    }
-                                } else {
-                                    return Err(syn::Error::new_spanned(&value, "init_sort 值必须是整数"));
-                                }
-                            } else {
-                                return Err(syn::Error::new_spanned(&value, "init_sort 值必须是整数"));
-                            }
-                        }
-                        _ => return Err(syn::Error::new_spanned(&value, "init_sort 值必须是整数")),
-                    };
-                    init_sort = Some(raw.map_err(|e| syn::Error::new_spanned(&value, e))?);
+                    init_sort = Some(value);
                 } else {
-                    return Err(syn::Error::new_spanned(&key, "init_sort 必须指定值，如 init_sort = -2147483648"));
+                    return Err(syn::Error::new_spanned(&key, "init_sort 必须指定值，如 init_sort = i32::MAX"));
                 }
             } else if key == "conf" {
                 if input.peek(Token![=]) {
