@@ -25,7 +25,7 @@ pub struct LogPlugins{
 }
 
 /// #[component(init)] 回调函数：在 build 之后、inner_init 阶段执行
-fn __di_component_init(this: &mut LogPlugins, _store: &Store) -> RIE<()> {
+fn init(this: &mut LogPlugins, _store: &Store) -> RIE<()> {
     // 如果全局守卫已经初始化（例如并行测试场景），跳过重复设置
     if is_log_initialized() {
         debug!("日志系统已初始化，跳过重复初始化");
