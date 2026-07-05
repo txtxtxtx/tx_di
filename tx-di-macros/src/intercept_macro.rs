@@ -97,14 +97,22 @@ fn generate_intercepted_fn(input_fn: &ItemFn) -> TokenStream2 {
     }
 }
 
-/// 粗略判断返回类型是否为 Result
+/// 判断返回类型是否为 Result / RIE / AppResult（统一使用 RIE）
+///
+/// 因为 `RIE<T> = AppResult<T> = Result<T, AppError>`，
+/// 所以返回 `RIE<T>` 的方法也支持 Ok/Err 匹配。
 fn is_result_return_type(output: &syn::ReturnType) -> bool {
     match output {
         syn::ReturnType::Type(_, ty) => {
             let s = quote! { #ty }.to_string();
+            // 直接写 Result、通过 RIE 别名、或完整路径
             s.starts_with("Result ") || s.starts_with("Result<")
                 || s.starts_with("::std::result::Result ")
                 || s.starts_with("::core::result::Result ")
+                || s.starts_with("RIE ") || s.starts_with("RIE<")
+                || s.starts_with("AppResult ") || s.starts_with("AppResult<")
+                || s.starts_with("::tx_di_core::RIE ")
+                || s.starts_with("::tx_di_core::RIE<")
         }
         _ => false,
     }
