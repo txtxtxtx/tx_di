@@ -6,16 +6,27 @@
 //! 3. 字段属性（tx_cst 自定义值、skip、Option）
 //! 4. Trait Object 注入
 //! 5. 配置组件
-//! 6. 生命周期钩子（init_sort、init、async_init、shutdown）
-//! 7. Store 操作
-//! 8. BuildContext & App
+//! 6. 生命周期钩子（init_sort、app_init、app_async_init、app_async_run、shutdown）
+//! 7. Store 操作（含边缘操作）
+//! 8. BuildContext & App（含异步生命周期）
 //! 9. AOP 拦截器
+//! 10. 注入错误路径
+//! 11. 并发注入
+//! 12. DepsTuple（含 resolve）
+//! 13. 批量 Trait 注入
 
+use std::any::TypeId;
+use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::time::Duration;
 
-use tx_di_core::{Component, DepsTuple, BuildContext, Scope};
-use tx_di_core::aop::{Interceptor, CallContext, CallResult, InterceptorChain};
+use tx_di_core::{
+    App, BoxFuture, BuildContext, CompRef, Component, DepsTuple, RIE, Scope,
+    Store, inject_all_traits_from_store, inject_from_store, inject_trait_from_store,
+};
+use tx_di_core::aop::{CallContext, CallResult, Interceptor, InterceptorChain};
 
 // ══════════════════════════════════════════════════════════════════════════
 // 测试组件定义
@@ -131,12 +142,77 @@ pub struct TestConfig {
 
 // ── 6. 生命周期钩子 ─────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 static INIT_COUNTER: AtomicU32 = AtomicU32::new(0);
+#[allow(dead_code)]
 static SHUTDOWN_COUNTER: AtomicU32 = AtomicU32::new(0);
 
 #[derive(Component)]
 pub struct LifecycleComponent {
     pub db: Arc<DbPool>,
+}
+
+// ── 6b. 生命周期钩子标记组件（每个组件放入独立模块，避免同名自由函数冲突）─
+
+static APP_INIT_CALLED: AtomicBool = AtomicBool::new(false);
+static APP_ASYNC_INIT_CALLED: AtomicBool = AtomicBool::new(false);
+static SHUTDOWN_CALLED: AtomicBool = AtomicBool::new(false);
+static INIT_ORDER: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
+
+pub mod app_init_mod {
+    use super::*;
+    #[derive(Component)]
+    #[component(app_init)]
+    pub struct AppInitTracker;
+    fn app_init(_comp: Arc<AppInitTracker>, _app: &Arc<App>) -> RIE<()> {
+        super::APP_INIT_CALLED.store(true, Ordering::SeqCst);
+        Ok(())
+    }
+}
+
+pub mod async_init_mod {
+    use super::*;
+    #[derive(Component)]
+    #[component(app_async_init)]
+    pub struct AsyncInitTracker;
+    fn app_async_init(_comp: Arc<AsyncInitTracker>, _app: &Arc<App>) -> BoxFuture<RIE<()>> {
+        Box::pin(async move {
+            super::APP_ASYNC_INIT_CALLED.store(true, Ordering::SeqCst);
+            Ok(())
+        })
+    }
+}
+
+pub mod shutdown_mod {
+    use super::*;
+    #[derive(Component)]
+    #[component(shutdown)]
+    pub struct ShutdownTracker;
+    fn shutdown(_comp: &ShutdownTracker) {
+        super::SHUTDOWN_CALLED.store(true, Ordering::SeqCst);
+    }
+}
+
+pub mod early_init_mod {
+    use super::*;
+    #[derive(Component)]
+    #[component(app_init, init_sort = 10)]
+    pub struct EarlyInit;
+    fn app_init(_comp: Arc<EarlyInit>, _app: &Arc<App>) -> RIE<()> {
+        super::INIT_ORDER.lock().unwrap().push("EarlyInit");
+        Ok(())
+    }
+}
+
+pub mod late_init_mod {
+    use super::*;
+    #[derive(Component)]
+    #[component(app_init, init_sort = 20)]
+    pub struct LateInit;
+    fn app_init(_comp: Arc<LateInit>, _app: &Arc<App>) -> RIE<()> {
+        super::INIT_ORDER.lock().unwrap().push("LateInit");
+        Ok(())
+    }
 }
 
 // ── 7. 大量依赖测试（验证 16 个依赖上限）─────────────────────────────────
@@ -602,4 +678,466 @@ fn test_scope_methods() {
 #[test]
 fn test_scope_default() {
     assert_eq!(Scope::default(), Scope::Singleton);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 14. 生命周期钩子测试
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_app_init_hook() {
+    APP_INIT_CALLED.store(false, Ordering::SeqCst);
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let _ = BuildContext::new::<PathBuf>(None)
+            .build_and_run()
+            .await
+            .unwrap();
+    });
+
+    assert!(
+        APP_INIT_CALLED.load(Ordering::SeqCst),
+        "app_init 钩子应被调用"
+    );
+}
+
+#[test]
+fn test_app_async_init_hook() {
+    APP_ASYNC_INIT_CALLED.store(false, Ordering::SeqCst);
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let _ = BuildContext::new::<PathBuf>(None)
+            .build_and_run()
+            .await
+            .unwrap();
+    });
+
+    assert!(
+        APP_ASYNC_INIT_CALLED.load(Ordering::SeqCst),
+        "app_async_init 钩子应被调用"
+    );
+}
+
+#[test]
+fn test_shutdown_hook() {
+    SHUTDOWN_CALLED.store(false, Ordering::SeqCst);
+
+    let ctx = BuildContext::new::<PathBuf>(None);
+    let app = ctx.build().unwrap();
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        app.shutdown().await;
+    });
+
+    assert!(
+        SHUTDOWN_CALLED.load(Ordering::SeqCst),
+        "shutdown 钩子应被调用"
+    );
+}
+
+#[test]
+fn test_init_sort_ordering() {
+    // 重置全局 order 记录
+    INIT_ORDER.lock().unwrap().clear();
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let _ = BuildContext::new::<PathBuf>(None)
+            .build_and_run()
+            .await
+            .unwrap();
+    });
+
+    let order = INIT_ORDER.lock().unwrap();
+    assert_eq!(order.len(), 2, "两个 init 组件都应被调用");
+    assert_eq!(
+        order[0], "EarlyInit",
+        "init_sort=10 应先执行"
+    );
+    assert_eq!(
+        order[1], "LateInit",
+        "init_sort=20 后执行"
+    );
+}
+
+#[test]
+fn test_app_async_run_hook() {
+    let ctx = BuildContext::new::<PathBuf>(None);
+    let app = ctx.build().unwrap();
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let arc = app.ins_run().await.unwrap();
+        // 等待后台任务完成 init → async_init → comp_run（所有 async_run 立即返回）
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        // 取消并优雅关闭
+        arc.shutdown_token.cancel();
+        if let Some(handle) = arc.task_handle.write().await.take() {
+            let _ = tokio::time::timeout(Duration::from_secs(2), handle).await;
+        }
+        arc.shutdown().await;
+    });
+}
+
+#[test]
+fn test_lifecycle_full_flow() {
+    APP_INIT_CALLED.store(false, Ordering::SeqCst);
+    APP_ASYNC_INIT_CALLED.store(false, Ordering::SeqCst);
+    SHUTDOWN_CALLED.store(false, Ordering::SeqCst);
+
+    let ctx = BuildContext::new::<PathBuf>(None);
+    let app = ctx.build().unwrap();
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let arc = app.ins_run().await.unwrap();
+        // 短暂等待让 init + async_init 完成
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        assert!(APP_INIT_CALLED.load(Ordering::SeqCst), "init");
+        assert!(APP_ASYNC_INIT_CALLED.load(Ordering::SeqCst), "async_init");
+
+        // 取消并关闭
+        arc.shutdown_token.cancel();
+        if let Some(handle) = arc.task_handle.write().await.take() {
+            let _ = tokio::time::timeout(Duration::from_secs(2), handle).await;
+        }
+        arc.shutdown().await;
+
+        assert!(SHUTDOWN_CALLED.load(Ordering::SeqCst), "shutdown");
+    });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 15. Store 边缘操作测试
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_store_insert_arc() {
+    let store = Store::new();
+    let val = Arc::new(42u64);
+    store.insert_arc(val.clone());
+
+    let entry = store.inner().get(&TypeId::of::<u64>()).unwrap();
+    match &*entry {
+        CompRef::Cached(arc) => {
+            let retrieved = arc.clone().downcast::<u64>().unwrap();
+            assert_eq!(*retrieved, 42);
+        }
+        _ => panic!("应为 Cached 变体"),
+    }
+}
+
+#[test]
+fn test_store_insert_factory() {
+    let store = Store::new();
+    store.insert_factory::<String, _>(|_| Arc::new("factory_created".to_string()));
+
+    assert!(store.contains::<String>());
+    let entry = store.inner().get(&TypeId::of::<String>()).unwrap();
+    assert!(
+        matches!(&*entry, CompRef::Factory(_)),
+        "应为 Factory 变体"
+    );
+}
+
+#[test]
+fn test_store_into_inner_and_from_dashmap() {
+    let store = Store::new();
+    store.insert_cached(100u64);
+    store.insert_cached("hello".to_string());
+    let original_len = store.len();
+
+    let inner = store.into_inner();
+    assert_eq!(inner.len(), original_len);
+
+    // 从 DashMap 重建 Store
+    let restored = Store::from_dashmap(inner);
+    assert_eq!(restored.len(), original_len);
+    assert!(restored.contains::<u64>());
+    assert!(restored.contains::<String>());
+}
+
+#[test]
+fn test_store_is_empty() {
+    let store = Store::new();
+    assert!(store.is_empty());
+
+    store.insert_cached(42u64);
+    assert!(!store.is_empty());
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 16. 批量 Trait 注入测试
+// ══════════════════════════════════════════════════════════════════════════
+
+pub trait Reporter: std::any::Any + Send + Sync {
+    fn report(&self) -> &str;
+}
+
+#[derive(Component)]
+#[component(as_trait = dyn Reporter)]
+pub struct XmlReporter {
+    #[tx_cst("xml".to_string())]
+    data: String,
+}
+impl Reporter for XmlReporter {
+    fn report(&self) -> &str {
+        &self.data
+    }
+}
+
+#[derive(Component)]
+#[component(as_trait = dyn Reporter)]
+pub struct JsonReporter {
+    #[tx_cst("json".to_string())]
+    data: String,
+}
+impl Reporter for JsonReporter {
+    fn report(&self) -> &str {
+        &self.data
+    }
+}
+
+#[test]
+fn test_inject_all_traits_from_store() {
+    let ctx = BuildContext::new::<PathBuf>(None);
+    let store = ctx.store();
+
+    let reporters: Vec<Arc<dyn Reporter>> = inject_all_traits_from_store(store);
+
+    // TRAIT_IMPL_MAP 是全局静态，跨测试累计，不检查长度只检查内容
+    assert!(!reporters.is_empty(), "应有至少一个 Reporter 实现");
+
+    let data: Vec<&str> = reporters.iter().map(|r| r.report()).collect();
+    assert!(
+        data.contains(&"json"),
+        "应包含 json 实现, got: {:?}",
+        data
+    );
+    assert!(
+        data.contains(&"xml"),
+        "应包含 xml 实现, got: {:?}",
+        data
+    );
+}
+
+#[test]
+fn test_inject_all_traits_empty() {
+    // 定义一个未注册的 trait（没有任何 #[component(as_trait)] 实现）
+    pub trait NoImplementations: std::any::Any + Send + Sync {}
+    let _ = std::any::type_name::<dyn NoImplementations>();
+
+    let ctx = BuildContext::new::<PathBuf>(None);
+    let store = ctx.store();
+
+    // 注入一个没有实现的 trait
+    let results: Vec<Arc<dyn NoImplementations>> = inject_all_traits_from_store(store);
+    assert!(results.is_empty(), "无实现时应返回空 Vec");
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 17. DepsTuple::resolve 测试
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_deps_tuple_resolve() {
+    let ctx = BuildContext::new::<PathBuf>(None);
+    let store = ctx.store();
+
+    let deps = <(Arc<DbPool>, Arc<RedisClient>) as DepsTuple>::resolve(store);
+    assert!(deps.is_ok(), "resolve 应成功");
+
+    let (db, redis) = deps.unwrap();
+    assert_eq!(db.url, "sqlite");
+    let _ = redis; // 占位验证
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 18. 配置组件真实文件测试
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_config_with_real_file() {
+    use std::io::Write;
+
+    // 创建临时配置目录和文件
+    let tmp_dir = std::env::temp_dir().join("tx_di_test_config");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let config_path = tmp_dir.join("test_app.toml");
+
+    let mut file = std::fs::File::create(&config_path).unwrap();
+    writeln!(file, r#"[test_config]"#).unwrap();
+    writeln!(file, r#"app_name = "TestApp""#).unwrap();
+    writeln!(file, "port = 8080").unwrap();
+    file.sync_all().unwrap();
+
+    // 使用配置文件路径构建
+    let ctx = BuildContext::new(Some(config_path.clone()));
+    let config = ctx.inject::<TestConfig>();
+
+    assert_eq!(config.app_name, "TestApp");
+    assert_eq!(config.port, 8080);
+
+    // 清理临时文件
+    let _ = std::fs::remove_file(&config_path);
+    let _ = std::fs::remove_dir(&tmp_dir);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 19. inject_from_store / inject_trait_from_store 直接调用
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_inject_from_store_fn() {
+    let ctx = BuildContext::new::<PathBuf>(None);
+    let db = inject_from_store::<DbPool>(ctx.store());
+    assert_eq!(db.url, "sqlite");
+}
+
+#[test]
+fn test_inject_trait_from_store_fn() {
+    let ctx = BuildContext::new::<PathBuf>(None);
+    let provider: Arc<dyn DataProvider> = inject_trait_from_store(ctx.store());
+    assert_eq!(provider.get_data(), "mysql_data");
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 20. BuildContext 默认构造 / inner_new
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_build_context_default() {
+    let ctx = BuildContext::default();
+    assert!(ctx.len() > 0);
+    let _ = ctx.inject::<DbPool>();
+}
+
+#[test]
+fn test_build_context_inner_new() {
+    use dashmap::DashMap;
+    let inner = DashMap::new();
+    inner.insert(
+        TypeId::of::<u64>(),
+        CompRef::Cached(Arc::new(42u64) as Arc<dyn std::any::Any + Send + Sync>),
+    );
+    let ctx = BuildContext::inner_new(inner);
+    let store = ctx.store();
+    assert!(store.contains::<u64>());
+    assert_eq!(store.len(), 1);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 21. DepsTuple 多元素测试
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_deps_tuple_three_elements() {
+    let deps = <(Arc<DbPool>, Arc<RedisClient>, Arc<UserRepo>) as DepsTuple>::dep_type_ids();
+    assert_eq!(deps.len(), 3);
+}
+
+#[test]
+fn test_deps_tuple_ten_elements() {
+    #[derive(Component, Default)]
+    pub struct A;
+    #[derive(Component, Default)]
+    pub struct B;
+    #[derive(Component, Default)]
+    pub struct C;
+    #[derive(Component, Default)]
+    pub struct D;
+    #[derive(Component, Default)]
+    pub struct E;
+
+    #[derive(Component)]
+    #[allow(dead_code)]
+    pub struct TenDeps {
+        pub a: Arc<A>,
+        pub b: Arc<B>,
+        pub c: Arc<C>,
+        pub d: Arc<D>,
+        pub e: Arc<E>,
+    }
+
+    // 5 个 Deps 元素
+    let deps = <(Arc<A>, Arc<B>, Arc<C>, Arc<D>, Arc<E>) as DepsTuple>::dep_type_ids();
+    assert_eq!(deps.len(), 5);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 22. Store inject 错误路径（downcast 失败 + inject_or_panic）
+// ══════════════════════════════════════════════════════════════════════════
+
+#[derive(Debug)]
+struct DowncastTarget;
+impl Component for DowncastTarget {
+    type Deps = ();
+    fn build(_: ()) -> Self {
+        DowncastTarget
+    }
+}
+
+#[test]
+fn test_inject_downcast_failure() {
+    let store = Store::new();
+    // 以 u64 类型注册到 DowncastTarget 的 TypeId 下，使 downcast 失败
+    store.inner().insert(
+        TypeId::of::<DowncastTarget>(),
+        CompRef::Cached(Arc::new(42u64) as Arc<dyn std::any::Any + Send + Sync>),
+    );
+
+    let result = store.inject::<DowncastTarget>();
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(err.context().unwrap_or_default().contains("downcast"));
+}
+
+#[test]
+fn test_inject_or_panic_unregistered() {
+    #[derive(Debug)]
+    struct Phantom;
+    impl Component for Phantom {
+        type Deps = ();
+        fn build(_: ()) -> Self {
+            Phantom
+        }
+    }
+
+    let store = Store::new();
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        store.inject_or_panic::<Phantom>()
+    }));
+    assert!(result.is_err(), "未注册组件 inject_or_panic 应 panic");
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 23. AOP 拦截器链空链默认值
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_interceptor_chain_default() {
+    let chain: InterceptorChain<tx_di_core::aop::LoggingInterceptor> =
+        InterceptorChain::default();
+    let ctx = CallContext::new("test");
+    // 空链不应 panic
+    chain.before_all(&ctx);
+    chain.after_all(&ctx, &CallResult::Ok);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 24. ArgValue From 转换
+// ══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_arg_value_conversions() {
+    use tx_di_core::aop::ArgValue;
+
+    let _ = ArgValue::from(42i64);
+    let _ = ArgValue::from("hello");
+    let _ = ArgValue::from("world".to_string());
+    let _ = ArgValue::from(true);
 }

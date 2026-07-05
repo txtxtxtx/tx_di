@@ -9,14 +9,16 @@
 //! 3. 并发注入 — 多线程 DashMap 读写竞争
 //! 4. CompRef 克隆 / downcast / DashMap 操作
 //! 5. 异步运行时开销
+//! 6. 高层注入函数 (inject_from_store / inject_trait_from_store)
+//! 7. App::build 构建性能
 
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
-use dashmap::DashMap;
 use std::any::{Any, TypeId};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tx_di_core::{
-    BoxFuture, CompRef, ComponentMeta, RIE, Scope, Store, CancellationToken,
-    inject_from_store, topo_sort,
+    BoxFuture, BuildContext, CancellationToken, CompRef, Component, ComponentMeta, DepsTuple, RIE,
+    Scope, Store, inject_from_store, topo_sort,
 };
 
 // ── 生成唯一 marker 类型 ─────────────────────────────────────────────────────
@@ -479,6 +481,73 @@ fn bench_async(c: &mut Criterion) {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Benchmark Group 6: 高层注入函数
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/// 用于基准测试的组件类型
+#[derive(Component, Default)]
+pub struct BenchComp;
+
+fn bench_inject_high_level(c: &mut Criterion) {
+    let mut group = c.benchmark_group("inject_high_level");
+
+    group.bench_function("inject_from_store", |b| {
+        let store = Store::new();
+        store.insert_cached(BenchComp);
+        b.iter(|| {
+            let val = inject_from_store::<BenchComp>(black_box(&store));
+            black_box(val);
+        });
+    });
+
+    group.bench_function("inject_from_store_multi", |b| {
+        let store = Store::new();
+        store.insert_cached(BenchComp);
+        store.insert_cached(BenchComp);
+        store.insert_cached(BenchComp);
+        b.iter(|| {
+            let a = inject_from_store::<BenchComp>(&store);
+            let b = inject_from_store::<BenchComp>(&store);
+            let c = inject_from_store::<BenchComp>(&store);
+            black_box((a, b, c));
+        });
+    });
+
+    // Prototype: bench inject_from_store with factory
+    group.bench_function("inject_from_store_factory", |b| {
+        let store = Store::new();
+        store.insert_factory::<BenchComp, _>(|_| Arc::new(BenchComp));
+        b.iter(|| {
+            let val = inject_from_store::<BenchComp>(black_box(&store));
+            black_box(val);
+        });
+    });
+
+    group.finish();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Benchmark Group 7: App 构建
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+fn bench_app_build(c: &mut Criterion) {
+    let mut group = c.benchmark_group("app_build");
+
+    group.bench_function("build_empty", |b| {
+        b.iter_batched(
+            || BuildContext::new::<PathBuf>(None),
+            |ctx| {
+                let app = ctx.build().unwrap();
+                black_box(app);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    group.finish();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 criterion_group!(
     benches,
@@ -487,5 +556,7 @@ criterion_group!(
     bench_concurrent,
     bench_comp_ref,
     bench_async,
+    bench_inject_high_level,
+    bench_app_build,
 );
 criterion_main!(benches);
