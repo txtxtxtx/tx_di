@@ -23,7 +23,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::Duration;
 
 use tx_di_core::{
-    App, AppError, BoxFuture, BuildContext, CompRef, Component, DepsTuple, DiErr, RIE, Scope,
+    App, AppError, BuildContext, CompRef, Component, DepsTuple, DiErr, RIE, Scope,
     Store, inject_all_traits_from_store, inject_from_store, inject_trait_from_store,
 };
 use tx_di_core::aop::{CallContext, CallResult, Interceptor, InterceptorChain};
@@ -175,11 +175,9 @@ pub mod async_init_mod {
     #[derive(Component)]
     #[component(app_async_init)]
     pub struct AsyncInitTracker;
-    fn app_async_init(_comp: Arc<AsyncInitTracker>, _app: &Arc<App>) -> BoxFuture<RIE<()>> {
-        Box::pin(async move {
-            super::APP_ASYNC_INIT_CALLED.store(true, Ordering::SeqCst);
-            Ok(())
-        })
+    async fn app_async_init(_comp: Arc<AsyncInitTracker>, _app: Arc<App>) -> RIE<()> {
+        super::APP_ASYNC_INIT_CALLED.store(true, Ordering::SeqCst);
+        Ok(())
     }
 }
 

@@ -12,10 +12,11 @@
 //! 6. 高层注入函数 (inject_from_store / inject_trait_from_store)
 //! 7. App::build 构建性能
 
-use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use std::any::{Any, TypeId};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::hint::black_box;
 use tx_di_core::{
     BoxFuture, BuildContext, CancellationToken, CompRef, Component, ComponentMeta, DepsTuple, RIE,
     Scope, Store, TraitImplMap, inject_from_store, topo_sort,
@@ -50,9 +51,6 @@ struct LargeObject {
     _name: String,
     _count: u64,
 }
-
-/// 空闲的 TraitImplEntry 切片
-static EMPTY_TRAIT_IMPLS: &[tx_di_core::store::TraitImplEntry] = &[];
 
 // ── 辅助函数 ─────────────────────────────────────────────────────────────────
 
@@ -156,7 +154,7 @@ fn bench_topo_sort(c: &mut Criterion) {
             let metas = make_independent_metas(n);
             let refs: Vec<&ComponentMeta> = metas.iter().collect();
             b.iter(|| {
-                black_box(topo_sort(black_box(&refs), &empty_trait_impls));
+                let _ = black_box(topo_sort(black_box(&refs), &empty_trait_impls));
             });
         });
     }
@@ -167,7 +165,7 @@ fn bench_topo_sort(c: &mut Criterion) {
             let metas = make_chain_metas(n);
             let refs: Vec<&ComponentMeta> = metas.iter().collect();
             b.iter(|| {
-                black_box(topo_sort(black_box(&refs), &empty_trait_impls));
+                let _ = black_box(topo_sort(black_box(&refs), &empty_trait_impls));
             });
         });
     }
