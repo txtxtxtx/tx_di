@@ -31,9 +31,8 @@ use std::path::PathBuf;
 use crate::config::ToastyConfig;
 use std::sync::{Arc, OnceLock, RwLock};
 use toasty::ModelSet;
-use tokio_util::sync::CancellationToken;
 use tx_di_core::{get_sys_config, App, CONFIG_PATH};
-use tx_di_core::{CompInit, RIE, tx_comp};
+use tx_di_core::{Component, DepsTuple, RIE};
 use crate::ToastyErr;
 
 /// Toasty 数据库实例的类型别名
@@ -68,8 +67,8 @@ pub type ToastyDb = toasty::Db;
 /// // 可多次调用，模型会合并
 /// ToastyPlugin::register_models(toasty::models!(AuditLog));
 /// ```
-#[derive(Debug)]
-#[tx_comp(init)]
+#[derive(Debug, Component)]
+#[component(app_async_init, init_sort = i32::MIN + 2)]
 pub struct ToastyPlugin {
     /// 配置引用
     pub config: Arc<ToastyConfig>,
@@ -168,88 +167,82 @@ impl ToastyPlugin {
     }
 }
 
-impl CompInit for ToastyPlugin {
-    tx_di_core::async_method!(
-        fn async_init_impl(ctx: Arc<App>, _token: CancellationToken) -> RIE<()> {
-            let plugin = ctx.inject::<ToastyPlugin>();
-            let config = plugin.config.clone();
+tx_di_core::async_method!(
+    /// `#[component(app_async_init)]` 回调：连接数据库、推送 Schema
+    fn app_async_init(comp: Arc<ToastyPlugin>, _app: Arc<App>) -> RIE<()> {
+        let config = comp.config.clone();
 
-            // 防止重复初始化
-            if plugin.db.get().is_some() {
-                tracing::warn!("ToastyPlugin: db already initialized, skipping");
-                return Ok(());
-            }
-
-            // ── 同步读取全局模型（不持有锁跨越 await）────────────────
-            let models = {
-                let models = plugin
-                    .models
-                    .read()
-                    .map_err(|_| ToastyErr::ModelRegistryError)?;
-                models.clone()
-            }; // models guard 在这里 drop
-            tracing::debug!(url = %config.database_url, "正在连接数据库...");
-            // 构建 Builder 并应用配置
-            let mut builder = ToastyDb::builder();
-            tracing::debug!(model_count = models.len(), "注册模型到 Toasty Db");
-            builder.models(models);
-
-            // 连接池配置
-            if let Some(max) = config.max_pool_size {
-                builder.max_pool_size(max);
-            }
-            if let Some(ref prefix) = config.table_name_prefix {
-                builder.table_name_prefix(prefix);
-            }
-            if let Some(secs) = config.pool_wait_timeout_secs {
-                builder.pool_wait_timeout(Some(std::time::Duration::from_secs(secs)));
-            }
-            if let Some(secs) = config.pool_create_timeout_secs {
-                builder.pool_create_timeout(Some(std::time::Duration::from_secs(secs)));
-            }
-            if let Some(secs) = config.pool_health_check_interval_secs {
-                if secs == 0 {
-                    builder.pool_health_check_interval(None);
-                } else {
-                    builder.pool_health_check_interval(Some(std::time::Duration::from_secs(secs)));
-                }
-            }
-            if let Some(secs) = config.pool_max_connection_lifetime_secs {
-                builder.pool_max_connection_lifetime(Some(std::time::Duration::from_secs(secs)));
-            }
-            if let Some(secs) = config.pool_max_connection_idle_time_secs {
-                builder.pool_max_connection_idle_time(Some(std::time::Duration::from_secs(secs)));
-            }
-            if config.pool_pre_ping {
-                builder.pool_pre_ping(true);
-            }
-            // 通过 URL 连接（自动选择驱动）
-            let db = builder
-                .connect(&config.database_url)
-                .await
-                .map_err(|_| ToastyErr::ConnectionFailed)?;
-            // 自动推送 Schema（开发环境）
-            if config.auto_schema {
-                tracing::debug!("正在推送数据库 Schema...");
-                db.push_schema()
-                    .await
-                    .map_err(|_| ToastyErr::SchemaPushFailed)?;
-                tracing::debug!("Schema 推送完成");
-                if let Some(config_path) = get_sys_config(CONFIG_PATH) {
-                    Self::change_auto_schema_closed(config_path.into());
-                }
-            }
-            // 写入 OnceLock
-            plugin.db.set(db).expect(&ToastyErr::AlreadyInitialized.to_string());
-            tracing::info!("数据库初始化完成");
-            Ok(())
+        // 防止重复初始化
+        if comp.db.get().is_some() {
+            tracing::warn!("ToastyPlugin: db already initialized, skipping");
+            return Ok(());
         }
-    );
-    fn init_sort() -> i32 {
-        // 在业务插件注册模型之后初始化（AdminPlugin = MAX-100，WebPlugin = MAX）
-        i32::MIN + 2
+
+        // ── 同步读取全局模型（不持有锁跨越 await）────────────────
+        let models = {
+            let models = comp
+                .models
+                .read()
+                .map_err(|_| ToastyErr::ModelRegistryError)?;
+            models.clone()
+        }; // models guard 在这里 drop
+        tracing::debug!(url = %config.database_url, "正在连接数据库...");
+        // 构建 Builder 并应用配置
+        let mut builder = ToastyDb::builder();
+        tracing::debug!(model_count = models.len(), "注册模型到 Toasty Db");
+        builder.models(models);
+
+        // 连接池配置
+        if let Some(max) = config.max_pool_size {
+            builder.max_pool_size(max);
+        }
+        if let Some(ref prefix) = config.table_name_prefix {
+            builder.table_name_prefix(prefix);
+        }
+        if let Some(secs) = config.pool_wait_timeout_secs {
+            builder.pool_wait_timeout(Some(std::time::Duration::from_secs(secs)));
+        }
+        if let Some(secs) = config.pool_create_timeout_secs {
+            builder.pool_create_timeout(Some(std::time::Duration::from_secs(secs)));
+        }
+        if let Some(secs) = config.pool_health_check_interval_secs {
+            if secs == 0 {
+                builder.pool_health_check_interval(None);
+            } else {
+                builder.pool_health_check_interval(Some(std::time::Duration::from_secs(secs)));
+            }
+        }
+        if let Some(secs) = config.pool_max_connection_lifetime_secs {
+            builder.pool_max_connection_lifetime(Some(std::time::Duration::from_secs(secs)));
+        }
+        if let Some(secs) = config.pool_max_connection_idle_time_secs {
+            builder.pool_max_connection_idle_time(Some(std::time::Duration::from_secs(secs)));
+        }
+        if config.pool_pre_ping {
+            builder.pool_pre_ping(true);
+        }
+        // 通过 URL 连接（自动选择驱动）
+        let db = builder
+            .connect(&config.database_url)
+            .await
+            .map_err(|_| ToastyErr::ConnectionFailed)?;
+        // 自动推送 Schema（开发环境）
+        if config.auto_schema {
+            tracing::debug!("正在推送数据库 Schema...");
+            db.push_schema()
+                .await
+                .map_err(|_| ToastyErr::SchemaPushFailed)?;
+            tracing::debug!("Schema 推送完成");
+            if let Some(config_path) = get_sys_config(CONFIG_PATH) {
+                ToastyPlugin::change_auto_schema_closed(config_path.into());
+            }
+        }
+        // 写入 OnceLock
+        comp.db.set(db).expect(&ToastyErr::AlreadyInitialized.to_string());
+        tracing::info!("数据库初始化完成");
+        Ok(())
     }
-}
+);
 
 /// ── 兼容辅助：手动构建数据库（不依赖 DI 异步初始化）─────────────────────
 ///

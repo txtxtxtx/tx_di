@@ -1,7 +1,7 @@
 //! Toasty 数据库配置
 
 use serde::Deserialize;
-use tx_di_core::{tx_comp, CompInit, InnerContext, RIE};
+use tx_di_core::{Component, RIE, Store};
 
 /// Toasty 数据库配置结构体
 ///
@@ -14,8 +14,8 @@ use tx_di_core::{tx_comp, CompInit, InnerContext, RIE};
 /// max_pool_size = 10
 /// table_name_prefix = ""
 /// ```
-#[derive(Debug, Clone, Deserialize)]
-#[tx_comp(conf, init)]
+#[derive(Debug, Clone, Deserialize, Component)]
+#[component(conf, init, init_sort = i32::MIN + 2)]
 pub struct ToastyConfig {
     /// 数据库连接字符串
     ///
@@ -107,20 +107,15 @@ impl Default for ToastyConfig {
     }
 }
 
-impl CompInit for ToastyConfig {
-    fn inner_init(&mut self, _ctx: &InnerContext) -> RIE<()> {
-        tracing::debug!(
-            url = %self.database_url,
-            auto_schema = self.auto_schema,
-            max_pool = ?self.max_pool_size,
-            "Toasty ORM 数据库配置已加载"
-        );
-        Ok(())
-    }
-
-    fn init_sort() -> i32 {
-        i32::MIN + 2
-    }
+/// `#[component(init)]` 回调：配置加载后打印日志
+fn init(this: &mut ToastyConfig, _store: &Store) -> RIE<()> {
+    tracing::debug!(
+        url = %this.database_url,
+        auto_schema = this.auto_schema,
+        max_pool = ?this.max_pool_size,
+        "Toasty ORM 数据库配置已加载"
+    );
+    Ok(())
 }
 
 fn default_database_url() -> String {

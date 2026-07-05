@@ -2,7 +2,7 @@
 
 use crate::config::SaTokenConf;
 use std::sync::Arc;
-use tx_di_core::{tx_comp, CompInit, InnerContext, RIE};
+use tx_di_core::{Component, DepsTuple, RIE, Store};
 use tracing::info;
 
 /// sa-token 插件
@@ -36,7 +36,8 @@ use tracing::info;
 /// // 注销
 /// StpUtil::logout(&sa_token_state);
 /// ```
-#[tx_comp(init)]
+#[derive(Component)]
+#[component(init, init_sort = i32::MIN + 1)]
 pub struct SaTokenPlugin {
     /// 配置引用
     pub config: Arc<SaTokenConf>,
@@ -64,32 +65,26 @@ impl SaTokenPlugin {
     }
 }
 
-impl CompInit for SaTokenPlugin {
-    fn inner_init(&mut self, _ctx: &InnerContext) -> RIE<()> {
-        info!("SaTokenPlugin 初始化");
-        let config = self.config.clone();
-        info!("正在构建 SaToken 状态...");
-        // 使用 Builder 模式构建 SaTokenState
-        let builder = sa_token_plugin_axum::SaTokenStateBuilder::default();
-        let state = config.apply_to_builder(builder).build();
-        // 写入 OnceLock
-        if self.state.set(state).is_err() {
-            tracing::warn!("SaTokenPlugin: state concurrently initialized");
-        }
-        // todo 注册权限拦截器
-        // tx_di_axum::add_layer(self.build_layer(),9999);
-        info!(
-                token_name = %config.token_name,
-                timeout = config.timeout,
-                "SaToken 初始化完成"
-            );
-        Ok(())
+/// `#[component(init)]` 回调：构建 SaToken 状态
+fn init(this: &mut SaTokenPlugin, _store: &Store) -> RIE<()> {
+    info!("SaTokenPlugin 初始化");
+    let config = this.config.clone();
+    info!("正在构建 SaToken 状态...");
+    // 使用 Builder 模式构建 SaTokenState
+    let builder = sa_token_plugin_axum::SaTokenStateBuilder::default();
+    let state = config.apply_to_builder(builder).build();
+    // 写入 OnceLock
+    if this.state.set(state).is_err() {
+        tracing::warn!("SaTokenPlugin: state concurrently initialized");
     }
-
-    fn init_sort() -> i32 {
-        // 在 SaTokenConf(90) 之后、业务组件之前
-        i32::MIN + 1
-    }
+    // todo 注册权限拦截器
+    // tx_di_axum::add_layer(self.build_layer(),9999);
+    info!(
+            token_name = %config.token_name,
+            timeout = config.timeout,
+            "SaToken 初始化完成"
+        );
+    Ok(())
 }
 
 // ── Axum 集成辅助 ─────────────────────────────────────────────────────────────

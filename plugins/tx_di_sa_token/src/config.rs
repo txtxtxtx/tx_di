@@ -2,7 +2,7 @@
 
 use serde::Deserialize;
 use std::sync::Arc;
-use tx_di_core::{tx_comp, CompInit, InnerContext, RIE};
+use tx_di_core::{Component, RIE, Store};
 use sa_token_plugin_axum::SaStorage;
 // 根据特性导入不同的存储后端
 #[cfg(feature = "memory")]
@@ -28,8 +28,8 @@ use sa_token_plugin_axum::DatabaseStorage;
 /// token_style = "uuid"
 /// is_read_header = true
 /// ```
-#[derive(Debug, Clone, Deserialize)]
-#[tx_comp(conf, init)]
+#[derive(Debug, Clone, Deserialize, Component)]
+#[component(conf = "sa_token_config", init, init_sort = i32::MIN + 1)]
 pub struct SaTokenConf {
     /// Token 名称（读取 Token 的 Header/Parameter/Cookie 键名）
     #[serde(default = "default_token_name")]
@@ -131,22 +131,16 @@ impl Default for SaTokenConf {
     }
 }
 
-impl CompInit for SaTokenConf {
-    fn inner_init(&mut self, _ctx: &InnerContext) -> RIE<()> {
-        tracing::info!(
-            token_name = %self.token_name,
-            timeout = self.timeout,
-            is_concurrent = self.is_concurrent,
-            token_style = %self.token_style,
-            "SaToken 配置已加载"
-        );
-        Ok(())
-    }
-
-    fn init_sort() -> i32 {
-        // 配置阶段，在 toasty 之前,日志之后，可以说是第二优先级
-        i32::MIN + 1
-    }
+/// `#[component(init)]` 回调：配置加载后打印日志
+fn init(this: &mut SaTokenConf, _store: &Store) -> RIE<()> {
+    tracing::info!(
+        token_name = %this.token_name,
+        timeout = this.timeout,
+        is_concurrent = this.is_concurrent,
+        token_style = %this.token_style,
+        "SaToken 配置已加载"
+    );
+    Ok(())
 }
 
 /// 将自定义配置转换为 SaTokenStateBuilder 的链式调用

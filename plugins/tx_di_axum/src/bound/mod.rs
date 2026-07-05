@@ -5,7 +5,7 @@ use axum::extract::{FromRequestParts};
 
 use axum::http::request::Parts;
 
-use tx_di_core::{App, ComponentDescriptor, IE, RIE};
+use tx_di_core::{App, AppError, Component, RIE};
 use crate::WebErrCode;
 use crate::e::WebErr;
 
@@ -13,7 +13,7 @@ use crate::e::WebErr;
 ///
 /// 作为 extractor 不出现在请求 body 中，使用空 schema 占位
 #[cfg(feature = "api-doc")]
-impl<T: ComponentDescriptor> schemars::JsonSchema for DiComp<T> {
+impl<T: Component> schemars::JsonSchema for DiComp<T> {
     fn schema_name() -> String {
         format!("DiComp_{}", std::any::type_name::<T>().replace("::", "_"))
     }
@@ -27,7 +27,7 @@ impl<T: ComponentDescriptor> schemars::JsonSchema for DiComp<T> {
 ///
 /// 作为 DI 容器注入的 extractor，不参与请求参数文档生成
 #[cfg(feature = "api-doc")]
-impl<T: ComponentDescriptor> aide::operation::OperationInput for DiComp<T> {}
+impl<T: Component> aide::operation::OperationInput for DiComp<T> {}
 
 #[derive(Clone)]
 pub struct AppStatus {
@@ -37,7 +37,7 @@ pub struct AppStatus {
 pub trait RequestPartsExt {
     fn app_status(&self) -> &AppStatus;
     /// 从 DI 容器中取出已缓存的单例组件（只读，无需 mut context）
-    fn get_comp<T: ComponentDescriptor>(&self) -> RIE<Arc<T>>;
+    fn get_comp<T: Component>(&self) -> RIE<Arc<T>>;
 }
 
 impl RequestPartsExt for Parts {
@@ -46,15 +46,15 @@ impl RequestPartsExt for Parts {
             .expect("AppStatus not found in request extensions; 请确认已通过 layer 注入 AppStatus")
     }
 
-    fn get_comp<T: ComponentDescriptor>(&self) -> RIE<Arc<T>> {
+    fn get_comp<T: Component>(&self) -> RIE<Arc<T>> {
         self.app_status()
             .app
             .try_inject::<T>()
-            .ok_or_else(|| IE::from(WebErrCode::ComponentNotFound))
+            .ok_or_else(|| AppError::from(WebErrCode::ComponentNotFound))
     }
 }
-pub struct DiComp<T: ComponentDescriptor>(pub Arc<T>);
-impl<T: ComponentDescriptor> Deref for DiComp<T> {
+pub struct DiComp<T: Component>(pub Arc<T>);
+impl<T: Component> Deref for DiComp<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -64,7 +64,7 @@ impl<T: ComponentDescriptor> Deref for DiComp<T> {
 
 impl<T, S> FromRequestParts<S> for DiComp<T>
 where
-    T: ComponentDescriptor,
+    T: Component,
     S: Send + Sync,
 {
     type Rejection = WebErr;

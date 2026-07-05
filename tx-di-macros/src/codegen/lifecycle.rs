@@ -7,8 +7,8 @@
 //! | 属性 | 回调函数 | 覆写的 trait 方法 |
 //! |------|----------|-------------------|
 //! | `app_init` | `app_init(comp: Arc<Self>, app: &Arc<App>)` | `init` |
-//! | `app_async_init` | `app_async_init(comp: Arc<Self>, app: &Arc<App>)` | `async_init` |
-//! | `app_async_run` | `app_async_run(comp: Arc<Self>, app: &Arc<App>, token)` | `async_run` |
+//! | `app_async_init` | `app_async_init(comp: Arc<Self>, app: Arc<App>)` | `async_init` |
+//! | `app_async_run` | `app_async_run(comp: Arc<Self>, app: Arc<App>, token)` | `async_run` |
 //! | `shutdown` | `shutdown(&self)` | `shutdown` |
 
 use proc_macro2::TokenStream as TokenStream2;
@@ -56,6 +56,9 @@ fn gen_app_init_impl(ctx: &CodeGenContext) -> TokenStream2 {
 }
 
 /// 生成 `#[inline] fn async_init(app: &Arc<App>) -> BoxFuture<RIE<()>>` 覆写
+///
+/// 注意：传递 `app.clone()`（`Arc<App>` 而非 `&Arc<App>`），
+/// 因为 `async_method!` 宏生成的 `BoxFuture` 要求 `'static` lifetime。
 fn gen_app_async_init_impl(ctx: &CodeGenContext) -> TokenStream2 {
     if !ctx.comp_attr.has_app_async_init {
         return quote! {};
@@ -64,12 +67,15 @@ fn gen_app_async_init_impl(ctx: &CodeGenContext) -> TokenStream2 {
         #[inline]
         fn async_init(app: &::std::sync::Arc<::tx_di_core::App>) -> ::tx_di_core::BoxFuture<::tx_di_core::RIE<()>> {
             let comp: ::std::sync::Arc<Self> = ::tx_di_core::inject_from_store(&app.store);
-            self::app_async_init(comp, app)
+            self::app_async_init(comp, app.clone())
         }
     }
 }
 
 /// 生成 `#[inline] fn async_run(app, token) -> BoxFuture<RIE<()>>` 覆写
+///
+/// 注意：传递 `app.clone()`（`Arc<App>` 而非 `&Arc<App>`），
+/// 因为 `async_method!` 宏生成的 `BoxFuture` 要求 `'static` lifetime。
 fn gen_app_async_run_impl(ctx: &CodeGenContext) -> TokenStream2 {
     if !ctx.comp_attr.has_app_async_run {
         return quote! {};
@@ -81,7 +87,7 @@ fn gen_app_async_run_impl(ctx: &CodeGenContext) -> TokenStream2 {
             token: ::tx_di_core::CancellationToken,
         ) -> ::tx_di_core::BoxFuture<::tx_di_core::RIE<()>> {
             let comp: ::std::sync::Arc<Self> = ::tx_di_core::inject_from_store(&app.store);
-            self::app_async_run(comp, app, token)
+            self::app_async_run(comp, app.clone(), token)
         }
     }
 }

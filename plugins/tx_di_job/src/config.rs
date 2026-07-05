@@ -1,11 +1,11 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
-use tx_di_core::{tx_comp, CompInit, InnerContext, RIE};
+use tx_di_core::{Component, RIE, Store};
 
 /// Job 插件配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[tx_comp(conf, init)]
+#[derive(Debug, Clone, Serialize, Deserialize, Component)]
+#[component(conf, init, init_sort = i32::MIN + 1)]
 pub struct JobConfig {
     /// 是否启用调度器 默认 启用
     #[serde(default = "default_enabled")]
@@ -45,19 +45,14 @@ impl Default for JobConfig {
     }
 }
 
-impl CompInit for JobConfig {
-    fn inner_init(&mut self, _: &InnerContext) -> RIE<()> {
-        // 验证配置
-        if self.poll_interval_secs <= 0 {
-            tracing::warn!("poll_interval_secs 不能为 0，已重置为默认值 1");
-            self.poll_interval_secs = default_poll_interval();
-        }
-        Ok(())
+/// `#[component(init)]` 回调：验证配置
+fn init(this: &mut JobConfig, _store: &Store) -> RIE<()> {
+    // 验证配置
+    if this.poll_interval_secs <= 0 {
+        tracing::warn!("poll_interval_secs 不能为 0，已重置为默认值 1");
+        this.poll_interval_secs = default_poll_interval();
     }
-    
-    fn init_sort() -> i32 {
-        i32::MIN + 1 // 配置需要早初始化
-    }
+    Ok(())
 }
 
 // 默认值函数

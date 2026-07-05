@@ -9,9 +9,8 @@ use crate::storage::{FileStorage, OpendalStorage};
 use crate::{sys_key, SYS_PREFIX};
 use dashmap::DashMap;
 use std::sync::Arc;
-use tokio_util::sync::CancellationToken;
 use tx_di_core::App;
-use tx_di_core::{CompInit, RIE, tx_comp};
+use tx_di_core::{Component, DepsTuple, RIE};
 use tx_error::{AppError, AppResult};
 
 /// 文件服务插件
@@ -33,8 +32,8 @@ use tx_error::{AppError, AppResult};
 ///     }
 /// }
 /// ```
-#[derive(Debug)]
-#[tx_comp(init)]
+#[derive(Debug, Component)]
+#[component(app_async_init, init_sort = i32::MIN + 3)]
 pub struct FilePlugin {
     /// 配置引用
     pub config: Arc<FileConfig>,
@@ -108,51 +107,45 @@ impl FilePlugin {
     }
 }
 
-impl CompInit for FilePlugin {
-    tx_di_core::async_method!(
-        fn async_init_impl(ctx: Arc<App>, _token: CancellationToken) -> RIE<()> {
-            let plugin = ctx.inject::<FilePlugin>();
-            let config = plugin.config.clone();
+tx_di_core::async_method!(
+    /// `#[component(app_async_init)]` 回调：初始化存储后端
+    fn app_async_init(comp: Arc<FilePlugin>, _app: Arc<App>) -> RIE<()> {
+        let config = comp.config.clone();
 
-            if !plugin.backends.is_empty() {
-                tracing::warn!("FilePlugin: backends already initialized, skipping");
-                return Ok(());
-            }
+        if !comp.backends.is_empty() {
+            tracing::warn!("FilePlugin: backends already initialized, skipping");
+            return Ok(());
+        }
 
-            // ── 1. 注册系统默认本地存储 sys:local ──────────────
-            let local = OpendalStorage::new_local(&config.base_path, &config.base_url)?;
-            plugin.backends.insert(sys_key("local"), Arc::new(local));
+        // ── 1. 注册系统默认本地存储 sys:local ──────────────
+        let local = OpendalStorage::new_local(&config.base_path, &config.base_url)?;
+        comp.backends.insert(sys_key("local"), Arc::new(local));
 
-            // ── 2. 注册配置文件中的额外后端 sys:<name> ───────────
-            for extra in &config.extra_storages {
-                let key = sys_key(&extra.name);
-                match OpendalStorage::from_storage_config(extra) {
-                    Ok(storage) => {
-                        plugin.backends.insert(key, Arc::new(storage));
-                    }
-                    Err(e) => {
-                        tracing::error!(
-                            name = %extra.name,
-                            backend = ?extra.backend,
-                            error = %e,
-                            "额外存储后端初始化失败，跳过"
-                        );
-                    }
+        // ── 2. 注册配置文件中的额外后端 sys:<name> ───────────
+        for extra in &config.extra_storages {
+            let key = sys_key(&extra.name);
+            match OpendalStorage::from_storage_config(extra) {
+                Ok(storage) => {
+                    comp.backends.insert(key, Arc::new(storage));
+                }
+                Err(e) => {
+                    tracing::error!(
+                        name = %extra.name,
+                        backend = ?extra.backend,
+                        error = %e,
+                        "额外存储后端初始化失败，跳过"
+                    );
                 }
             }
-
-            tracing::info!(
-                local_path = %config.base_path,
-                backend_count = plugin.backends.len(),
-                extra_count = config.extra_storages.len(),
-                "文件存储后端已初始化"
-            );
-
-            Ok(())
         }
-    );
 
-    fn init_sort() -> i32 {
-        i32::MIN + 3
+        tracing::info!(
+            local_path = %config.base_path,
+            backend_count = comp.backends.len(),
+            extra_count = config.extra_storages.len(),
+            "文件存储后端已初始化"
+        );
+
+        Ok(())
     }
-}
+);

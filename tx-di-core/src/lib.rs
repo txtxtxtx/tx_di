@@ -60,6 +60,10 @@ pub use topology::topo_sort;
 pub use aop::{CallContext, CallResult, Interceptor, InterceptorChain};
 
 /// 简化异步方法实现的宏
+///
+/// 将用户写的 `fn name(...) -> RIE<()> { ... }` 转换为
+/// `fn name(...) -> BoxFuture<RIE<()>> { Box::pin(async move { ... }) }`，
+/// 自动处理 `BoxFuture` 包装，用户无需手动写 `Box::pin`。
 #[macro_export]
 macro_rules! async_method {
     (
@@ -67,8 +71,8 @@ macro_rules! async_method {
         $vis:vis fn $name:ident($($param:ident: $ty:ty),* $(,)?) -> $ret:ty $body:block
     ) => {
         $(#[$meta])*
-        $vis fn $name($($param: $ty),*) -> impl ::std::future::Future<Output = $ret> + Send {
-            async move $body
+        $vis fn $name($($param: $ty),*) -> $crate::BoxFuture<$ret> {
+            Box::pin(async move $body)
         }
     };
 }

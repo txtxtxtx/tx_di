@@ -1,7 +1,7 @@
 //! 文件存储配置
 
 use serde::{Deserialize, Serialize};
-use tx_di_core::{tx_comp, CompInit, InnerContext, RIE};
+use tx_di_core::{Component, RIE, Store};
 
 /// 存储后端类型
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -129,8 +129,8 @@ impl Default for StorageConfig {
 /// region = "ap-southeast-1"
 /// endpoint = "http://localhost:9000"
 /// ```
-#[derive(Debug, Clone, Deserialize)]
-#[tx_comp(conf, init)]
+#[derive(Debug, Clone, Deserialize, Component)]
+#[component(conf, init, init_sort = i32::MIN + 3)]
 pub struct FileConfig {
     /// 本地存储根路径（sys:local 使用）
     #[serde(default = "default_base_path")]
@@ -165,19 +165,14 @@ impl Default for FileConfig {
     }
 }
 
-impl CompInit for FileConfig {
-    fn inner_init(&mut self, _ctx: &InnerContext) -> RIE<()> {
-        tracing::info!(
-            base_path = %self.base_path,
-            max_file_size = self.max_file_size,
-            "文件存储配置已加载"
-        );
-        Ok(())
-    }
-
-    fn init_sort() -> i32 {
-        i32::MIN + 3
-    }
+/// `#[component(init)]` 回调：配置加载后打印日志
+fn init(this: &mut FileConfig, _store: &Store) -> RIE<()> {
+    tracing::info!(
+        base_path = %this.base_path,
+        max_file_size = this.max_file_size,
+        "文件存储配置已加载"
+    );
+    Ok(())
 }
 
 fn default_base_path() -> String {

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use serde::Deserialize;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use tx_di_core::{tx_comp, CompInit, InnerContext, RIE};
+use tx_di_core::{Component, RIE, Store};
 use crate::layers::{add_layer_by_name};
 
 
@@ -26,8 +26,8 @@ use crate::layers::{add_layer_by_name};
 /// # host = "::"          # 监听所有 IPv6 接口
 /// port = 8080
 /// ```
-#[derive(Debug, Clone, Deserialize)]
-#[tx_comp(conf,init)]
+#[derive(Debug, Clone, Deserialize, Component)]
+#[component(conf, init, init_sort = i32::MAX)]
 pub struct WebConfig {
     /// 服务器监听地址
     ///
@@ -109,21 +109,17 @@ impl Default for WebConfig {
     }
 }
 
-impl CompInit for WebConfig {
-    fn inner_init(&mut self, _: &InnerContext) -> RIE<()> {
-        // 设置超时时间
-        crate::layers::set_timeout_secs(self.timeout_secs);
-        // 注册配置的中间件
-        if let Some(layers) = &self.layers.clone() {
-            for (priority, layer) in layers {
-                add_layer_by_name(layer, *priority);
-            }
+/// `#[component(init)]` 回调：配置超时和中间件注册
+fn init(this: &mut WebConfig, _store: &Store) -> RIE<()> {
+    // 设置超时时间
+    crate::layers::set_timeout_secs(this.timeout_secs);
+    // 注册配置的中间件
+    if let Some(layers) = &this.layers.clone() {
+        for (priority, layer) in layers {
+            add_layer_by_name(layer, *priority);
         }
-        Ok(())
     }
-    fn init_sort() -> i32 {
-        i32::MAX
-    }
+    Ok(())
 }
 
 
