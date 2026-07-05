@@ -14,6 +14,7 @@
 mod attr;
 mod classify;
 mod codegen;
+mod intercept_macro;
 mod name_utils;
 mod type_utils;
 
@@ -124,4 +125,22 @@ use proc_macro::TokenStream;
 #[proc_macro_derive(Component, attributes(component, tx_cst))]
 pub fn derive_component(input: TokenStream) -> TokenStream {
     codegen::derive_component(input)
+}
+
+/// `#[intercept]` — 标记需要 AOP 拦截的方法
+///
+/// 必须在 `#[component(intercept(...))]` 标记的结构体的 impl 块中使用。
+/// 生成的包裹代码会调用拦截器链的 before/after 回调。
+///
+/// # 参数覆写
+///
+/// 拦截器可通过 `ctx.get_raw_mut::<T>(index)` 修改方法参数，
+/// `#[intercept]` 生成的代码会自动提取被覆写的参数传入业务方法。
+///
+/// # Panics
+///
+/// 如果拦截器的 `before` 返回 `Err`，方法不会执行且 panic。
+#[proc_macro_attribute]
+pub fn intercept(attr: TokenStream, item: TokenStream) -> TokenStream {
+    intercept_macro::intercept_impl(attr, item)
 }

@@ -43,6 +43,8 @@ pub struct CompAttr {
     pub init_sort: Option<Expr>,
     pub conf: Option<Option<String>>,
     pub as_trait: Option<Type>,
+    /// 拦截器类型列表（用于 AOP）
+    pub interceptors: Vec<Type>,
 }
 
 impl CompAttr {
@@ -82,6 +84,7 @@ struct CompAttrArgs {
     init_sort: Option<Expr>,
     conf: Option<Option<String>>,
     as_trait: Option<Type>,
+    interceptors: Vec<Type>,
 }
 
 impl From<CompAttrArgs> for CompAttr {
@@ -96,6 +99,7 @@ impl From<CompAttrArgs> for CompAttr {
             init_sort: args.init_sort,
             conf: args.conf,
             as_trait: args.as_trait,
+            interceptors: args.interceptors,
         }
     }
 }
@@ -124,6 +128,7 @@ impl Parse for CompAttrArgs {
         let mut init_sort = None;
         let mut conf = None;
         let mut as_trait = None;
+        let mut interceptors = Vec::new();
 
         loop {
             if input.is_empty() {
@@ -205,10 +210,13 @@ impl Parse for CompAttrArgs {
                     ));
                 }
             } else if key == "intercept" {
-                // AOP 拦截器 — 暂时跳过，后续实现
-                if input.peek(syn::token::Paren) {
-                    let _content: syn::ExprParen = input.parse()?;
-                }
+                // AOP 拦截器 — 解析拦截器类型列表
+                let content;
+                syn::parenthesized!(content in input);
+                use syn::punctuated::Punctuated;
+                let types: Punctuated<Type, Token![,]> =
+                    content.parse_terminated(Type::parse, Token![,])?;
+                interceptors = types.into_iter().collect();
             } else if key == "for" {
                 // 泛型具体化 — 暂时跳过，后续实现
                 if input.peek(syn::token::Paren) {
@@ -238,6 +246,7 @@ impl Parse for CompAttrArgs {
             init_sort,
             conf,
             as_trait,
+            interceptors,
         })
     }
 }

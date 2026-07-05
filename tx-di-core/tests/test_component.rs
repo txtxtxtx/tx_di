@@ -501,8 +501,9 @@ fn test_interceptor_before_after() {
     }
 
     impl Interceptor for TestInterceptor {
-        fn before(&self, _ctx: &CallContext) {
+        fn before(&self, _ctx: &mut CallContext) -> RIE<()> {
             self.before_called.store(true, Ordering::SeqCst);
+            Ok(())
         }
         fn after(&self, _ctx: &CallContext, _result: &CallResult) {
             self.after_called.store(true, Ordering::SeqCst);
@@ -517,8 +518,8 @@ fn test_interceptor_before_after() {
         after_called: after.clone(),
     };
 
-    let ctx = CallContext::new("test_method");
-    interceptor.before(&ctx);
+    let mut ctx = CallContext::new("test_method");
+    interceptor.before(&mut ctx).unwrap();
     interceptor.after(&ctx, &CallResult::Ok);
 
     assert!(before.load(Ordering::SeqCst));
@@ -534,8 +535,9 @@ fn test_interceptor_chain() {
     }
 
     impl Interceptor for CountingInterceptor {
-        fn before(&self, _ctx: &CallContext) {
+        fn before(&self, _ctx: &mut CallContext) -> RIE<()> {
             self.counter.fetch_add(1, Ordering::SeqCst);
+            Ok(())
         }
         fn after(&self, _ctx: &CallContext, _result: &CallResult) {
             self.counter.fetch_add(1, Ordering::SeqCst);
@@ -547,8 +549,8 @@ fn test_interceptor_chain() {
     chain.push(CountingInterceptor { counter: counter.clone() });
     chain.push(CountingInterceptor { counter: counter.clone() });
 
-    let ctx = CallContext::new("test");
-    chain.before_all(&ctx);
+    let mut ctx = CallContext::new("test");
+    chain.before_all(&mut ctx).unwrap();
     // 2 个拦截器各调一次 before = 2
     assert_eq!(counter.load(Ordering::SeqCst), 2);
 
@@ -562,9 +564,9 @@ fn test_logging_interceptor() {
     use tx_di_core::aop::LoggingInterceptor;
 
     let interceptor = LoggingInterceptor;
-    let ctx = CallContext::new("test_method").with_arg("param1".into());
+    let mut ctx = CallContext::new("test_method").with_arg("param1".into());
     // 不 panic 即通过
-    interceptor.before(&ctx);
+    interceptor.before(&mut ctx).unwrap();
     interceptor.after(&ctx, &CallResult::Ok);
     interceptor.after(&ctx, &CallResult::Err("test error".into()));
 }
@@ -574,12 +576,12 @@ fn test_metrics_interceptor() {
     use tx_di_core::aop::MetricsInterceptor;
 
     let interceptor = MetricsInterceptor::new();
-    let ctx = CallContext::new("counted_method");
+    let mut ctx = CallContext::new("counted_method");
 
     assert_eq!(interceptor.count(), 0);
-    interceptor.before(&ctx);
+    interceptor.before(&mut ctx).unwrap();
     assert_eq!(interceptor.count(), 1);
-    interceptor.before(&ctx);
+    interceptor.before(&mut ctx).unwrap();
     assert_eq!(interceptor.count(), 2);
 }
 
@@ -1120,16 +1122,15 @@ fn test_inject_or_panic_unregistered() {
 
 #[test]
 fn test_interceptor_chain_default() {
-    let chain: InterceptorChain<tx_di_core::aop::LoggingInterceptor> =
-        InterceptorChain::default();
-    let ctx = CallContext::new("test");
+    let chain = InterceptorChain::default();
+    let mut ctx = CallContext::new("test");
     // 空链不应 panic
-    chain.before_all(&ctx);
+    chain.before_all(&mut ctx).unwrap();
     chain.after_all(&ctx, &CallResult::Ok);
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// 24. ArgValue From 转换
+// 24. ArgValue From 转换 + raw_args
 // ══════════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -1140,4 +1141,25 @@ fn test_arg_value_conversions() {
     let _ = ArgValue::from("hello");
     let _ = ArgValue::from("world".to_string());
     let _ = ArgValue::from(true);
+}
+
+#[test]
+fn test_raw_args_in_call_context() {
+    let mut ctx = CallContext::new("test")
+        .with_arg(tx_di_core::aop::ArgValue::Other("42".into()))
+        .with_raw(42u64)
+        .with_arg(tx_di_core::aop::ArgValue::Str("hello".into()))
+        .with_raw("hello".to_string());
+
+    // 验证可以 downcast 读取
+    let val: &mut u64 = ctx.get_raw_mut(0).unwrap();
+    assert_eq!(*val, 42);
+    // 验证可以覆写
+    *val = 100;
+    let val: &mut u64 = ctx.get_raw_mut(0).unwrap();
+    assert_eq!(*val, 100);
+
+    // 验证字符串参数
+    let s: &mut String = ctx.get_raw_mut(1).unwrap();
+    assert_eq!(s, "hello");
 }

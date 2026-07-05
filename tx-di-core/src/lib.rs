@@ -57,7 +57,7 @@ pub use registry::{ComponentMeta, COMPONENT_REGISTRY};
 pub use scope::Scope;
 pub use store::{Store, CompRef, TraitImplEntry, TraitImplMap, inject_from_store, inject_trait_from_store, inject_all_traits_from_store};
 pub use topology::topo_sort;
-pub use aop::{CallContext, CallResult, Interceptor, Next};
+pub use aop::{CallContext, CallResult, Interceptor, InterceptorChain};
 
 /// 简化异步方法实现的宏
 #[macro_export]
