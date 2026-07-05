@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use tx_common::id;
 use tx_common::page::Page;
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
 use crate::shared::repository::RepositoryError;
 use crate::role::model::aggregate::Role;
@@ -13,7 +13,7 @@ use crate::role::repository::RoleRepository;
 /// 只持有 RoleRepository，不跨聚合依赖。
 /// 跨聚合操作（如添加用户到角色时的用户状态校验）
 /// 由 Application 层 `RoleAppService` 负责编排。
-#[tx_comp]
+#[derive(Component)]
 pub struct RoleService {
     role_repo: Arc<dyn RoleRepository>,
 }

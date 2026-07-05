@@ -7,12 +7,12 @@ use admin_domain::role::service::RoleService;
 use admin_domain::user::repository::UserRepository;
 use admin_domain::user::model::value_object::UserStatus;
 use admin_domain::shared::repository::RepositoryError;
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
 use tx_common::page::Page;
 
 /// Role application service - 编排领域操作 + 跨聚合校验
-#[tx_comp]
+#[derive(Component)]
 pub struct RoleAppService {
     role_service: Arc<RoleService>,
     user_repo: Arc<dyn UserRepository>,

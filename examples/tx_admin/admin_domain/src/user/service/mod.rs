@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use tx_common::id;
 use tx_common::page::Page;
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
 use crate::shared::repository::RepositoryError;
 use crate::user::model::aggregate::User;
@@ -14,7 +14,7 @@ use crate::password;
 /// 只持有 UserRepository，不跨聚合依赖。
 /// 跨聚合操作（角色校验、部门校验、权限查询）由 Application 层的
 /// `UserAppService` 负责编排。
-#[tx_comp]
+#[derive(Component)]
 pub struct UserService {
     user_repo: Arc<dyn UserRepository>,
 }

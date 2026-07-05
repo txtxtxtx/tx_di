@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use admin_proto::{JobResponse, JobLogResponse};
 use tx_common::page::Page;
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_di_job::{JobPlugin, JobRepository, InfrustJob, InfrustJobLog, JobStatus, AuditFields, SoftDelete, ExecutionStatus};
 use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
@@ -12,7 +12,7 @@ use crate::job::dto::{CreateJobRequest, UpdateJobRequest, ListJobsRequest, ListJ
 /// 定时任务应用服务
 ///
 /// 基于 tx_di_job 插件，封装定时任务和任务日志的用例逻辑。
-#[tx_comp]
+#[derive(Component)]
 pub struct JobAppService {
     tp: Arc<ToastyPlugin>,
     job_plugin: Arc<JobPlugin>,

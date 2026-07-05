@@ -3,10 +3,10 @@ use std::sync::Arc;
 use crate::department::dto::*;
 use admin_domain::department::model::value_object::{DeptQuery, DeptTreeNode};
 use admin_domain::department::service::DepartmentService;
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
 
-#[tx_comp]
+#[derive(Component)]
 pub struct DepartmentAppService {
     dept_service: Arc<DepartmentService>,
 }

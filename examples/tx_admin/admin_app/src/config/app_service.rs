@@ -4,11 +4,11 @@ use crate::config::dto::config_to_response;
 use admin_domain::config::model::value_object::ConfigQuery;
 use admin_domain::config::service::ConfigService;
 use admin_proto::{CreateConfigRequest, UpdateConfigRequest, ListConfigsRequest, ConfigResponse};
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
 use tx_common::page::Page;
 
-#[tx_comp]
+#[derive(Component)]
 pub struct ConfigAppService {
     config_service: Arc<ConfigService>,
 }

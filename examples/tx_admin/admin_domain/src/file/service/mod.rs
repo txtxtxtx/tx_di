@@ -5,11 +5,11 @@ use crate::file::model::value_object::{FileDownloadInfo, FileQuery, FileUploadCo
 use crate::file::repository::{FileConfigRepository, FileRepository};
 use crate::shared::repository::RepositoryError;
 use tx_common::page::Page;
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
 use tx_common::id;
 
-#[tx_comp]
+#[derive(Component)]
 pub struct FileService {
     file_repo: Arc<dyn FileRepository>,
     file_config_repo: Arc<dyn FileConfigRepository>,

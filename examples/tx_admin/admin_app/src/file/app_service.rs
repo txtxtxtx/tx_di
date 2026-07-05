@@ -10,7 +10,7 @@ use admin_domain::file::service::FileService;
 use admin_domain::file::repository::FileConfigRepository;
 use admin_proto::{ListFilesRequest, FileResponse};
 use tx_common::page::Page;
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_di_file::{user_key, FilePluginErr, StorageConfig};
 use tx_di_file::storage::{guess_mime_type, extract_extension, FileStorageErr, FileStorage, OpendalStorage};
 use tx_di_file::FilePlugin;
@@ -40,7 +40,7 @@ impl<R: AsyncRead + Unpin> AsyncRead for CountingReader<R> {
     }
 }
 
-#[tx_comp]
+#[derive(Component)]
 pub struct FileAppService {
     pub file_service: Arc<FileService>,
     pub file_plugin: Arc<FilePlugin>,

@@ -8,7 +8,7 @@ use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::model::AuditFields;
 use admin_domain::shared::repository::{RepositoryError, db_err};
 use tx_common::page::Page;
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
@@ -16,7 +16,8 @@ use super::model::{SysDictData, SysDictType};
 use crate::common::{Status, Deleted};
 
 /// Toasty 实现的 DictTypeRepository
-#[tx_comp(as_trait = dyn DictTypeRepository)]
+#[derive(Component)]
+#[component(as_trait = dyn DictTypeRepository)]
 pub struct ToastyDictTypeRepository {
     plugin: Arc<ToastyPlugin>,
 }
@@ -194,7 +195,8 @@ impl DictTypeRepository for ToastyDictTypeRepository {
 }
 
 /// Toasty 实现的 DictDataRepository
-#[tx_comp(as_trait = dyn DictDataRepository)]
+#[derive(Component)]
+#[component(as_trait = dyn DictDataRepository)]
 pub struct ToastyDictDataRepository {
     plugin: Arc<ToastyPlugin>,
 }

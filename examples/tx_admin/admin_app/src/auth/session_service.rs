@@ -3,7 +3,7 @@
 //! 封装所有 Session/Token 操作（sa-token），
 //! 使 API 层不再直接依赖 `StpUtil`。
 
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_di_sa_token::StpUtil;
 use tx_error::{AppError, AppResult};
 use admin_domain::shared::model::value_object::SessionEctData;
@@ -13,7 +13,7 @@ use admin_domain::shared::model::value_object::SessionEctData;
 /// 负责：
 /// - 登录时创建 sa-token 会话，绑定角色/权限/extra_data
 /// - 登出时销毁会话、清除权限/角色缓存
-#[tx_comp]
+#[derive(Component)]
 pub struct AuthSessionService;
 
 impl AuthSessionService {

@@ -8,11 +8,11 @@ use admin_proto::{
     CreateDictTypeRequest, UpdateDictTypeRequest, ListDictTypesRequest, DictTypeResponse,
     CreateDictDataRequest, UpdateDictDataRequest, ListDictDataRequest, DictDataResponse,
 };
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
 use tx_common::page::Page;
 
-#[tx_comp]
+#[derive(Component)]
 pub struct DictTypeAppService {
     dict_type_service: Arc<DictTypeService>,
 }
@@ -82,7 +82,7 @@ impl DictTypeAppService {
     }
 }
 
-#[tx_comp]
+#[derive(Component)]
 pub struct DictDataAppService {
     dict_data_service: Arc<DictDataService>,
 }

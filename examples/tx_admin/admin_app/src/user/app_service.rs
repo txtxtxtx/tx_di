@@ -12,12 +12,12 @@ use admin_domain::role::repository::RoleRepository;
 use admin_domain::department::repository::DepartmentRepository;
 use admin_domain::menu::repository::MenuRepository;
 use admin_domain::shared::repository::RepositoryError;
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
 use tx_common::page::Page;
 
 /// User application service - 编排领域操作 + 跨聚合校验
-#[tx_comp]
+#[derive(Component)]
 pub struct UserAppService {
     user_service: Arc<UserService>,
     role_repo: Arc<dyn RoleRepository>,

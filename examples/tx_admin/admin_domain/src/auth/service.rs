@@ -8,7 +8,7 @@
 
 use std::sync::Arc;
 
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_error::{AppError, AppResult};
 
 use crate::user::model::aggregate::User;
@@ -19,7 +19,7 @@ use crate::auth::error::AuthError;
 ///
 /// 提供 `authenticate` 方法，统一处理登录认证逻辑，
 /// 返回明确的 `AuthError` 领域错误。
-#[tx_comp]
+#[derive(Component)]
 pub struct AuthService {
     user_service: Arc<UserService>,
 }

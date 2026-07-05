@@ -8,7 +8,7 @@ use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::model::AuditFields;
 use admin_domain::shared::repository::{RepositoryError, db_err};
 use tx_common::page::Page;
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
@@ -16,7 +16,8 @@ use super::model::{SysFile, SysFileConfig};
 use crate::common::{Deleted, StorageType};
 
 /// Toasty 实现的 FileRepository
-#[tx_comp(as_trait = dyn FileRepository)]
+#[derive(Component)]
+#[component(as_trait = dyn FileRepository)]
 pub struct ToastyFileRepository {
     plugin: Arc<ToastyPlugin>,
 }
@@ -161,7 +162,8 @@ impl FileRepository for ToastyFileRepository {
 }
 
 /// Toasty 实现的 FileConfigRepository
-#[tx_comp(as_trait = dyn FileConfigRepository)]
+#[derive(Component)]
+#[component(as_trait = dyn FileConfigRepository)]
 pub struct ToastyFileConfigRepository {
     plugin: Arc<ToastyPlugin>,
 }

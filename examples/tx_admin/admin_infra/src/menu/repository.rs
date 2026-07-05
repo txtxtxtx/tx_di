@@ -8,7 +8,7 @@ use admin_domain::menu::repository::MenuRepository;
 use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::model::AuditFields;
 use admin_domain::shared::repository::{RepositoryError, db_err};
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
@@ -18,7 +18,8 @@ use crate::role::model::SysRoleMenu;
 use crate::user::model::SysUserRole;
 
 /// Toasty 实现的 MenuRepository
-#[tx_comp(as_trait = dyn MenuRepository)]
+#[derive(Component)]
+#[component(as_trait = dyn MenuRepository)]
 pub struct ToastyMenuRepository {
     plugin: Arc<ToastyPlugin>,
 }

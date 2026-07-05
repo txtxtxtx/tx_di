@@ -6,11 +6,11 @@ use crate::dictionary::model::value_object::{DictDataQuery, DictTypeQuery};
 use crate::dictionary::repository::{DictDataRepository, DictTypeRepository};
 use crate::shared::repository::RepositoryError;
 use tx_common::page::Page;
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
 use tx_common::id;
 
-#[tx_comp]
+#[derive(Component)]
 pub struct DictTypeService {
     dict_type_repo: Arc<dyn DictTypeRepository>,
 }
@@ -169,7 +169,7 @@ impl DictTypeService {
     }
 }
 
-#[tx_comp]
+#[derive(Component)]
 pub struct DictDataService {
     dict_data_repo: Arc<dyn DictDataRepository>,
 }

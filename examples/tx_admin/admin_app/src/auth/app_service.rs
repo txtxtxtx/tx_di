@@ -10,14 +10,14 @@ use admin_domain::menu::service::MenuService;
 use crate::auth::session_service::AuthSessionService;
 use crate::log::app_service::LoginLogAppService;
 use crate::user::app_service::UserAppService;
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
 
 /// 认证应用服务
 ///
 /// 编排登录/登出所需的多个领域服务和会话服务。
 /// Session 管理由 `AuthSessionService` 封装，不再暴露到 API 层。
-#[tx_comp]
+#[derive(Component)]
 pub struct AuthAppService {
     auth_service: Arc<AuthService>,
     user_app: Arc<UserAppService>,

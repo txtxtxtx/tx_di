@@ -6,11 +6,11 @@ use crate::config::model::value_object::ConfigQuery;
 use crate::config::repository::ConfigRepository;
 use crate::shared::repository::RepositoryError;
 use tx_common::page::Page;
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
 use tx_common::id;
 
-#[tx_comp]
+#[derive(Component)]
 pub struct ConfigService {
     config_repo: Arc<dyn ConfigRepository>,
 }

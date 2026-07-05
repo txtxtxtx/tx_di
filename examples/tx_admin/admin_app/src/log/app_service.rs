@@ -4,13 +4,13 @@ use admin_proto::{CreateOperateLogRequest, ListOperateLogsRequest, OperateLogRes
                   CreateLoginLogRequest, ListLoginLogsRequest, LoginLogResponse};
 use admin_domain::log::model::value_object::{LoginLogQuery, OperateLogQuery};
 use admin_domain::log::service::{LoginLogService, OperateLogService};
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
 use tx_common::page::Page;
 
 use crate::log::dto::{operate_log_to_response, login_log_to_response};
 
-#[tx_comp]
+#[derive(Component)]
 pub struct OperateLogAppService {
     log_service: Arc<OperateLogService>,
 }
@@ -77,7 +77,7 @@ impl OperateLogAppService {
     }
 }
 
-#[tx_comp]
+#[derive(Component)]
 pub struct LoginLogAppService {
     log_service: Arc<LoginLogService>,
 }

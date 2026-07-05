@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use tx_common::id;
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
 use crate::shared::repository::RepositoryError;
 use crate::department::model::aggregate::Department;
@@ -8,7 +8,7 @@ use crate::shared::model::value_object::DeletedStatus;
 use crate::department::model::value_object::{DeptQuery, DeptTreeNode};
 use crate::department::repository::DepartmentRepository;
 
-#[tx_comp]
+#[derive(Component)]
 pub struct DepartmentService {
     dept_repo: Arc<dyn DepartmentRepository>,
 }

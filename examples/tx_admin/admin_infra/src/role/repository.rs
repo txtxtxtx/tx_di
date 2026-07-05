@@ -9,7 +9,7 @@ use admin_domain::role::model::value_object::RoleQuery;
 use admin_domain::role::repository::RoleRepository;
 use admin_domain::user::model::aggregate::User;
 use tx_common::page::Page;
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
@@ -18,7 +18,8 @@ use crate::user::model::{SysUser, SysUserRole};
 use crate::common::{Status, Deleted};
 
 /// Toasty 实现的 RoleRepository
-#[tx_comp(as_trait = dyn RoleRepository)]
+#[derive(Component)]
+#[component(as_trait = dyn RoleRepository)]
 pub struct ToastyRoleRepository {
     plugin: Arc<ToastyPlugin>,
 }

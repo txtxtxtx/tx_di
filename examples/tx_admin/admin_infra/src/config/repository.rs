@@ -8,7 +8,7 @@ use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::model::AuditFields;
 use admin_domain::shared::repository::{RepositoryError, db_err};
 use tx_common::page::Page;
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
@@ -16,7 +16,8 @@ use super::model::SysConfig;
 use crate::common::Deleted;
 
 /// Toasty 实现的 ConfigRepository
-#[tx_comp(as_trait = dyn ConfigRepository)]
+#[derive(Component)]
+#[component(as_trait = dyn ConfigRepository)]
 pub struct ToastyConfigRepository {
     plugin: Arc<ToastyPlugin>,
 }

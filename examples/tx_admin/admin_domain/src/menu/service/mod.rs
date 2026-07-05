@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 use tx_common::id;
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
 use crate::shared::repository::RepositoryError;
 use crate::menu::model::aggregate::Menu;
@@ -10,7 +10,7 @@ use crate::menu::model::value_object::{MenuQuery, MenuTreeNode};
 use crate::menu::repository::MenuRepository;
 
 /// Menu domain service
-#[tx_comp]
+#[derive(Component)]
 pub struct MenuService {
     menu_repo: Arc<dyn MenuRepository>,
 }

@@ -7,7 +7,7 @@ use admin_domain::user::model::aggregate::User;
 use admin_domain::user::model::value_object::{UserQuery, UserStatus};
 use admin_domain::user::repository::UserRepository;
 use tx_common::page::Page;
-use tx_di_core::tx_comp;
+use tx_di_core::{Component, DepsTuple};
 use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
@@ -15,7 +15,8 @@ use super::model::{SysUser, SysUserDept, SysUserRole};
 use crate::common::{Sex, Status, Deleted};
 
 /// Toasty 实现的 UserRepository
-#[tx_comp(as_trait = dyn UserRepository)]
+#[derive(Component)]
+#[component(as_trait = dyn UserRepository)]
 pub struct ToastyUserRepository {
     plugin: Arc<ToastyPlugin>,
 }
