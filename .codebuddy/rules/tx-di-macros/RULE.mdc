@@ -1,8 +1,9 @@
 ---
-description: tx-di-macros Component derive 宏的使用规范与开发约束
-alwaysApply: false
+description: 
+alwaysApply: true
 enabled: true
-updatedAt: 2026-07-04T22:22:00.000Z
+updatedAt: 2026-07-05T14:55:46.372Z
+provider: 
 ---
 
 # tx-di-macros 使用规范

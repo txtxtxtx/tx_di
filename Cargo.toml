@@ -28,6 +28,10 @@ members = [
     "plugins/tx_di_file",
     # 定时任务
     "plugins/tx_di_job",
+    # 缓存
+    "plugins/tx_di_cache",
+    # 注册/配置中心
+    "plugins/tx_di_registry",
     # 会议系统,todo 先忽略，以后更新
     # "examples/tx_di_meeting",
     # 后台管理系统

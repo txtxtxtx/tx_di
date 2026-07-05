@@ -1,0 +1,29 @@
+[package]
+name = "tx_di_cache"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+readme = "README.md"
+repository.workspace = true
+
+[features]
+default = ["memory"]
+memory = []
+redis = ["dep:redis"]
+
+[dependencies]
+tx-di-core = { workspace = true }
+tx_error = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+async-trait = { workspace = true }
+dashmap = { workspace = true }
+rand = { workspace = true }
+thiserror = { workspace = true }
+
+# Redis（仅 feature="redis" 时启用）
+redis = { version = "0.28", optional = true, default-features = false, features = ["tokio-comp", "connection-manager"] }
