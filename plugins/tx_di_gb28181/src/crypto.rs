@@ -46,7 +46,7 @@ mod tests {
 
     #[test]
     fn digest_auth_valid() {
-        let auth = "Digest username=\"34020000001320000001\", realm=\"3402000000\", nonce=\"testnonce\", response=\"correct\", uri=\"sip:34020000002000000001@192.168.1.100:5060\"";
+        let _auth = "Digest username=\"34020000001320000001\", realm=\"3402000000\", nonce=\"testnonce\", response=\"correct\", uri=\"sip:34020000002000000001@192.168.1.100:5060\"";
 
         // 计算正确的 response
         let a1 = "34020000001320000001:3402000000:12345678";
