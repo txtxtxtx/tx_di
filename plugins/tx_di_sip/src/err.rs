@@ -37,4 +37,10 @@ pub enum SipErr {
     /// 取消令牌已存在
     #[err(-10, "取消令牌已存在")]
     TokenAlreadySet,
+    /// SIP 回复失败
+    #[err(-11, "SIP 回复失败")]
+    ReplyFailed,
+    /// SIP 事务已被取出（无法再回复）
+    #[err(-12, "SIP 事务已被取出")]
+    TransactionMissing,
 }

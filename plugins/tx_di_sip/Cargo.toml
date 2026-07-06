@@ -18,6 +18,8 @@ anyhow.workspace = true
 tokio-util = { workspace = true }
 dashmap.workspace = true
 futures.workspace = true
+async-trait = { workspace = true }
+rand = { workspace = true }
 
 [dev-dependencies]
 toml.workspace = true

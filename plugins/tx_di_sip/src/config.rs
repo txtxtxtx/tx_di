@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use std::net::SocketAddr;
-use tx_di_core::{tx_comp, CompInit, RIE};
+use tx_di_core::{Component, RIE};
 use crate::SipErr;
 
 /// SIP 传输协议类型
@@ -49,8 +49,8 @@ pub enum SipTransport {
 /// port = 5060
 /// transport = "udp"
 /// ```
-#[derive(Debug, Clone, Deserialize)]
-#[tx_comp(conf, init)]
+#[derive(Debug, Clone, Deserialize, Component)]
+#[component(conf, init_sort = 10000)]
 pub struct SipConfig {
     /// 监听地址
     ///
@@ -109,6 +109,25 @@ pub struct SipConfig {
     /// TLS 传输配置（仅 `transport = "tls"` 时使用）
     #[serde(default)]
     pub tls: Option<TlsConfig>,
+
+    /// 是否启用 SIP 服务（默认 true）
+    ///
+    /// 水平扩容时可设为 `false` 仅做「客户端」（不监听入站），
+    /// 或配合其他开关只做「服务端」。
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+
+    /// 分发队列容量（生产者 → 消费者 channel），默认 10000
+    ///
+    /// 原通过环境变量 `SIP_QUEUE_SIZE` 配置，现统一进配置文件。
+    #[serde(default = "default_dispatch_queue_size")]
+    pub dispatch_queue_size: usize,
+
+    /// 并发 handler 上限（Semaphore 背压），默认 1000
+    ///
+    /// 原通过环境变量 `SIP_MAX_HANDLERS` 配置，现统一进配置文件。
+    #[serde(default = "default_max_concurrent_handlers")]
+    pub max_concurrent_handlers: usize,
 }
 
 /// TLS 传输配置
@@ -133,13 +152,10 @@ impl Default for SipConfig {
             retry_count: default_retry_count(),
             request_timeout_secs: default_request_timeout_secs(),
             tls: None,
+            enabled: default_enabled(),
+            dispatch_queue_size: default_dispatch_queue_size(),
+            max_concurrent_handlers: default_max_concurrent_handlers(),
         }
-    }
-}
-
-impl CompInit for SipConfig {
-    fn init_sort() -> i32 {
-        10000
     }
 }
 
@@ -194,4 +210,16 @@ pub(crate) fn default_retry_count() -> u32 {
 
 pub(crate) fn default_request_timeout_secs() -> u64 {
     30
+}
+
+pub(crate) fn default_enabled() -> bool {
+    true
+}
+
+pub(crate) fn default_dispatch_queue_size() -> usize {
+    10_000
+}
+
+pub(crate) fn default_max_concurrent_handlers() -> usize {
+    1000
 }

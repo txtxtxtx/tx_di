@@ -7,8 +7,9 @@
 //!
 //! - **IPv4 / IPv6 双栈支持** — 通过配置 `host` 字段选择监听地址
 //! - **UDP + TCP 双传输层** — 可单独或同时启用
-//! - **消息处理注册** — 类似 axum 路由的 [`sip_router.add_handler`] 机制
-//! - **消息发送接口** — [`SipSender`] 提供 `register()`/`invite()` 等便捷 API
+//! - **消息处理注册** — 类似 axum 路由的 [`SipRouter::add_handler`] 机制
+//! - **中间件洋葱链** — 作用在 [`SipTx`] 上（认证/日志/NAT 修正/限流）
+//! - **消息发送接口** — [`SipSender`] 提供 `register()`/`invite()`/`send_message()` 等
 //! - **优雅停止** — 通过 `CancellationToken` 支持 shutdown
 //!
 //! ## 快速开始
@@ -29,23 +30,20 @@
 //! port     = 5060          # SIP 端口
 //! transport = "udp"        # 传输协议: udp / tcp / both
 //! user_agent = "MyApp/1.0"
+//! enabled = true           # 是否启用 SIP 服务
 //! ```
 //!
 //! ### 3. 注册消息处理器 & 启动
 //!
-//! ```rust,no_run
-//! use tx_di_sip::{SipPlugin, SipRouter};
+//! ```rust,ignore
+//! use tx_di_sip::{SipPlugin, SipRouter, SipTx};
 //! use rsipstack::sip::StatusCode;
 //! use tx_di_core::BuildContext;
 //!
 //! // 启动前注册处理器
-//! sip_router.add_handler(Some("REGISTER"), 0, |mut tx| async move {
-//!     println!("收到 REGISTER: {}", tx.original);
-//!     tx.reply(StatusCode::OK).await?;
-//!     Ok(())
-//! });
-//!
-//! sip_router.add_handler(Some("OPTIONS"), 0, |mut tx| async move {
+//! let router = SipRouter::new();
+//! router.add_handler(Some("REGISTER"), 0, |tx: SipTx| async move {
+//!     println!("收到 REGISTER: {}", tx.request().method);
 //!     tx.reply(StatusCode::OK).await?;
 //!     Ok(())
 //! });
@@ -59,19 +57,24 @@ mod config;
 mod comp;
 pub mod err;
 mod handler;
+mod middleware;
 mod sender;
+mod sip_tx;
 
 pub use config::*;
 pub use comp::*;
 pub use err::SipErr;
 pub use handler::SipRouter;
+pub use middleware::{SipMiddleware, SipNextFn, SipNextFut};
 pub use sender::SipSender;
+pub use sip_tx::SipTx;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::net::{Ipv4Addr, SocketAddr};
     use tx_di_core::RIE;
+
     // ─────────────────────────────────────────────────────────────────────
     //  SipConfig 单元测试
     // ─────────────────────────────────────────────────────────────────────
@@ -110,6 +113,19 @@ mod tests {
     fn config_default_log_messages_false() {
         let cfg = default_config();
         assert!(!cfg.log_messages);
+    }
+
+    #[test]
+    fn config_default_enabled_true() {
+        let cfg = default_config();
+        assert!(cfg.enabled);
+    }
+
+    #[test]
+    fn config_default_perf() {
+        let cfg = default_config();
+        assert_eq!(cfg.dispatch_queue_size, 10_000);
+        assert_eq!(cfg.max_concurrent_handlers, 1000);
     }
 
     // ── enable_udp / enable_tcp ──────────────────────────────────────
@@ -199,7 +215,6 @@ mod tests {
 
     #[test]
     fn bind_addr_ipv6_with_brackets() {
-        // 包含冒号的 IPv6 地址应自动加方括号
         let cfg = SipConfig {
             host: "::".to_string(),
             port: 5060,
@@ -210,7 +225,6 @@ mod tests {
 
     #[test]
     fn bind_addr_ipv6_already_bracketed() {
-        // 已经有方括号的不重复加
         let cfg = SipConfig {
             host: "::1".to_string(),
             port: 5070,
@@ -252,14 +266,7 @@ mod tests {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    //  SipTransport 序列化/反序列化测试
-    // ─────────────────────────────────────────────────────────────────────
-
-    // ─────────────────────────────────────────────────────────────────────
     //  SipTransport 反序列化测试
-    //
-    //  通过完整 SipConfig TOML 间接验证 SipTransport 的反序列化行为，
-    //  因为裸 enum 的 toml 反序列化格式与 serde_json 不同（TOML 需要结构体上下文）。
     // ─────────────────────────────────────────────────────────────────────
 
     #[test]
@@ -294,7 +301,6 @@ mod tests {
 
     #[test]
     fn transport_default_is_udp() {
-        // 不传 transport 字段时，默认为 Udp
         let cfg: SipConfig = toml::from_str("host = \"0.0.0.0\"\nport = 5060").unwrap();
         assert_eq!(cfg.transport, SipTransport::Udp);
     }
@@ -305,7 +311,6 @@ mod tests {
 
     #[test]
     fn config_from_toml_minimal() {
-        // 只填必填项，其余使用默认值
         let toml_str = r#"
             host = "0.0.0.0"
             port = 5060
@@ -318,17 +323,23 @@ mod tests {
         assert_eq!(cfg.user_agent, "tx-di-sip/1.0.0");   // 默认值
         assert!(cfg.external_ip.is_none());               // 默认值
         assert!(!cfg.log_messages);                       // 默认值
+        assert!(cfg.enabled);                             // 默认值
+        assert_eq!(cfg.dispatch_queue_size, 10_000);      // 默认值
+        assert_eq!(cfg.max_concurrent_handlers, 1000);    // 默认值
     }
 
     #[test]
     fn config_from_toml_full() {
         let toml_str = r#"
-            host         = "::"
-            port         = 5062
-            transport    = "both"
-            user_agent   = "GB28101-Srv/2.0"
-            external_ip  = "203.0.113.10"
+            host = "::"
+            port = 5062
+            transport = "both"
+            user_agent = "GB28101-Srv/2.0"
+            external_ip = "203.0.113.10"
             log_messages = true
+            enabled = false
+            dispatch_queue_size = 20000
+            max_concurrent_handlers = 2000
         "#;
         let cfg: SipConfig = toml::from_str(toml_str).expect("完整配置解析成功");
 
@@ -338,6 +349,9 @@ mod tests {
         assert_eq!(cfg.user_agent, "GB28101-Srv/2.0");
         assert_eq!(cfg.external_ip.as_deref().unwrap(), "203.0.113.10");
         assert!(cfg.log_messages);
+        assert!(!cfg.enabled);
+        assert_eq!(cfg.dispatch_queue_size, 20000);
+        assert_eq!(cfg.max_concurrent_handlers, 2000);
     }
 
     #[test]
@@ -358,7 +372,6 @@ mod tests {
 
     #[test]
     fn config_from_toml_ipv4_both_transports() {
-        // 模拟 di-config.toml 中的典型生产配置
         let toml_str = r#"
             host       = "0.0.0.0"
             port       = 5060
@@ -374,9 +387,6 @@ mod tests {
 
     // ─────────────────────────────────────────────────────────────────────
     //  SipRouter 测试（注册 / 分发 / 清空 / 计数）
-    //
-    //  注意：SipRouter 使用全局 LazyLock<RwLock<Vec<HandlerEntry>>> 作为注册表，
-    //  并行测试会相互干扰。因此所有 router 相关的测试合并在一个串行 test 函数中。
     // ─────────────────────────────────────────────────────────────────────
 
     #[test]
@@ -427,14 +437,12 @@ mod tests {
 
     #[test]
     fn config_extreme_port_values() {
-        // 最小端口 1
         let cfg_min = SipConfig {
             port: 1,
             ..default_config()
         };
         assert_eq!(cfg_min.socket_addr().unwrap().port(), 1);
 
-        // 最大端口 65535
         let cfg_max = SipConfig {
             port: 65535,
             ..default_config()
@@ -444,7 +452,6 @@ mod tests {
 
     #[test]
     fn bind_addr_hostname_style_no_colon() {
-        // 不含冒号的主机名不加方括号
         let cfg = SipConfig {
             host: "sip-server.local".to_string(),
             port: 5060,
@@ -467,6 +474,30 @@ mod tests {
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    //  SipTx 测试（fake 模式）
+    // ─────────────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn sip_tx_fake_reply_is_idempotent() {
+        use rsipstack::sip::StatusCode;
+        let req = rsipstack::sip::Request {
+            method: rsipstack::sip::Method::Register,
+            uri: rsipstack::sip::Uri::try_from("sip:registrar@example.com").unwrap(),
+            headers: vec![].into(),
+            body: vec![],
+            version: rsipstack::sip::Version::V2,
+        };
+        let (tx, recorder) = SipTx::fake(req);
+
+        tx.reply(StatusCode::OK).await.unwrap();
+        // 第二次回复应被幂等忽略
+        tx.reply(StatusCode::Forbidden).await.unwrap();
+
+        assert!(tx.replied());
+        assert_eq!(*recorder.lock().await, Some(StatusCode::OK));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     //  辅助函数
     // ─────────────────────────────────────────────────────────────────────
 
@@ -483,15 +514,14 @@ mod tests {
             retry_count: 0,
             request_timeout_secs: 0,
             tls: None,
+            enabled: true,
+            dispatch_queue_size: 10_000,
+            max_concurrent_handlers: 1000,
         }
     }
 
-    /// 空操作 handler：接收 Transaction 并直接返回 Ok
-    ///
-    /// 注意：此 handler 不调用 `tx.reply()`，仅用于验证注册/分发机制本身。
-    /// 真正的分发集成测试需要构造真实的 rsipstack Transaction，
-    /// 那属于端到端集成测试范畴（需启动 UDP/TCP transport）。
-    async fn dummy_handler(_tx: rsipstack::transaction::transaction::Transaction) -> RIE<()> {
+    /// 空操作 handler：接收 SipTx 并直接返回 Ok
+    async fn dummy_handler(_tx: SipTx) -> RIE<()> {
         Ok(())
     }
 }

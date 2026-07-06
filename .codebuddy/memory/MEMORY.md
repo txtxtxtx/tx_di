@@ -50,9 +50,49 @@
 | `app_init` | `fn app_init(comp: Arc<T>, app: &Arc<App>) -> RIE<()>` |
 | `app_async_init` | `async fn app_async_init(comp: Arc<T>, app: Arc<App>) -> RIE<()>` |
 | `app_async_run` | `async fn app_async_run(comp: Arc<T>, app: Arc<App>, token: CancellationToken) -> RIE<()>` |
-| `shutdown` | `fn shutdown(&self)` |
+| `shutdown` | `fn shutdown(_comp: &T)`（模块级自由函数，首参为组件引用，**不是** `&self`） |
 
 ### 注意事项
 - `DepsTuple` 必须在所有使用 `#[derive(Component)]` 有依赖的模块中 `use tx_di_core::DepsTuple`
 - `app` 参数在异步回调中必须是 `Arc<App>`（非 `&Arc<App>`），因为 `BoxFuture` 要求 `'static`
 - 异步回调直接写 `async fn`，无需 `async_method!` 或手动 `Box::pin`
+
+## rsipstack 头文件位置（0.5.x）
+- 只有 `Via`/`From`/`To`/`CSeq` 在 `rsipstack::sip::typed`
+- `CallId`/`ContentType`/`Event`/`Expires`/`MaxForwards` 等其余头在 `rsipstack::sip` 根（untyped 再导出），**不在** `typed`
+- untyped 头均有 `.new(impl Into<String>)`；`Expires`/`MaxForwards` 另有 `From<u32>`
+- `Endpoint { pub inner: EndpointInnerRef }`，`incoming_transactions(&self) -> Result<TransactionReceiver>`，`Transaction::new_client(key, request, endpoint_inner, None)` + `tx.send()` 发 out-of-dialog 请求
+
+## tx_di_sip 插件（2026-07-06 实现）
+- 架构：`SipTx`(`Arc<Mutex<Option<Transaction>>>` + 缓存 Request + `replied` 幂等标志 + `fake()` 测试模式) 解决 Transaction 不可克隆问题
+- 中间件：`SipMiddleware` trait + `#[component(as_trait = dyn SipMiddleware)]` DI 收集，`build_chain` 洋葱模型
+- `SipPlugin`(`#[component(app_async_init, shutdown)]`) + `SipRouter`(`#[component(init_sort=10000)]`) + `SipConfig`(`#[component(conf, init_sort=10000)]`)
+- 性能参数 `enabled`/`dispatch_queue_size`/`max_concurrent_handlers` 在配置驱动（替代原环境变量 SipQueueSize/SIP_MAX_HANDLERS）
+
+## tx_di_sip 插件架构决策（2026-07-06）
+
+### 硬约束（rsipstack 0.5.16）
+- `Transaction`：`Send + Sync + Unpin`，但 **`!Clone`**。
+- 回复/发送方法均为 **`&mut self` + `async`**：`reply` / `reply_with` / `respond` / `send` / `send_cancel` / `send_ack`。
+- `original: Request` 是公开字段（`Request` 可 `Clone`），只读检视零成本。
+- `Drop for Transaction` 存在（服务端事务 Drop 会走清理/超时）→ **必须保证最终有 reply**。
+
+### 用户明确要求：强绑定 rsipstack
+- **不要**引入 `SipEndpoint` / `SipServer` 这类「解耦 rsipstack、可替换实现」的 trait。
+- `SipPlugin` 直接持有 rsipstack `Endpoint`；Handler 接收真实 rsipstack 类型；gb28181 直接 `app.inject::<SipPlugin>()`。
+
+### 中间件设计最终方案：SipTx 共享信封
+- `Transaction` 不可克隆 + reply 需 `&mut`，故采用 `SipTx` 薄信封：`Arc<Mutex<Option<Transaction>>>` + 构造时缓存 `Request` 克隆 + `replied: Arc<AtomicBool>` 幂等标志 + 可选 fake 记录器。
+- `SipTx` 生产用真实 `Transaction`，测试用 `SipTx::fake(Request)`（无需 `EndpointInnerRef`，reply 仅记录）→ 既强绑定又可单测。
+- `SipMiddleware` trait：`async fn process(&self, tx: SipTx, next: SipNextFn) -> RIE<()>`，DI 收集（`inject_all_traits_from_store::<dyn SipMiddleware>()`），去掉原 `middleware.rs` 的全局 `static REGISTRY`。
+- `SipHandlerFn = Arc<dyn Fn(SipTx) -> SipNextFut + Send + Sync>`；`router.dispatch` 用 `build_chain` 真正走洋葱链（`middleware.rs` 的 `apply_middleware_chain` 当前「接好没通电」——`handler.rs:305` 的 `router.dispatch(msg)` 没调用它，是已知 bug）。
+- `dispatch` 兜底：链结束后若 `!replied` 则自动 reply 405，防止 Transaction Drop 无响应。
+- `SipTx` 在 dispatch 末尾才 drop，确保真实 Transaction 的 Drop 发生在兜底回复之后。
+
+### 其他已确认缺陷（待修）
+- P4 `comp.rs` init 里 `ctx.inject::<SipPlugin>()` 自注入 → 改用 `app_async_init` 收 token。
+- P5 shutdown 只 `token.cancel()` 未 join `JoinSet` → 用 `Arc<Mutex<JoinSet>>` 并在 `shutdown` await join。
+- P6 配置缺 `enabled` 开关；P7 perf 参数（队列/并发）从环境变量改进 `SipConfig`。
+- P8 `sender.rs` 返回 `anyhow::Result` → 统一 `RIE`；P9 补 `send_message/notify/subscribe/info`。
+- P11 `SipMetrics` 是死代码，需实时快照接入。
+- P12 `SipRouter` 应升为 DI Component（不再 `#[tx_cst(SipRouter::new())]` 藏在 SipPlugin 字段）。
