@@ -325,16 +325,23 @@ impl Gb28181Server {
     ///
     /// GB28181-2022 §9.1.4
     pub async fn hangup(&self, call_id: &str) -> anyhow::Result<()> {
-        let session = self.sessions.get(call_id).map(|r: dashmap::mapref::one::Ref<String, SessionInfo>| r.value().clone());
+        // 先移除会话，避免设备随后的 BYE 触发 Terminated 重复清理/重复事件
+        let session = self.sessions.remove(call_id).map(|(_, v)| v);
 
         if let Some(sess) = session {
-            let stream_id = sess.stream_id.clone();
             let media = self.media.get().expect("MediaBackend not initialized");
-            if let Err(e) = media.close_rtp_server(&stream_id).await {
+            if let Err(e) = media.close_rtp_server(&sess.stream_id).await {
                 warn!(call_id = %call_id, error = %e, "关闭 RTP 端口失败（忽略）");
             }
 
-            self.sessions.remove(call_id);
+            // 真 BYE：向设备发送 SIP BYE，真正释放对端资源
+            if let Ok(sender) = self.sip_plugin.sender() {
+                if let Err(e) = sender.bye(&sess.dialog).await {
+                    warn!(call_id = %call_id, error = %e, "发送 BYE 失败（会话可能已结束）");
+                } else {
+                    info!(call_id = %call_id, "📴 已发送 SIP BYE");
+                }
+            }
 
             info!(call_id = %call_id, "📴 主动挂断");
 
@@ -658,6 +665,7 @@ impl Gb28181Server {
             ssrc: ssrc.clone(),
             stream_id: stream_id.clone(),
             is_realtime: true,
+            dialog,
         };
         self.sessions.insert(call_id.clone(), session);
 
@@ -684,12 +692,15 @@ impl Gb28181Server {
                     }
                     DialogState::Terminated(id, _) => {
                         info!(call_id = %call_id_clone, dialog_id = %id, "🎤 对讲会话结束");
-                        let _ = media_clone.close_rtp_server(&stream_id).await;
-                        sessions_clone.remove(&call_id_clone);
-                        tokio::spawn(event::emit(Gb28181Event::AudioTalkbackEnded {
-                            device_id: device_id_owned.clone(),
-                            call_id: call_id_clone.clone(),
-                        }));
+                        // 若已通过 hangup 主动挂断并清理，则跳过避免重复处理
+                        if sessions_clone.contains_key(&call_id_clone) {
+                            let _ = media_clone.close_rtp_server(&stream_id).await;
+                            sessions_clone.remove(&call_id_clone);
+                            tokio::spawn(event::emit(Gb28181Event::AudioTalkbackEnded {
+                                device_id: device_id_owned.clone(),
+                                call_id: call_id_clone.clone(),
+                            }));
+                        }
                         break;
                     }
                     _ => {}
@@ -1230,6 +1241,7 @@ impl Gb28181Server {
             ssrc: ssrc.clone(),
             stream_id: stream_id.clone(),
             is_realtime,
+            dialog,
         };
         self.sessions.insert(call_id.clone(), session);
 
@@ -1274,17 +1286,20 @@ impl Gb28181Server {
                             "📹 点播会话结束"
                         );
 
-                        if let Err(e) = media_clone.close_rtp_server(&stream_id_clone).await {
-                            warn!(call_id = %call_id_clone, error = %e, "关闭 RTP 端口失败");
+                        // 若已通过 hangup 主动挂断并清理，则跳过避免重复处理
+                        if sessions_clone.contains_key(&call_id_clone) {
+                            if let Err(e) = media_clone.close_rtp_server(&stream_id_clone).await {
+                                warn!(call_id = %call_id_clone, error = %e, "关闭 RTP 端口失败");
+                            }
+
+                            sessions_clone.remove(&call_id_clone);
+
+                            tokio::spawn(event::emit(Gb28181Event::SessionEnded {
+                                device_id: device_id_owned.clone(),
+                                channel_id: channel_id_owned.clone(),
+                                call_id: call_id_clone.clone(),
+                            }));
                         }
-
-                        sessions_clone.remove(&call_id_clone);
-
-                        tokio::spawn(event::emit(Gb28181Event::SessionEnded {
-                            device_id: device_id_owned.clone(),
-                            channel_id: channel_id_owned.clone(),
-                            call_id: call_id_clone.clone(),
-                        }));
                         break;
                     }
                     _ => {}

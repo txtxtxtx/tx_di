@@ -102,3 +102,9 @@
 - `process` 仅对 REGISTER：ACL 前置 403 → 无 Authorization 发 401 质询（`NonceStore` 生成 nonce）→ 有则 `verify_digest_auth` 校验（失败 403，成功放行）；非 REGISTER 直接 `next(tx)`。
 - `NonceStore` 现位于 `auth.rs`（随中间件单例常驻），`handlers.rs::handle_register` 不再含认证/ACL，只做注册/注销业务。
 - 注意：`auth.rs` 需 `use rsipstack::sip::HeadersExt`（from_header/expires_header 等方法来自该 trait）。
+
+### 真 BYE（2026-07-07 完成）
+- `SessionInfo` 增加 `dialog: ClientInviteDialog` 字段（`rsipstack::dialog::client_dialog::ClientInviteDialog`，`#[derive(Clone)]` 且 thread-safe，可直接存 DashMap 跨任务）。因其未实现 `Debug`，`SessionInfo` 改为 `#[derive(Clone)]` + 手写 `Debug`（跳过 dialog 字段）。
+- `hangup(call_id)` 真正发 SIP BYE：`self.sip_plugin.sender().bye(&sess.dialog)`；先 `sessions.remove` 再 close RTP + bye + emit `SessionEnded`。
+- `invite_internal`/`audio_talkback` 的 `DialogState::Terminated` 分支加 `sessions_clone.contains_key` 去重，避免 hangup 后 Terminated 重复清理/事件。
+- `plugin.rs` 的 `xml`/`sdp` 导入块是迁移时遗留未用项（调用都在 `plugin_tail.rs`），已删除；`media` 导入精简为 `{MediaBackend, build_backend}`。最终 `cargo check -p tx_di_gb28181` 零警告。

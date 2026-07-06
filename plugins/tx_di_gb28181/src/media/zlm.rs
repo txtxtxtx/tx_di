@@ -113,12 +113,12 @@ pub struct MediaInfo {
     pub stream: String,
     pub schema: String,
     pub vhost: String,
-    #[serde(default)]
-    pub originUrl: Option<String>,
-    #[serde(default)]
-    pub aliveSecond: Option<u64>,
-    #[serde(default)]
-    pub totalReaderCount: Option<u32>,
+    #[serde(default, rename = "originUrl")]
+    pub origin_url: Option<String>,
+    #[serde(default, rename = "aliveSecond")]
+    pub alive_second: Option<u64>,
+    #[serde(default, rename = "totalReaderCount")]
+    pub total_reader_count: Option<u32>,
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -461,9 +461,9 @@ impl MediaBackend for ZlmBackend {
                 app: m.app,
                 stream_id: m.stream,
                 schema: m.schema,
-                reader_count: m.totalReaderCount.unwrap_or(0),
-                alive_secs: m.aliveSecond.unwrap_or(0),
-                origin_url: m.originUrl,
+                reader_count: m.total_reader_count.unwrap_or(0),
+                alive_secs: m.alive_second.unwrap_or(0),
+                origin_url: m.origin_url,
             })
             .collect())
     }

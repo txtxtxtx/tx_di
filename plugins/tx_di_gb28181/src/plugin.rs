@@ -11,43 +11,22 @@
 
 use crate::config::Gb28181ServerConfig;
 use crate::device_registry::DeviceRegistry;
-#[allow(unused_imports)]
 use tx_gb28181::device::GbDevice;
 use crate::event::{self, Gb28181Event};
 use crate::handlers::register_server_handlers;
-#[allow(unused_imports)]
-use crate::media::{MediaBackend, OpenRtpRequest, PlayUrls, build_backend};
-#[allow(unused_imports)]
-use crate::sdp::{
-    AudioCodec, SessionType, build_audio_invite_sdp, build_invite_sdp, build_snapshot_sdp,
-    parse_audio_sdp, parse_snapshot_sdp,
-};
-#[allow(unused_imports)]
-use crate::xml::{
-    ConfigType, GuardMode, PlaybackControl, PtzCommand, PtzPreciseParam, ZoomRect,
-    build_alarm_reset_xml, build_alarm_subscribe_xml, build_broadcast_cancel_xml,
-    build_broadcast_invite_xml, build_catalog_query_xml, build_config_download_query_xml,
-    build_cruise_list_query_xml, build_cruise_start_xml, build_cruise_stop_xml,
-    build_cruise_track_query_xml, build_device_info_query_xml, build_device_status_query_xml,
-    build_guard_control_xml, build_guard_control_xml_v2, build_guard_info_query_xml,
-    build_make_video_record_xml, build_playback_control_xml, build_preset_goto_xml,
-    build_preset_list_query_xml, build_preset_set_xml, build_ptz_control_xml,
-    build_ptz_precise_status_query_xml, build_ptz_precise_xml, build_record_control_xml,
-    build_record_info_query_xml, build_storage_format_xml, build_storage_status_query_xml,
-    build_target_track_xml, build_teleboot_xml, build_time_sync_query_xml,
-    build_time_sync_response_xml, build_zoom_in_xml, build_zoom_out_xml,
-};
+use crate::media::{MediaBackend, build_backend};
 use dashmap::DashMap;
 use std::future::Future;
 use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, OnceLock};
 use tokio::time::{Duration, interval};
 use tracing::{error, info, warn};
+use rsipstack::dialog::client_dialog::ClientInviteDialog;
 use tx_di_core::{App, Component, DepsTuple, RIE};
 use tx_di_sip::SipPlugin;
 
 /// 活跃媒体会话信息
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SessionInfo {
     pub call_id: String,
     pub device_id: String,
@@ -56,6 +35,23 @@ pub struct SessionInfo {
     pub ssrc: String,
     pub stream_id: String,
     pub is_realtime: bool,
+    /// SIP 对话句柄（UAC INVITE 创建），用于主动发送 BYE 挂断
+    pub dialog: ClientInviteDialog,
+}
+
+impl std::fmt::Debug for SessionInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SessionInfo")
+            .field("call_id", &self.call_id)
+            .field("device_id", &self.device_id)
+            .field("channel_id", &self.channel_id)
+            .field("rtp_port", &self.rtp_port)
+            .field("ssrc", &self.ssrc)
+            .field("stream_id", &self.stream_id)
+            .field("is_realtime", &self.is_realtime)
+            .field("dialog", &"<ClientInviteDialog>")
+            .finish()
+    }
 }
 
 /// GB28181 服务端插件

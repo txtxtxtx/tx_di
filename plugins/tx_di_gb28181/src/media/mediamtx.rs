@@ -274,8 +274,17 @@ impl MediaBackend for MediaMtxBackend {
     }
 
     async fn close_rtp_server(&self, stream_id: &str) -> RIE<()> {
-        if self.rtp_ports.remove(stream_id).is_none() {
-            warn!(stream_id = %stream_id, "MediaMTX 后端：未找到对应 RTP 端口记录");
+        match self.rtp_ports.remove(stream_id) {
+            Some((_, entry)) => {
+                debug!(
+                    stream_id = %stream_id,
+                    port = entry.port,
+                    "MediaMTX 后端：释放 RTP 端口"
+                );
+            }
+            None => {
+                warn!(stream_id = %stream_id, "MediaMTX 后端：未找到对应 RTP 端口记录");
+            }
         }
 
         let path = format!("/v3/config/paths/remove/rtp%2F{}", stream_id);
