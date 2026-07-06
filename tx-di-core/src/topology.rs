@@ -78,9 +78,10 @@ pub fn topo_sort(metas: &[&ComponentMeta], trait_impls: &TraitImplMap) -> RIE<Ve
 
     // 将所有入度为 0 的节点加入优先队列（无依赖的组件）
     // 使用 BinaryHeap + Reverse 实现最小堆，按 init_sort 值排序（值越小优先级越高）
+    // 这样拓扑排序结果同时满足：依赖关系 + init_sort 优先级（无依赖关系的组件间按 init_sort 排序）
     let mut heap: BinaryHeap<Reverse<(i32, usize)>> = (0..n)
         .filter(|&i| in_degree[i] == 0)
-        .map(|i| Reverse((0_i32, i))) // init_sort 移到 Component trait，这里用 0
+        .map(|i| Reverse(((metas[i].init_sort_fn)(), i)))
         .collect();
 
     let mut result = Vec::with_capacity(n);
@@ -90,7 +91,7 @@ pub fn topo_sort(metas: &[&ComponentMeta], trait_impls: &TraitImplMap) -> RIE<Ve
         for &j in &adj[i] {
             in_degree[j] -= 1;
             if in_degree[j] == 0 {
-                heap.push(Reverse((0_i32, j)));
+                heap.push(Reverse(((metas[j].init_sort_fn)(), j)));
             }
         }
     }

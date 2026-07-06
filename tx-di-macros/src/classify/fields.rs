@@ -6,7 +6,7 @@
 use syn::{Expr, Ident, ItemStruct, Result as SynResult, Type};
 
 use crate::attr::field_attr::{extract_inject_expr, has_skip_attr};
-use crate::type_utils::{is_arc_dyn_trait, is_option_type, is_plain_arc_dyn_trait};
+use crate::type_utils::{is_arc_dyn_trait, is_option_type, is_plain_arc_dyn_trait, is_vec_arc_dyn_trait};
 
 /// 字段注入类别
 ///
@@ -19,6 +19,8 @@ pub enum FieldKind {
     TraitInject { ty: Type },
     /// 必选 trait object 注入（`Arc<dyn Trait>`）
     TraitInjectRequired { ty: Type },
+    /// 列表 trait object 注入（`Vec<Arc<dyn Trait>>`），注入所有实现
+    TraitInjectList { ty: Type },
     /// 自定义表达式赋值（`#[tx_cst(expr)]`）
     Custom { expr: Expr },
     /// 可选普通依赖（`Option<T>`，非 trait），build 时填 None
@@ -44,6 +46,9 @@ pub fn classify_fields(input: &ItemStruct) -> SynResult<Vec<(Ident, FieldKind)>>
         } else if is_plain_arc_dyn_trait(&field.ty) {
             // Arc<dyn Trait> — 必选 trait object 注入
             FieldKind::TraitInjectRequired { ty: field.ty.clone() }
+        } else if is_vec_arc_dyn_trait(&field.ty) {
+            // Vec<Arc<dyn Trait>> — 列表 trait object 注入
+            FieldKind::TraitInjectList { ty: field.ty.clone() }
         } else if is_arc_dyn_trait(&field.ty) {
             // Option<Arc<dyn Trait>> — 可选 trait object 注入
             FieldKind::TraitInject { ty: field.ty.clone() }

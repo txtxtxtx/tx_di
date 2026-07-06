@@ -21,7 +21,7 @@ use syn::{parse_macro_input, Ident, ItemStruct, Result as SynResult, Type, Visib
 use crate::attr::comp_attr::{parse_component_attr_from_attributes, CompAttr};
 use crate::classify::fields::{classify_fields, FieldKind};
 use crate::type_utils::{
-    extract_trait_from_arc, extract_trait_from_option_arc, strip_arc_type,
+    extract_trait_from_arc, extract_trait_from_option_arc, extract_trait_from_vec_arc, strip_arc_type,
 };
 
 /// `#[derive(Component)]` 入口
@@ -49,6 +49,8 @@ pub struct CodeGenContext {
     pub trait_inject_fields: Vec<(Ident, Type)>,
     /// 必选 trait object 注入字段（字段名, trait 类型）
     pub required_trait_fields: Vec<(Ident, Type)>,
+    /// 列表 trait object 注入字段（字段名, trait 类型）
+    pub list_trait_fields: Vec<(Ident, Type)>,
 }
 
 /// 核心实现：解析 struct，分类字段，生成 `impl Component` 与注册条目
@@ -107,6 +109,18 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
         })
         .collect();
 
+    let list_trait_fields: Vec<(Ident, Type)> = fields_info
+        .iter()
+        .filter_map(|(name, kind)| match kind {
+            FieldKind::TraitInjectList { ty } => {
+                let trait_ty = extract_trait_from_vec_arc(ty)
+                    .expect("is_vec_arc_dyn_trait 已验证，提取 trait 类型不应失败");
+                Some((name.clone(), trait_ty))
+            }
+            _ => None,
+        })
+        .collect();
+
     let ctx = CodeGenContext {
         struct_name,
         vis,
@@ -115,6 +129,7 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
         inject_fields,
         trait_inject_fields,
         required_trait_fields,
+        list_trait_fields,
     };
 
     // 各子模块生成代码片段

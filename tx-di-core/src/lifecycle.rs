@@ -297,25 +297,21 @@ impl App {
 
     // ── 生命周期执行 ─────────────────────────────────────────────────────
 
-    /// 同步初始化阶段：按 init_sort 顺序调用所有组件的 init()
+    /// 同步初始化阶段：按已排序顺序（拓扑序 + init_sort）调用所有组件的 init()
     fn init(app: &Arc<App>) -> RIE<()> {
-        // 按 init_sort 排序（值越小越先执行）
-        let mut sorted_metas: Vec<&ComponentMeta> = app.metas.clone();
-        sorted_metas.sort_by_key(|m| (m.init_sort_fn)());
-
-        for meta in &sorted_metas {
+        // App.metas 已在 BuildContext::auto_register_all 中按 topo_sort(init_sort) 排序，
+        // 同时满足依赖关系和 init_sort 优先级，无需重复排序
+        for meta in &app.metas {
             debug!("[di] init: {}", meta.name);
             (meta.init_fn)(app)?;
         }
         Ok(())
     }
 
-    /// 异步初始化阶段：按 init_sort 顺序调用所有组件的 async_init()
+    /// 异步初始化阶段：按已排序顺序（拓扑序 + init_sort）调用所有组件的 async_init()
     async fn async_init(app: &Arc<App>) -> RIE<()> {
-        let mut sorted_metas: Vec<&ComponentMeta> = app.metas.clone();
-        sorted_metas.sort_by_key(|m| (m.init_sort_fn)());
-
-        for meta in &sorted_metas {
+        // 同 init()，复用 BuildContext 已排好的顺序
+        for meta in &app.metas {
             debug!("[di] async_init: {}", meta.name);
             (meta.async_init_fn)(app).await?;
         }

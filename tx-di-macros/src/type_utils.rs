@@ -100,6 +100,32 @@ pub fn is_plain_arc_dyn_trait(ty: &Type) -> bool {
     extract_trait_from_arc(ty).is_some()
 }
 
+/// 从 `Vec<Arc<dyn Trait>>` 中提取 `dyn Trait` 的 Type
+///
+/// 用于列表 trait inject 字段的 inner_init 生成。
+pub fn extract_trait_from_vec_arc(ty: &Type) -> Option<Type> {
+    let path = match ty {
+        Type::Path(tp) => &tp.path,
+        _ => return None,
+    };
+    let segs = &path.segments;
+    if segs.len() != 1 || segs[0].ident != "Vec" {
+        return None;
+    }
+    if let PathArguments::AngleBracketed(ab) = &segs[0].arguments {
+        if let Some(GenericArgument::Type(arc_ty)) = ab.args.first() {
+            // arc_ty 应该是 Arc<dyn Trait>
+            return extract_trait_from_arc(arc_ty);
+        }
+    }
+    None
+}
+
+/// 检查类型是否为 `Vec<Arc<dyn Trait>>` 形式
+pub fn is_vec_arc_dyn_trait(ty: &Type) -> bool {
+    extract_trait_from_vec_arc(ty).is_some()
+}
+
 /// 将类型按 `Arc<T>` 解包后生成 TokenStream（若不是 Arc 则原样输出）
 ///
 /// 保留用于需要在宏展开中输出内部类型的场景。

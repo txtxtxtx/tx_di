@@ -1185,3 +1185,50 @@ fn test_arg_value_conversions() {
     let _ = ArgValue::from("world".to_string());
     let _ = ArgValue::from(true);
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// 25. 列表 trait 注入（Vec<Arc<dyn Trait>>）— 完全 safe，无 unsafe
+// ══════════════════════════════════════════════════════════════════════════
+
+/// 消费所有 Reporter 实现的组件
+#[derive(Component)]
+pub struct ReporterAggregator {
+    /// 列表注入：注入所有实现了 dyn Reporter 的组件
+    pub reporters: Vec<Arc<dyn Reporter>>,
+}
+
+#[test]
+fn test_list_trait_inject() {
+    let ctx = BuildContext::new::<PathBuf>(None);
+    let agg = ctx.inject::<ReporterAggregator>();
+
+    // 应注入所有 Reporter 实现（JsonReporter + XmlReporter）
+    assert!(
+        agg.reporters.len() >= 2,
+        "应至少注入 2 个 Reporter 实现，实际: {}",
+        agg.reporters.len()
+    );
+
+    let data: Vec<&str> = agg.reporters.iter().map(|r| r.report()).collect();
+    assert!(data.contains(&"json"), "应包含 json 实现, got: {:?}", data);
+    assert!(data.contains(&"xml"), "应包含 xml 实现, got: {:?}", data);
+}
+
+/// 列表注入与其他字段混合
+#[derive(Component)]
+pub struct MixedConsumer {
+    pub db: Arc<DbPool>,
+    pub reporters: Vec<Arc<dyn Reporter>>,
+}
+
+#[test]
+fn test_list_trait_inject_mixed() {
+    let ctx = BuildContext::new::<PathBuf>(None);
+    let consumer = ctx.inject::<MixedConsumer>();
+
+    assert_eq!(consumer.db.url, "sqlite");
+    assert!(
+        consumer.reporters.len() >= 2,
+        "混合字段也应正确注入列表"
+    );
+}

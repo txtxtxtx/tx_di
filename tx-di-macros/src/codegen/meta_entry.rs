@@ -41,6 +41,7 @@ pub fn gen_meta_entry(ctx: &CodeGenContext, factory_fn: TokenStream2) -> TokenSt
             .trait_inject_fields
             .iter()
             .chain(ctx.required_trait_fields.iter())
+            .chain(ctx.list_trait_fields.iter())
             .map(|(_, ty)| quote! { || std::any::TypeId::of::<#ty>() })
             .collect();
         fns.extend(trait_fns);

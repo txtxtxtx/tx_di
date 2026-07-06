@@ -14,7 +14,7 @@ use crate::codegen::CodeGenContext;
 /// 生成 `inner_init` 方法实现；无需覆盖时返回空 TokenStream
 pub fn gen_inner_init(ctx: &CodeGenContext) -> TokenStream2 {
     let has_trait_inject =
-        !ctx.trait_inject_fields.is_empty() || !ctx.required_trait_fields.is_empty();
+        !ctx.trait_inject_fields.is_empty() || !ctx.required_trait_fields.is_empty() || !ctx.list_trait_fields.is_empty();
 
     if !has_trait_inject && !ctx.comp_attr.has_init {
         return quote! {};
@@ -48,12 +48,24 @@ pub fn gen_inner_init(ctx: &CodeGenContext) -> TokenStream2 {
         })
         .collect();
 
+    // 列表 trait inject 字段赋值（注入所有实现，空 Vec 安全覆盖）
+    let list_assigns: Vec<TokenStream2> = ctx
+        .list_trait_fields
+        .iter()
+        .map(|(fname, ty)| {
+            quote! {
+                self.#fname = ::tx_di_core::inject_all_traits_from_store::<#ty>(store);
+            }
+        })
+        .collect();
+
     if ctx.comp_attr.has_init {
         quote! {
             #[inline]
             fn inner_init(&mut self, store: &::tx_di_core::Store) -> ::tx_di_core::RIE<()> {
                 #( #optional_assigns )*
                 #( #required_assigns )*
+                #( #list_assigns )*
                 self::init(self, store)
             }
         }
@@ -63,6 +75,7 @@ pub fn gen_inner_init(ctx: &CodeGenContext) -> TokenStream2 {
             fn inner_init(&mut self, store: &::tx_di_core::Store) -> ::tx_di_core::RIE<()> {
                 #( #optional_assigns )*
                 #( #required_assigns )*
+                #( #list_assigns )*
                 Ok(())
             }
         }

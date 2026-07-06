@@ -66,6 +66,10 @@ pub fn gen_component_impl(ctx: &CodeGenContext) -> TokenStream2 {
                     #fname: unsafe { ::core::mem::zeroed() }
                 }
             }
+            FieldKind::TraitInjectList { .. } => {
+                // 列表 trait inject：用空 Vec 占位（safe!），inner_init 中填充所有实现
+                quote! { #fname: ::std::vec::Vec::new() }
+            }
             FieldKind::Custom { expr } => quote! { #fname: #expr },
         })
         .collect();
