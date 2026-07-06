@@ -78,15 +78,15 @@ dependencies = [
  "tonic",
  "tower 0.5.3",
  "tracing",
- "tx-di-core",
- "tx_common",
+ "tx-di-core 0.3.0",
+ "tx_common 0.1.0",
  "tx_di_axum",
  "tx_di_file",
  "tx_di_job",
  "tx_di_log",
  "tx_di_sa_token",
  "tx_di_toasty",
- "tx_error",
+ "tx_error 0.1.0",
 ]
 
 [[package]]
@@ -111,13 +111,13 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.18",
  "tracing",
- "tx-di-core",
- "tx_common",
+ "tx-di-core 0.3.0",
+ "tx_common 0.1.0",
  "tx_di_file",
  "tx_di_job",
  "tx_di_sa_token",
  "tx_di_toasty",
- "tx_error",
+ "tx_error 0.1.0",
  "uuid",
 ]
 
@@ -141,9 +141,9 @@ dependencies = [
  "serde_with",
  "tokio",
  "tracing",
- "tx-di-core",
- "tx_common",
- "tx_error",
+ "tx-di-core 0.3.0",
+ "tx_common 0.1.0",
+ "tx_error 0.1.0",
 ]
 
 [[package]]
@@ -158,11 +158,11 @@ dependencies = [
  "toasty",
  "tokio",
  "tracing",
- "tx-di-core",
- "tx_common",
+ "tx-di-core 0.3.0",
+ "tx_common 0.1.0",
  "tx_di_job",
  "tx_di_toasty",
- "tx_error",
+ "tx_error 0.1.0",
 ]
 
 [[package]]
@@ -1650,7 +1650,7 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.18",
  "tracing",
- "tx-di-core",
+ "tx-di-core 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tx_di_log",
 ]
 
@@ -6193,14 +6193,47 @@ dependencies = [
  "toml",
  "tracing",
  "tracing-subscriber",
- "tx-di-macros",
- "tx_common",
- "tx_error",
+ "tx-di-macros 0.3.0",
+ "tx_common 0.1.0",
+ "tx_error 0.1.0",
+]
+
+[[package]]
+name = "tx-di-core"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e917c65ba99d737fbf6ffe28373745fe2b67a5bb9b83fb8eca6568d147e8b9d8"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "dashmap",
+ "linkme",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util 0.7.18",
+ "toml",
+ "tracing",
+ "tx-di-macros 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tx_common 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tx_error 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "tx-di-macros"
 version = "0.3.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "tx-di-macros"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dda13f7c491638d20acca40f206b29836c32430dbdbea0166c58bfa3b58da4c0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6215,7 +6248,18 @@ dependencies = [
  "chrono",
  "schemars 0.8.22",
  "serde",
- "tx_error",
+ "tx_error 0.1.0",
+]
+
+[[package]]
+name = "tx_common"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6870ff572b5502abd8aa49e3e7b3345c43166cb8b53923ebdbf4297a918bb824"
+dependencies = [
+ "chrono",
+ "serde",
+ "tx_error 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -6237,10 +6281,10 @@ dependencies = [
  "tower 0.5.3",
  "tower-http",
  "tracing",
- "tx-di-core",
- "tx_common",
+ "tx-di-core 0.3.0",
+ "tx_common 0.1.0",
  "tx_di_log",
- "tx_error",
+ "tx_error 0.1.0",
 ]
 
 [[package]]
@@ -6257,8 +6301,8 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.18",
  "tracing",
- "tx-di-core",
- "tx_error",
+ "tx-di-core 0.3.0",
+ "tx_error 0.1.0",
 ]
 
 [[package]]
@@ -6278,8 +6322,8 @@ dependencies = [
  "tokio-stream",
  "tokio-util 0.7.18",
  "tracing",
- "tx-di-core",
- "tx_error",
+ "tx-di-core 0.3.0",
+ "tx_error 0.1.0",
  "uuid",
 ]
 
@@ -6299,10 +6343,10 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.18",
  "tracing",
- "tx-di-core",
- "tx_common",
+ "tx-di-core 0.3.0",
+ "tx_common 0.1.0",
  "tx_di_toasty",
- "tx_error",
+ "tx_error 0.1.0",
 ]
 
 [[package]]
@@ -6316,7 +6360,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
- "tx-di-core",
+ "tx-di-core 0.3.0",
 ]
 
 [[package]]
@@ -6334,8 +6378,8 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.18",
  "tracing",
- "tx-di-core",
- "tx_error",
+ "tx-di-core 0.3.0",
+ "tx_error 0.1.0",
 ]
 
 [[package]]
@@ -6350,7 +6394,7 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.18",
  "tracing",
- "tx-di-core",
+ "tx-di-core 0.3.0",
  "tx_di_axum",
 ]
 
@@ -6366,8 +6410,8 @@ dependencies = [
  "tokio-util 0.7.18",
  "toml",
  "tracing",
- "tx-di-core",
- "tx_error",
+ "tx-di-core 0.3.0",
+ "tx_error 0.1.0",
 ]
 
 [[package]]
@@ -6381,12 +6425,37 @@ dependencies = [
  "thiserror 2.0.18",
  "toml",
  "tracing",
- "tx_macros",
+ "tx_macros 0.1.0",
+]
+
+[[package]]
+name = "tx_error"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c10f0f4c5bf41c89e6829b72c3e47c78167cec7b793e3ff3cded9ddb50be2dd5"
+dependencies = [
+ "anyhow",
+ "serde_json",
+ "thiserror 2.0.18",
+ "toml",
+ "tracing",
+ "tx_macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "tx_macros"
 version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "tx_macros"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0f1e4123939e83a8bfd76a1129e0a0e84d1db2b49ceaa7421ee382a7f5ecc11"
 dependencies = [
  "proc-macro2",
  "quote",
