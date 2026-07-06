@@ -9,7 +9,7 @@ repository.workspace = true
 
 [dependencies]
 # DI 框架
-tx-di-core = { workspace = true }
+tx-di-core = { version = " 0.3.0"}
 tx_di_log = { path = "../../plugins/tx_di_log" }
 
 # 异步运行时
