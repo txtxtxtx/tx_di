@@ -14,7 +14,7 @@ use super::{
     MediaBackend, MediaStreamInfo, OpenRtpRequest, PlayUrls, RtpServerHandle, StreamProxyHandle,
 };
 use crate::err::GbErr;
-use tx_di_core::IE;
+use tx_di_core::AppError as IE;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 use tx_di_core::RIE;

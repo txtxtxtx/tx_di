@@ -12,8 +12,8 @@
 //! ```
 
 use crate::config::Gb28181ServerConfig;
-use crate::crypto::{generate_nonce, verify_digest_auth};
 use crate::device_registry::{DeviceRegistry};
+use crate::plugin::Gb28181Server;
 use tx_gb28181::device::GbDevice;
 use crate::event::{emit, Gb28181Event};
 use crate::xml::{
@@ -26,16 +26,14 @@ use crate::xml::{
 // ── 从公共模块 re-export Gb28181CmdType（向后兼容）─────────────────────────
 pub use tx_gb28181::Gb28181CmdType;
 use rsipstack::sip::{Header, HeadersExt, StatusCode};
-use rsipstack::transaction::transaction::Transaction;
 use std::sync::Arc;
-use dashmap::DashMap;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 use tx_di_core::RIE;
-use tx_di_sip::{SipPlugin};
+use tx_di_sip::SipTx;
 
 /// 创建简单的 SIP 响应处理器（回复 200 OK）
-fn create_ok_handler(method_name: &'static str) -> impl Fn(Transaction) -> std::pin::Pin<Box<dyn Future<Output = RIE<()>> + Send>> + Send + Sync + 'static {
-    move |mut tx| {
+fn create_ok_handler(method_name: &'static str) -> impl Fn(SipTx) -> std::pin::Pin<Box<dyn Future<Output = RIE<()>> + Send>> + Send + Sync + 'static {
+    move |tx: SipTx| {
         let method = method_name;
         Box::pin(async move {
             tx.reply(StatusCode::OK)
@@ -47,24 +45,19 @@ fn create_ok_handler(method_name: &'static str) -> impl Fn(Transaction) -> std::
 }
 
 /// 向 SipRouter 注册所有 GB28181 服务端消息处理器
-pub fn register_server_handlers(
-    sip_plugin: Arc<SipPlugin>,
-    registry: DeviceRegistry,
-    config: Arc<Gb28181ServerConfig>,
-    nonce_store: NonceStore,
-) ->RIE<()> {
-    let reg_register = registry.clone();
-    let cfg_register = config.clone();
-    let nonce_register = nonce_store.clone();
-    let reg_message = registry.clone();
-    let cfg_message = config.clone();
+pub fn register_server_handlers(server: Arc<Gb28181Server>) -> RIE<()> {
+    let sip_plugin = server.sip_plugin.clone();
+    let reg_register = server.device_registry.clone();
+    let cfg_register = server.config.clone();
+    let reg_message = server.device_registry.clone();
+    let cfg_message = server.config.clone();
 
-    // REGISTER — 设备注册/注销/刷新（含摘要认证）
-    sip_plugin.add_handler(Some("REGISTER"), 0, move |tx| {
+    // REGISTER — 设备注册/注销/刷新
+    // （摘要认证与 ACL 已由 Gb28181AuthMiddleware 在洋葱链前置处理）
+    sip_plugin.add_handler(Some("REGISTER"), 0, move |tx: SipTx| {
         let reg = reg_register.clone();
         let cfg = cfg_register.clone();
-        let nonce = nonce_register.clone();
-        async move { handle_register(tx, reg, cfg, nonce).await }
+        async move { handle_register(tx, reg, cfg).await }
     })?;
 
     // MESSAGE — 心跳、目录响应、设备信息响应、报警、录像等
@@ -86,56 +79,20 @@ pub fn register_server_handlers(
     Ok(())
 }
 
-// ── Nonce 存储（用于摘要认证）────────────────────────────────────────────────
-// Nonce 生成和摘要验证函数已提取到 crate::crypto 模块
-
-/// Nonce 存储：记录已发给每个设备的 nonce，防止重放攻击
-#[derive(Clone)]
-pub struct NonceStore {
-    inner: Arc<DashMap<String, String>>,
-}
-
-impl NonceStore {
-    pub fn new() -> Self {
-        Self {
-            inner: Arc::new(DashMap::new()) ,
-        }
-    }
-
-    /// 生成并存储 nonce（使用加密安全随机数）
-    pub fn issue(&self, device_id: &str) -> String {
-        let nonce = generate_nonce();
-        self.inner
-            .insert(device_id.to_string(), nonce.clone());
-        nonce
-    }
-
-    /// 验证 nonce（验证后不自动删除，允许重用）
-    #[allow(dead_code)]
-    pub fn verify(&self, device_id: &str, nonce: &str) -> bool {
-        self.inner.get(device_id)
-            .map(|n| n.value() == nonce)
-            .unwrap_or(false)
-    }
-
-    /// 删除 nonce（认证成功后清除）
-    pub fn remove(&self, device_id: &str) {
-        self.inner.remove(device_id);
-    }
-}
-
 // ── REGISTER ─────────────────────────────────────────────────────────────────
 
 /// 处理 REGISTER 请求
+///
+/// 摘要认证与 ACL 前置校验已由 `Gb28181AuthMiddleware` 在洋葱链完成，
+/// 本函数只负责注册/注销业务。
 async fn handle_register(
-    mut tx: Transaction,
+    tx: SipTx,
     registry: DeviceRegistry,
     config: Arc<Gb28181ServerConfig>,
-    nonce_store: NonceStore,
 ) -> RIE<()> {
     // 解析 From 头中的 device_id
     let from_str = tx
-        .original
+        .request()
         .from_header()
         .map(|h| h.value().to_string())
         .unwrap_or_default();
@@ -143,21 +100,21 @@ async fn handle_register(
 
     // 解析 Expires
     let expires = tx
-        .original
+        .request()
         .expires_header()
         .map(|h| h.value().to_string().parse::<u32>().unwrap_or(3600))
         .unwrap_or(3600);
 
     // 解析 Contact 头
     let contact = tx
-        .original
+        .request()
         .contact_header()
         .map(|h| h.value().to_string())
         .unwrap_or_default();
 
     // 获取远端地址（Via 头）
     let remote_addr = tx
-        .original
+        .request()
         .via_header()
         .map(|h| h.value().to_string())
         .unwrap_or_default();
@@ -167,84 +124,6 @@ async fn handle_register(
         expires = expires,
         "📡 收到 REGISTER"
     );
-
-    // ── ACL 白名单/黑名单检查 ─────────────────────────────────────────────────
-
-    if let Err(reason) = config.check_device_allowed(&device_id) {
-        warn!(device_id = %device_id, reason = %reason, "🚫 ACL 拒绝注册");
-        tx.reply_with(StatusCode::Forbidden, vec![], Some(reason.as_bytes().to_vec()))
-            .await
-            .map_err(|e| anyhow::anyhow!("发送 403 Forbidden 失败: {}", e))?;
-        return Ok(());
-    }
-
-    // ── 摘要认证 ────────────────────────────────────────────────────────────
-    if config.enable_auth && expires > 0 {
-        // 检查是否有 Authorization 头
-        let auth_header = tx
-            .original
-            .headers
-            .iter()
-            .find(|h| {
-                let s = format!("{}", h);
-                s.to_lowercase().starts_with("authorization:")
-            })
-            .map(|h| format!("{}", h));
-
-        match auth_header {
-            None => {
-                // 没有 Authorization → 发 401 + 生成 nonce
-                let nonce = nonce_store.issue(&device_id);
-                let www_auth = format!(
-                    "Digest realm=\"{}\", nonce=\"{}\", algorithm=MD5",
-                    config.realm, nonce
-                );
-                let headers = vec![Header::WwwAuthenticate(
-                    rsipstack::sip::WwwAuthenticate::new(www_auth),
-                )];
-                tx.reply_with(StatusCode::Unauthorized, headers, None)
-                    .await
-                    .map_err(|e| anyhow::anyhow!("发送 401 Unauthorized 失败: {}", e))?;
-                debug!(device_id = %device_id, "🔐 发送 401 质询");
-                return Ok(());
-            }
-            Some(auth) => {
-                // 有 Authorization → 验证
-                let nonce = nonce_store
-                    .inner
-                    .get(&device_id)
-                    .map(|v| v.clone())
-                    .unwrap_or_default();
-
-                // 提取 REGISTER 的 Request-URI（用于 MD5 计算）
-                let req_uri = tx
-                    .original
-                    .uri
-                    .to_string();
-
-                let ok = verify_digest_auth(
-                    &auth,
-                    "REGISTER",
-                    &req_uri,
-                    config.get_password(&device_id),
-                    &config.realm,
-                    &nonce,
-                );
-
-                if !ok {
-                    warn!(device_id = %device_id, "🔐 摘要认证失败，拒绝注册");
-                    tx.reply(StatusCode::Forbidden)
-                        .await
-                        .map_err(|e| anyhow::anyhow!("发送 403 失败: {}", e))?;
-                    return Ok(());
-                }
-
-                // 认证成功，清除 nonce
-                nonce_store.remove(&device_id);
-                debug!(device_id = %device_id, "🔐 摘要认证通过");
-            }
-        }
-    }
 
     // ── 正常注册/注销逻辑 ────────────────────────────────────────────────────
     if expires == 0 {
@@ -293,7 +172,7 @@ async fn handle_register(
 // ── MESSAGE ──────────────────────────────────────────────────────────────────
 
 async fn handle_message(
-    mut tx: Transaction,
+    tx: SipTx,
     registry: DeviceRegistry,
     _config: Arc<Gb28181ServerConfig>,
 ) -> RIE<()> {
@@ -303,7 +182,7 @@ async fn handle_message(
         .await
         .map_err(|e| anyhow::anyhow!("回复 MESSAGE 200 OK 失败: {}", e))?;
 
-    let body = std::str::from_utf8(&tx.original.body)
+    let body = std::str::from_utf8(&tx.request().body)
         .unwrap_or("")
         .to_string();
 
@@ -320,7 +199,7 @@ async fn handle_message(
     };
 
     let from_str = tx
-        .original
+        .request()
         .from_header() // 从 From 头中提取
         .map(|h| h.value().to_string())
         .unwrap_or_default();

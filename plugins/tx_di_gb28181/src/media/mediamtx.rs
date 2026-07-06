@@ -44,7 +44,7 @@ use std::net::UdpSocket;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::Arc;
 use tracing::{debug, warn};
-use tx_di_core::{IE, RIE};
+use tx_di_core::{AppError as IE, RIE};
 // ── 配置 ─────────────────────────────────────────────────────────────────────
 
 /// MediaMTX 后端配置

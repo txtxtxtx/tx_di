@@ -21,13 +21,9 @@ use crate::xml::{
     GuardMode, PlaybackControl, PtzCommand, PtzPreciseParam, ZoomRect,
 };
 use rsipstack::dialog::dialog::DialogState;
-use rsipstack::dialog::dialog_layer::DialogLayer;
 use rsipstack::dialog::invitation::InviteOption;
 use rsipstack::sip as rsip;
-use rsipstack::transaction::key::{TransactionKey, TransactionRole};
-use rsipstack::transaction::transaction::Transaction;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
 use tracing::{info, warn};
 use tx_gb28181::device::GbDevice;
 
@@ -402,8 +398,7 @@ impl Gb28181Server {
         );
 
         let sender = self.sip_plugin.sender()?;
-        let endpoint = sender.inner();
-        let dialog_layer = Arc::new(DialogLayer::new(endpoint.clone()));
+        let dialog_layer = sender.dialog_layer();
         let (state_tx, mut state_rx) = dialog_layer.new_dialog_state_channel();
 
         let caller_uri = rsip::Uri::try_from(caller_str.as_str())
@@ -619,8 +614,7 @@ impl Gb28181Server {
         );
 
         let sender = self.sip_plugin.sender()?;
-        let endpoint = sender.inner();
-        let dialog_layer = Arc::new(DialogLayer::new(endpoint.clone()));
+        let dialog_layer = sender.dialog_layer();
         let (state_tx, mut state_rx) = dialog_layer.new_dialog_state_channel();
 
         let caller_uri = rsip::Uri::try_from(caller_str.as_str())
@@ -1200,8 +1194,7 @@ impl Gb28181Server {
 
         // 创建SIP对话层并建立状态通道
         let sender = self.sip_plugin.sender()?;
-        let endpoint = sender.inner();
-        let dialog_layer = Arc::new(DialogLayer::new(endpoint.clone()));
+        let dialog_layer = sender.dialog_layer();
         let (state_tx, mut state_rx) = dialog_layer.new_dialog_state_channel();
 
         // 解析主叫和被叫SIP URI
@@ -1321,60 +1314,16 @@ impl Gb28181Server {
         &self,
         contact: &str,
         body: &str,
-        seq: u32,
+        _seq: u32,
     ) -> anyhow::Result<()> {
         let sender = self.sip_plugin.sender()?;
-        let inner = sender.inner();
-
-        let req_uri = rsip::Uri::try_from(contact)
-            .map_err(|_| GbErr::InvalidUri)?;
-
         let platform_id = &self.config.platform_id;
         let sip_ip = &self.config.sip_ip;
         let from_str = format!("sip:{}@{}", platform_id, sip_ip);
-        let from_uri = rsip::Uri::try_from(from_str.as_str())
-            .map_err(|e| anyhow::anyhow!("无效的 From URI: {}", e))?;
 
-        let via = inner
-            .get_via(None, None)
-            .map_err(|e| anyhow::anyhow!("获取 Via 头失败: {}", e))?;
-
-        let from = rsip::typed::From {
-            display_name: None,
-            uri: from_uri,
-            params: vec![rsip::Param::Tag(rsip::uri::Tag::new(
-                rsipstack::transaction::make_tag(),
-            ))],
-        };
-        let to = rsip::typed::To {
-            display_name: None,
-            uri: req_uri.clone(),
-            params: vec![],
-        };
-
-        let mut request = inner.make_request(
-            rsip::method::Method::Message,
-            req_uri,
-            via,
-            from,
-            to,
-            seq,
-            None,
-        );
-
-        request
-            .headers
-            .push(rsip::Header::ContentType("Application/MANSCDP+xml".into()));
-        request.body = body.as_bytes().to_vec();
-
-        let key = TransactionKey::from_request(&request, TransactionRole::Client)
-            .map_err(|e| anyhow::anyhow!("构造事务 key 失败: {}", e))?;
-
-        let mut tx = Transaction::new_client(key, request, inner, None);
-        tx.send()
-            .await
-            .map_err(|_| GbErr::MessageSendFailed)?;
-
+        let _ = sender
+            .send_message(contact, &from_str, body.as_bytes(), "Application/MANSCDP+xml")
+            .await?;
         Ok(())
     }
 }

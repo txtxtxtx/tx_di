@@ -14,7 +14,7 @@ use crate::device_registry::DeviceRegistry;
 #[allow(unused_imports)]
 use tx_gb28181::device::GbDevice;
 use crate::event::{self, Gb28181Event};
-use crate::handlers::{NonceStore, register_server_handlers};
+use crate::handlers::register_server_handlers;
 #[allow(unused_imports)]
 use crate::media::{MediaBackend, OpenRtpRequest, PlayUrls, build_backend};
 #[allow(unused_imports)]
@@ -42,9 +42,8 @@ use std::future::Future;
 use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, OnceLock};
 use tokio::time::{Duration, interval};
-use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
-use tx_di_core::{App, BoxFuture, CompInit, RIE, tx_comp};
+use tx_di_core::{App, Component, DepsTuple, RIE};
 use tx_di_sip::SipPlugin;
 
 /// 活跃媒体会话信息
@@ -82,16 +81,14 @@ pub struct SessionInfo {
 /// base_url = "http://127.0.0.1:8080"
 /// secret   = "035c73f7-bb6b-4889-a715-d9eb2d1925cc"
 /// ```
-#[tx_comp(init)]
+#[derive(Component)]
+#[component(app_async_init, init_sort = 10001)]
 pub struct Gb28181Server {
     /// 配置
     pub config: Arc<Gb28181ServerConfig>,
     /// 设备注册表
     #[tx_cst(DeviceRegistry::new())]
     pub device_registry: DeviceRegistry,
-    /// 随机数存储
-    #[tx_cst(NonceStore::new())]
-    pub nonce_store: NonceStore,
     /// sip 插件
     pub sip_plugin: Arc<SipPlugin>,
     /// 每设备独立 SN 序列号
@@ -108,68 +105,58 @@ pub struct Gb28181Server {
     pub media: OnceLock<Arc<dyn MediaBackend>>,
 }
 
-impl CompInit for Gb28181Server {
-    fn async_init(ctx: Arc<App>, _token: CancellationToken) -> BoxFuture {
-        Box::pin(async move {
-            let srv = ctx.inject::<Gb28181Server>();
+/// 应用异步初始化：注册 SIP 处理器、构建流媒体后端、启动级联与心跳检测
+async fn app_async_init(comp: Arc<Gb28181Server>, _app: Arc<App>) -> RIE<()> {
+        let config = comp.config.clone();
+        let registry = comp.device_registry.clone();
+        let sip_plugin = comp.sip_plugin.clone();
 
-            let config = srv.config.clone();
-            let registry = srv.device_registry.clone();
-            let nonce_store = srv.nonce_store.clone();
-            let sip_plugin = srv.sip_plugin.clone();
-            // 构建流媒体后端
-            let media_backend = build_backend(&config.media_backend);
+        // 构建流媒体后端
+        let media_backend = build_backend(&config.media_backend);
 
-            // 注册 SIP 消息处理器
-            register_server_handlers(sip_plugin.clone(), registry.clone(), config.clone(), nonce_store)?;
+        // 注册 SIP 消息处理器
+        register_server_handlers(comp.clone())?;
 
-            // 存储 media backend
-            let _ = srv.media.set(media_backend.clone());
+        // 存储 media backend
+        let _ = comp.media.set(media_backend.clone());
 
-            // ── 级联：下级平台模式（向上级注册）────────────────────────────────
-            if config.cascade.enable_lower {
-                if let Some(cascade_lower) = crate::cascade::CascadeLower::new(
-                    &config.cascade,
-                    &config.platform_id,
-                    &config.sip_ip,
-                    sip_plugin.clone(),
-                    registry.clone(),
-                ) {
-                    let cancel_token = sip_plugin.get_cancel_token()?;
-                    cascade_lower.start(cancel_token);
-                    info!("下级平台级联任务已启动");
-                } else {
-                    warn!("enabled_lower=true 但缺少 upper_platform_sip 或 upper_platform_id 配置");
-                }
+        // ── 级联：下级平台模式（向上级注册）────────────────────────────────
+        if config.cascade.enable_lower {
+            if let Some(cascade_lower) = crate::cascade::CascadeLower::new(
+                &config.cascade,
+                &config.platform_id,
+                &config.sip_ip,
+                sip_plugin.clone(),
+                registry.clone(),
+            ) {
+                let cancel_token = sip_plugin.get_cancel_token()?;
+                cascade_lower.start(cancel_token);
+                info!("下级平台级联任务已启动");
+            } else {
+                warn!("enabled_lower=true 但缺少 upper_platform_sip 或 upper_platform_id 配置");
             }
+        }
 
-            info!(
-                platform_id = %config.platform_id,
-                realm = %config.realm,
-                sip_ip = %config.sip_ip,
-                heartbeat_timeout_secs = config.heartbeat_timeout_secs,
-                enable_auth = config.enable_auth,
-                media_backend = media_backend.backend_name(),
-                "GB28181 服务端处理器注册完成"
-            );
+        info!(
+            platform_id = %config.platform_id,
+            realm = %config.realm,
+            sip_ip = %config.sip_ip,
+            heartbeat_timeout_secs = config.heartbeat_timeout_secs,
+            enable_auth = config.enable_auth,
+            media_backend = media_backend.backend_name(),
+            "GB28181 服务端处理器注册完成"
+        );
 
-            // 启动心跳超时检测后台任务
-            let timeout_secs = config.heartbeat_timeout_secs;
-            let registry_clone = registry.clone();
-            let sip_plugin_clone = sip_plugin.clone();
-            tokio::spawn(async move {
-                if let Err(e) = heartbeat_watchdog(registry_clone, sip_plugin_clone, timeout_secs).await {
-                    error!("心跳检测任务出错：{}", e);
-                }
-            });
-            Ok(())
-        })
-    }
-
-    fn init_sort() -> i32 {
-        // 在 SipPlugin（MAX-1）之后初始化
-        10001
-    }
+        // 启动心跳超时检测后台任务
+        let timeout_secs = config.heartbeat_timeout_secs;
+        let registry_clone = registry.clone();
+        let sip_plugin_clone = sip_plugin.clone();
+        tokio::spawn(async move {
+            if let Err(e) = heartbeat_watchdog(registry_clone, sip_plugin_clone, timeout_secs).await {
+                error!("心跳检测任务出错：{}", e);
+            }
+        });
+        Ok(())
 }
 
 impl Gb28181Server {

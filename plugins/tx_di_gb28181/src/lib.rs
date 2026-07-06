@@ -108,6 +108,7 @@ mod device_registry;
 pub mod err;
 mod event;
 mod handlers;
+mod auth;
 mod plugin;
 pub mod sdp;
 pub mod xml;
@@ -118,6 +119,7 @@ pub use config::{Gb28181ServerConfig, MediaConfig, CascadeConfig};
 pub use device_registry::DeviceRegistry;
 pub use event::{Gb28181Event, subscribe as subscribe_events};
 pub use handlers::Gb28181CmdType;
+pub use auth::Gb28181AuthMiddleware;
 pub use plugin::{Gb28181Server, SessionInfo};
 pub use sdp::{parse_sdp_ssrc, AudioCodec, AudioSessionInfo, SnapshotInfo};
 pub use xml::{

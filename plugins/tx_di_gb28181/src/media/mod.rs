@@ -63,7 +63,7 @@ pub mod null;
 pub mod zlm;
 
 use crate::err::GbErr;
-use tx_di_core::IE;
+use tx_di_core::AppError as IE;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::sync::Arc;

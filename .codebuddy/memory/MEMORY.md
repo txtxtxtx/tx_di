@@ -96,3 +96,9 @@
 - P8 `sender.rs` 返回 `anyhow::Result` → 统一 `RIE`；P9 补 `send_message/notify/subscribe/info`。
 - P11 `SipMetrics` 是死代码，需实时快照接入。
 - P12 `SipRouter` 应升为 DI Component（不再 `#[tx_cst(SipRouter::new())]` 藏在 SipPlugin 字段）。
+
+## gb28181 插件架构决策（2026-07-06 重设计）
+- 认证模块：`plugins/tx_di_gb28181/src/auth.rs` 的 `Gb28181AuthMiddleware` 实现 `SipMiddleware`（`#[component(as_trait = dyn SipMiddleware)]`），由 `SipPlugin::app_async_init` 经 `inject_all_traits_from_store::<dyn SipMiddleware>()` DI 收集进洋葱链（`sort()=10` 最外层前置）。
+- `process` 仅对 REGISTER：ACL 前置 403 → 无 Authorization 发 401 质询（`NonceStore` 生成 nonce）→ 有则 `verify_digest_auth` 校验（失败 403，成功放行）；非 REGISTER 直接 `next(tx)`。
+- `NonceStore` 现位于 `auth.rs`（随中间件单例常驻），`handlers.rs::handle_register` 不再含认证/ACL，只做注册/注销业务。
+- 注意：`auth.rs` 需 `use rsipstack::sip::HeadersExt`（from_header/expires_header 等方法来自该 trait）。

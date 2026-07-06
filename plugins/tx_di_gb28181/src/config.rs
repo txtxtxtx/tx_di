@@ -3,7 +3,7 @@
 use crate::media::MediaBackendConfig;
 use serde::Deserialize;
 use std::collections::HashMap;
-use tx_di_core::{tx_comp, CompInit};
+use tx_di_core::Component;
 
 /// 媒体层配置（RTP/RTSP 推流参数）
 #[derive(Debug, Clone, Deserialize)]
@@ -69,8 +69,8 @@ fn default_rtp_end() -> u16 {
 /// http_port = 8080
 /// https_port = 8081
 /// ```
-#[derive(Debug, Clone, Deserialize)]
-#[tx_comp(conf, init)]
+#[derive(Debug, Clone, Deserialize, Component)]
+#[component(conf)]
 pub struct Gb28181ServerConfig {
     /// 本平台 ID（20 位编号，GB28181 规范）
     #[serde(default = "default_platform_id")]
@@ -168,12 +168,6 @@ impl Default for Gb28181ServerConfig {
             allowed_device_ids: Vec::new(),
             blocked_device_ids: Vec::new(),
         }
-    }
-}
-
-impl CompInit for Gb28181ServerConfig {
-    fn init_sort() -> i32 {
-        10001
     }
 }
 

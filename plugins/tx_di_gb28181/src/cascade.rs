@@ -373,59 +373,10 @@ impl CascadeLower {
     /// 发送 SIP MESSAGE 到上级平台
     async fn send_msg(&self, body: &str, seq: u32) -> RIE<()> {
         let sender = self.sip_plugin.sender()?;
-        let inner = sender.inner();
-
-        let req_uri = rsip::Uri::try_from(self.upper_sip.as_str())
-            .map_err(|_| GbErr::InvalidUri)?;
-
         let from_str = format!("sip:{}@{}", self.local_platform_id, self.local_sip_ip);
-        let from_uri = rsip::Uri::try_from(from_str.as_str())
-            .map_err(|_| GbErr::InvalidUri)?;
-
-        let via = inner
-            .get_via(None, None)
-            .map_err(|e| anyhow::anyhow!("获取 Via 头失败: {e}"))?;
-
-        let from = rsip::typed::From {
-            display_name: None,
-            uri: from_uri,
-            params: vec![rsip::Param::Tag(rsip::uri::Tag::new(
-                rsipstack::transaction::make_tag(),
-            ))],
-        };
-
-        let to_uri = rsip::Uri::try_from(self.upper_sip.as_str())
-            .map_err(|_| GbErr::InvalidUri)?;
-
-        let mut request = inner.make_request(
-            rsip::method::Method::Message,
-            req_uri,
-            via,
-            from,
-            rsip::typed::To {
-                display_name: None,
-                uri: to_uri,
-                params: vec![],
-            },
-            seq,
-            None,
-        );
-
-        request
-            .headers
-            .push(rsip::Header::ContentType(
-                "Application/MANSCDP+xml".into(),
-            ));
-        request.body = body.as_bytes().to_vec();
-
-        let key = TransactionKey::from_request(&request, TransactionRole::Client)
-            .map_err(|e| anyhow::anyhow!("构造 MESSAGE 事务 key 失败: {e}"))?;
-
-        let mut tx = Transaction::new_client(key, request, inner, None);
-        tx.send()
-            .await
-            .map_err(|_| GbErr::MessageSendFailed)?;
-
+        let _ = sender
+            .send_message(&self.upper_sip, &from_str, body.as_bytes(), "Application/MANSCDP+xml")
+            .await?;
         debug!(sn = seq, "级联 MESSAGE 发送成功");
         Ok(())
     }
