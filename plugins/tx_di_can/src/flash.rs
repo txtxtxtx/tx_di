@@ -54,6 +54,12 @@ pub struct FlashConfig {
     pub memory_address: u32,
     /// 目标内存格式标识符
     pub memory_size_len: u8,
+    /// 压缩方法（0x00 = 不压缩；与 ECU 0x34 协商）
+    pub compression: u8,
+    /// 加密方法（0x00 = 不加密；与 ECU 0x34 协商）
+    pub encryption: u8,
+    /// 显式擦除例程 ID（0x31 0xFF00；0 表示不擦除）
+    pub erase_routine_id: u8,
     /// 例程控制选项数据（hex 原始字节）
     pub routine_option: Vec<u8>,
 }
@@ -69,6 +75,9 @@ impl Default for FlashConfig {
             verify_routine_id: 0x02,
             memory_address: 0x00000000,
             memory_size_len: 4,
+            compression: 0x00,
+            encryption: 0x00,
+            erase_routine_id: 0xFF,
             routine_option: vec![],
         }
     }
@@ -123,8 +132,8 @@ impl FlashEngine {
     where
         F: Fn(&[u8]) -> Vec<u8> + Send + Sync,
     {
-        let data = std::fs::read(firmware.as_ref())
-            .map_err(|e| anyhow!("读取固件文件失败: {}", e))?;
+        let data = crate::hex::load_firmware(firmware.as_ref())
+            .map_err(|e| anyhow!("读取/解码固件文件失败: {}", e))?;
 
         self.flash_data(data, key_fn).await
     }
@@ -153,39 +162,87 @@ impl FlashEngine {
 
         // ── 1. 安全访问 ──────────────────────────────
         tracing::info!("[flash] 1/7 安全访问 (level={})", self.config.security_level);
-        self.uds
+        if let Err(e) = self
+            .uds
             .security_access(self.config.security_level, &key_fn)
             .await
-            .map_err(|e| anyhow!("安全访问失败: {e}"))?;
+        {
+            let reason = format!("安全访问失败: {e}");
+            emit_event(CanEvent::FlashError {
+                reason: reason.clone(),
+            })
+            .await;
+            return Err(anyhow!(reason));
+        }
 
         // ── 2. 进入编程会话 ──────────────────────────
         tracing::info!(
             "[flash] 2/7 进入编程会话 ({:?})",
             self.config.session_type
         );
-        self.uds
-            .session_control(self.config.session_type)
-            .await
-            .map_err(|e| anyhow!("进入编程会话失败: {e}"))?;
+        if let Err(e) = self.uds.session_control(self.config.session_type).await {
+            let reason = format!("进入编程会话失败: {e}");
+            emit_event(CanEvent::FlashError {
+                reason: reason.clone(),
+            })
+            .await;
+            return Err(anyhow!(reason));
+        }
+
+        // ── 2.5 显式擦除例程（0x31 0xFF00）─────────────
+        if self.config.erase_before_download && self.config.erase_routine_id != 0 {
+            tracing::info!(
+                "[flash] 2.5/7 显式擦除 (routine=0x{:02X})",
+                self.config.erase_routine_id
+            );
+            if let Err(e) = self
+                .uds
+                .routine_control(
+                    0x01, // startRoutine
+                    0xFF << 8 | self.config.erase_routine_id as u16,
+                    &[],
+                )
+                .await
+            {
+                let reason = format!("显式擦除失败: {e}");
+                emit_event(CanEvent::FlashError {
+                    reason: reason.clone(),
+                })
+                .await;
+                return Err(anyhow!(reason));
+            }
+        }
 
         // ── 3. 请求下载 0x34 ─────────────────────────
         tracing::info!(
-            "[flash] 3/7 请求下载 (addr=0x{:08X}, len={})",
+            "[flash] 3/7 请求下载 (addr=0x{:08X}, len={}, comp=0x{:02X}, enc=0x{:02X})",
             self.config.memory_address,
-            total_bytes
+            total_bytes,
+            self.config.compression,
+            self.config.encryption
         );
-        let max_block_size = self
+        let max_block_size = match self
             .uds
             .request_download(
                 self.config.memory_address,
                 total_bytes as u32,
-                0x00, // 不压缩
-                0x00, // 不加密
+                self.config.compression,
+                self.config.encryption,
                 self.config.memory_size_len,
                 self.config.memory_size_len,
             )
             .await
-            .map_err(|e| anyhow!("请求下载失败: {e}"))?;
+        {
+            Ok(v) => v,
+            Err(e) => {
+                let reason = format!("请求下载失败: {e}");
+                emit_event(CanEvent::FlashError {
+                    reason: reason.clone(),
+                })
+                .await;
+                return Err(anyhow!(reason));
+            }
+        };
 
         let block_size = if max_block_size > 0 {
             max_block_size
@@ -204,10 +261,14 @@ impl FlashEngine {
 
         // ── 5. 退出传输 0x37 ─────────────────────────
         tracing::info!("[flash] 5/7 退出传输");
-        self.uds
-            .request_transfer_exit()
-            .await
-            .map_err(|e| anyhow!("退出传输失败: {e}"))?;
+        if let Err(e) = self.uds.request_transfer_exit().await {
+            let reason = format!("退出传输失败: {e}");
+            emit_event(CanEvent::FlashError {
+                reason: reason.clone(),
+            })
+            .await;
+            return Err(anyhow!(reason));
+        }
 
         // ── 6. 例程控制：校验完整性 ──────────────────
         tracing::info!(
@@ -225,10 +286,14 @@ impl FlashEngine {
 
         // ── 7. ECU 复位 ──────────────────────────────
         tracing::info!("[flash] 7/7 ECU 复位 (0x11 01)");
-        self.uds
-            .ecu_reset(0x01) // hardReset
-            .await
-            .map_err(|e| anyhow!("ECU 复位失败: {e}"))?;
+        if let Err(e) = self.uds.ecu_reset(0x01).await {
+            let reason = format!("ECU 复位失败: {e}");
+            emit_event(CanEvent::FlashError {
+                reason: reason.clone(),
+            })
+            .await;
+            return Err(anyhow!(reason));
+        }
 
         let elapsed_ms = {
             let guard = self.start.lock().unwrap();
@@ -267,11 +332,17 @@ impl FlashEngine {
             let chunk = &data[offset..chunk_end];
 
             if self.config.erase_before_download || !is_all_ff(chunk) {
-                let resp = self
-                    .uds
-                    .transfer_data(seq, chunk)
-                    .await
-                    .map_err(|e| anyhow!("TransferData block {} 失败: {e}", seq))?;
+                let resp = match self.uds.transfer_data(seq, chunk).await {
+                    Ok(r) => r,
+                    Err(e) => {
+                        let reason = format!("TransferData block {} 失败: {e}", seq);
+                        emit_event(CanEvent::FlashError {
+                            reason: reason.clone(),
+                        })
+                        .await;
+                        return Err(anyhow!(reason));
+                    }
+                };
 
                 // 某些 ECU 会回传额外数据（如校验结果），可忽略
                 if !resp.is_empty() {

@@ -108,3 +108,22 @@
 - `hangup(call_id)` 真正发 SIP BYE：`self.sip_plugin.sender().bye(&sess.dialog)`；先 `sessions.remove` 再 close RTP + bye + emit `SessionEnded`。
 - `invite_internal`/`audio_talkback` 的 `DialogState::Terminated` 分支加 `sessions_clone.contains_key` 去重，避免 hangup 后 Terminated 重复清理/事件。
 - `plugin.rs` 的 `xml`/`sdp` 导入块是迁移时遗留未用项（调用都在 `plugin_tail.rs`），已删除；`media` 导入精简为 `{MediaBackend, build_backend}`。最终 `cargo check -p tx_di_gb28181` 零警告。
+
+## tx_di_can 无设备联调增强（2026-07-08 完成）
+用户无 CAN 硬件，需在 SimBus 上完整联调监控/诊断/刷写。核心交付：
+
+### 后端（79 测试全绿）
+- `src/db/` 描述库：内置 DTC/DID 集（VIN/SW/HW/EngineSpeed 等）+ 外部 JSON/TOML 加载，ECU 仿真与前端共用。
+- `src/sim_ecu/` 通用 ECU 仿真节点：订阅接收→ISO-TP 重组→按描述库应答各 UDS SID（0x10/0x11/0x14/0x19/0x22/0x23/0x27/0x2E/0x31/0x34/0x36/0x37/0x3E）+ 最小 bootloader 状态机；仅 SimBus 或 `config.sim_ecu` 时启动。
+- `src/sim_ecu/state.rs` 新增：显式擦除例程 0x31 0xFF00、压缩/加密真实协商（0x34 解析 dataFormatIdentifier，仅 0x00 支持）、修正地址/长度字段解析。
+- `src/hex.rs` S19/IntelHEX 解码；`src/flash.rs` FlashError 真实触发 + 擦除/压缩加密接入 `FlashConfig`。
+- `src/record.rs` 录制/回放 CSV；`src/dbc.rs` DBC 解析 + 信号字节↔物理量双向解码（Intel/Motorola）。
+- `plugin.rs` 总线统计（帧计数/字节/负载率）+ 应用层帧过滤器；`event.rs` P2-2 评估结论：保留 CanEvent 为唯一真相源（tx-di-core 无应用事件总线）。
+
+### 前端（vue-tsc 类型检查通过）
+- 新增/增强 Tauri 命令：get_bus_stats/set_frame_filter/send_isotp/get_desc_dids/get_desc_dtcs/sim_ecu_status/record_csv/replay_csv/load_dbc/decode_dbc。
+- 视图：TraceView（循环发送/过滤掩码/解码切换/负载率曲线/高亮/导出）、UdsView（+ISO-TP 原始面板 + 描述库）、FlashView（文件选择/擦除/seedkey）、SimEcuView（状态+自检）、RecordReplayView、DbcView。
+- 验证命令：`cargo test -p tx_di_can`（79 绿）、`cargo check --workspace`、`npx vue-tsc --noEmit`（app 目录，需先 `npm install`）。
+
+### 已知待办（后续阶段，未实现）
+XCP/CCP 标定（A2L+DAQ/CAL）、离线分析、审计报表（PDF/HTML）、中英双语、产线权限分级、.canproj 工程管理、自动化脚本/宏。这些是计划 v2/v3 项，本次未实现。

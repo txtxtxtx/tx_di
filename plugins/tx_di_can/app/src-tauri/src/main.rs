@@ -42,6 +42,18 @@ fn main() {
             commands::security_access,
             commands::read_dtc,
             commands::flash,
+            commands::get_bus_stats,
+            commands::reset_stats,
+            commands::set_frame_filter,
+            commands::get_frame_filter,
+            commands::send_isotp,
+            commands::get_desc_dids,
+            commands::get_desc_dtcs,
+            commands::sim_ecu_status,
+            commands::record_csv,
+            commands::replay_csv,
+            commands::load_dbc,
+            commands::decode_dbc,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

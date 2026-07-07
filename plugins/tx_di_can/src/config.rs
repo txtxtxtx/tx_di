@@ -35,6 +35,9 @@ fn default_fd_bitrate() -> u32 {
 fn default_rx_queue() -> usize {
     512
 }
+fn default_sim_ecu() -> bool {
+    false
+}
 fn default_tx_timeout() -> u64 {
     100
 }
@@ -76,6 +79,9 @@ pub struct CanConfig {
     pub enable_fd: bool,
     #[serde(default = "default_rx_queue")]
     pub rx_queue_size: usize,
+    /// 是否启用 ECU 仿真节点（无设备联调 UDS/刷写，SimBus 下默认可由插件自动开启）
+    #[serde(default = "default_sim_ecu")]
+    pub sim_ecu: bool,
     #[serde(default = "default_tx_timeout")]
     pub tx_timeout_ms: u64,
     #[serde(default = "default_isotp_tx_id")]
@@ -101,6 +107,7 @@ impl Default for CanConfig {
             fd_bitrate: default_fd_bitrate(),
             enable_fd: false,
             rx_queue_size: default_rx_queue(),
+            sim_ecu: default_sim_ecu(),
             tx_timeout_ms: default_tx_timeout(),
             isotp_tx_id: default_isotp_tx_id(),
             isotp_rx_id: default_isotp_rx_id(),

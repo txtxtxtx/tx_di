@@ -6,12 +6,18 @@ import TraceView from './views/TraceView.vue'
 import UdsView from './views/UdsView.vue'
 import FlashView from './views/FlashView.vue'
 import ConfigView from './views/ConfigView.vue'
+import SimEcuView from './views/SimEcuView.vue'
+import RecordReplayView from './views/RecordReplayView.vue'
+import DbcView from './views/DbcView.vue'
 
 const activeTab = ref('trace')
 const tabs = [
   { key: 'trace', label: '总线监控' },
   { key: 'uds', label: 'UDS 诊断' },
   { key: 'flash', label: '固件刷写' },
+  { key: 'simecu', label: 'ECU 仿真' },
+  { key: 'record', label: '录制回放' },
+  { key: 'dbc', label: 'DBC 解码' },
   { key: 'config', label: '连接配置' },
 ]
 
@@ -52,6 +58,9 @@ onUnmounted(() => unlisten?.())
       <TraceView v-if="activeTab === 'trace'" />
       <UdsView v-else-if="activeTab === 'uds'" />
       <FlashView v-else-if="activeTab === 'flash'" />
+      <SimEcuView v-else-if="activeTab === 'simecu'" />
+      <RecordReplayView v-else-if="activeTab === 'record'" />
+      <DbcView v-else-if="activeTab === 'dbc'" />
       <ConfigView v-else-if="activeTab === 'config'" />
     </main>
   </div>

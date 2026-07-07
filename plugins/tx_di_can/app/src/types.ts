@@ -48,6 +48,52 @@ export interface FlashConfigInput {
   default_block_size?: number
 }
 
+export interface BusStats {
+  frame_count: number
+  fd_frame_count: number
+  bytes: number
+  start_ms: number
+  load_permille: number
+}
+
+export interface FrameFilter {
+  id_min: number | null
+  id_max: number | null
+  id_mask: number
+  id_match: number
+}
+
+export interface DescDidInfo {
+  id: number
+  name: string
+  unit: string
+}
+
+export interface DescDtcInfo {
+  code: number
+  text: string
+}
+
+export interface DbcSigInfo {
+  name: string
+  unit: string
+  factor: number
+  offset: number
+  is_signed: boolean
+}
+
+export interface DbcMsgInfo {
+  id: number
+  name: string
+  dlc: number
+  signals: DbcSigInfo[]
+}
+
+export interface DbcValue {
+  name: string
+  value: number
+}
+
 export type CanEvent =
   | { BusReady: { interface: string } }
   | { BusError: { description: string } }

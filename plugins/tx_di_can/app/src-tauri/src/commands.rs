@@ -6,8 +6,84 @@
 use serde::Deserialize;
 use std::sync::Arc;
 use tx_di_can::{
-    CanConfig, CanFdFrame, CanFrame, CanPlugin, FlashConfig, SessionType, UdsClient,
+    dbc::Dbc, BusStats, CanConfig, CanFdFrame, CanFrame, CanPlugin, FlashConfig, FrameFilter,
+    SessionType, UdsClient,
 };
+
+/// 描述库 DID 摘要（供前端描述面板展示）
+#[derive(Debug, serde::Serialize)]
+pub struct DescDidInfo {
+    pub id: u16,
+    pub name: String,
+    pub unit: String,
+}
+
+/// 描述库 DTC 摘要
+#[derive(Debug, serde::Serialize)]
+pub struct DescDtcInfo {
+    pub code: u32,
+    pub text: String,
+}
+
+/// DBC 信号摘要
+#[derive(Debug, serde::Serialize)]
+pub struct DbcSigInfo {
+    pub name: String,
+    pub unit: String,
+    pub factor: f64,
+    pub offset: f64,
+    pub is_signed: bool,
+}
+
+/// DBC 消息摘要
+#[derive(Debug, serde::Serialize)]
+pub struct DbcMsgInfo {
+    pub id: u32,
+    pub name: String,
+    pub dlc: u8,
+    pub signals: Vec<DbcSigInfo>,
+}
+
+/// DBC 整体摘要
+#[derive(Debug, serde::Serialize)]
+pub struct DbcSummary {
+    pub messages: Vec<DbcMsgInfo>,
+}
+
+/// DBC 解码结果
+#[derive(Debug, serde::Serialize)]
+pub struct DbcValue {
+    pub name: String,
+    pub value: f64,
+}
+
+/// 前端传入的帧过滤器（ID 范围 / 掩码匹配）
+#[derive(Debug, Deserialize)]
+pub struct FrameFilterInput {
+    /// ID 下限（含），可空
+    #[serde(default)]
+    pub id_min: Option<u32>,
+    /// ID 上限（含），可空
+    #[serde(default)]
+    pub id_max: Option<u32>,
+    /// 掩码（0 表示不按掩码匹配）
+    #[serde(default)]
+    pub id_mask: u32,
+    /// 期望匹配值
+    #[serde(default)]
+    pub id_match: u32,
+}
+
+impl From<FrameFilterInput> for FrameFilter {
+    fn from(f: FrameFilterInput) -> Self {
+        FrameFilter {
+            id_min: f.id_min,
+            id_max: f.id_max,
+            id_mask: f.id_mask,
+            id_match: f.id_match,
+        }
+    }
+}
 
 /// 前端传入的帧（JSON 友好，避免直接构造 `FrameId` 枚举）
 #[derive(Debug, Deserialize)]
@@ -170,6 +246,135 @@ pub async fn flash(
         .map_err(|e| e.to_string())
 }
 
+// ── 监控增强：统计与过滤 ───────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn get_bus_stats() -> Option<BusStats> {
+    CanPlugin::get_stats()
+}
+
+#[tauri::command]
+pub fn reset_stats() {
+    CanPlugin::reset_stats()
+}
+
+#[tauri::command]
+pub fn set_frame_filter(filter: Option<FrameFilterInput>) -> Result<(), String> {
+    CanPlugin::set_filter(filter.map(Into::into));
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_frame_filter() -> Option<FrameFilter> {
+    CanPlugin::get_filter()
+}
+
+// ── ISO-TP 原始收发 ───────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn send_isotp(tx_id: u32, rx_id: u32, data: Vec<u8>) -> Result<(), String> {
+    let ch = CanPlugin::create_isotp_channel(tx_id, rx_id);
+    ch.send(&data).await.map_err(|e| e.to_string())
+}
+
+// ── 描述库查询 ─────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn get_desc_dids() -> Vec<DescDidInfo> {
+    match CanPlugin::desc_db() {
+        Some(db) => db
+            .supported_dids()
+            .into_iter()
+            .filter_map(|id| {
+                let m = db.did_meta(id)?;
+                Some(DescDidInfo {
+                    id,
+                    name: m.name.clone(),
+                    unit: m.unit.clone().unwrap_or_default(),
+                })
+            })
+            .collect(),
+        None => Vec::new(),
+    }
+}
+
+#[tauri::command]
+pub fn get_desc_dtcs() -> Vec<DescDtcInfo> {
+    match CanPlugin::desc_db() {
+        Some(db) => db
+            .supported_dtc_codes()
+            .into_iter()
+            .map(|code| DescDtcInfo {
+                code,
+                text: db.dtc_text(code).unwrap_or("未知").to_string(),
+            })
+            .collect(),
+        None => Vec::new(),
+    }
+}
+
+#[tauri::command]
+pub fn sim_ecu_status() -> bool {
+    CanPlugin::sim_ecu_enabled()
+}
+
+// ── 录制 / 回放 ────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn record_csv(path: String, duration_ms: u64) -> Result<u32, String> {
+    CanPlugin::record_csv(&path, duration_ms)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn replay_csv(path: String, speed_factor: f64) -> Result<u32, String> {
+    CanPlugin::replay_csv(&path, speed_factor)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ── DBC 解码 ───────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn load_dbc(path: String) -> Result<DbcSummary, String> {
+    let txt = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let dbc = Dbc::parse(&txt).map_err(|e| e.to_string())?;
+    Ok(DbcSummary {
+        messages: dbc
+            .messages
+            .into_iter()
+            .map(|m| DbcMsgInfo {
+                id: m.id,
+                name: m.name,
+                dlc: m.dlc,
+                signals: m
+                    .signals
+                    .into_iter()
+                    .map(|s| DbcSigInfo {
+                        name: s.name,
+                        unit: s.unit,
+                        factor: s.factor,
+                        offset: s.offset,
+                        is_signed: s.is_signed,
+                    })
+                    .collect(),
+            })
+            .collect(),
+    })
+}
+
+#[tauri::command]
+pub fn decode_dbc(path: String, can_id: u32, data: Vec<u8>) -> Result<Vec<DbcValue>, String> {
+    let txt = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let dbc = Dbc::parse(&txt).map_err(|e| e.to_string())?;
+    Ok(dbc
+        .decode(can_id, &data)
+        .into_iter()
+        .map(|(name, value)| DbcValue { name, value })
+        .collect())
+}
+
 // ── 辅助 ───────────────────────────────────────────────────────────────────
 
 /// 取得指定 tx/rx 的 UDS 客户端（rx = tx + 8，符合标准请求/响应配对）
@@ -206,6 +411,9 @@ fn build_flash_config(c: &FlashConfigInput) -> FlashConfig {
         verify_routine_id: 0x02,
         memory_address: c.memory_address,
         memory_size_len: 4,
+        compression: 0x00,
+        encryption: 0x00,
+        erase_routine_id: 0xFF,
         routine_option: vec![],
     }
 }

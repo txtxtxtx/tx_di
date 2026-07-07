@@ -23,6 +23,7 @@ use crate::adapter::CanAdapter;
 use crate::event::{emit_event, CanEvent};
 use crate::isotp::{IsoTpChannel, IsoTpConfig};
 use anyhow::Result;
+use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -82,6 +83,35 @@ pub enum NrcCode {
     SubFunctionNotSupportedInActiveSession = 0x7E,
     ServiceNotSupportedInActiveSession = 0x7F,
     Unknown(u8),
+}
+
+impl NrcCode {
+    /// 返回 NRC 的数值编码
+    pub fn code(self) -> u8 {
+        match self {
+            NrcCode::GeneralReject => 0x10,
+            NrcCode::ServiceNotSupported => 0x11,
+            NrcCode::SubFunctionNotSupported => 0x12,
+            NrcCode::IncorrectMessageLengthOrInvalidFormat => 0x13,
+            NrcCode::ResponseTooLong => 0x14,
+            NrcCode::BusyRepeatRequest => 0x21,
+            NrcCode::ConditionsNotCorrect => 0x22,
+            NrcCode::RequestSequenceError => 0x24,
+            NrcCode::RequestOutOfRange => 0x31,
+            NrcCode::SecurityAccessDenied => 0x33,
+            NrcCode::InvalidKey => 0x35,
+            NrcCode::ExceededNumberOfAttempts => 0x36,
+            NrcCode::RequiredTimeDelayNotExpired => 0x37,
+            NrcCode::UploadDownloadNotAccepted => 0x70,
+            NrcCode::TransferDataSuspended => 0x71,
+            NrcCode::GeneralProgrammingFailure => 0x72,
+            NrcCode::WrongBlockSequenceCounter => 0x73,
+            NrcCode::ResponsePending => 0x78,
+            NrcCode::SubFunctionNotSupportedInActiveSession => 0x7E,
+            NrcCode::ServiceNotSupportedInActiveSession => 0x7F,
+            NrcCode::Unknown(v) => v,
+        }
+    }
 }
 
 impl From<u8> for NrcCode {
@@ -305,6 +335,76 @@ impl UdsClient {
         payload.extend_from_slice(data);
         self.request(UdsService::WriteDataByIdentifier, &payload).await?;
         Ok(())
+    }
+
+    /// 0x22 ReadDataByIdentifier（多 DID 一次读取）
+    ///
+    /// 发送所有 DID 组合请求，返回正响应**完整报文**（含 0x62 SID）。
+    /// 调用方按 `(DID, 字节长度)` 布局用 `parse_data_by_id` 切分各 DID 数据。
+    pub async fn read_data_multi(&self, dids: &[u16]) -> Result<Vec<u8>, UdsError> {
+        let mut payload = Vec::with_capacity(dids.len() * 2);
+        for &did in dids {
+            payload.push((did >> 8) as u8);
+            payload.push((did & 0xFF) as u8);
+        }
+        self.request(UdsService::ReadDataByIdentifier, &payload).await
+    }
+
+    /// 将多 DID 读响应（已剥去 0x62 SID）按布局切分为 `DID → 数据`
+    ///
+    /// `layout` 需与请求顺序一致，每项为 `(DID, 该 DID 数据字节长度)`。
+    /// 输入 `resp` 来自 `read_data_multi` 的返回值（不含 SID 字节）。
+    pub fn parse_data_by_id(
+        resp: &[u8],
+        layout: &[(u16, usize)],
+    ) -> Result<HashMap<u16, Vec<u8>>, UdsError> {
+        let mut out = HashMap::new();
+        let mut i = 0usize;
+        for &(did, len) in layout {
+            if i + 2 + len > resp.len() {
+                return Err(UdsError::InvalidResponse(format!(
+                    "多 DID 读响应长度不足 (DID=0x{did:04X})"
+                )));
+            }
+            let got_did = ((resp[i] as u16) << 8) | (resp[i + 1] as u16);
+            if got_did != did {
+                return Err(UdsError::InvalidResponse(format!(
+                    "多 DID 读 DID 顺序不符: 期望 0x{did:04X}, 收到 0x{got_did:04X}"
+                )));
+            }
+            out.insert(did, resp[i + 2..i + 2 + len].to_vec());
+            i += 2 + len;
+        }
+        Ok(out)
+    }
+
+    /// 0x19 ReadDTCInformation（任意 sub-function）
+    ///
+    /// `sub_fn`：0x01 数量 / 0x02 按状态掩码 / 0x0A 受支持 DTC 等。
+    pub async fn read_dtc_subfn(
+        &self,
+        sub_fn: u8,
+        status_mask: u8,
+    ) -> Result<Vec<DtcRecord>, UdsError> {
+        let resp = self
+            .request(UdsService::ReadDtcInformation, &[sub_fn, status_mask])
+            .await?;
+        // resp = [sub_fn_echo, dtc_status_availability_mask, dtc_and_status_records...]
+        if resp.len() < 2 {
+            return Ok(vec![]);
+        }
+        let mut records = vec![];
+        let mut i = 2usize;
+        while i + 3 < resp.len() {
+            let code = ((resp[i] as u32) << 16) | ((resp[i + 1] as u32) << 8) | (resp[i + 2] as u32);
+            let status = resp[i + 3];
+            records.push(DtcRecord {
+                dtc_code: code,
+                status_mask: status,
+            });
+            i += 4;
+        }
+        Ok(records)
     }
 
     /// 0x27 SecurityAccess — 两步握手（seed-key）

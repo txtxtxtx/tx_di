@@ -2,6 +2,13 @@
 //!
 //! 基于 `LazyLock<Vec<Handler>>` 实现多订阅者异步扇出，
 //! 与 GB28181 插件相同的模式，保持架构一致性。
+//!
+//! ## P2-2 事件总线统一评估结论
+//! `tx-di-core` 的事件体系仅覆盖组件生命周期（`init`/`async_init`/`shutdown` 回调），
+//! 并无面向应用的遥测/领域事件总线。而 `CanEvent` 已派生 `Serialize`，是 Tauri 前端
+//! `app.emit("can://event", ev)` 的唯一协议来源。将 `CanEvent` 强行映射到框架生命周期事件
+//! 既无承载类型，也会破坏前端协议。因此评估结论为：**保留 `CanEvent` 作为应用事件唯一真相源**，
+//! 维持既有扇出 + Tauri emit 双通道，不引入框架事件映射。
 
 use crate::frame::{CanFdFrame, CanFrame};
 use anyhow::Result;

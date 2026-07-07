@@ -64,12 +64,17 @@
 
 mod adapter;
 mod config;
+pub mod db;
+pub mod dbc;
 pub mod err;
 mod event;
 mod frame;
 mod flash;
+pub mod hex;
 mod isotp;
 mod plugin;
+pub mod sim_ecu;
+pub mod record;
 mod uds;
 
 pub use adapter::{CanAdapter, AdapterKind};
@@ -77,12 +82,14 @@ pub use adapter::{CanAdapter, AdapterKind};
 #[cfg(test)]
 mod tests;
 pub use config::CanConfig;
+pub use db::{DescDb, DidMeta, DtcMeta};
 pub use err::CanErr;
 pub use event::{CanEvent, on_event};
 pub use flash::{FlashConfig, FlashEngine, FlashProgress, FlashResult};
 pub use frame::{CanFdFrame, CanFrame, FrameId, FrameKind};
 pub use isotp::{IsoTpChannel, IsoTpConfig};
-pub use plugin::CanPlugin;
+pub use plugin::{BusStats, CanPlugin, FrameFilter};
+pub use sim_ecu::{SimEcuConfig, spawn_sim_ecu};
 pub use uds::{
     DtcRecord, NrcCode, SessionType, UdsClient, UdsError, UdsService,
 };

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { api } from '../api/can'
 import { state, pushLog } from '../store'
 
@@ -14,6 +14,15 @@ const keyAlgo = ref('negate')
 const dtcMask = ref('FF')
 const dtcResult = ref('')
 
+// ISO-TP 原始收发
+const isoRxId = ref('7E8')
+const isoData = ref('22 F1 90')
+const isoLog = ref('')
+
+// 描述库
+const dids = ref<{ id: number; name: string; unit: string }[]>([])
+const dtcs = ref<{ code: number; text: string }[]>([])
+
 function tx() {
   return parseInt(txId.value, 16)
 }
@@ -21,6 +30,12 @@ function parseData(s: string): number[] {
   return s.trim().split(/\s+/).filter(Boolean).map((h) => parseInt(h, 16))
 }
 const hex = (n: number) => n.toString(16).padStart(2, '0').toUpperCase()
+async function loadDesc() {
+  dids.value = await api.getDescDids()
+  dtcs.value = await api.getDescDtcs()
+}
+
+onMounted(loadDesc)
 
 async function doRead() {
   try {
@@ -81,6 +96,16 @@ async function doDtc() {
     pushLog('失败: ' + String(e))
   }
 }
+async function doIsoSend() {
+  try {
+    await api.sendIsotp(tx(), parseInt(isoRxId.value, 16), parseData(isoData.value))
+    isoLog.value += `TX → ${isoData.value}\n`
+    pushLog('ISO-TP 原始帧已发送')
+  } catch (e) {
+    isoLog.value += `ERR ${String(e)}\n`
+    pushLog('ISO-TP 发送失败: ' + String(e))
+  }
+}
 </script>
 
 <template>
@@ -129,6 +154,51 @@ async function doDtc() {
         <button @click="doDtc">读取 DTC</button>
       </div>
     </section>
+
+    <section class="panel">
+      <h3>ISO-TP 原始收发</h3>
+      <div class="row">
+        <label>Rx ID(hex)</label><input v-model="isoRxId" style="width: 80px" />
+        <label>数据(hex)</label><input v-model="isoData" style="width: 260px" />
+        <button @click="doIsoSend">发送</button>
+        <button @click="loadDesc">加载描述库</button>
+      </div>
+      <pre style="height: 120px; overflow: auto">{{ isoLog }}</pre>
+    </section>
+
+    <div style="display: flex; gap: 12px; flex: 1; min-height: 0">
+      <section class="panel grow">
+        <h3>描述库 DID ({{ dids.length }})</h3>
+        <div class="table-wrap" style="max-height: 200px">
+          <table>
+            <thead><tr><th>DID</th><th>名称</th><th>单位</th></tr></thead>
+            <tbody>
+              <tr v-for="d in dids" :key="d.id">
+                <td class="mono">0x{{ d.id.toString(16).toUpperCase() }}</td>
+                <td>{{ d.name }}</td>
+                <td>{{ d.unit }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section class="panel grow">
+        <h3>描述库 DTC ({{ dtcs.length }})</h3>
+        <div class="table-wrap" style="max-height: 200px">
+          <table>
+            <thead><tr><th>码</th><th>描述</th></tr></thead>
+            <tbody>
+              <tr v-for="c in dtcs" :key="c.code">
+                <td class="mono">0x{{ c.code.toString(16).toUpperCase() }}</td>
+                <td>{{ c.text }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+
 
     <div style="display: flex; gap: 12px; flex: 1; min-height: 0">
       <section class="panel grow">

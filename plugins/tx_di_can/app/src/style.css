@@ -63,3 +63,25 @@ th { color: var(--muted); position: sticky; top: 0; background: var(--panel); }
 pre { white-space: pre-wrap; margin: 0; }
 .progress { height: 10px; background: var(--panel2); border-radius: 5px; overflow: hidden; }
 .progress > div { height: 100%; background: var(--accent); transition: width 0.2s; }
+
+/* ── Trace 监控增强 ── */
+.muted { color: var(--muted); font-size: 12px; }
+.row.stats { align-items: stretch; }
+.stat {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--panel2); border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 12px; min-width: 76px;
+}
+.stat-val { font-size: 16px; font-weight: 600; color: var(--accent); }
+.stat-label { font-size: 11px; color: var(--muted); }
+.loadbar {
+  display: flex; align-items: flex-end; gap: 1px; height: 44px; width: 220px;
+  background: var(--panel2); border: 1px solid var(--border); border-radius: 6px; padding: 2px;
+}
+.loadcell { flex: 1; background: linear-gradient(180deg, #48cae4, #0096c7); border-radius: 1px; min-height: 2px; }
+.toolbar { float: right; display: inline-flex; gap: 6px; align-items: center; }
+.toolbar select, .toolbar input { font-size: 12px; }
+table tbody tr.rx { color: #cfe9d6; }
+table tbody tr.tx { color: #cfe2f3; }
+table tbody tr.hl { background: #3a3320; box-shadow: inset 3px 0 0 #f59e0b; }
+table tbody tr:hover { background: var(--panel2); }

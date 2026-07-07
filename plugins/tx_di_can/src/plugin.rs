@@ -2,17 +2,123 @@
 
 use crate::adapter::create_adapter;
 use crate::adapter::CanAdapter;
-use crate::config::CanConfig;
+use crate::config::{AdapterKind, CanConfig};
+use crate::db::DescDb;
 use crate::event::{emit_event, CanEvent};
 use crate::flash::{FlashConfig, FlashEngine, FlashResult};
 use crate::frame::{CanFdFrame, CanFrame};
 use crate::isotp::{IsoTpChannel, IsoTpConfig};
+use crate::record::Recorder;
+use crate::sim_ecu::{spawn_sim_ecu, SimEcuConfig};
 use crate::uds::UdsClient;
 use anyhow::Result;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
+use tokio::sync::broadcast::error::RecvError;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{info, warn};
 use tx_di_core::{App, Component, DepsTuple, RIE, Store};
+
+/// 总线统计（帧计数 / 字节数 / 总线负载率）
+#[derive(Default, Clone, serde::Serialize)]
+pub struct BusStats {
+    /// 累计标准 CAN 帧数
+    pub frame_count: u64,
+    /// 累计 CANFD 帧数
+    pub fd_frame_count: u64,
+    /// 累计数据字节数
+    pub bytes: u64,
+    /// 统计起始时刻（UNIX 毫秒）
+    pub start_ms: u64,
+    /// 估算总线负载率（千分比，0~1000）
+    pub load_permille: u32,
+}
+
+impl BusStats {
+    fn now_ms() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0)
+    }
+
+    fn new() -> Self {
+        BusStats {
+            start_ms: Self::now_ms(),
+            ..Default::default()
+        }
+    }
+
+    /// 记录一帧并更新负载率估算
+    fn record(&mut self, is_fd: bool, dlc: usize, bitrate: u32) {
+        if is_fd {
+            self.fd_frame_count += 1;
+        } else {
+            self.frame_count += 1;
+        }
+        self.bytes += dlc as u64;
+        if bitrate == 0 {
+            return;
+        }
+        let elapsed_s = (Self::now_ms().saturating_sub(self.start_ms)) as f64 / 1000.0;
+        if elapsed_s <= 0.0 {
+            return;
+        }
+        // 帧位时间估算：经典 CAN ≈ 47 + 8*dlc 位；FD 数据段单独计，粗略按 2 倍
+        let bits = if is_fd {
+            67 + 8 * dlc * 2
+        } else {
+            47 + 8 * dlc
+        } as f64;
+        let bus_bits = bitrate as f64 * elapsed_s;
+        if bus_bits > 0.0 {
+            self.load_permille = ((bits * (self.frame_count + self.fd_frame_count) as f64
+                / bus_bits)
+                * 1000.0)
+                .min(1000.0) as u32;
+        }
+    }
+}
+
+/// 应用层帧过滤器（ID 范围 / 掩码匹配）
+#[derive(Default, Clone, serde::Serialize)]
+pub struct FrameFilter {
+    /// ID 下限（含），None 表示不限
+    pub id_min: Option<u32>,
+    /// ID 上限（含），None 表示不限
+    pub id_max: Option<u32>,
+    /// 掩码：仅比较 (id & id_mask) == (id_match & id_mask)
+    pub id_mask: u32,
+    /// 期望匹配值（与 id_mask 配合）
+    pub id_match: u32,
+}
+
+impl FrameFilter {
+    /// 不过滤（任何帧都通过）
+    pub fn none() -> Self {
+        FrameFilter::default()
+    }
+
+    /// 当前过滤器是否放行该 ID
+    pub fn matches(&self, id: u32) -> bool {
+        if let Some(lo) = self.id_min {
+            if id < lo {
+                return false;
+            }
+        }
+        if let Some(hi) = self.id_max {
+            if id > hi {
+                return false;
+            }
+        }
+        if self.id_mask != 0 {
+            if (id & self.id_mask) != (self.id_match & self.id_mask) {
+                return false;
+            }
+        }
+        true
+    }
+}
 
 /// 默认配置文件路径（可通过 #[tx_cst(my_custom_path())] 覆盖）
 fn default_can_config_path() -> String {
@@ -35,8 +141,14 @@ pub(crate) struct CanPluginInner {
     uds_default: Arc<UdsClient>,
     /// 多通道 UDS 客户端（按 tx_id 缓存）
     uds_channels: dashmap::DashMap<u32, Arc<UdsClient>>,
+    /// 描述库（DID/DTC 应答与展示数据来源）
+    db: Arc<DescDb>,
     /// 运行标志（Arc 共享，可在闭包间传递）
     running: Arc<AtomicBool>,
+    /// 总线统计（帧计数 / 字节数 / 负载率）
+    stats: Arc<Mutex<BusStats>>,
+    /// 应用层帧过滤器（None 表示不过滤）
+    filter: Arc<RwLock<Option<FrameFilter>>>,
 }
 
 impl CanPluginInner {
@@ -69,7 +181,10 @@ impl CanPluginInner {
             adapter,
             uds_default,
             uds_channels: dashmap::DashMap::new(),
+            db: Arc::new(DescDb::builtin()),
             running: Arc::new(AtomicBool::new(false)),
+            stats: Arc::new(Mutex::new(BusStats::new())),
+            filter: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -93,6 +208,9 @@ impl CanPluginInner {
                 info!("[can] CAN 总线已就绪: {}", adapter_name);
             }
 
+            // 适配器就绪后启动 ECU 仿真节点（SimBus 下自动开启，便于无设备联调）
+            inner.start_sim_ecu();
+
             let rx = inner.adapter.subscribe();
             let fd_rx = inner.adapter.subscribe_fd();
             inner.running.store(true, Ordering::SeqCst);
@@ -107,7 +225,21 @@ impl CanPluginInner {
                     frame = rec.recv() => {
                         match frame {
                             Ok(f) => {
-                                emit_event(CanEvent::FrameReceived(f)).await;
+                                let pass = {
+                                    let g = inner.filter.read().unwrap();
+                                    match &*g {
+                                        Some(ft) => ft.matches(f.id.raw()),
+                                        None => true,
+                                    }
+                                };
+                                if pass {
+                                    emit_event(CanEvent::FrameReceived(f.clone())).await;
+                                }
+                                inner
+                                    .stats
+                                    .lock()
+                                    .unwrap()
+                                    .record(false, f.data.len(), inner.config.bitrate);
                             }
                             Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
                                 warn!("[can] 接收队列溢出，丢弃 {} 帧", n);
@@ -118,7 +250,21 @@ impl CanPluginInner {
                     fd = fd_rec.recv() => {
                         match fd {
                             Ok(f) => {
-                                emit_event(CanEvent::FdFrameReceived(f)).await;
+                                let pass = {
+                                    let g = inner.filter.read().unwrap();
+                                    match &*g {
+                                        Some(ft) => ft.matches(f.id.raw()),
+                                        None => true,
+                                    }
+                                };
+                                if pass {
+                                    emit_event(CanEvent::FdFrameReceived(f.clone())).await;
+                                }
+                                inner
+                                    .stats
+                                    .lock()
+                                    .unwrap()
+                                    .record(true, f.data.len(), inner.config.bitrate);
                             }
                             Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
                                 warn!("[can] FD 接收队列溢出，丢弃 {} 帧", n);
@@ -129,6 +275,22 @@ impl CanPluginInner {
                 }
             }
         });
+    }
+
+    /// 启动 ECU 仿真节点（若配置启用或当前为 SimBus 适配器）
+    ///
+    /// 仿真任务作为订阅者挂在接收循环之后，对诊断帧生成 UDS 响应并回发，
+    /// 使 SimBus 从"回环"变为"ECU 应答"。真实适配器（PCAN/SocketCAN）不受影响。
+    fn start_sim_ecu(self: &Arc<Self>) {
+        let enabled = self.config.sim_ecu || matches!(self.config.adapter, AdapterKind::SimBus);
+        if !enabled {
+            return;
+        }
+        let cfg = SimEcuConfig::from_can_config(&self.config);
+        let adapter = self.adapter.clone();
+        let db = self.db.clone();
+        let running = self.running.clone();
+        spawn_sim_ecu(adapter, cfg, db, running);
     }
 }
 
@@ -331,6 +493,87 @@ impl CanPlugin {
         let client = Self::uds_client(config.target_id, config.target_id.wrapping_add(8));
         let engine = FlashEngine::new(client, config);
         engine.flash(firmware, key_fn).await
+    }
+
+    /// 读取总线统计（帧计数 / 字节数 / 负载率）
+    pub fn get_stats() -> Option<BusStats> {
+        INSTANCE
+            .read()
+            .unwrap()
+            .as_ref()
+            .map(|i| i.stats.lock().unwrap().clone())
+    }
+
+    /// 重置总线统计计数
+    pub fn reset_stats() {
+        if let Some(inner) = INSTANCE.read().unwrap().as_ref() {
+            *inner.stats.lock().unwrap() = BusStats::new();
+        }
+    }
+
+    /// 设置应用层帧过滤器（None 表示不过滤）
+    pub fn set_filter(filter: Option<FrameFilter>) {
+        if let Some(inner) = INSTANCE.read().unwrap().as_ref() {
+            *inner.filter.write().unwrap() = filter;
+        }
+    }
+
+    /// 读取当前帧过滤器
+    pub fn get_filter() -> Option<FrameFilter> {
+        INSTANCE
+            .read()
+            .unwrap()
+            .as_ref()
+            .and_then(|i| i.filter.read().unwrap().clone())
+    }
+
+    /// 取得描述库（DID/DTC 应答与展示数据来源）
+    pub fn desc_db() -> Option<Arc<DescDb>> {
+        INSTANCE.read().unwrap().as_ref().map(|i| i.db.clone())
+    }
+
+    /// 当前是否启用了 ECU 仿真节点（SimBus 或显式开启）
+    pub fn sim_ecu_enabled() -> bool {
+        INSTANCE.read().unwrap().as_ref().map_or(false, |i| {
+            i.config.sim_ecu || matches!(i.config.adapter, AdapterKind::SimBus)
+        })
+    }
+
+    /// 录制总线帧到 CSV（持续 duration_ms 毫秒）
+    pub async fn record_csv(path: &str, duration_ms: u64) -> Result<u32, String> {
+        let inner = Self::instance();
+        let mut rx = inner.adapter.subscribe();
+        let mut fd = inner.adapter.subscribe_fd();
+        let mut rec = Recorder::new(path).map_err(|e| e.to_string())?;
+        let start = std::time::Instant::now();
+        let mut count = 0u32;
+        loop {
+            if start.elapsed().as_millis() as u64 >= duration_ms {
+                break;
+            }
+            tokio::select! {
+                f = rx.recv() => match f {
+                    Ok(fr) => { let _ = rec.record_can(&fr); count += 1; }
+                    Err(RecvError::Lagged(_)) => {}
+                    Err(_) => break,
+                },
+                ff = fd.recv() => match ff {
+                    Ok(fr) => { let _ = rec.record_fd(&fr); count += 1; }
+                    Err(RecvError::Lagged(_)) => {}
+                    Err(_) => break,
+                },
+            }
+        }
+        Ok(count)
+    }
+
+    /// 从 CSV 回放帧到总线（speed_factor 倍速；0 表示尽快）
+    pub async fn replay_csv(path: &str, speed_factor: f64) -> Result<u32, String> {
+        let inner = Self::instance();
+        let n = crate::record::replay_csv(path, inner.adapter.as_ref(), speed_factor)
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(n as u32)
     }
 }
 

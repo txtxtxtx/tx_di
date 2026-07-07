@@ -1,7 +1,18 @@
 // Tauri command 调用封装 + 事件订阅
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import type { CanConfig, CanEvent, FlashConfigInput, FrameInput } from '../types'
+import type {
+  BusStats,
+  CanConfig,
+  CanEvent,
+  DbcMsgInfo,
+  DbcValue,
+  DescDidInfo,
+  DescDtcInfo,
+  FlashConfigInput,
+  FrameFilter,
+  FrameInput,
+} from '../types'
 
 export const api = {
   defaultConfig: () => invoke<CanConfig>('default_config'),
@@ -25,6 +36,23 @@ export const api = {
     invoke<string[]>('read_dtc', { txId, statusMask }),
   flash: (firmwarePath: string, config: FlashConfigInput, keyAlgo: string) =>
     invoke<void>('flash', { firmwarePath, config, keyAlgo }),
+  getBusStats: () => invoke<BusStats | null>('get_bus_stats'),
+  resetStats: () => invoke<void>('reset_stats'),
+  setFrameFilter: (filter: FrameFilter | null) =>
+    invoke<void>('set_frame_filter', { filter }),
+  getFrameFilter: () => invoke<FrameFilter | null>('get_frame_filter'),
+  sendIsotp: (txId: number, rxId: number, data: number[]) =>
+    invoke<void>('send_isotp', { txId, rxId, data }),
+  getDescDids: () => invoke<DescDidInfo[]>('get_desc_dids'),
+  getDescDtcs: () => invoke<DescDtcInfo[]>('get_desc_dtcs'),
+  simEcuStatus: () => invoke<boolean>('sim_ecu_status'),
+  recordCsv: (path: string, durationMs: number) =>
+    invoke<number>('record_csv', { path, durationMs }),
+  replayCsv: (path: string, speedFactor: number) =>
+    invoke<number>('replay_csv', { path, speedFactor }),
+  loadDbc: (path: string) => invoke<DbcMsgInfo[]>('load_dbc', { path }),
+  decodeDbc: (path: string, canId: number, data: number[]) =>
+    invoke<DbcValue[]>('decode_dbc', { path, canId, data }),
 }
 
 export function onCanEvent(cb: (e: CanEvent) => void): Promise<UnlistenFn> {

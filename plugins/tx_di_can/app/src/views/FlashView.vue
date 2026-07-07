@@ -15,6 +15,12 @@ const pct = () =>
     ? Math.round((state.flash.bytesSent / state.flash.totalBytes) * 100)
     : 0
 
+function onPick(e: Event) {
+  const f = (e.target as HTMLInputElement).files?.[0]
+  // 注：WebView2 下标准 <input type=file> 仅提供文件名；真实路径需经 Tauri 文件对话框
+  if (f) firmwarePath.value = f.name
+}
+
 async function doFlash() {
   if (state.flash.active) return
   state.flash.active = true
@@ -46,7 +52,9 @@ async function doFlash() {
     <section class="panel">
       <h3>固件刷写 (UDS 0x34~0x37)</h3>
       <div class="row">
-        <label>固件路径</label><input v-model="firmwarePath" style="width: 280px" />
+        <label>固件文件</label>
+        <input :value="firmwarePath" style="width: 240px" readonly />
+        <input type="file" accept=".bin,.s19,.srec,.hex" @change="onPick" style="width: 220px" />
       </div>
       <div class="row">
         <label>Target ID(hex)</label><input v-model="targetId" style="width: 90px" />
@@ -54,7 +62,7 @@ async function doFlash() {
         <label>安全等级(hex)</label><input v-model="securityLevel" style="width: 60px" />
       </div>
       <div class="row">
-        <label><input type="checkbox" v-model="eraseBefore" /> 下载前擦除</label>
+        <label><input type="checkbox" v-model="eraseBefore" /> 下载前显式擦除 (0x31 0xFF00)</label>
         <label>密钥算法</label>
         <select v-model="keyAlgo">
           <option value="negate">取反(negate)</option>
@@ -70,7 +78,7 @@ async function doFlash() {
         <div :style="{ width: pct() + '%' }"></div>
       </div>
       <div class="row" style="margin-top: 8px">
-        <span>
+        <span :class="{ err: state.flash.status.startsWith('失败') }">
           {{ state.flash.bytesSent }} / {{ state.flash.totalBytes }} 字节 ·
           块 {{ state.flash.blockSeq }} / {{ state.flash.totalBlocks }} ·
           {{ state.flash.status }}
@@ -84,3 +92,7 @@ async function doFlash() {
     </section>
   </div>
 </template>
+
+<style scoped>
+.err { color: var(--err); font-weight: 600; }
+</style>

@@ -1,6 +1,6 @@
 // 全局响应式状态
 import { reactive } from 'vue'
-import type { CanConfig, CanEvent } from './types'
+import type { BusStats, CanConfig, CanEvent, FrameFilter } from './types'
 
 export interface TraceRow {
   id: number
@@ -8,6 +8,8 @@ export interface TraceRow {
   type: string
   dir: string
   dataHex: string
+  dataRaw: number[]
+  frameId: number
   info: string
 }
 
@@ -21,6 +23,14 @@ export const state = reactive({
   config: null as CanConfig | null,
   trace: [] as TraceRow[],
   log: [] as string[],
+  stats: {
+    frame_count: 0,
+    fd_frame_count: 0,
+    bytes: 0,
+    start_ms: 0,
+    load_permille: 0,
+  } as BusStats,
+  filter: null as FrameFilter | null,
   flash: {
     active: false,
     blockSeq: 0,
@@ -43,6 +53,11 @@ export function pushLog(msg: string) {
   if (state.log.length > 500) state.log.pop()
 }
 
+export async function refreshStats() {
+  const s = await import('./api/can').then((m) => m.api.getBusStats())
+  if (s) state.stats = s
+}
+
 function addTrace(type: string, dir: string, f: FrameLike, info = '') {
   const idNum = f.id?.Standard ?? f.id?.Extended ?? 0
   state.trace.unshift({
@@ -51,6 +66,8 @@ function addTrace(type: string, dir: string, f: FrameLike, info = '') {
     type,
     dir,
     dataHex: hex(f.data),
+    dataRaw: f.data,
+    frameId: idNum,
     info: info || `ID 0x${idNum.toString(16).toUpperCase()}`,
   })
   if (state.trace.length > 2000) state.trace.pop()
