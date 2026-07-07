@@ -17,4 +17,5 @@ examples/tx_admin/data/dist
 /uploads/
 /uploadsddd/
 /pkgs/
-plugins\tx_di_can\app\node_modules
+examples\tx_di_can\app\node_modules
+examples/tx_di_can/app/dist
