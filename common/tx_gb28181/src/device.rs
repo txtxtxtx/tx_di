@@ -20,6 +20,7 @@
 //! | `GbDevice` → 2022 `ItemType` | `gb_device.to_item_type()` |
 
 use crate::enums::{DeviceIDType, ItemType, StatusType};
+use crate::version::GbVersion;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -124,6 +125,9 @@ pub struct GbDevice {
 
     /// 是否在线（心跳超时检测后的内部标记）
     pub online: bool,
+
+    /// 协议版本（2016 / 2022），粒度每设备，驱动出网字符集与指令裁剪
+    pub version: GbVersion,
 }
 
 impl Default for GbDevice {
@@ -140,6 +144,7 @@ impl Default for GbDevice {
             last_heartbeat: Instant::now(),
             expires: 3600,
             online: true,
+            version: GbVersion::default(),
         }
     }
 
@@ -313,6 +318,7 @@ impl GbDevice {
             last_heartbeat: Instant::now(),
             expires: 3600,
             online: item.status == StatusType::ON,
+            version: GbVersion::default(),
         }
     }
 
@@ -382,7 +388,7 @@ mod tests {
     fn gb_device_new_device() {
         let dev = GbDevice::new_device("34020000001320000001", "TestDevice");
         assert_eq!(dev.device_type, GbDeviceType::Device);
-        assert_eq!(dev.item.device_id, DeviceIDType::Len2("34020000001320000001".into()));
+        assert_eq!(dev.item.device_id, DeviceIDType::Len20("34020000001320000001".into()));
         assert_eq!(dev.item.name, "TestDevice");
         assert_eq!(dev.item.parental, 1);
         assert!(dev.is_parent());
@@ -402,7 +408,7 @@ mod tests {
     fn gb_device_new_area() {
         let area = GbDevice::new_area("330100", "杭州");
         assert_eq!(area.device_type, GbDeviceType::Area);
-        assert_eq!(area.item.device_id, DeviceIDType::Len2("330100".into()));
+        assert_eq!(area.item.device_id, DeviceIDType::Len20("330100".into()));
         assert!(area.is_parent());
     }
     

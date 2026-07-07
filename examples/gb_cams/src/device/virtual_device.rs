@@ -2,7 +2,24 @@
 
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
-use tx_gb28181::ChannelStatus;
+
+/// 通道在线状态（gb_cams 本地定义，避免依赖国标协议库的实现细节）
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ChannelStatus {
+    /// 在线
+    On,
+    /// 离线
+    Off,
+}
+
+impl ChannelStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ChannelStatus::On => "on",
+            ChannelStatus::Off => "off",
+        }
+    }
+}
 
 /// 虚拟通道
 #[derive(Debug, Clone, Serialize, Deserialize)]

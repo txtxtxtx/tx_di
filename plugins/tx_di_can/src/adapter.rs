@@ -10,7 +10,9 @@ use crate::err::CanErr;
 use crate::frame::{CanFdFrame, CanFrame};
 use anyhow::Result;
 use async_trait::async_trait;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::broadcast;
 use tokio::task::JoinSet;
 use crate::adapter::pcan_impl::get_pcan;
@@ -72,12 +74,16 @@ impl CanAdapter for SimBusAdapter {
     }
 
     async fn send(&self, frame: &CanFrame) -> Result<()> {
-        let _ = self.tx.send(frame.clone());
+        let mut f = frame.clone();
+        f.timestamp_us = crate::frame::now_micros();
+        let _ = self.tx.send(f);
         Ok(())
     }
 
     async fn send_fd(&self, frame: &CanFdFrame) -> Result<()> {
-        let _ = self.fd_tx.send(frame.clone());
+        let mut f = frame.clone();
+        f.timestamp_us = crate::frame::now_micros();
+        let _ = self.fd_tx.send(f);
         Ok(())
     }
 
@@ -300,6 +306,76 @@ impl CanAdapter for SocketCanAdapter {
                 );
             }
 
+            // 设为非阻塞，避免 recvfrom 阻塞异步执行器
+            unsafe {
+                libc::fcntl(sock, libc::F_SETFL, libc::O_NONBLOCK);
+            }
+
+            // 启动接收后台任务
+            self.running.store(true, Ordering::SeqCst);
+            let rx_sock = sock;
+            let tx = self.tx.clone();
+            let fd_tx = self.fd_tx.clone();
+            let running = self.running.clone();
+            self.tasks.lock().unwrap().spawn(async move {
+                let mut buf = [0u8; 72];
+                loop {
+                    if !running.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    let n = unsafe {
+                        libc::recvfrom(
+                            rx_sock,
+                            buf.as_mut_ptr() as *mut _,
+                            buf.len(),
+                            0,
+                            std::ptr::null_mut(),
+                            std::ptr::null_mut(),
+                        )
+                    };
+                    if n < 0 {
+                        let raw = std::io::Error::last_os_error().raw_os_error();
+                        if raw == Some(libc::EAGAIN) || raw == Some(libc::EWOULDBLOCK) {
+                            tokio::time::sleep(Duration::from_micros(200)).await;
+                            continue;
+                        }
+                        tokio::time::sleep(Duration::from_millis(10)).await;
+                        continue;
+                    }
+                    let can_id = u32::from_ne_bytes([buf[0], buf[1], buf[2], buf[3]]);
+                    if can_id & 0x2000_0000 != 0 {
+                        // 错误帧，跳过
+                        continue;
+                    }
+                    let ts = crate::frame::now_micros();
+                    if n >= (std::mem::size_of::<CanFdFrameLinux>() as isize)
+                        && (buf[5] & 0x04) != 0
+                    {
+                        // CAN-FD 帧（flags 含 FD 位）
+                        let len = buf[4] as usize;
+                        let flags = buf[5];
+                        let data = buf[8..8 + len.min(64)].to_vec();
+                        let _ = fd_tx.send(crate::frame::CanFdFrame {
+                            id: crate::frame::FrameId::from_raw(can_id),
+                            data,
+                            brs: flags & 0x01 != 0,
+                            esi: flags & 0x02 != 0,
+                            timestamp_us: ts,
+                        });
+                    } else if n >= (std::mem::size_of::<CanFrameLinux>() as isize) {
+                        let dlc = buf[4] as usize;
+                        let data = buf[8..8 + dlc.min(8)].to_vec();
+                        let _ = tx.send(crate::frame::CanFrame {
+                            id: crate::frame::FrameId::from_raw(can_id),
+                            kind: crate::frame::FrameKind::Data,
+                            data,
+                            timestamp_us: ts,
+                        });
+                    }
+                }
+                tracing::info!("[socketcan] 接收任务退出");
+            });
+
             *self.sock_fd.lock().unwrap() = Some(sock);
             tracing::info!(
                 "[socketcan] 接口 '{}' 已打开 (ifindex={}, fd={})",
@@ -480,6 +556,8 @@ mod pcan_impl {
     pub const PCAN_BAUD_250K: u16 = 0x011C;
     pub const PCAN_BAUD_125K: u16 = 0x031C;
     pub const PCAN_ERROR_OK: u32 = 0x00000;
+    /// 接收队列为空（无新帧）
+    pub const PCAN_ERROR_QRCVEMPTY: u32 = 0x00001;
 
     // 消息类型
     pub const PCAN_MESSAGE_STANDARD: u32 = 0x000;
@@ -513,24 +591,44 @@ mod pcan_impl {
         }
     }
 
+    /// PCAN FD 帧（与 C TPCANMsgFD 对齐，80 字节）
+    /// `CAN_ReadFD` 同时读取经典帧（MSGTYPE_FD 未置位）与 FD 帧
+    #[repr(C)]
+    pub struct PcanMsgFd {
+        pub can_id: u32,
+        pub msg_type: u8,
+        pub dlc: u8,
+        /// TPCANMsgFD 在 DLC 与 DATA 之间有 2 字节保留
+        pub _reserved: [u8; 2],
+        pub data: [u8; 64],
+        /// TPCANTimestampFD（time_us + time_ns），本工具时间戳取自系统时钟，忽略
+        pub _timestamp: [u32; 2],
+    }
+
     // FFI 函数指针
     type PcanOpen = unsafe extern "system" fn(channel: u32) -> PcanHandle;
     type PcanClose = unsafe extern "system" fn(handle: PcanHandle) -> u32;
     type PcanInit = unsafe extern "system" fn(handle: PcanHandle, btr0btr1: u16, hwtype: u32) -> u32;
     type PcanWrite = unsafe extern "system" fn(handle: PcanHandle, msg: *const PcanMsg) -> u32;
+    /// CAN_ReadFD：读取 CAN / CAN-FD 帧（FD 通道同时支持两种帧）
+    type PcanReadFd = unsafe extern "system" fn(handle: PcanHandle, msg: *mut PcanMsgFd) -> u32;
+    /// CAN_WriteFD：发送 CAN-FD 帧（使用 TPCANMsgFD 结构）
+    type PcanWriteFd = unsafe extern "system" fn(handle: PcanHandle, msg: *const PcanMsgFd) -> u32;
 
     /// PCAN DLL 加载器
+    #[allow(non_snake_case)]
     pub struct PcanDll {
         pub CAN_Open: PcanOpen,
         pub CAN_Close: PcanClose,
         pub CAN_Init: PcanInit,
         pub CAN_Write: PcanWrite,
+        pub CAN_ReadFD: PcanReadFd,
+        pub CAN_WriteFD: PcanWriteFd,
     }
 
     impl PcanDll {
         pub fn load() -> anyhow::Result<Self> {
             use windows::core::PCWSTR;
-            use std::ptr;
 
             let dll_paths = [
                 "pcanbasic.dll",
@@ -571,6 +669,8 @@ mod pcan_impl {
                 CAN_Close: unsafe { std::mem::transmute(get_sym("CAN_Close")?) },
                 CAN_Init: unsafe { std::mem::transmute(get_sym("CAN_Init")?) },
                 CAN_Write: unsafe { std::mem::transmute(get_sym("CAN_Write")?) },
+                CAN_ReadFD: unsafe { std::mem::transmute(get_sym("CAN_ReadFD")?) },
+                CAN_WriteFD: unsafe { std::mem::transmute(get_sym("CAN_WriteFD")?) },
             })
         }
     }
@@ -605,6 +705,17 @@ mod pcan_impl {
     pub struct PcanState {
         pub handle: PcanHandle,
     }
+
+    /// 波特率(bps) → BTR0BTR1 编码（PCAN 经典帧初始化用）
+    pub fn bitrate_to_btr0btr1(bps: u32) -> u16 {
+        match bps {
+            1_000_000 => PCAN_BAUD_1M,
+            500_000 => PCAN_BAUD_500K,
+            250_000 => PCAN_BAUD_250K,
+            125_000 => PCAN_BAUD_125K,
+            _ => PCAN_BAUD_500K,
+        }
+    }
 }
 
 // PcanAdapter 必须定义在 pcan_impl 外部（对 create_adapter 可见），
@@ -616,7 +727,7 @@ pub struct PcanAdapter {
     tx: broadcast::Sender<CanFrame>,
     fd_tx: broadcast::Sender<CanFdFrame>,
     tasks: std::sync::Mutex<JoinSet<()>>,
-    running: std::sync::Mutex<bool>,
+    running: std::sync::Arc<AtomicBool>,
     bitrate: u16,
 }
 
@@ -628,7 +739,7 @@ pub struct PcanAdapter {
     tx: broadcast::Sender<CanFrame>,
     fd_tx: broadcast::Sender<CanFdFrame>,
     tasks: std::sync::Mutex<JoinSet<()>>,
-    running: std::sync::Mutex<bool>,
+    running: std::sync::Arc<AtomicBool>,
     bitrate: u16,
 }
 
@@ -644,7 +755,7 @@ impl PcanAdapter {
             tx,
             fd_tx,
             tasks: std::sync::Mutex::new(JoinSet::new()),
-            running: std::sync::Mutex::new(false),
+            running: std::sync::Arc::new(AtomicBool::new(false)),
             bitrate: pcan_impl::PCAN_BAUD_500K,
         }
     }
@@ -671,7 +782,7 @@ impl PcanAdapter {
             tx,
             fd_tx,
             tasks: std::sync::Mutex::new(JoinSet::new()),
-            running: std::sync::Mutex::new(false),
+            running: std::sync::Arc::new(AtomicBool::new(false)),
             bitrate: 0x001C,
         }
     }
@@ -762,14 +873,13 @@ impl CanAdapter for PcanAdapter {
             handle as usize,
             self.bitrate
         );
+        // 启动后台接收任务（CAN_ReadFD 同时读经典与 FD 帧）
+        self.start_recv();
         Ok(())
     }
 
     async fn close(&self) -> Result<()> {
-        {
-            let mut running = self.running.lock().unwrap();
-            *running = false;
-        }
+        self.running.store(false, Ordering::SeqCst);
 
         let mut tasks = std::mem::take(&mut *self.tasks.lock().unwrap());
         tasks.abort_all();
@@ -829,17 +939,22 @@ impl CanAdapter for PcanAdapter {
         };
 
         let pcan = get_pcan();
-        let len = frame.data.len().min(64) as u8;
-        let flags =
-            PCAN_MESSAGE_FD
+        let msg_type = (PCAN_MESSAGE_FD
             | if frame.brs { PCAN_MESSAGE_BRS } else { 0 }
-            | if frame.esi { PCAN_MESSAGE_ESI } else { 0 };
-        let msg = PcanMsg::new(frame.id.raw(), flags, len, &frame.data);
+            | if frame.esi { PCAN_MESSAGE_ESI } else { 0 })
+            as u8;
+        // 构造 TPCANMsgFD：dlc 使用 FD DLC 编码（0..=15），DATA 最多 64 字节
+        let mut msg: PcanMsgFd = unsafe { std::mem::zeroed() };
+        msg.can_id = frame.id.raw();
+        msg.msg_type = msg_type;
+        msg.dlc = frame.fd_dlc();
+        let n = frame.data.len().min(64);
+        msg.data[..n].copy_from_slice(&frame.data[..n]);
 
-        let result = unsafe { (pcan.CAN_Write)(handle, &msg) };
+        let result = unsafe { (pcan.CAN_WriteFD)(handle, &msg) };
         if result != PCAN_ERROR_OK {
             return Err(anyhow::anyhow!(
-                "PCAN FD: CAN_Write 失败，错误码: 0x{:08X}",
+                "PCAN FD: CAN_WriteFD 失败，错误码: 0x{:08X}",
                 result
             ));
         }
@@ -867,12 +982,16 @@ pub fn create_adapter(
     kind: &AdapterKind,
     interface: &str,
     queue_size: usize,
+    bitrate: u32,
 ) -> Arc<dyn CanAdapter> {
     match kind {
         AdapterKind::SimBus => Arc::new(SimBusAdapter::new(interface, queue_size)),
         AdapterKind::SocketCan => Arc::new(SocketCanAdapter::new(interface, queue_size)),
         #[cfg(all(windows, feature = "pcan"))]
-        AdapterKind::Pcan => Arc::new(PcanAdapter::new(interface, queue_size)),
+        AdapterKind::Pcan => Arc::new(
+            PcanAdapter::new(interface, queue_size)
+                .with_bitrate(pcan_impl::bitrate_to_btr0btr1(bitrate)),
+        ),
         #[cfg(not(all(windows, feature = "pcan")))]
         AdapterKind::Pcan => {
             tracing::warn!("[pcan] 适配器未启用，请使用 `features = [\"pcan\"]` 并在 Windows 上编译");
@@ -882,5 +1001,82 @@ pub fn create_adapter(
             tracing::warn!("[kvaser] 适配器占位，降级为 SimBus");
             Arc::new(SimBusAdapter::new(interface, queue_size))
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PCAN 接收任务（Windows + pcan feature）
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[cfg(all(windows, feature = "pcan"))]
+impl PcanAdapter {
+    /// 启动 PCAN 接收后台任务（CAN_ReadFD 同时读经典与 FD 帧）
+    fn start_recv(&self) {
+        use pcan_impl::*;
+        let handle = match *self.state.lock().unwrap() {
+            Some(ref s) => s.handle,
+            None => return,
+        };
+        let tx = self.tx.clone();
+        let fd_tx = self.fd_tx.clone();
+        let running = self.running.clone();
+        let pcan = get_pcan();
+        tokio::spawn(async move {
+            loop {
+                if !running.load(Ordering::SeqCst) {
+                    break;
+                }
+                let mut msg: PcanMsgFd = unsafe { std::mem::zeroed() };
+                let status = unsafe { (pcan.CAN_ReadFD)(handle, &mut msg) };
+                if status == PCAN_ERROR_OK {
+                    let is_fd = (msg.msg_type as u32) & PCAN_MESSAGE_FD != 0;
+                    let ts = crate::frame::now_micros();
+                    if is_fd {
+                        let len = fd_dlc_to_len(msg.dlc);
+                        let data = msg.data[..len.min(64)].to_vec();
+                        let _ = fd_tx.send(crate::frame::CanFdFrame {
+                            id: crate::frame::FrameId::from_raw(msg.can_id),
+                            data,
+                            brs: (msg.msg_type as u32) & PCAN_MESSAGE_BRS != 0,
+                            esi: (msg.msg_type as u32) & PCAN_MESSAGE_ESI != 0,
+                            timestamp_us: ts,
+                        });
+                    } else {
+                        let len = msg.dlc.min(8) as usize;
+                        let data = msg.data[..len].to_vec();
+                        let _ = tx.send(crate::frame::CanFrame {
+                            id: crate::frame::FrameId::from_raw(msg.can_id),
+                            kind: crate::frame::FrameKind::Data,
+                            data,
+                            timestamp_us: ts,
+                        });
+                    }
+                } else if status == PCAN_ERROR_QRCVEMPTY {
+                    tokio::time::sleep(Duration::from_micros(200)).await;
+                } else {
+                    crate::event::emit_event(crate::event::CanEvent::BusError {
+                        description: format!("PCAN CAN_ReadFD 错误 0x{:08X}", status),
+                    })
+                    .await;
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                }
+            }
+            tracing::info!("[pcan] 接收任务退出");
+        });
+    }
+}
+
+/// FD DLC 编码 → 实际字节长度（ISO 11898-1:2015）
+#[cfg(all(windows, feature = "pcan"))]
+fn fd_dlc_to_len(dlc: u8) -> usize {
+    match dlc {
+        0..=8 => dlc as usize,
+        9 => 12,
+        10 => 16,
+        11 => 20,
+        12 => 24,
+        13 => 32,
+        14 => 48,
+        _ => 64,
     }
 }

@@ -147,3 +147,8 @@ impl CanFdFrame {
         }
     }
 }
+
+/// 当前 UTC 时间，单位微秒，用于接收帧时间戳
+pub fn now_micros() -> u64 {
+    chrono::Utc::now().timestamp_micros().max(0) as u64
+}

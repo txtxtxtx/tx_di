@@ -155,7 +155,7 @@ pub async fn generate(ExtJson(req): ExtJson<GenerateReq>) -> impl IntoResponse {
 /// DELETE /api/gb_cams/devices/:id — 删除设备
 pub async fn remove(Path(id): Path<String>) -> impl IntoResponse {
     let mgr = DeviceManager::instance();
-    if mgr.remove_device(&id).await {
+    if mgr.remove_device(&id) {
         ok(serde_json::json!({ "device_id": id }))
     } else {
         err::<serde_json::Value>(404, format!("设备 {} 不存在", id))

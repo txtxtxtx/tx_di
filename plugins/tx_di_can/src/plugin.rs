@@ -1,6 +1,5 @@
 //! CAN/CANFD 上位机插件主体
 
-use crate::err::CanErr;
 use crate::adapter::create_adapter;
 use crate::adapter::CanAdapter;
 use crate::config::CanConfig;
@@ -11,18 +10,17 @@ use crate::isotp::{IsoTpChannel, IsoTpConfig};
 use crate::uds::UdsClient;
 use anyhow::Result;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
-use tokio_util::sync::CancellationToken;
+use std::sync::{Arc, RwLock};
 use tracing::{info, warn};
-use tx_di_core::{tx_comp, App, BoxFuture, BuildContext, CompInit, InnerContext, RIE};
+use tx_di_core::{App, Component, DepsTuple, RIE, Store};
 
 /// 默认配置文件路径（可通过 #[tx_cst(my_custom_path())] 覆盖）
 fn default_can_config_path() -> String {
     "configs/can.toml".to_string()
 }
 
-/// 全局服务实例
-static INSTANCE: OnceLock<CanPluginInner> = OnceLock::new();
+/// 全局服务实例（运行期可重置，以支持 connect/disconnect 重连）
+static INSTANCE: RwLock<Option<Arc<CanPluginInner>>> = RwLock::new(None);
 
 /// 全局配置路径（由 BuildContext 注入）
 // CONFIG_PATH 已废弃：配置直接由 config_path 字段传入 inner_init
@@ -48,6 +46,7 @@ impl CanPluginInner {
             &config.adapter,
             &config.interface,
             config.rx_queue_size,
+            config.bitrate,
         );
 
         let isotp_config = IsoTpConfig {
@@ -55,6 +54,7 @@ impl CanPluginInner {
             rx_id: config.isotp_rx_id,
             block_size: config.isotp_block_size,
             st_min_ms: config.isotp_st_min_ms,
+            is_fd: config.enable_fd,
             ..Default::default()
         };
         let uds_default = Arc::new(UdsClient::new(
@@ -94,18 +94,38 @@ impl CanPluginInner {
             }
 
             let rx = inner.adapter.subscribe();
+            let fd_rx = inner.adapter.subscribe_fd();
             inner.running.store(true, Ordering::SeqCst);
             let running = Arc::clone(&inner.running); // running: Arc<AtomicBool>
             let mut rec = rx;
-            while running.load(Ordering::SeqCst) {
-                match rec.recv().await {
-                    Ok(frame) => {
-                        emit_event(CanEvent::FrameReceived(frame)).await;
+            let mut fd_rec = fd_rx;
+            loop {
+                if !running.load(Ordering::SeqCst) {
+                    break;
+                }
+                tokio::select! {
+                    frame = rec.recv() => {
+                        match frame {
+                            Ok(f) => {
+                                emit_event(CanEvent::FrameReceived(f)).await;
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                warn!("[can] 接收队列溢出，丢弃 {} 帧", n);
+                            }
+                            Err(_) => break,
+                        }
                     }
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        warn!("[can] 接收队列溢出，丢弃 {} 帧", n);
+                    fd = fd_rec.recv() => {
+                        match fd {
+                            Ok(f) => {
+                                emit_event(CanEvent::FdFrameReceived(f)).await;
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                warn!("[can] FD 接收队列溢出，丢弃 {} 帧", n);
+                            }
+                            Err(_) => break,
+                        }
                     }
-                    Err(_) => break,
                 }
             }
         });
@@ -158,7 +178,8 @@ impl CanPluginInner {
 ///     ..Default::default()
 /// }, |seed| seed.iter().map(|b| !b).collect()).await.unwrap();
 /// ```
-#[tx_comp(init)]
+#[derive(Component)]
+#[component(init, app_async_init, shutdown, init_sort = 2147483643)]
 pub struct CanPlugin {
     /// 配置文件路径，默认为 `configs/can.toml`
     #[tx_cst(default_can_config_path())]
@@ -166,10 +187,58 @@ pub struct CanPlugin {
 }
 
 impl CanPlugin {
-    /// 获取全局实例（必须在 BuildContext::build() 之后调用）
+    /// 获取全局实例（必须在 connect() 或 BuildContext::build() 之后调用）
     #[allow(private_interfaces)]
-    pub fn instance() -> &'static CanPluginInner {
-        INSTANCE.get().expect("CanPlugin 未初始化，请先 BuildContext::build()")
+    pub fn instance() -> Arc<CanPluginInner> {
+        INSTANCE
+            .read()
+            .unwrap()
+            .clone()
+            .expect("CanPlugin 未初始化，请先调用 connect() 或 BuildContext::build()")
+    }
+
+    /// 运行期连接：构造新实例、打开适配器并启动接收循环（先断开旧连接）
+    pub async fn connect(config: CanConfig) -> RIE<()> {
+        Self::disconnect().await;
+        let inner = Arc::new(CanPluginInner::new(config));
+        // 打开适配器并启动接收后台循环（内部会 emit BusReady / BusError 事件）
+        // start_rx_loop 消费 Arc，故用 clone 启动、原 Arc 存入 INSTANCE
+        inner.clone().start_rx_loop().await;
+        *INSTANCE.write().unwrap() = Some(inner);
+        Ok(())
+    }
+
+    /// 断开连接：停止接收循环并关闭适配器
+    pub async fn disconnect() {
+        let inner = INSTANCE.read().unwrap().clone();
+        if let Some(inner) = inner {
+            inner.running.store(false, Ordering::SeqCst);
+            let adapter = inner.adapter.clone();
+            let _ = adapter.close().await;
+        }
+    }
+
+    /// 是否已连接（接收循环运行中）
+    pub fn is_connected() -> bool {
+        INSTANCE
+            .read()
+            .unwrap()
+            .as_ref()
+            .map_or(false, |i| i.running.load(Ordering::SeqCst))
+    }
+
+    /// 读取当前生效配置（未连接时返回 None）
+    pub fn get_config() -> Option<CanConfig> {
+        INSTANCE
+            .read()
+            .unwrap()
+            .as_ref()
+            .map(|i| (*i.config).clone())
+    }
+
+    /// 默认配置（供 UI 初始化表单）
+    pub fn default_config() -> CanConfig {
+        CanConfig::default()
     }
 
     /// 订阅事件
@@ -189,6 +258,7 @@ impl CanPlugin {
             IsoTpConfig {
                 tx_id,
                 rx_id,
+                is_fd: inner.config.enable_fd,
                 ..Default::default()
             },
         )
@@ -205,6 +275,7 @@ impl CanPlugin {
             IsoTpConfig {
                 tx_id,
                 rx_id,
+                is_fd: inner.config.enable_fd,
                 ..Default::default()
             },
             inner.config.uds_p2_timeout_ms,
@@ -264,49 +335,57 @@ impl CanPlugin {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CompInit 实现（同步 + 异步分离，与 GB28181 插件模式一致）
+// 生命周期（新框架 API：#[derive(Component)] 覆写 inner_init / async_init / shutdown）
 // ─────────────────────────────────────────────────────────────────────────────
 
-impl CompInit for CanPlugin {
-    /// 同步初始化：加载配置，建立全局实例
-    fn inner_init(&mut self, _: &InnerContext) -> RIE<()> {
-        let config = CanConfig::load_from_toml(&self.config_path)
-            .map_err(|e| {
-                tx_di_core::IE::from(anyhow::anyhow!(
-                    "[can] 加载配置失败 {}: {}",
-                    self.config_path,
-                    e
-                ))
-            })?;
-
-        if INSTANCE.set(CanPluginInner::new(config)).is_err() {
-            warn!("[can] CanPlugin 重复初始化");
+/// inner_init（构建期调用）：加载配置并构造全局实例
+/// 若已通过 connect() 设置了实例，则不覆盖（避免 DI 启动覆盖运行期配置）
+fn init(comp: &mut CanPlugin, _store: &Store) -> RIE<()> {
+    if INSTANCE.read().unwrap().is_some() {
+        return Ok(());
+    }
+    let config = match CanConfig::load_from_toml(&comp.config_path) {
+        Ok(c) => c,
+        Err(e) => {
+            warn!(
+                "[can] 加载配置失败 {}: {}，使用默认配置",
+                comp.config_path, e
+            );
+            CanConfig::default()
         }
-        Ok(())
-    }
+    };
+    *INSTANCE.write().unwrap() = Some(Arc::new(CanPluginInner::new(config)));
+    Ok(())
+}
 
-    /// 异步初始化：启动帧接收循环
-    fn async_init(_ctx: Arc<App>, token: CancellationToken) -> BoxFuture {
-        Box::pin(async move {
-            if let Some(inner_ref) = INSTANCE.get() {
-                let inner = Arc::new(inner_ref.clone());
-                let running = inner.running.clone();
-                
-                // 监听取消信号，停止接收循环
-                let cancel_task = tokio::spawn(async move {
-                    token.cancelled().await;
-                    running.store(false, Ordering::SeqCst);
-                    info!("[can] 收到停止信号，关闭 CAN 接收循环");
-                });
-                
-                inner.start_rx_loop().await;
-                cancel_task.abort(); // 清理取消任务
-            }
-            Ok(())
-        })
+/// async_init（运行期调用）：启动帧接收后台循环
+async fn app_async_init(comp: Arc<CanPlugin>, app: Arc<App>) -> RIE<()> {
+    let _ = comp;
+    let inner = INSTANCE.read().unwrap().clone();
+    if let Some(inner) = inner {
+        let running = inner.running.clone();
+        let token = app.shutdown_token.clone();
+        let cancel_task = tokio::spawn(async move {
+            token.cancelled().await;
+            running.store(false, Ordering::SeqCst);
+            info!("[can] 收到停止信号，关闭 CAN 接收循环");
+        });
+        inner.start_rx_loop().await;
+        cancel_task.abort();
     }
+    Ok(())
+}
 
-    fn init_sort() -> i32 {
-        i32::MAX - 4
+/// shutdown：停止接收循环并关闭适配器
+fn shutdown(comp: &CanPlugin) {
+    let _ = comp;
+    let inner = INSTANCE.read().unwrap().clone();
+    if let Some(inner) = inner {
+        inner.running.store(false, Ordering::SeqCst);
+        let adapter = inner.adapter.clone();
+        tokio::spawn(async move {
+            let _ = adapter.close().await;
+        });
+        info!("[can] CAN 接收循环已请求停止");
     }
 }

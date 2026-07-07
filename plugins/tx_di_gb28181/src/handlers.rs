@@ -147,6 +147,7 @@ async fn handle_register(
             online: true,
             registered_at: chrono::Utc::now(),
             last_heartbeat: tokio::time::Instant::now(),
+            version: config.device_version_for(&device_id),
             ..Default::default()
         };
         registry.register(dev);
@@ -288,9 +289,19 @@ async fn handle_catalog_response(
         "📂 收到目录响应"
     );
 
+    // 子设备继承父设备（网关）的协议版本
+    let parent_version = registry
+        .get(device_id)
+        .map(|d| d.version)
+        .unwrap_or_default();
+
     let sub_devices: Vec<GbDevice> = items
         .iter()
-        .map(|item| GbDevice::from_item_type(item))
+        .map(|item| {
+            let mut sub = GbDevice::from_item_type(item);
+            sub.version = parent_version;
+            sub
+        })
         .collect();
 
     // 批量注册子设备（2022 模型：每个通道是独立的 GbDevice 节点）

@@ -17,12 +17,9 @@
 
 use crate::config::CascadeConfig;
 use crate::device_registry::DeviceRegistry;
-use crate::err::GbErr;
-use rsipstack::sip as rsip;
-use rsipstack::sip::{SipMessage, StatusCode};
-use rsipstack::transaction::key::{TransactionKey, TransactionRole};
-use rsipstack::transaction::transaction::{Transaction, TransactionEvent};
-use std::sync::atomic::{AtomicU32, Ordering};
+use rsipstack::sip::StatusCode;
+use tx_gb28181::GbVersion;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::interval;
@@ -30,7 +27,6 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 use tx_di_core::RIE;
 use tx_di_sip::SipPlugin;
-use tx_gb28181::utils::{md5_digest, md5_hex};
 
 /// 下级平台级联管理器
 pub struct CascadeLower {
@@ -52,10 +48,10 @@ pub struct CascadeLower {
     device_registry: DeviceRegistry,
     /// 序列号
     seq: AtomicU32,
-    /// 上次 401 nonce（用于重试）
-    last_nonce: std::sync::Mutex<Option<String>>,
+    /// 上级平台协议版本（决定出网 XML 字符集与指令集）
+    upper_version: GbVersion,
     /// 当前注册状态
-    registered: std::sync::atomic::AtomicBool,
+    registered: AtomicBool,
 }
 
 impl CascadeLower {
@@ -84,8 +80,8 @@ impl CascadeLower {
             sip_plugin,
             device_registry,
             seq: AtomicU32::new(1),
-            last_nonce: std::sync::Mutex::new(None),
-            registered: std::sync::atomic::AtomicBool::new(false),
+            upper_version: config.upper_version,
+            registered: AtomicBool::new(false),
         })
     }
 
@@ -141,199 +137,37 @@ impl CascadeLower {
         }
     }
 
-    /// 向上级平台发送 REGISTER（含摘要认证）
+    /// 向上级平台发送 REGISTER（复用 `SipSender::register` 的自动 401 重认证）
     async fn register(&self) -> RIE<()> {
         let sender = self.sip_plugin.sender()?;
-        let inner = sender.inner();
+        let resp = sender
+            .register(&self.upper_sip, &self.local_platform_id, &self.auth_password)
+            .await?;
 
-        let req_uri_str = &self.upper_sip;
-        let req_uri = rsip::Uri::try_from(req_uri_str.as_str())
-            .map_err(|_| GbErr::InvalidUri)?;
-
-        let from_str = format!("sip:{}@{}", self.local_platform_id, self.local_sip_ip);
-        let from_uri = rsip::Uri::try_from(from_str.as_str())
-            .map_err(|_| GbErr::InvalidUri)?;
-
-        let to_str = format!("sip:{}@{}", self.upper_platform_id, self.local_sip_ip);
-        let to_uri = rsip::Uri::try_from(to_str.as_str())
-            .map_err(|_| GbErr::InvalidUri)?;
-
-        let via = inner
-            .get_via(None, None)
-            .map_err(|e| anyhow::anyhow!("获取 Via 头失败: {e}"))?;
-
-        let from_header = rsip::typed::From {
-            display_name: None,
-            uri: from_uri.clone(),
-            params: vec![rsip::Param::Tag(rsip::uri::Tag::new(
-                rsipstack::transaction::make_tag(),
-            ))],
-        };
-
-        // make_request 内部自动生成 Call-Id，传 None 即可
-        let mut request = inner.make_request(
-            rsip::method::Method::Register,
-            req_uri.clone(),
-            via.clone(),
-            from_header.clone(),
-            rsip::typed::To {
-                display_name: None,
-                uri: to_uri.clone(),
-                params: vec![],
-            },
-            self.seq.fetch_add(1, Ordering::Relaxed),
-            None,
-        );
-
-        request
-            .headers
-            .push(rsip::Header::Contact(
-                rsip::headers::untyped::Contact::new(from_uri.to_string()),
-            ));
-        request
-            .headers
-            .push(rsip::Header::Expires(self.expires.into()));
-
-        // 如果之前收到过 401，加上 Authorization
-        if let Some(nonce) = self.last_nonce.lock().unwrap().as_ref() {
-            let auth_value = build_digest_auth(
-                &self.local_platform_id,
-                &self.auth_password,
-                "REGISTER",
-                req_uri_str,
-                nonce,
-            );
-            request
-                .headers
-                .push(rsip::Header::Authorization(
-                    rsip::headers::untyped::Authorization::new(auth_value),
-                ));
-        }
-
-        let key = TransactionKey::from_request(&request, TransactionRole::Client)
-            .map_err(|e| anyhow::anyhow!("构造 REGISTER 事务 key 失败: {e}"))?;
-
-        // 通过 Transaction 内置 TU channel 接收响应
-        let mut tx = Transaction::new_client(key, request, inner, None);
-        tx.send()
-            .await
-            .map_err(|_| GbErr::RegisterFailed)?;
-
-        // 等待响应（超时 5 秒）
-        match tokio::time::timeout(Duration::from_secs(5), tx.tu_receiver.recv()).await {
-            Ok(Some(TransactionEvent::Received(SipMessage::Response(response), _))) => {
-                let status = response.status_code;
-                match status {
-                    StatusCode::OK => {
-                        self.registered.store(true, Ordering::Relaxed);
-                        info!("✅ 下级平台注册到上级成功");
-                    }
-                    StatusCode::Unauthorized => {
-                        // 提取 nonce 并重试
-                        let www_auth = response
-                            .headers
-                            .iter()
-                            .find_map(|h| {
-                                let s = format!("{h}");
-                                if s.to_lowercase().starts_with("www-authenticate:") {
-                                    Some(s)
-                                } else {
-                                    None
-                                }
-                            });
-
-                        if let Some(ref auth_str) = www_auth {
-                            let nonce = extract_nonce(auth_str);
-                            if !nonce.is_empty() {
-                                debug!(nonce = %nonce, "收到 401，提取 nonce 准备重试");
-                                *self.last_nonce.lock().unwrap() = Some(nonce);
-                                // 立即重试（带 Authorization）
-                                drop(tx);
-                                match Box::pin(self.register()).await {
-                                    Err(e) => {
-                                        warn!(error = %e, "带认证重试注册失败");
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                    }
-                    _ => {
-                        warn!(
-                            status = %status,
-                            "上级平台返回非预期状态码"
-                        );
-                    }
-                }
-            }
-            Ok(Some(TransactionEvent::Terminate(_))) => {
-                warn!("REGISTER 事务被终止");
+        match resp.status_code {
+            StatusCode::OK => {
+                self.registered.store(true, Ordering::Relaxed);
+                info!("✅ 下级平台注册到上级成功");
             }
             _ => {
-                warn!("REGISTER 未收到响应（超时）");
+                warn!(status = %resp.status_code, "上级平台返回非预期状态码");
             }
         }
-
         Ok(())
     }
 
-    /// 向上级平台注销（Expires: 0）
+    /// 向上级平台注销（Expires: 0，复用 `SipSender::unregister`）
     async fn unregister(&self) -> RIE<()> {
         let sender = self.sip_plugin.sender()?;
-        let inner = sender.inner();
-
-        let req_uri = rsip::Uri::try_from(self.upper_sip.as_str())
-            .map_err(|_| GbErr::InvalidUri)?;
-
-        let from_str = format!("sip:{}@{}", self.local_platform_id, self.local_sip_ip);
-        let from_uri = rsip::Uri::try_from(from_str.as_str())
-            .map_err(|_| GbErr::InvalidUri)?;
-
-        let via = inner
-            .get_via(None, None)
-            .map_err(|e| anyhow::anyhow!("获取 Via 头失败: {e}"))?;
-
-        // make_request 内部自动生成 Call-Id
-        let mut request = inner.make_request(
-            rsip::method::Method::Register,
-            req_uri.clone(),
-            via,
-            rsip::typed::From {
-                display_name: None,
-                uri: from_uri.clone(),
-                params: vec![rsip::Param::Tag(rsip::uri::Tag::new(
-                    rsipstack::transaction::make_tag(),
-                ))],
-            },
-            rsip::typed::To {
-                display_name: None,
-                uri: req_uri,
-                params: vec![],
-            },
-            self.seq.fetch_add(1, Ordering::Relaxed),
-            None,
-        );
-
-        request
-            .headers
-            .push(rsip::Header::Contact(
-                rsip::headers::untyped::Contact::new(from_uri.to_string()),
-            ));
-        request.headers.push(rsip::Header::Expires(0.into()));
-
-        let key = TransactionKey::from_request(&request, TransactionRole::Client)
-            .map_err(|e| anyhow::anyhow!("构造注销事务 key 失败: {e}"))?;
-
-        let mut tx = Transaction::new_client(key, request, inner, None);
-        tx.send()
-            .await
-            .map_err(|_| GbErr::UnregisterFailed)?;
-
+        sender
+            .unregister(&self.upper_sip, &self.local_platform_id, &self.auth_password)
+            .await?;
+        self.registered.store(false, Ordering::Relaxed);
         info!("下级平台已向上级注销");
         Ok(())
     }
 
-    /// 推送设备目录到上级平台
+    /// 推送设备目录到上级平台（按上级版本编码出网 XML）
     async fn push_catalog(&self) -> RIE<()> {
         let devices = self.device_registry.all_devices();
         if devices.is_empty() {
@@ -367,15 +201,17 @@ impl CascadeLower {
             items = items_xml,
         );
 
-        self.send_msg(&body, sn).await
+        // 按上级平台协议版本重声明字符集并编码字节（2016→GB2312，2022→GB18030）
+        let encoded = self.upper_version.serialize(&body);
+        self.send_msg(&encoded, sn).await
     }
 
-    /// 发送 SIP MESSAGE 到上级平台
-    async fn send_msg(&self, body: &str, seq: u32) -> RIE<()> {
+    /// 发送 SIP MESSAGE（字节）到上级平台
+    async fn send_msg(&self, body: &[u8], seq: u32) -> RIE<()> {
         let sender = self.sip_plugin.sender()?;
         let from_str = format!("sip:{}@{}", self.local_platform_id, self.local_sip_ip);
-        let _ = sender
-            .send_message(&self.upper_sip, &from_str, body.as_bytes(), "Application/MANSCDP+xml")
+        sender
+            .send_message(&self.upper_sip, &from_str, body, "Application/MANSCDP+xml")
             .await?;
         debug!(sn = seq, "级联 MESSAGE 发送成功");
         Ok(())
@@ -425,58 +261,3 @@ fn build_item_xml(item: &tx_gb28181::enums::ItemType) -> String {
     xml
 }
 
-// ── 摘要认证辅助函数 ─────────────────────────────────────────────────────────
-
-/// 构建 Digest Authorization 头值
-fn build_digest_auth(
-    username: &str,
-    password: &str,
-    method: &str,
-    uri: &str,
-    nonce: &str,
-) -> String {
-    let realm = "3402000000";
-    let ha1 = md5_hex(md5_digest(format!("{username}:{realm}:{password}").as_bytes()));
-    let ha2 = md5_hex(md5_digest(format!("{method}:{uri}").as_bytes()));
-    let response = md5_hex(md5_digest(format!("{ha1}:{nonce}:{ha2}").as_bytes()));
-
-    format!(
-        "Digest username=\"{username}\", realm=\"{realm}\", nonce=\"{nonce}\", uri=\"{uri}\", response=\"{response}\", algorithm=MD5"
-    )
-}
-
-/// 从 WWW-Authenticate 头中提取 nonce
-fn extract_nonce(auth_str: &str) -> String {
-    auth_str
-        .split("nonce=\"")
-        .nth(1)
-        .and_then(|s| s.split('"').next())
-        .unwrap_or("")
-        .to_string()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_build_digest_auth() {
-        let auth = build_digest_auth(
-            "34020000002000000001",
-            "12345678",
-            "REGISTER",
-            "sip:34020000002000000002@192.168.1.1:5060",
-            "abc123",
-        );
-        assert!(auth.starts_with("Digest "));
-        assert!(auth.contains("username=\"34020000002000000001\""));
-        assert!(auth.contains("nonce=\"abc123\""));
-        assert!(auth.contains("algorithm=MD5"));
-    }
-
-    #[test]
-    fn test_extract_nonce() {
-        let header = "Digest realm=\"3402000000\", nonce=\"def456\", algorithm=MD5";
-        assert_eq!(extract_nonce(header), "def456");
-    }
-}

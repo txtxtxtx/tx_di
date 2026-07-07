@@ -386,12 +386,38 @@ async fn build_tls_transport(
         .await
         .map_err(|e| anyhow::anyhow!("读取 TLS 私钥失败: {}", e))?;
 
+    // 双向 TLS：客户端 CA（校验对端）/ 客户端证书与私钥（作为 TLS 客户端时发起 mTLS）
+    let ca_certs = match &tls_cfg.ca_certs {
+        Some(p) => Some(
+            tokio::fs::read(p)
+                .await
+                .map_err(|e| anyhow::anyhow!("读取 TLS CA 证书失败: {}", e))?,
+        ),
+        None => None,
+    };
+    let client_cert = match &tls_cfg.client_cert {
+        Some(p) => Some(
+            tokio::fs::read(p)
+                .await
+                .map_err(|e| anyhow::anyhow!("读取 TLS 客户端证书失败: {}", e))?,
+        ),
+        None => None,
+    };
+    let client_key = match &tls_cfg.client_key {
+        Some(p) => Some(
+            tokio::fs::read(p)
+                .await
+                .map_err(|e| anyhow::anyhow!("读取 TLS 客户端私钥失败: {}", e))?,
+        ),
+        None => None,
+    };
+
     let rsip_tls = rsipstack::transport::tls::TlsConfig {
         cert: Some(cert_bytes),
         key: Some(key_bytes),
-        client_cert: None,
-        client_key: None,
-        ca_certs: None,
+        client_cert,
+        client_key,
+        ca_certs,
         sni_hostname: None,
     };
 

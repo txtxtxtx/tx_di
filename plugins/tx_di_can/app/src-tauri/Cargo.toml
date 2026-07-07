@@ -1,0 +1,15 @@
+[package]
+name = "can-host"
+version = "0.1.0"
+description = "CAN/CANFD 诊断上位机 (Tauri + tx_di_can)"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# 依赖同仓库的 CAN 协议引擎（作为根 workspace 的成员引入）
+tx_di_can = { path = "../.." }

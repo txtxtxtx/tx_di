@@ -13,18 +13,19 @@
 
 pub mod cmd_type;
 pub mod device;
+pub mod version;
 pub mod event;
 pub mod sdp;
 pub mod sip;
 pub mod xml;
 pub mod ps;
 pub mod enums;
-pub mod utils;
 pub mod rtcp;
 // ── 便捷再导出 ──────────────────────────────────────────────────────────────
 
 pub use cmd_type::Gb28181CmdType;
 pub use device::{GbDevice, GbDeviceType};
+pub use version::GbVersion;
 pub use event::{Gb28181Event, add_event_listener, emit, subscribe};
 pub use sip::extract_user_from_sip_uri;
 pub use xml::AlarmType;

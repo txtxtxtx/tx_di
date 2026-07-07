@@ -57,9 +57,12 @@ mod config;
 mod comp;
 pub mod err;
 mod handler;
+pub mod auth;
 mod middleware;
 mod sender;
+pub mod client;
 mod sip_tx;
+mod dialog;
 
 pub use config::*;
 pub use comp::*;
@@ -67,7 +70,9 @@ pub use err::SipErr;
 pub use handler::SipRouter;
 pub use middleware::{SipMiddleware, SipNextFn, SipNextFut};
 pub use sender::SipSender;
+pub use client::{SipClient, SipClientConfig};
 pub use sip_tx::SipTx;
+pub use dialog::{DialogKey, InDialogTable};
 
 #[cfg(test)]
 mod tests {
@@ -92,9 +97,9 @@ mod tests {
     }
 
     #[test]
-    fn config_default_transport_udp() {
+    fn config_default_transport_both() {
         let cfg = default_config();
-        assert_eq!(cfg.transport, SipTransport::Udp);
+        assert_eq!(cfg.transport, SipTransport::Both);
     }
 
     #[test]
@@ -300,9 +305,9 @@ mod tests {
     }
 
     #[test]
-    fn transport_default_is_udp() {
+    fn transport_default_is_both() {
         let cfg: SipConfig = toml::from_str("host = \"0.0.0.0\"\nport = 5060").unwrap();
-        assert_eq!(cfg.transport, SipTransport::Udp);
+        assert_eq!(cfg.transport, SipTransport::Both);
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -319,7 +324,7 @@ mod tests {
 
         assert_eq!(cfg.host, "0.0.0.0");
         assert_eq!(cfg.port, 5060);
-        assert_eq!(cfg.transport, SipTransport::Udp);     // 默认值
+        assert_eq!(cfg.transport, SipTransport::Both);    // 默认值
         assert_eq!(cfg.user_agent, "tx-di-sip/1.0.0");   // 默认值
         assert!(cfg.external_ip.is_none());               // 默认值
         assert!(!cfg.log_messages);                       // 默认值
@@ -383,6 +388,52 @@ mod tests {
         assert!(cfg.enable_udp());
         assert!(cfg.enable_tcp());
         assert_eq!(cfg.socket_addr().unwrap().port(), 5060);
+    }
+
+    // ── TlsConfig 双向 TLS 反序列化 ──────────────────────────────────────
+
+    #[test]
+    fn tls_config_parse_basic() {
+        let cfg: SipConfig = toml::from_str(
+            r#"
+            host = "0.0.0.0"
+            port = 5061
+            transport = "tls"
+            [tls]
+            cert_pem = "server.pem"
+            key_pem  = "server.key"
+        "#,
+        )
+        .unwrap();
+        let tls = cfg.tls.expect("应解析出 tls 配置");
+        assert_eq!(tls.cert_pem, "server.pem");
+        assert_eq!(tls.key_pem, "server.key");
+        // 双向 TLS 字段默认为 None
+        assert!(tls.ca_certs.is_none());
+        assert!(tls.client_cert.is_none());
+        assert!(tls.client_key.is_none());
+    }
+
+    #[test]
+    fn tls_config_parse_mutual_fields() {
+        let cfg: SipConfig = toml::from_str(
+            r#"
+            host = "0.0.0.0"
+            port = 5061
+            transport = "tls"
+            [tls]
+            cert_pem    = "server.pem"
+            key_pem     = "server.key"
+            ca_certs    = "ca.pem"
+            client_cert = "client.pem"
+            client_key  = "client.key"
+        "#,
+        )
+        .unwrap();
+        let tls = cfg.tls.expect("应解析出 tls 配置");
+        assert_eq!(tls.ca_certs.as_deref(), Some("ca.pem"));
+        assert_eq!(tls.client_cert.as_deref(), Some("client.pem"));
+        assert_eq!(tls.client_key.as_deref(), Some("client.key"));
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -506,7 +557,7 @@ mod tests {
         SipConfig {
             host: default_host(),
             port: default_port(),
-            transport: SipTransport::Udp,
+            transport: SipTransport::Both,
             user_agent: default_user_agent(),
             external_ip: None,
             log_messages: false,

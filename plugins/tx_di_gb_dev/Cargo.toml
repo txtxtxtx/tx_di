@@ -1,0 +1,29 @@
+[package]
+name = "tx_di_gb_dev"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+description = "GB28181 device-side (UAC) plugin for tx-di: register/keepalive/response, reusable by gb_cams and cascade lower"
+
+[dependencies]
+tx-di-core.workspace = true
+tx_di_sip       = { path = "../tx_di_sip" }
+tx_gb28181      = { path = "../../common/tx_gb28181" }
+
+rsipstack.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+serde.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+dashmap.workspace = true
+chrono.workspace = true
+async-trait.workspace = true
+encoding_rs.workspace = true
+
+[dev-dependencies]
+toml.workspace = true
+

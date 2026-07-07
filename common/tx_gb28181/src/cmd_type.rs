@@ -44,6 +44,8 @@ pub enum Gb28181CmdType {
     GuardInfo,
     /// 语音广播消息（Invite / TearDown）
     Broadcast,
+    /// 设备控制指令（平台 → 设备：PTZ / 预置位 / 看守位 / 录像等）
+    DeviceControl,
 }
 
 impl std::fmt::Display for Gb28181CmdType {
@@ -65,6 +67,7 @@ impl std::fmt::Display for Gb28181CmdType {
             Self::PtzPreciseStatus => write!(f, "PtzPreciseStatus"),
             Self::GuardInfo       => write!(f, "GuardInfo"),
             Self::Broadcast       => write!(f, "Broadcast"),
+            Self::DeviceControl   => write!(f, "DeviceControl"),
         }
     }
 }
@@ -112,6 +115,7 @@ impl std::str::FromStr for Gb28181CmdType {
             "ptzprecisestatus" => Ok(Self::PtzPreciseStatus),
             "guardinfo"        => Ok(Self::GuardInfo),
             "broadcast"        => Ok(Self::Broadcast),
+            "devicecontrol"    => Ok(Self::DeviceControl),
             _                  => Err(format!("未知的 GB28181 指令类型: {cmd}")),
         }
     }
@@ -131,6 +135,7 @@ mod tests {
         assert_eq!("Catalog".parse::<Gb28181CmdType>().unwrap(), Gb28181CmdType::Catalog);
         assert_eq!("Alarm".parse::<Gb28181CmdType>().unwrap(), Gb28181CmdType::Alarm);
         assert_eq!("Broadcast".parse::<Gb28181CmdType>().unwrap(), Gb28181CmdType::Broadcast);
+        assert_eq!("DeviceControl".parse::<Gb28181CmdType>().unwrap(), Gb28181CmdType::DeviceControl);
     }
 
     #[test]

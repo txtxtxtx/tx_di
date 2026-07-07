@@ -5,12 +5,15 @@
 
 use crate::frame::{CanFdFrame, CanFrame};
 use anyhow::Result;
+use serde::Serialize;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{LazyLock, Mutex};
 
 /// CAN 插件事件
-#[derive(Debug, Clone)]
+///
+/// 派生 `Serialize` 以便通过 Tauri 的 `app.emit` 转发到前端。
+#[derive(Debug, Clone, Serialize)]
 pub enum CanEvent {
     /// 总线初始化完成
     BusReady {

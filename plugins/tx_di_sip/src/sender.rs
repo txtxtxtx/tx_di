@@ -86,6 +86,41 @@ impl SipSender {
         Ok(resp)
     }
 
+    /// 向上级 SIP 服务器发起注销（REGISTER with Expires: 0）
+    ///
+    /// 复用 rsipstack `Registration` 并携带 `Credential`，自动处理 401 重认证。
+    pub async fn unregister(
+        &self,
+        registrar: &str,
+        username: &str,
+        password: &str,
+    ) -> RIE<rsip::Response> {
+        let registrar_uri = rsip::Uri::try_from(
+            if registrar.starts_with("sip:") || registrar.starts_with("sips:") {
+                registrar.to_string()
+            } else {
+                format!("sip:{}", registrar)
+            }
+            .as_str(),
+        )
+        .map_err(|_| SipErr::InvalidUri)?;
+
+        let credential = Credential {
+            username: username.to_string(),
+            password: password.to_string(),
+            realm: self.config.realm.clone(),
+        };
+
+        let mut reg = Registration::new(self.endpoint.clone(), Some(credential));
+        let resp = reg
+            .register(registrar_uri, Some(0))
+            .await
+            .map_err(|_| SipErr::RegisterFailed)?;
+
+        info!(status = %resp.status_code, "UNREGISTER 响应");
+        Ok(resp)
+    }
+
     // ── 呼叫 ────────────────────────────────────────────────────────────────
 
     /// 向目标发起 INVITE 呼叫

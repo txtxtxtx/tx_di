@@ -4,6 +4,7 @@ use crate::media::MediaBackendConfig;
 use serde::Deserialize;
 use std::collections::HashMap;
 use tx_di_core::Component;
+use tx_gb28181::GbVersion;
 
 /// 媒体层配置（RTP/RTSP 推流参数）
 #[derive(Debug, Clone, Deserialize)]
@@ -19,6 +20,13 @@ pub struct MediaConfig {
     /// RTP 端口结束值
     #[serde(default = "default_rtp_end")]
     pub rtp_port_end: u16,
+
+    /// NAT 穿透时对外暴露的公网 IP（用于 SDP `c=` 行与广播 `<IP>` 字段）。
+    ///
+    /// 不填（默认）时使用 `local_ip` / `sip_ip`；填写后所有**出网** SDP 媒体地址
+    /// 与该公网 IP 对齐，解决服务器在私有网络、对端无法回包的问题。
+    #[serde(default)]
+    pub nat_external_ip: Option<String>,
 }
 
 impl Default for MediaConfig {
@@ -27,6 +35,7 @@ impl Default for MediaConfig {
             local_ip: default_media_ip(),
             rtp_port_start: default_rtp_start(),
             rtp_port_end: default_rtp_end(),
+            nat_external_ip: None,
         }
     }
 }
@@ -149,6 +158,27 @@ pub struct Gb28181ServerConfig {
     /// ```
     #[serde(default)]
     pub blocked_device_ids: Vec<String>,
+
+    // ── 协议版本（每设备粒度）─────────────────────────────────────────────────
+
+    /// 默认协议版本（新注册设备未在下表命中时使用），默认 2022
+    ///
+    /// ```toml
+    /// [gb28181_server_config]
+    /// default_version = "2022"
+    /// ```
+    #[serde(default)]
+    pub default_version: GbVersion,
+
+    /// 按设备 ID 覆盖协议版本（混合组网：部分 2016 老设备 + 2022 新设备）
+    ///
+    /// ```toml
+    /// [gb28181_server_config.device_versions]
+    /// "34020000001320000001" = "2016"
+    /// "34020000001320000002" = "2022"
+    /// ```
+    #[serde(default)]
+    pub device_versions: HashMap<String, GbVersion>,
 }
 
 impl Default for Gb28181ServerConfig {
@@ -167,6 +197,8 @@ impl Default for Gb28181ServerConfig {
             cascade: CascadeConfig::default(),
             allowed_device_ids: Vec::new(),
             blocked_device_ids: Vec::new(),
+            default_version: GbVersion::default(),
+            device_versions: HashMap::new(),
         }
     }
 }
@@ -218,6 +250,10 @@ pub struct CascadeConfig {
 
     /// 向上级注册的密码
     pub upper_auth_password: Option<String>,
+
+    /// 上级平台协议版本（决定出网目录 XML 的字符集：2016→GB2312，2022→GB18030）
+    #[serde(default)]
+    pub upper_version: GbVersion,
 }
 fn enable_upper() -> bool {
     true
@@ -239,6 +275,17 @@ impl Gb28181ServerConfig {
     /// 1. 黑名单命中 → 拒绝（黑名单优先）
     /// 2. 白名单非空且未命中 → 拒绝
     /// 3. 其余情况 → 允许
+    /// 解析指定设备的协议版本（每设备覆盖优先，回退默认版本）
+    ///
+    /// 混合组网场景下，部分老设备为 2016、新设备为 2022，平台据此
+    /// 决定下发 XML 的字符集（GB2312 / GB18030）与可下发的指令集。
+    pub fn device_version_for(&self, device_id: &str) -> GbVersion {
+        self.device_versions
+            .get(device_id)
+            .copied()
+            .unwrap_or(self.default_version)
+    }
+
     pub fn check_device_allowed(&self, device_id: &str) -> Result<(), String> {
         // 黑名单优先
         if self.blocked_device_ids.iter().any(|id| id == device_id) {
@@ -253,3 +300,35 @@ impl Gb28181ServerConfig {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn version_fallback_to_default() {
+        let cfg = Gb28181ServerConfig::default();
+        assert_eq!(cfg.device_version_for("unknown-dev"), GbVersion::V2022);
+    }
+
+    #[test]
+    fn version_per_device_override() {
+        let mut cfg = Gb28181ServerConfig::default();
+        cfg.default_version = GbVersion::V2022;
+        cfg.device_versions
+            .insert("34020000001320000001".to_string(), GbVersion::V2016);
+        assert_eq!(
+            cfg.device_version_for("34020000001320000001"),
+            GbVersion::V2016
+        );
+        // 未命中覆盖的仍用默认
+        assert_eq!(cfg.device_version_for("other"), GbVersion::V2022);
+    }
+
+    #[test]
+    fn version_default_is_v2022() {
+        let cfg = Gb28181ServerConfig::default();
+        assert_eq!(cfg.default_version, GbVersion::V2022);
+    }
+}
+

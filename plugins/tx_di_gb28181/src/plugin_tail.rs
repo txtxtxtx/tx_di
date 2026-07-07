@@ -26,9 +26,25 @@ use rsipstack::sip as rsip;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tracing::{info, warn};
 use tx_gb28181::device::GbDevice;
+use tx_gb28181::sip::extract_user_from_sip_uri;
 
 impl Gb28181Server {
     // ── 注册表查询 ───────────────────────────────────────────────────────────
+
+    /// 出网 SDP / 广播地址使用的媒体 IP。
+    ///
+    /// 优先级：`nat_external_ip`（NAT 公网）> `media.local_ip`（非未指定）> `sip_ip`。
+    /// NAT 场景下直接返回公网 IP，使对端能正确回包。
+    fn media_ip(&self) -> String {
+        if let Some(nat) = &self.config.media.nat_external_ip {
+            return nat.clone();
+        }
+        if is_unspecified_ip(&self.config.media.local_ip) {
+            self.config.sip_ip.clone()
+        } else {
+            self.config.media.local_ip.clone()
+        }
+    }
 
     /// 获取设备信息
     pub fn get_device(&self, device_id: &str) -> Option<GbDevice> {
@@ -382,11 +398,7 @@ impl Gb28181Server {
     pub async fn snapshot(&self, device_id: &str, channel_id: &str) -> anyhow::Result<String> {
         let dev = self.get_dev_or_err(device_id)?;
         let sn = self.next_sn_for(device_id);
-        let media_ip = if is_unspecified_ip(&self.config.media.local_ip) {
-            self.config.sip_ip.clone()
-        } else {
-            self.config.media.local_ip.clone()
-        };
+        let media_ip = self.media_ip();
 
         let stream_id = format!("snapshot_{}_{}", channel_id, sn);
         let sdp_offer = build_snapshot_sdp(&media_ip, sn);
@@ -508,11 +520,7 @@ impl Gb28181Server {
             .insert(device_id.to_string(), audio_port);
 
         let sn = self.next_sn();
-        let media_ip = if is_unspecified_ip(&self.config.media.local_ip) {
-            self.config.sip_ip.clone()
-        } else {
-            self.config.media.local_ip.clone()
-        };
+        let media_ip = self.media_ip();
 
         let ack_xml = format!(
             "<?xml version=\"1.0\" encoding=\"GB2312\"?>\r\n\
@@ -586,11 +594,7 @@ impl Gb28181Server {
     ) -> anyhow::Result<(String, String, u16)> {
         let dev = self.get_dev_or_err(device_id)?;
         let sn = self.next_sn_for(device_id);
-        let media_ip = if is_unspecified_ip(&self.config.media.local_ip) {
-            self.config.sip_ip.clone()
-        } else {
-            self.config.media.local_ip.clone()
-        };
+        let media_ip = self.media_ip();
 
         let stream_id = format!("talkback_{}_{}", channel_id, sn);
         let media = self.media.get().expect("MediaBackend not initialized");
@@ -1136,11 +1140,7 @@ impl Gb28181Server {
         let dev = self.get_dev_or_err(device_id)?;
 
         // 确定媒体IP地址：如果配置的本地IP为未指定地址，则使用SIP IP
-        let media_ip = if is_unspecified_ip(&self.config.media.local_ip) {
-            self.config.sip_ip.clone()
-        } else {
-            self.config.media.local_ip.clone()
-        };
+        let media_ip = self.media_ip();
 
         // 生成流ID并分配RTP端口
         let stream_id = format!("{}_{}", channel_id, self.next_sn_for(device_id));
@@ -1325,19 +1325,31 @@ impl Gb28181Server {
     }
 
     /// 向指定设备 Contact URI 发送 MESSAGE
+    ///
+    /// 出网 XML 统一经设备版本 [`tx_gb28181::GbVersion`] 编码：
+    /// 改写字符集声明并按目标字符集真编码字节，修复 2016 设备 GB2312 乱码。
     async fn send_message_to_device(
         &self,
         contact: &str,
         body: &str,
         _seq: u32,
     ) -> anyhow::Result<()> {
+        // 解析设备 ID → 查注册表版本 → 回退配置默认版本
+        let device_id = extract_user_from_sip_uri(contact).unwrap_or_default();
+        let version = self
+            .device_registry
+            .get(&device_id)
+            .map(|d| d.version)
+            .unwrap_or_else(|| self.config.device_version_for(&device_id));
+        let encoded = version.serialize(body);
+
         let sender = self.sip_plugin.sender()?;
         let platform_id = &self.config.platform_id;
         let sip_ip = &self.config.sip_ip;
         let from_str = format!("sip:{}@{}", platform_id, sip_ip);
 
         let _ = sender
-            .send_message(contact, &from_str, body.as_bytes(), "Application/MANSCDP+xml")
+            .send_message(contact, &from_str, &encoded, "Application/MANSCDP+xml")
             .await?;
         Ok(())
     }

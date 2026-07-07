@@ -545,7 +545,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_adapter_simbus() {
-        let adapter = create_adapter(&AdapterKind::SimBus, "vcan0", 16);
+        let adapter = create_adapter(&AdapterKind::SimBus, "vcan0", 16, 500_000);
         adapter.open().await.expect("应成功");
         assert_eq!(adapter.name(), "vcan0");
     }
@@ -553,7 +553,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_adapter_kvaser_fallback() {
         // Kvaser 降级为 SimBus
-        let adapter = create_adapter(&AdapterKind::Kvaser, "test_kvaser", 8);
+        let adapter = create_adapter(&AdapterKind::Kvaser, "test_kvaser", 8, 500_000);
         adapter.open().await.expect("应成功");
         assert_eq!(adapter.name(), "test_kvaser");
     }

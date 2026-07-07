@@ -608,6 +608,66 @@ pub fn encode_ptz_cmd(cmd: &PtzCommand) -> String {
     )
 }
 
+/// 将 GB28181 PTZ 指令字符串（如 `"A50F01HH00V1V2V3SS"`）解码为 [`PtzCommand`]
+///
+/// 与 [`encode_ptz_cmd`] 互逆。无法识别（长度不足、前缀不符、未知方向）时返回 `None`。
+pub fn decode_ptz_cmd(hex: &str) -> Option<PtzCommand> {
+    let h = hex.trim().to_ascii_uppercase();
+    if h.len() < 18 {
+        return None;
+    }
+    let bytes: Vec<u8> = (0..h.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&h[i..i + 2], 16).ok())
+        .collect::<Option<Vec<u8>>>()?;
+    if bytes.len() < 9 || bytes[0] != 0xA5 || bytes[1] != 0x0F || bytes[2] != 0x01 {
+        return None;
+    }
+    let hh = bytes[3];
+    let v1 = bytes[5];
+    let v2 = bytes[6];
+    let v3 = bytes[7];
+    let pan = PtzSpeed { pan: v1, tilt: 0, zoom: 0 };
+    let tilt = PtzSpeed { pan: 0, tilt: v2, zoom: 0 };
+    let zoom = PtzSpeed { pan: 0, tilt: 0, zoom: v3 & 0x0F };
+    Some(match hh {
+        0x00 => PtzCommand::Stop,
+        0x01 => PtzCommand::Right(pan),
+        0x02 => PtzCommand::Left(pan),
+        0x04 => PtzCommand::Down(tilt),
+        0x08 => PtzCommand::Up(tilt),
+        0x05 => PtzCommand::RightDown(PtzSpeed { pan: v1, tilt: v2, zoom: 0 }),
+        0x09 => PtzCommand::RightUp(PtzSpeed { pan: v1, tilt: v2, zoom: 0 }),
+        0x06 => PtzCommand::LeftDown(PtzSpeed { pan: v1, tilt: v2, zoom: 0 }),
+        0x0A => PtzCommand::LeftUp(PtzSpeed { pan: v1, tilt: v2, zoom: 0 }),
+        0x10 => PtzCommand::ZoomIn(zoom),
+        0x20 => PtzCommand::ZoomOut(zoom),
+        0x40 => match v3 {
+            0x01 => PtzCommand::FocusFar,
+            0x02 => PtzCommand::FocusNear,
+            0x04 => PtzCommand::IrisOpen,
+            0x08 => PtzCommand::IrisClose,
+            _ => return None,
+        },
+        _ => return None,
+    })
+}
+
+/// 解析设备控制（PTZ）指令 XML（平台 → 设备），返回 `(通道 ID, PtzCommand)`
+///
+/// 从 `<Control><CmdType>DeviceControl</CmdType><DeviceID>..</DeviceID><PTZCmd>..</PTZCmd>`
+/// 中提取通道与 PTZ 指令。无法解析时返回 `None`。
+pub fn parse_ptz_control_xml(xml: &str) -> Option<(String, PtzCommand)> {
+    let cmd_type = parse_xml_field(xml, "CmdType")?;
+    if cmd_type != "DeviceControl" {
+        return None;
+    }
+    let channel = parse_xml_field(xml, "DeviceID")?;
+    let ptz_hex = parse_xml_field(xml, "PTZCmd")?;
+    let ptz = decode_ptz_cmd(&ptz_hex)?;
+    Some((channel, ptz))
+}
+
 /// 构建 PTZ 控制 XML（平台 → 设备）
 ///
 /// GB28181-2022 §8.4：DeviceControl/PTZCmd
@@ -2665,7 +2725,7 @@ mod tests {
 </DeviceList>"#;
         let items = parse_catalog_items(xml);
         assert_eq!(items.len(), 2);
-        assert_eq!(items[0].device_id, DeviceIDType::Len4("ch01".to_string()));
+        assert_eq!(items[0].device_id, DeviceIDType::Len20("ch01".to_string()));
         assert_eq!(items[0].manufacturer, "Hikvision");
         assert_eq!(items[1].status.as_str(), "OFF");
     }
@@ -2699,6 +2759,25 @@ mod tests {
         assert!(xml.contains("DeviceControl"));
         assert!(xml.contains("PTZCmd"));
         assert!(xml.contains("channel1"));
+    }
+
+    #[test]
+    fn test_decode_ptz_cmd_roundtrip() {
+        let encoded = encode_ptz_cmd(&PtzCommand::Right(PtzSpeed { pan: 50, tilt: 0, zoom: 0 }));
+        let decoded = decode_ptz_cmd(&encoded).expect("应可解码");
+        assert_eq!(encode_ptz_cmd(&decoded), encoded);
+    }
+
+    #[test]
+    fn test_parse_ptz_control_xml() {
+        let encoded = encode_ptz_cmd(&PtzCommand::Left(PtzSpeed { pan: 10, tilt: 0, zoom: 0 }));
+        let xml = format!(
+            "<Control><CmdType>DeviceControl</CmdType><DeviceID>ch9</DeviceID><PTZCmd>{}</PTZCmd></Control>",
+            encoded
+        );
+        let (ch, cmd) = parse_ptz_control_xml(&xml).expect("应可解析");
+        assert_eq!(ch, "ch9");
+        assert_eq!(encode_ptz_cmd(&cmd), encoded);
     }
 
     #[test]

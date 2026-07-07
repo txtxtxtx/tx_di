@@ -20,25 +20,31 @@ layers = [
 [web_config.spa_apps]
 "/cam" = "examples/gb_cams/ui/dist"
 
-# ── GB28181 模拟器配置 ────────────────────────────────────────────────────────
+# ── GB28181 模拟器业务配置 ──────────────────────────────────────────────────
 [gb_cams_config]
-# 上级平台
-platform_id   = "41010500002000000001"
-platform_ip   = "192.168.0.66"
-platform_port = 8116
-realm         = "4101050000"
-password      = "123456"
-
-# 设备基础参数
-heartbeat_secs = 60
-register_ttl   = 3600
-
-# SIP 端口分配：每个设备占用一个端口，从 base_port 开始递增
-sip_base_port = 6100
-
 # 媒体参数
 video_width   = 1280
 video_height  = 720
 video_fps     = 25
 # 背景图片路径（相对于项目根目录）
 background_image = "examples/gb_cams/public/qj.jpg"
+
+# ── SIP 传输层（由 tx_di_sip 提供端点）──────────────────────────────────────
+[sip_config]
+host = "0.0.0.0"
+port = 5060
+
+# ── 设备端（单实例多通道，由 tx_di_gb_dev 驱动注册/心跳/响应）────────────────
+[gb_dev]
+# 上级平台 SIP URI（注册服务器取 @ 之后部分）
+platform_uri = "sip:41010500002000000001@192.168.0.66:8116"
+# 本设备 ID（注册用户名，20 位）
+device_id    = "41010500001320000001"
+username     = "41010500001320000001"
+password     = "123456"
+realm        = "4101050000"
+register_ttl = 3600
+heartbeat_secs = 60
+# 协议版本：v2016（GB2312）/ v2022（GB18030）
+version      = "v2022"
+enabled      = true

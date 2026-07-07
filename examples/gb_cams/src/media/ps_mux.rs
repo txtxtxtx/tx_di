@@ -122,7 +122,6 @@ fn write_system_header(buf: &mut BytesMut) {
     // Stream info: audio stream
     buf.put_u8(0xC0);
     buf.put_u8(AUDIO_STREAM_ID);
-    buf.put_u16(0xC001);
 }
 
 /// 写入 PSM (Program Stream Map)

@@ -1,0 +1,10 @@
+# 默认能力（权限）配置
+# - core:default 包含事件订阅(listen/emit)、窗口、应用等核心能力
+# - 本应用自定义命令（generate_handler! 中的命令）在 Tauri 2 中默认即被允许，
+#   无需逐个声明；仅插件/核心模块命令需要在此显式授权。
+identifier = "default"
+description = "CAN 诊断上位机主窗口默认权限"
+windows = ["main"]
+permissions = [
+    "core:default",
+]

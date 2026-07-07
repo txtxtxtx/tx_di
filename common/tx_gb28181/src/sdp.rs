@@ -318,6 +318,61 @@ fn clean_ip(raw: String) -> String {
         .to_string()
 }
 
+/// 将 SDP 中所有连接地址（会话级 / 媒体级 `c=` 行，以及 `o=` 行中的地址）替换为 `new_ip`。
+///
+/// 用于 **NAT 穿透** 场景：媒体服务器位于私有网络，但对外（SDP `c=`/`o=` 行）必须暴露
+/// 公网 IP，否则对端会把 RTP 发往不可达的私网地址。
+///
+/// - `new_ip` 可以是 IPv4 或 IPv6，函数会自动推导 `IP4` / `IP6` 网络类型。
+/// - 仅替换地址，其余 SDP 行原样保留；行尾统一规范为 `\r\n`。
+///
+/// # 示例
+///
+/// ```
+/// let sdp = "v=0\r\no=- 1 1 IN IP4 192.168.1.10\r\nc=IN IP4 192.168.1.10\r\nm=video 10000 RTP/AVP 96\r\n";
+/// let out = tx_gb28181::sdp::rewrite_connection_address(sdp, "203.0.113.50");
+/// assert!(out.contains("c=IN IP4 203.0.113.50"));
+/// assert!(out.contains("o=- 1 1 IN IP4 203.0.113.50"));
+/// ```
+pub fn rewrite_connection_address(sdp: &str, new_ip: &str) -> String {
+    let (addr_type, _) = ip_net_type(new_ip);
+    let mut out = String::with_capacity(sdp.len());
+    for raw_line in sdp.split('\n') {
+        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+        let trimmed = line.trim_start();
+        if let Some(rest) = trimmed.strip_prefix("c=IN ") {
+            // rest = "IP4 192.168.1.1" 或 "IP6 ::1"，仅替换地址部分
+            let _ = rest;
+            out.push_str(&format!("c=IN {} {}\r\n", addr_type, new_ip));
+        } else if let Some(rest) = trimmed.strip_prefix("o=") {
+            out.push_str(&format!("o={}\r\n", rewrite_o_line(rest, addr_type, new_ip)));
+        } else {
+            out.push_str(line);
+            out.push_str("\r\n");
+        }
+    }
+    out
+}
+
+/// 重写 `o=` 行中的网络类型与地址（`o=<user> <sess-id> <sess-ver> IN IP4 <addr>`）。
+fn rewrite_o_line(body: &str, addr_type: &str, new_ip: &str) -> String {
+    let mut parts: Vec<&str> = body.split_whitespace().collect();
+    let n = parts.len();
+    if n >= 2 {
+        // 末段为地址
+        parts[n - 1] = new_ip;
+        // 倒数第二段原为 IP4/IP6，需同步网络类型
+        if n >= 3 {
+            parts[n - 2] = addr_type;
+        }
+        // 倒数第三段原为 IN
+        if n >= 4 {
+            parts[n - 3] = "IN";
+        }
+    }
+    parts.join(" ")
+}
+
 // ── 语音广播/对讲 SDP ─────────────────────────────────────────────────────────
 
 /// 音频编码类型
@@ -1044,5 +1099,56 @@ mod tests {
         let sdp = "v=0\r\ns=SnapShot\r\n";
         let info = parse_snapshot_sdp(sdp);
         assert!(info.image_url.is_empty());
+    }
+
+    // ── rewrite_connection_address ───────────────────────────────────────────
+
+    #[test]
+    fn nat_rewrite_ipv4_c_and_o_line() {
+        let sdp = "v=0\r\n\
+o=- 1 1 IN IP4 192.168.1.10\r\n\
+s=Play\r\n\
+c=IN IP4 192.168.1.10\r\n\
+m=video 10000 RTP/AVP 96\r\n";
+        let out = rewrite_connection_address(sdp, "203.0.113.50");
+        assert!(out.contains("c=IN IP4 203.0.113.50"), "c= 行应被重写: {}", out);
+        assert!(
+            out.contains("o=- 1 1 IN IP4 203.0.113.50"),
+            "o= 行地址应被重写: {}",
+            out
+        );
+        // 其余行保持不变
+        assert!(out.contains("m=video 10000 RTP/AVP 96"));
+        assert!(out.contains("s=Play"));
+    }
+
+    #[test]
+    fn nat_rewrite_preserves_media_level_c_line() {
+        let sdp = "v=0\r\n\
+o=- 1 1 IN IP4 10.0.0.1\r\n\
+c=IN IP4 10.0.0.1\r\n\
+m=video 10000 RTP/AVP 96\r\n\
+c=IN IP4 10.0.0.2\r\n";
+        let out = rewrite_connection_address(sdp, "198.51.100.7");
+        // 会话级与媒体级 c= 都应被替换
+        assert_eq!(out.matches("c=IN IP4 198.51.100.7").count(), 2);
+    }
+
+    #[test]
+    fn nat_rewrite_ipv6_address() {
+        let sdp = "v=0\r\no=- 1 1 IN IP4 192.168.1.10\r\nc=IN IP4 192.168.1.10\r\n";
+        let out = rewrite_connection_address(sdp, "2001:db8::1");
+        assert!(out.contains("c=IN IP6 2001:db8::1"));
+        assert!(out.contains("o=- 1 1 IN IP6 2001:db8::1"));
+    }
+
+    #[test]
+    fn nat_rewrite_no_address_is_noop_line() {
+        let sdp = "v=0\r\ns=Play\r\nm=video 10000 RTP/AVP 96\r\n";
+        let out = rewrite_connection_address(sdp, "203.0.113.50");
+        assert!(out.contains("s=Play"));
+        assert!(out.contains("m=video 10000 RTP/AVP 96"));
+        // 无 c=/o= 行，输出不应出现新地址
+        assert!(!out.contains("203.0.113.50"));
     }
 }

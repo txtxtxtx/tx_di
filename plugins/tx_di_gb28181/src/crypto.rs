@@ -5,8 +5,8 @@
 //! - MD5 摘要计算（GB28181 SIP 摘要认证专用）
 //! - SIP Digest Auth 验证（RFC 2617）
 
-// ── SIP Digest Auth 验证 ──────────────────────────────────────────────────
-pub use tx_gb28181::utils::{generate_nonce, md5_digest, md5_hex, verify_digest_auth};
+// ── SIP Digest Auth 验证（已下沉到 L0 纯净层 tx_di_sip::auth）─────────────
+pub use tx_di_sip::auth::{generate_nonce, md5_digest, md5_hex, verify_digest_auth};
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

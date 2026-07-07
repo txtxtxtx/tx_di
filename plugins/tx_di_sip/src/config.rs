@@ -7,12 +7,12 @@ use crate::SipErr;
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq,Default)]
 #[serde(rename_all = "lowercase")]
 pub enum SipTransport {
-    /// 仅启用 UDP（默认）
-    #[default]
+    /// 仅启用 UDP
     Udp,
     /// 仅启用 TCP
     Tcp,
-    /// 同时启用 UDP 和 TCP
+    /// 同时启用 UDP 和 TCP（默认；国标场景推荐，兼容老设备 UDP 与 NAT 友好 TCP）
+    #[default]
     Both,
     /// TLS 安全传输（需要配置 `tls` 字段）
     Tls,
@@ -67,11 +67,13 @@ pub struct SipConfig {
     #[serde(default = "default_port")]
     pub port: u16,
 
-    /// 传输层协议，默认 `udp`
+    /// 传输层协议，默认 `both`（国标场景推荐：兼容老设备 UDP、NAT 友好 TCP）
     ///
-    /// - `udp`：仅 UDP（轻量，推荐开发环境）
+    /// - `udp`：仅 UDP（轻量）
     /// - `tcp`：仅 TCP
     /// - `both`：UDP + TCP 双栈
+    /// - `tls`：TLS 安全传输（需配置 `[sip_config.tls]`）
+    /// - `ws`：WebSocket 传输
     #[serde(default)]
     pub transport: SipTransport,
 
@@ -133,10 +135,24 @@ pub struct SipConfig {
 /// TLS 传输配置
 #[derive(Debug, Clone, Deserialize)]
 pub struct TlsConfig {
-    /// 证书 PEM 文件路径
+    /// 服务器证书 PEM 文件路径（作为 TLS 服务端时用于握手）
     pub cert_pem: String,
-    /// 私钥 PEM 文件路径
+    /// 服务器私钥 PEM 文件路径
     pub key_pem: String,
+    /// 客户端 CA 证书 PEM 文件路径（可选）。
+    ///
+    /// 配置后启用 **双向 TLS（mTLS）**：服务端在校验对端时要求并验证客户端证书，
+    /// 仅放行持有受信证书的 SIP 对端（适合平台间高安全级联）。
+    #[serde(default)]
+    pub ca_certs: Option<String>,
+    /// 客户端证书 PEM 文件路径（可选）。
+    ///
+    /// 本端作为 **TLS 客户端** 向上级 TLS SIP 服务器注册时，携带此证书发起 mTLS 握手。
+    #[serde(default)]
+    pub client_cert: Option<String>,
+    /// 客户端证书私钥 PEM 文件路径（可选），与 `client_cert` 配套。
+    #[serde(default)]
+    pub client_key: Option<String>,
 }
 
 impl Default for SipConfig {

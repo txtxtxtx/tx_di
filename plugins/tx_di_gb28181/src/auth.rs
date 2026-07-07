@@ -20,7 +20,7 @@ use tx_di_sip::{SipMiddleware, SipNextFn, SipTx};
 use tx_gb28181::sip::extract_user_from_sip_uri;
 
 use crate::config::Gb28181ServerConfig;
-use crate::crypto::{generate_nonce, verify_digest_auth};
+use tx_di_sip::auth::{generate_nonce, verify_digest_auth};
 
 /// Nonce 存储：记录已发给每个设备的 nonce，防止重放攻击
 ///

@@ -19,7 +19,9 @@ members = [
     # gb28181,todo 先忽略，以后更新
     "plugins/tx_di_gb28181",
     # can, todo 先忽略，以后更新
-    # "plugins/tx_di_can",
+    "plugins/tx_di_can",
+    # can 上位机 Tauri 应用（桌面 UI）
+    "plugins/tx_di_can/app/src-tauri",
     # 数据库orm
     "plugins/tx_di_toasty",
     # 认证授权
@@ -45,12 +47,14 @@ members = [
     # yctd a7->mqtt
     "examples/dfbja7_transformer",
     # app
-    # 国标设备模拟
-    #    "examples/gb_cams",
+    # 国标设备模拟（单实例多通道，复用 tx_di_gb_dev 框架）
+    "examples/gb_cams",
     # 国标服务,todo 先忽略，以后更新
     # "examples/gb28181_admin",
     # 国标公共模块，todo 先忽略，以后更新
     # "common/tx_gb28181",
+    # 国标设备端插件（L2b，gb_cams 与级联下级复用）
+    "plugins/tx_di_gb_dev",
 ]
 resolver = "3"
 [workspace.package]

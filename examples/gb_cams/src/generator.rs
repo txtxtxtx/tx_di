@@ -33,17 +33,14 @@ pub fn generate_device_id(prefix: &str, seq: u64) -> String {
 
 /// 生成通道 ID（20 位）
 ///
-/// 通道 ID = 设备 ID 前18位 + 两位通道序号
+/// 通道 ID = 设备 ID 前 18 位 + 两位通道序号（符合 GB28181 子设备编码惯例）
 pub fn generate_channel_id(device_id: &str, ch_seq: u32) -> String {
     let base = if device_id.len() >= 18 {
         &device_id[..18]
     } else {
         device_id
     };
-    let mut id = format!("{}{:02}", base, ch_seq);
-    // 替换 11-13位 为 132
-    id.replace_range(11..14, DEVICE_TYPE_IPC);
-    id
+    format!("{}{:02}", base, ch_seq)
 }
 
 /// 随机设备前缀生成器
@@ -70,7 +67,7 @@ pub fn generate_devices(
     base_seq: u64,
 ) -> Vec<(String, Vec<String>, String)> {
     let mut result = Vec::with_capacity(count);
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     for i in 0..count {
         let seq = base_seq + i as u64;
@@ -80,7 +77,7 @@ pub fn generate_devices(
             .collect();
 
         // 随机设备名称
-        let name = format!("Camera-{:04}", rng.gen_range(1..=9999));
+        let name = format!("Camera-{:04}", rng.random_range(1..=9999));
         result.push((device_id, channels, name));
     }
 
@@ -120,7 +117,7 @@ pub fn random_region_code() -> &'static str {
         "513428", "513429", "513430", "513431", "513432", "513433", "513434", "513435", "513436",
         "513437",
     ];
-    let idx = rand::thread_rng().gen_range(0..regions.len());
+    let idx = rand::rng().random_range(0..regions.len());
     regions[idx]
 }
 
@@ -138,7 +135,7 @@ mod tests {
     #[test]
     fn test_generate_channel_id() {
         let ch = generate_channel_id("34020000001320000001", 1);
-        assert_eq!(ch, "34020000001320000101");
+        assert_eq!(ch, "34020000001320000001");
         assert_eq!(ch.len(), 20);
     }
 
@@ -148,7 +145,7 @@ mod tests {
         assert_eq!(devices.len(), 3);
         assert_eq!(devices[0].0, "34020000001320000001");
         assert_eq!(devices[0].1.len(), 2);
-        assert_eq!(devices[0].1[0], "34020000001320000101");
+        assert_eq!(devices[0].1[0], "34020000001320000001");
         assert_eq!(devices[1].0, "34020000001320000002");
     }
 }
