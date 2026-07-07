@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { api, onCanEvent } from './api/can.ts'
 import { state, pushLog, handleEvent } from './store.ts'
+import { t, i18n, toggleLang } from './i18n.ts'
 import TraceView from './views/TraceView.vue'
 import UdsView from './views/UdsView.vue'
 import FlashView from './views/FlashView.vue'
@@ -9,17 +10,23 @@ import ConfigView from './views/ConfigView.vue'
 import SimEcuView from './views/SimEcuView.vue'
 import RecordReplayView from './views/RecordReplayView.vue'
 import DbcView from './views/DbcView.vue'
+import XcpView from './views/XcpView.vue'
+import AuditView from './views/AuditView.vue'
+import ProjectView from './views/ProjectView.vue'
 
 const activeTab = ref('trace')
-const tabs = [
-  { key: 'trace', label: '总线监控' },
-  { key: 'uds', label: 'UDS 诊断' },
-  { key: 'flash', label: '固件刷写' },
-  { key: 'simecu', label: 'ECU 仿真' },
-  { key: 'record', label: '录制回放' },
-  { key: 'dbc', label: 'DBC 解码' },
-  { key: 'config', label: '连接配置' },
-]
+const tabs = computed(() => [
+  { key: 'trace', label: t('tab.trace') },
+  { key: 'uds', label: t('tab.uds') },
+  { key: 'flash', label: t('tab.flash') },
+  { key: 'simecu', label: t('tab.simecu') },
+  { key: 'record', label: t('tab.record') },
+  { key: 'dbc', label: t('tab.dbc') },
+  { key: 'xcp', label: t('tab.xcp') },
+  { key: 'audit', label: t('tab.audit') },
+  { key: 'project', label: t('tab.project') },
+  { key: 'config', label: t('tab.config') },
+])
 
 let unlisten: (() => void) | null = null
 
@@ -41,17 +48,18 @@ onUnmounted(() => unlisten?.())
     <header class="topbar">
       <span class="title">CAN 诊断上位机</span>
       <span class="status" :class="{ on: state.connected }">
-        {{ state.connected ? '已连接' : '未连接' }}
+        {{ state.connected ? t('common.connected') : t('common.disconnected') }}
       </span>
+      <button class="lang" @click="toggleLang">{{ i18n.lang === 'zh' ? 'EN' : '中' }}</button>
     </header>
     <nav class="tabs">
       <button
-        v-for="t in tabs"
-        :key="t.key"
-        :class="{ active: activeTab === t.key }"
-        @click="activeTab = t.key"
+        v-for="ta in tabs"
+        :key="ta.key"
+        :class="{ active: activeTab === ta.key }"
+        @click="activeTab = ta.key"
       >
-        {{ t.label }}
+        {{ ta.label }}
       </button>
     </nav>
     <main class="content">
@@ -61,6 +69,9 @@ onUnmounted(() => unlisten?.())
       <SimEcuView v-else-if="activeTab === 'simecu'" />
       <RecordReplayView v-else-if="activeTab === 'record'" />
       <DbcView v-else-if="activeTab === 'dbc'" />
+      <XcpView v-else-if="activeTab === 'xcp'" />
+      <AuditView v-else-if="activeTab === 'audit'" />
+      <ProjectView v-else-if="activeTab === 'project'" />
       <ConfigView v-else-if="activeTab === 'config'" />
     </main>
   </div>

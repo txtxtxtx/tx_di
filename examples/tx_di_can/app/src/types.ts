@@ -94,6 +94,58 @@ export interface DbcValue {
   value: number
 }
 
+export interface XcpVarInfo {
+  name: string
+  datatype: string
+  address: number
+  unit: string
+}
+
+export interface XcpA2lInfo {
+  module: string
+  measurements: XcpVarInfo[]
+  characteristics: XcpVarInfo[]
+}
+
+export interface XcpValue {
+  name: string
+  hex: string
+  raw: number[]
+}
+
+export interface AuditEntryInfo {
+  ts_ms: number
+  kind: string
+  detail: string
+  result: string
+}
+
+export interface CsvAnalysis {
+  total_frames: number
+  fd_frames: number
+  span_ms: number
+  assumed_bitrate: number
+  load_permille: number
+  avg_interval_ms: number
+  top_ids: [number, number][]
+}
+
+export interface FlashProjectConfig {
+  target_id: number
+  security_level: number
+  memory_address: number
+  erase_before_download: boolean
+}
+
+export interface ProjectConfig {
+  name: string
+  can: CanConfig
+  uds_tx_id: number
+  recent_dids: number[]
+  recent_dtcs: number[]
+  flash: FlashProjectConfig
+}
+
 export type CanEvent =
   | { BusReady: { interface: string } }
   | { BusError: { description: string } }

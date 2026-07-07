@@ -54,6 +54,20 @@ fn main() {
             commands::replay_csv,
             commands::load_dbc,
             commands::decode_dbc,
+            // A. XCP 标定
+            commands::xcp_parse_a2l,
+            commands::xcp_measure_all,
+            commands::xcp_calibrate,
+            commands::xcp_daq_sample,
+            // B. 审计 / 报表
+            commands::audit_log,
+            commands::audit_clear,
+            commands::export_report,
+            // C. 离线分析
+            commands::analyze_csv,
+            // D. 工程管理
+            commands::save_project,
+            commands::load_project,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

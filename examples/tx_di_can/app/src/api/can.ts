@@ -2,9 +2,11 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type {
+  AuditEntryInfo,
   BusStats,
   CanConfig,
   CanEvent,
+  CsvAnalysis,
   DbcMsgInfo,
   DbcValue,
   DescDidInfo,
@@ -12,6 +14,9 @@ import type {
   FlashConfigInput,
   FrameFilter,
   FrameInput,
+  ProjectConfig,
+  XcpA2lInfo,
+  XcpValue,
 } from '../types'
 
 export const api = {
@@ -53,6 +58,25 @@ export const api = {
   loadDbc: (path: string) => invoke<DbcMsgInfo[]>('load_dbc', { path }),
   decodeDbc: (path: string, canId: number, data: number[]) =>
     invoke<DbcValue[]>('decode_dbc', { path, canId, data }),
+  // A. XCP 标定
+  xcpParseA2l: (path: string) => invoke<XcpA2lInfo>('xcp_parse_a2l', { path }),
+  xcpMeasureAll: (path: string) => invoke<XcpValue[]>('xcp_measure_all', { path }),
+  xcpCalibrate: (path: string, name: string, data: number[]) =>
+    invoke<void>('xcp_calibrate', { path, name, data }),
+  xcpDaqSample: (path: string, name: string) =>
+    invoke<XcpValue>('xcp_daq_sample', { path, name }),
+  // B. 审计 / 报表
+  auditLog: () => invoke<AuditEntryInfo[]>('audit_log'),
+  auditClear: () => invoke<void>('audit_clear'),
+  exportReport: (path: string, format: string) =>
+    invoke<void>('export_report', { path, format }),
+  // C. 离线分析
+  analyzeCsv: (path: string, bitrate: number) =>
+    invoke<CsvAnalysis>('analyze_csv', { path, bitrate }),
+  // D. 工程管理
+  saveProject: (path: string, cfg: ProjectConfig) =>
+    invoke<void>('save_project', { path, cfg }),
+  loadProject: (path: string) => invoke<ProjectConfig>('load_project', { path }),
 }
 
 export function onCanEvent(cb: (e: CanEvent) => void): Promise<UnlistenFn> {

@@ -6,7 +6,7 @@
 
 use crate::adapter::CanAdapter;
 use crate::frame::{CanFdFrame, CanFrame, FrameId};
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use std::path::Path;
 use std::time::Duration;
 
@@ -131,6 +131,87 @@ pub fn load_csv(path: impl AsRef<Path>) -> Result<Vec<FrameRecord>> {
     Ok(out)
 }
 
+/// 离线分析结果
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CsvAnalysis {
+    /// 总帧数
+    pub total_frames: u64,
+    /// 其中 CAN-FD 帧数
+    pub fd_frames: u64,
+    /// 时间跨度（毫秒）
+    pub span_ms: u64,
+    /// 假设总线波特率（bps），用于估算负载率
+    pub assumed_bitrate: u32,
+    /// 估算总线负载率（千分比 0~1000）
+    pub load_permille: u32,
+    /// 平均每帧间隔（毫秒）
+    pub avg_interval_ms: f64,
+    /// Top 会话节点（ID, 帧数），按帧数降序取前 10
+    pub top_ids: Vec<(u32, u64)>,
+}
+
+/// 离线分析 CSV 录制文件：统计帧数、时间跨度、负载率、Top 节点
+///
+/// `assumed_bitrate` 用于把总比特数换算成负载率（默认 500kbps）。
+pub fn analyze_csv(path: impl AsRef<Path>, assumed_bitrate: u32) -> Result<CsvAnalysis> {
+    let records = load_csv(path)?;
+    let total = records.len() as u64;
+    if total == 0 {
+        return Ok(CsvAnalysis {
+            total_frames: 0,
+            fd_frames: 0,
+            span_ms: 0,
+            assumed_bitrate,
+            load_permille: 0,
+            avg_interval_ms: 0.0,
+            top_ids: Vec::new(),
+        });
+    }
+    let mut min_ts = u64::MAX;
+    let mut max_ts = 0u64;
+    let mut fd = 0u64;
+    let mut total_bits = 0u64;
+    let mut counts: std::collections::HashMap<u32, u64> = std::collections::HashMap::new();
+    for r in &records {
+        min_ts = min_ts.min(r.timestamp_us);
+        max_ts = max_ts.max(r.timestamp_us);
+        if r.is_fd {
+            fd += 1;
+        }
+        let bits = if r.is_fd {
+            67 + 8 * r.data.len() * 2
+        } else {
+            47 + 8 * r.data.len()
+        } as u64;
+        total_bits += bits;
+        *counts.entry(r.id).or_insert(0) += 1;
+    }
+    let span_ms = max_ts.saturating_sub(min_ts) / 1000;
+    let span_s = span_ms as f64 / 1000.0;
+    let load_permille = if span_s > 0.0 && assumed_bitrate > 0 {
+        ((total_bits as f64 / span_s) / assumed_bitrate as f64 * 1000.0).min(1000.0) as u32
+    } else {
+        0
+    };
+    let avg_interval_ms = if total > 1 {
+        span_ms as f64 / (total - 1) as f64
+    } else {
+        0.0
+    };
+    let mut top: Vec<(u32, u64)> = counts.into_iter().collect();
+    top.sort_by(|a, b| b.1.cmp(&a.1));
+    top.truncate(10);
+    Ok(CsvAnalysis {
+        total_frames: total,
+        fd_frames: fd,
+        span_ms,
+        assumed_bitrate,
+        load_permille,
+        avg_interval_ms,
+        top_ids: top,
+    })
+}
+
 /// 回放 CSV 到总线（按原始间隔 × speed_factor 倍速；speed_factor<1 更快）
 ///
 /// `speed_factor`：0.5 两倍速，2.0 半速；0 表示不等待（尽量快）。
@@ -250,6 +331,32 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(f1.id.raw(), 0x7E0);
+        let _ = std::fs::remove_file(&p);
+    }
+
+    #[test]
+    fn test_analyze_csv() {
+        let dir = std::env::temp_dir();
+        let p = dir.join(format!("tx_di_can_analyze_{}.csv", std::process::id()));
+        {
+            let mut rec = Recorder::new(&p).unwrap();
+            for (i, id) in [0x7E0u32, 0x7E0, 0x7E8].iter().enumerate() {
+                rec.record(&FrameRecord {
+                    timestamp_us: 1000 * (i as u64 + 1),
+                    is_fd: false,
+                    id: *id,
+                    brs: false,
+                    esi: false,
+                    data: vec![0x01, 0x02, 0x03],
+                })
+                .unwrap();
+            }
+        }
+        let a = analyze_csv(&p, 500_000).unwrap();
+        assert_eq!(a.total_frames, 3);
+        assert_eq!(a.fd_frames, 0);
+        assert!(a.span_ms >= 2);
+        assert_eq!(a.top_ids[0], (0x7E0, 2));
         let _ = std::fs::remove_file(&p);
     }
 }

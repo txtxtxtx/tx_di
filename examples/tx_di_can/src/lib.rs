@@ -75,6 +75,10 @@ mod isotp;
 mod plugin;
 pub mod sim_ecu;
 pub mod record;
+pub mod xcp;
+pub mod audit;
+pub mod report;
+pub mod project;
 mod uds;
 
 pub use adapter::{CanAdapter, AdapterKind};
@@ -90,6 +94,9 @@ pub use frame::{CanFdFrame, CanFrame, FrameId, FrameKind};
 pub use isotp::{IsoTpChannel, IsoTpConfig};
 pub use plugin::{BusStats, CanPlugin, FrameFilter};
 pub use sim_ecu::{SimEcuConfig, spawn_sim_ecu};
+pub use record::CsvAnalysis;
+pub use project::ProjectConfig;
+pub use xcp::{parse_a2l, A2l, A2lType, Measurement, Characteristic, XcpMaster, XcpPacket, XcpSlave};
 pub use uds::{
     DtcRecord, NrcCode, SessionType, UdsClient, UdsError, UdsService,
 };

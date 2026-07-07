@@ -1,4 +1,4 @@
-//! Tauri 命令：封装 `tx_di_can` 的公开 API 供前端调用
+﻿//! Tauri 命令：封装 `tx_di_can` 的公开 API 供前端调用
 //!
 //! 每个命令返回 `Result<T, String>`：成功值经 serde 序列化给前端，
 //! 错误统一转为字符串消息。所有底层错误（`anyhow::Error` / `UdsError`）均 `.to_string()`。
@@ -6,8 +6,8 @@
 use serde::Deserialize;
 use std::sync::Arc;
 use tx_di_can::{
-    dbc::Dbc, BusStats, CanConfig, CanFdFrame, CanFrame, CanPlugin, FlashConfig, FrameFilter,
-    SessionType, UdsClient,
+    audit, dbc::Dbc, report, BusStats, CanConfig, CanFdFrame, CanFrame, CanPlugin, CsvAnalysis,
+    FlashConfig, FrameFilter,     ProjectConfig, SessionType, UdsClient, A2l, A2lType, XcpMaster, parse_a2l,
 };
 
 /// 描述库 DID 摘要（供前端描述面板展示）
@@ -145,14 +145,18 @@ pub fn is_connected() -> bool {
 
 #[tauri::command]
 pub async fn connect(config: CanConfig) -> Result<(), String> {
-    CanPlugin::connect(config)
-        .await
-        .map_err(|e| e.to_string())
+    let r = CanPlugin::connect(config).await;
+    match &r {
+        Ok(()) => audit::ok("connect", "ok"),
+        Err(e) => audit::fail("connect", "fail", &e.to_string()),
+    }
+    r.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn disconnect() -> Result<(), String> {
     CanPlugin::disconnect().await;
+    audit::ok("disconnect", "ok");
     Ok(())
 }
 
@@ -160,35 +164,50 @@ pub async fn disconnect() -> Result<(), String> {
 
 #[tauri::command]
 pub async fn send_frame(frame: FrameInput) -> Result<(), String> {
+    let len = frame.data.len();
     let f = CanFrame::new(frame.id, frame.data);
-    CanPlugin::send_frame(&f).await.map_err(|e| e.to_string())
+    let r = CanPlugin::send_frame(&f).await;
+    match &r {
+        Ok(()) => audit::ok("send", &format!("id=0x{:X} len={}", frame.id, len)),
+        Err(e) => audit::fail("send", &format!("id=0x{:X}", frame.id), &e.to_string()),
+    }
+    r.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn send_fd_frame(frame: FrameInput) -> Result<(), String> {
+    let len = frame.data.len();
     let mut f = CanFdFrame::new(frame.id, frame.data);
     f.brs = frame.brs;
     f.esi = frame.esi;
-    CanPlugin::send_fd_frame(&f)
-        .await
-        .map_err(|e| e.to_string())
+    let r = CanPlugin::send_fd_frame(&f).await;
+    match &r {
+        Ok(()) => audit::ok("send_fd", &format!("id=0x{:X} len={}", frame.id, len)),
+        Err(e) => audit::fail("send_fd", &format!("id=0x{:X}", frame.id), &e.to_string()),
+    }
+    r.map_err(|e| e.to_string())
 }
 
 // ── UDS 诊断 ───────────────────────────────────────────────────────────────
 
 #[tauri::command]
 pub async fn read_data(tx_id: u32, did: u16) -> Result<String, String> {
-    let data = CanPlugin::read_data(tx_id, did)
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(hex_encode(&data))
+    let r = CanPlugin::read_data(tx_id, did).await;
+    match &r {
+        Ok(d) => audit::ok("read_did", &format!("tx=0x{:X} did=0x{:X} len={}", tx_id, did, d.len())),
+        Err(e) => audit::fail("read_did", &format!("tx=0x{:X} did=0x{:X}", tx_id, did), &e.to_string()),
+    }
+    r.map(|data| hex_encode(&data)).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn write_data(tx_id: u32, did: u16, data: Vec<u8>) -> Result<(), String> {
-    CanPlugin::write_data(tx_id, did, &data)
-        .await
-        .map_err(|e| e.to_string())
+    let r = CanPlugin::write_data(tx_id, did, &data).await;
+    match &r {
+        Ok(()) => audit::ok("write_did", &format!("tx=0x{:X} did=0x{:X} len={}", tx_id, did, data.len())),
+        Err(e) => audit::fail("write_did", &format!("tx=0x{:X} did=0x{:X}", tx_id, did), &e.to_string()),
+    }
+    r.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -240,10 +259,12 @@ pub async fn flash(
 ) -> Result<(), String> {
     let fc = build_flash_config(&config);
     let key_fn = make_key_fn(&key_algo);
-    CanPlugin::flash(firmware_path, fc, key_fn)
-        .await
-        .map(|_| ())
-        .map_err(|e| e.to_string())
+    let r = CanPlugin::flash(firmware_path.clone(), fc, key_fn).await;
+    match &r {
+        Ok(_) => audit::ok("flash", &format!("fw={} target=0x{:X}", firmware_path, config.target_id)),
+        Err(e) => audit::fail("flash", &format!("fw={} target=0x{:X}", firmware_path, config.target_id), &e.to_string()),
+    }
+    r.map(|_| ()).map_err(|e| e.to_string())
 }
 
 // ── 监控增强：统计与过滤 ───────────────────────────────────────────────────
@@ -274,7 +295,12 @@ pub fn get_frame_filter() -> Option<FrameFilter> {
 #[tauri::command]
 pub async fn send_isotp(tx_id: u32, rx_id: u32, data: Vec<u8>) -> Result<(), String> {
     let ch = CanPlugin::create_isotp_channel(tx_id, rx_id);
-    ch.send(&data).await.map_err(|e| e.to_string())
+    let r = ch.send(&data).await;
+    match &r {
+        Ok(()) => audit::ok("isotp", &format!("tx=0x{:X} rx=0x{:X} len={}", tx_id, rx_id, data.len())),
+        Err(e) => audit::fail("isotp", &format!("tx=0x{:X} rx=0x{:X}", tx_id, rx_id), &e.to_string()),
+    }
+    r.map_err(|e| e.to_string())
 }
 
 // ── 描述库查询 ─────────────────────────────────────────────────────────────
@@ -322,16 +348,22 @@ pub fn sim_ecu_status() -> bool {
 
 #[tauri::command]
 pub async fn record_csv(path: String, duration_ms: u64) -> Result<u32, String> {
-    CanPlugin::record_csv(&path, duration_ms)
-        .await
-        .map_err(|e| e.to_string())
+    let r = CanPlugin::record_csv(&path, duration_ms).await;
+    match &r {
+        Ok(n) => audit::ok("record", &format!("path={} frames={}", path, n)),
+        Err(e) => audit::fail("record", &path, &e.to_string()),
+    }
+    r.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn replay_csv(path: String, speed_factor: f64) -> Result<u32, String> {
-    CanPlugin::replay_csv(&path, speed_factor)
-        .await
-        .map_err(|e| e.to_string())
+    let r = CanPlugin::replay_csv(&path, speed_factor).await;
+    match &r {
+        Ok(n) => audit::ok("replay", &format!("path={} frames={}", path, n)),
+        Err(e) => audit::fail("replay", &path, &e.to_string()),
+    }
+    r.map_err(|e| e.to_string())
 }
 
 // ── DBC 解码 ───────────────────────────────────────────────────────────────
@@ -425,3 +457,189 @@ fn hex_encode(data: &[u8]) -> String {
         .collect::<Vec<_>>()
         .join(" ")
 }
+
+// ── A. XCP 标定（A2L + 仿真从站/主站） ─────────────────────────────────────
+
+/// XCP 变量信息（测量量/标定量）
+#[derive(Debug, serde::Serialize)]
+pub struct XcpVarInfo {
+    pub name: String,
+    pub datatype: String,
+    pub address: u32,
+    pub unit: String,
+}
+
+/// XCP A2L 解析结果
+#[derive(Debug, serde::Serialize)]
+pub struct XcpA2lInfo {
+    pub module: String,
+    pub measurements: Vec<XcpVarInfo>,
+    pub characteristics: Vec<XcpVarInfo>,
+}
+
+/// XCP 采样值（测量量当前值）
+#[derive(Debug, serde::Serialize)]
+pub struct XcpValue {
+    pub name: String,
+    pub hex: String,
+    pub raw: Vec<u8>,
+}
+
+fn a2l_type_name(t: A2lType) -> String {
+    match t {
+        A2lType::UByte => "UBYTE",
+        A2lType::UWord => "UWORD",
+        A2lType::ULong => "ULONG",
+        A2lType::SByte => "SBYTE",
+        A2lType::SWord => "SWORD",
+        A2lType::SLong => "SLONG",
+        A2lType::Float32Ieee => "FLOAT32_IEEE",
+    }
+    .to_string()
+}
+
+fn to_var_info(name: &str, dt: A2lType, addr: u32, unit: &str) -> XcpVarInfo {
+    XcpVarInfo {
+        name: name.to_string(),
+        datatype: a2l_type_name(dt),
+        address: addr,
+        unit: unit.to_string(),
+    }
+}
+
+#[tauri::command]
+pub fn xcp_parse_a2l(path: String) -> Result<XcpA2lInfo, String> {
+    let txt = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let a2l = parse_a2l(&txt);
+    Ok(XcpA2lInfo {
+        module: a2l.module.clone(),
+        measurements: a2l
+            .measurements
+            .iter()
+            .map(|m| to_var_info(&m.name, m.datatype, m.address, &m.unit))
+            .collect(),
+        characteristics: a2l
+            .characteristics
+            .iter()
+            .map(|c| to_var_info(&c.name, c.datatype, c.address, &c.unit))
+            .collect(),
+    })
+}
+
+/// 连接仿真从站并对所有测量量执行 UPLOAD，返回当前值
+#[tauri::command]
+pub fn xcp_measure_all(path: String) -> Result<Vec<XcpValue>, String> {
+    let txt = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let a2l = parse_a2l(&txt);
+    let mut master = XcpMaster::from_a2l(a2l);
+    if !master.connect() {
+        return Err("XCP CONNECT 失败".to_string());
+    }
+    let mut out = Vec::new();
+    for m in master.a2l().measurements.clone() {
+        if let Some(raw) = master.read_measurement(&m.name) {
+            out.push(XcpValue {
+                name: m.name,
+                hex: hex_encode(&raw),
+                raw,
+            });
+        }
+    }
+    Ok(out)
+}
+
+/// 对标定量执行 DOWNLOAD（标定写入）
+#[tauri::command]
+pub fn xcp_calibrate(path: String, name: String, data: Vec<u8>) -> Result<(), String> {
+    let txt = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let a2l = parse_a2l(&txt);
+    let mut master = XcpMaster::from_a2l(a2l);
+    if !master.calibrate(&name, &data) {
+        return Err(format!("未找到标定量 {name}"));
+    }
+    audit::ok("xcp", &format!("calibrate {name}"));
+    Ok(())
+}
+
+/// 对单个测量量建立 DAQ 并采样一次
+#[tauri::command]
+pub fn xcp_daq_sample(path: String, name: String) -> Result<XcpValue, String> {
+    let txt = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let a2l = parse_a2l(&txt);
+    let mut master = XcpMaster::from_a2l(a2l);
+    if !master.connect() {
+        return Err("XCP CONNECT 失败".to_string());
+    }
+    if !master.start_daq(&name) {
+        return Err(format!("未找到测量量 {name}"));
+    }
+    match master.daq_sample(&name) {
+        Some(raw) => Ok(XcpValue {
+            name,
+            hex: hex_encode(&raw),
+            raw,
+        }),
+        None => Err("DAQ 采样失败".to_string()),
+    }
+}
+
+// ── B. 审计 / 报表导出 ────────────────────────────────────────────────────
+
+#[derive(Debug, serde::Serialize, Clone)]
+pub struct AuditEntryInfo {
+    pub ts_ms: u64,
+    pub kind: String,
+    pub detail: String,
+    pub result: String,
+}
+
+#[tauri::command]
+pub fn audit_log() -> Vec<AuditEntryInfo> {
+    audit::log()
+        .into_iter()
+        .map(|e| AuditEntryInfo {
+            ts_ms: e.ts_ms,
+            kind: e.kind,
+            detail: e.detail,
+            result: e.result,
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub fn audit_clear() {
+    audit::clear();
+}
+
+#[tauri::command]
+pub fn export_report(path: String, format: String) -> Result<(), String> {
+    let entries = audit::log();
+    match format.as_str() {
+        "pdf" => report::export_pdf(&path, "CAN 诊断上位机 操作审计报表", &entries)
+            .map_err(|e| e.to_string()),
+        _ => report::export_html(&path, "CAN 诊断上位机 操作审计报表", &entries)
+            .map_err(|e| e.to_string()),
+    }
+}
+
+// ── C. 离线分析 ───────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn analyze_csv(path: String, bitrate: u32) -> Result<CsvAnalysis, String> {
+    tx_di_can::record::analyze_csv(&path, bitrate)
+        .map_err(|e| e.to_string())
+}
+
+// ── D. 工程管理（.canproj） ───────────────────────────────────────────────
+
+#[tauri::command]
+pub fn save_project(path: String, cfg: ProjectConfig) -> Result<(), String> {
+    cfg.save(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn load_project(path: String) -> Result<ProjectConfig, String> {
+    ProjectConfig::load(&path).map_err(|e| e.to_string())
+}
+
+

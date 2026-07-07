@@ -125,5 +125,14 @@
 - 视图：TraceView（循环发送/过滤掩码/解码切换/负载率曲线/高亮/导出）、UdsView（+ISO-TP 原始面板 + 描述库）、FlashView（文件选择/擦除/seedkey）、SimEcuView（状态+自检）、RecordReplayView、DbcView。
 - 验证命令：`cargo test -p tx_di_can`（79 绿）、`cargo check --workspace`、`npx vue-tsc --noEmit`（app 目录，需先 `npm install`）。
 
+### tx_di_can 迁移与 A/B/C/D 完成（2026-07-08）
+用户将 `tx_di_can` 从 `plugins/` 迁移至 `examples/tx_di_can`（属示例代码，非 workspace 插件），并完成四项高级特性：
+- **A XCP 标定 + A2L**：`src/xcp.rs`（XcpSlave/XcpMaster/XcpPacket、A2L/Measurement/Characteristic 解析、CRO/DTO、SET_MTA/UPLOAD/DOWNLOAD/SHORT_UPLOAD/BUILD_CHECKSUM、DAQ/ODT）— 修复迁移后编译错（`map(|t| unquote(t))`、`slice4/slice2` 安全辅助替代 `try_into`、MTA 字段改名 `mta_addr`、解析仅在 `/begin` 触发）。
+- **B 审计 + 报表**：`src/audit.rs`（`AuditEntry` + `OnceLock<Mutex<Vec>>`，record/ok/fail/log/clear）、`src/report.rs`（gen_html/export_html/export_pdf，手写 PDF 仅 ASCII 非 ASCII→`?`）。
+- **C CSV 离线分析**：`src/record.rs` `analyze_csv` → `CsvAnalysis`（总帧数/FD帧/时间跨度/负载率‰/平均间隔/Top10 节点）。
+- **D i18n + 工程管理**：`src/project.rs` `ProjectConfig`（`.canproj` JSON 保存/加载，含 CanConfig/Flash/最近 DID/DTC）；前端 `src/i18n.ts`（中英双语 localStorage 持久化）。
+- 前端：新增 XcpView/AuditView/ProjectView，RecordReplayView 加离线分析面板，App.vue 加 xcp/audit/project 页签 + 语言切换按钮。
+- 验证：`cargo test -p tx_di_can` **89 passed / 0 failed**；`cargo check -p can-host` EXIT=0；`npx vue-tsc --noEmit`（app 目录）EXIT=0。
+
 ### 已知待办（后续阶段，未实现）
-XCP/CCP 标定（A2L+DAQ/CAL）、离线分析、审计报表（PDF/HTML）、中英双语、产线权限分级、.canproj 工程管理、自动化脚本/宏。这些是计划 v2/v3 项，本次未实现。
+产线权限分级、自动化脚本/宏、CCP 协议（仅 XCP on CAN 已做）。这些是计划 v3 项，本次未实现。

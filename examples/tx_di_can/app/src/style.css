@@ -28,6 +28,10 @@ body {
   background: #4a2a2a; color: var(--err); font-size: 12px;
 }
 .topbar .status.on { background: #234a2a; color: var(--ok); }
+.topbar .lang {
+  margin-left: 8px; padding: 3px 10px; border-radius: 10px; cursor: pointer;
+  background: var(--border); color: var(--fg); border: 1px solid var(--border); font-size: 12px;
+}
 .tabs { display: flex; gap: 4px; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--border); }
 .tabs button {
   background: transparent; color: var(--muted); border: none;
