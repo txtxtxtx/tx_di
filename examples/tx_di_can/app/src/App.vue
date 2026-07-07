@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { api, onCanEvent } from './api/can'
-import { state, pushLog, handleEvent } from './store'
+import { api, onCanEvent } from './api/can.ts'
+import { state, pushLog, handleEvent } from './store.ts'
 import TraceView from './views/TraceView.vue'
 import UdsView from './views/UdsView.vue'
 import FlashView from './views/FlashView.vue'
