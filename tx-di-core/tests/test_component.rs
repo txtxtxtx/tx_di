@@ -19,7 +19,7 @@ use std::any::TypeId;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::time::Duration;
 
 use tx_di_core::{
@@ -626,6 +626,84 @@ fn test_interceptor_after_modify_result() {
         _ => panic!("expected Err"),
     }
 }
+
+// ── 9b. AOP 宏端到端集成测试（`#[component(intercept(...))]` + `#[intercept]`）──
+//
+// 验证宏链路真实可用：拦截器作为 DI 组件被注入拦截链，业务方法经 `#[intercept]`
+// 包裹后实际触发 before/after 拦截。覆盖 sync 与 async 两种情况。
+
+/// 计数拦截器 — 本身也是 DI 组件，before 时自增计数器
+#[derive(Component, Default)]
+pub struct AopCountInterceptor {
+    #[tx_cst(AtomicU64::new(0))]
+    pub counter: AtomicU64,
+}
+
+impl Interceptor for AopCountInterceptor {
+    fn before(&self, _ctx: &CallContext) -> RIE<()> {
+        self.counter.fetch_add(1, Ordering::Relaxed);
+        Ok(())
+    }
+}
+
+/// 被拦截的业务组件（同时演示 sync 与 async 方法拦截）
+#[derive(Component)]
+#[component(intercept(AopCountInterceptor))]
+pub struct AopBiz {
+    #[tx_cst(skip)]
+    _placeholder: (),
+}
+
+impl AopBiz {
+    #[intercept]
+    fn sync_add(&self, x: u32) -> RIE<u32> {
+        Ok(x + 1)
+    }
+
+    #[intercept]
+    async fn async_mul(&self, x: u32) -> RIE<u32> {
+        Ok(x * 2)
+    }
+}
+
+#[test]
+fn test_aop_intercept_macro_end_to_end() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let app = BuildContext::new::<PathBuf>(None).build().unwrap();
+        let arc = app.ins_run().await.unwrap();
+
+        let biz = inject_from_store::<AopBiz>(&arc.store());
+        let interceptor = inject_from_store::<AopCountInterceptor>(&arc.store());
+
+        // init 阶段已将拦截器注入链中；调用前计数器清零
+        interceptor.counter.store(0, Ordering::Relaxed);
+
+        // sync 拦截方法
+        assert_eq!(biz.sync_add(41).unwrap(), 42);
+        assert_eq!(
+            interceptor.counter.load(Ordering::Relaxed),
+            1,
+            "sync 方法应触发一次 before 拦截"
+        );
+
+        // async 拦截方法
+        assert_eq!(biz.async_mul(5).await.unwrap(), 10);
+        assert_eq!(
+            interceptor.counter.load(Ordering::Relaxed),
+            2,
+            "async 方法应触发第二次 before 拦截"
+        );
+
+        // 优雅关闭后台任务
+        arc.shutdown_token.cancel();
+        if let Some(handle) = arc.task_handle.write().await.take() {
+            let _ = tokio::time::timeout(Duration::from_secs(2), handle).await;
+        }
+        arc.shutdown().await;
+    });
+}
+
 
 // ── 10. 错误处理 ─────────────────────────────────────────────────────────
 

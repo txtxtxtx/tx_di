@@ -49,13 +49,6 @@ fn generate_intercepted_fn(input_fn: &ItemFn) -> TokenStream2 {
 
     let params = &input_fn.sig.inputs;
 
-    // 生成包裹函数体
-    let (await_kw, _is_async) = if is_async {
-        (quote! { .await }, true)
-    } else {
-        (quote! {}, false)
-    };
-
     // 检测返回类型是否为 Result（简化处理：总是尝试 Ok/Err 匹配）
     let is_result_ret = is_result_return_type(&input_fn.sig.output);
 
@@ -86,8 +79,8 @@ fn generate_intercepted_fn(input_fn: &ItemFn) -> TokenStream2 {
                 panic!("[di] 拦截器拒绝 method={}: {}", stringify!(#fn_name), e)
             });
 
-            // Phase 2: 执行业务逻辑
-            let __result = #body #await_kw;
+            // Phase 2: 执行业务逻辑（包裹函数本身已是 async，原 body 直接在异步上下文中执行）
+            let __result = #body;
 
             // Phase 3: after 拦截（可加工 CallResult）
             #after_block

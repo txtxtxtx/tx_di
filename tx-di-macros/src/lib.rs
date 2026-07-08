@@ -39,6 +39,7 @@ use proc_macro::TokenStream;
 /// | `conf` / `conf = "key"` | 配置组件 |
 /// | `as_trait = dyn Trait` | Trait 实现注册 |
 /// | `init_sort = N` | 初始化排序（值越小越先执行，默认 10000） |
+/// | `intercept(T1, T2, ..)` | AOP 拦截器（从容器注入 `Interceptor` 组件，见 `#[intercept]`） |
 ///
 /// ## `#[tx_cst(...)]` — 字段属性
 ///
