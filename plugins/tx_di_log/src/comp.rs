@@ -123,10 +123,10 @@ fn init(this: &mut LogPlugins, _store: &Store) -> RIE<()> {
         let _ = subscriber.try_init();
     }
 
-    // 设置 panic hook
+    // 设置 panic hook：仅记录日志，不强制退出进程。
+    // 强制退出会破坏测试环境（catch_unwind 无法捕获）与嵌入式场景的正常流程。
     panic::set_hook(Box::new(|panic_info| {
         error!("程序异常终止: {}", panic_info);
-        std::process::exit(-1); // 退出程序
     }));
     debug!("日志初始化完成");
     Ok(())

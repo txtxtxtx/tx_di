@@ -16,10 +16,13 @@ tx-di-macros/src/
 │   └── fields.rs       # FieldKind 枚举 + classify_fields 函数
 ├── codegen/
 │   ├── mod.rs          # CodeGenContext + derive_component_impl 编排
-│   ├── component_impl.rs   # 生成 impl Component for T
+│   ├── component_impl.rs   # 生成 impl Component for T（含 intercept init 装配）
 │   ├── factory.rs          # 生成 factory 闭包
 │   ├── inner_init.rs       # 生成 inner_init 方法
+│   ├── lifecycle.rs        # 生命周期覆写（init/app_init/app_async_init/app_async_run/shutdown）
+│   ├── intercept.rs        # 生成 AOP 拦截器链 init 覆写
 │   └── meta_entry.rs       # 生成 linkme ComponentMeta 注册条目
+├── intercept_macro.rs  # #[intercept] 方法属性宏
 ├── type_utils.rs       # 类型检测工具（Arc/Option/Arc<dyn Trait>）
 └── name_utils.rs       # 命名转换工具（驼峰 ↔ 蛇形）
 ```
@@ -42,7 +45,10 @@ tx-di-macros/src/
 | `codegen::component_impl` | 生成 `impl Component` | `gen_component_impl` |
 | `codegen::factory` | 生成 factory 闭包 | `gen_factory_fn` |
 | `codegen::inner_init` | 生成 `inner_init` 方法 | `gen_inner_init` |
+| `codegen::lifecycle` | 生成生命周期覆写（init / app_init / app_async_init / app_async_run / shutdown） | `gen_lifecycle_overrides` |
+| `codegen::intercept` | 生成 AOP 拦截器链 `init` 覆写 | `gen_interceptor_init_override` |
 | `codegen::meta_entry` | 生成 `linkme` 注册条目 | `gen_meta_entry` |
+| `intercept_macro` | 提供 `#[intercept]` 方法属性宏 | `intercept_impl` |
 | `type_utils` | 类型检测工具函数 | `strip_arc_type`, `is_option_type`, `is_arc_dyn_trait`, `is_plain_arc_dyn_trait`, `extract_trait_from_arc`, `extract_trait_from_option_arc` |
 | `name_utils` | 命名转换工具函数 | `camel_to_snake`, `camel_to_screaming_snake` |
 
@@ -122,7 +128,7 @@ fn shutdown(&self) {
 
 ### 4. 配置组件
 
-### 4. Trait 实现注册
+### 5. Trait 实现注册
 
 ```rust
 #[derive(Component)]
@@ -145,7 +151,10 @@ pub struct UserService {
 }
 ```
 
-### 5. 生命周期钩子
+### 6. 生命周期回调实现示例
+
+回调**函数名与 `#[component(...)]` 标志保持一致**（如 `init` 标志对应 `fn init`，`app_init` 对应 `fn app_init`）。
+宏生成的覆写方法使用 `self::` 前缀调用回调，即使 `init` / `shutdown` 与 trait 方法同名也不会冲突。
 
 ```rust
 #[derive(Component)]
@@ -154,15 +163,16 @@ pub struct DatabaseService {
     pool: Arc<DbPool>,
 }
 
-impl DatabaseService {
-    fn __di_component_init(&mut self, store: &Store) -> RIE<()> {
-        // 自定义初始化逻辑，在 build 完成后、正式使用前调用
-        Ok(())
-    }
+// 对应 #[component(init)]：覆写 inner_init，build 完成后、正式使用前调用
+fn init(&mut self, store: &Store) -> RIE<()> {
+    // 自定义初始化逻辑
+    Ok(())
 }
 ```
 
-### 6. 初始化排序
+> 注意：这里的 `fn init` 覆写的是 `inner_init` 而非 trait 的 `init`/`init(app)`。`shutdown` 回调则直接用 `&self` 作为接收器。
+
+### 7. 初始化排序
 
 ```rust
 use tx_di_core::Component;

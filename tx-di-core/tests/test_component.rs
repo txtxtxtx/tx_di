@@ -28,6 +28,7 @@ use tx_di_core::{
 };
 use tx_di_core::aop::{CallContext, CallResult, Interceptor, InterceptorChain};
 use tx_di_core::intercept;
+use tx_di_log::LogPlugins;
 
 // ══════════════════════════════════════════════════════════════════════════
 // 测试组件定义
@@ -647,9 +648,30 @@ impl Interceptor for AopCountInterceptor {
     }
 }
 
+/// 测试用日志拦截器 — 演示 AOP 拦截链的日志输出。
+///
+/// 注意：必须定义在测试文件内（而非依赖 tx_di_core 内部的 `LoggingInterceptor`），
+/// 因为库 crate 内部的 `#[derive(Component)]` 注册项在集成测试二进制中不会被链接进来。
+#[derive(Component, Default)]
+pub struct AopLogInterceptor;
+
+impl Interceptor for AopLogInterceptor {
+    fn before(&self, ctx: &CallContext) -> RIE<()> {
+        tracing::info!("[AOP-Interceptor] before: method={}", ctx.method_name);
+        Ok(())
+    }
+    fn after(&self, ctx: &CallContext, result: &mut CallResult) {
+        tracing::info!(
+            "[AOP-Interceptor] after: method={} result={:?}",
+            ctx.method_name,
+            result
+        );
+    }
+}
+
 /// 被拦截的业务组件（同时演示 sync 与 async 方法拦截）
 #[derive(Component)]
-#[component(intercept(AopCountInterceptor))]
+#[component(intercept(AopCountInterceptor, AopLogInterceptor))]
 pub struct AopBiz {
     #[tx_cst(skip)]
     _placeholder: (),
@@ -669,30 +691,43 @@ impl AopBiz {
 
 #[tokio::test]
 async fn test_aop_intercept_macro_end_to_end() {
-    let app = BuildContext::new::<PathBuf>(None).build().unwrap();
-        let arc = app.ins_run().await.unwrap();
+    // 引入日志插件：初始化 tracing 订阅者（默认控制台输出），便于观察 AOP 拦截流程
+    let ctx = BuildContext::new::<PathBuf>(None);
+    let app = ctx.build().unwrap();
+    let arc = app.ins_run().await.unwrap();
+    tracing::info!("[AOP] App 初始化完成，拦截链已注册");
 
-        let biz = inject_from_store::<AopBiz>(&arc.store());
-        let interceptor = inject_from_store::<AopCountInterceptor>(&arc.store());
+    let biz = inject_from_store::<AopBiz>(&arc.store());
+    let interceptor = inject_from_store::<AopCountInterceptor>(&arc.store());
 
-        // init 阶段已将拦截器注入链中；调用前计数器清零
-        interceptor.counter.store(0, Ordering::Relaxed);
+    // init 阶段已将拦截器注入链中；调用前计数器清零
+    interceptor.counter.store(0, Ordering::Relaxed);
 
-        // sync 拦截方法
-        assert_eq!(biz.sync_add(41).unwrap(), 42);
-        assert_eq!(
-            interceptor.counter.load(Ordering::Relaxed),
-            1,
-            "sync 方法应触发一次 before 拦截"
-        );
+    // sync 拦截方法
+    tracing::info!("[AOP] 调用 sync_add(41)");
+    assert_eq!(biz.sync_add(41).unwrap(), 42);
+    tracing::info!(
+        "[AOP] sync_add 返回 42，before 拦截次数 = {}",
+        interceptor.counter.load(Ordering::Relaxed)
+    );
+    assert_eq!(
+        interceptor.counter.load(Ordering::Relaxed),
+        1,
+        "sync 方法应触发一次 before 拦截"
+    );
 
-        // async 拦截方法
-        assert_eq!(biz.async_mul(5).await.unwrap(), 10);
-        assert_eq!(
-            interceptor.counter.load(Ordering::Relaxed),
-            2,
-            "async 方法应触发第二次 before 拦截"
-        );
+    // async 拦截方法
+    tracing::info!("[AOP] 调用 async_mul(5)");
+    assert_eq!(biz.async_mul(5).await.unwrap(), 10);
+    tracing::info!(
+        "[AOP] async_mul 返回 10，before 拦截次数 = {}",
+        interceptor.counter.load(Ordering::Relaxed)
+    );
+    assert_eq!(
+        interceptor.counter.load(Ordering::Relaxed),
+        2,
+        "async 方法应触发第二次 before 拦截"
+    );
 
         // 优雅关闭后台任务
         arc.shutdown_token.cancel();

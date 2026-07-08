@@ -31,6 +31,7 @@ criterion = { workspace = true, features = ["html_reports"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "signal"] }
 tracing-subscriber = { workspace = true }
 serde = { workspace = true }
+tx_di_log = { workspace = true }
 
 [[bench]]
 name = "di_bench"

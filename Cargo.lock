@@ -8615,6 +8615,7 @@ dependencies = [
  "tracing-subscriber",
  "tx-di-macros 0.3.0",
  "tx_common 0.1.0",
+ "tx_di_log",
  "tx_error 0.1.0",
 ]
 
