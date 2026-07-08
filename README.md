@@ -52,11 +52,16 @@ pub struct UserService {
 
 #[tokio::main]
 async fn main() {
-    let mut ctx = BuildContext::new::<std::path::PathBuf>(None);
-    let svc = ctx.inject::<UserService>();   // 返回 Arc<UserService>
+    // 1. 构建阶段：加载配置 + 自动注册并构建所有组件
+    //    ⚠️ 此时仅 build + inner_init 完成，组件「不完整」，不可当成品使用
+    let ctx = BuildContext::new::<std::path::PathBuf>(None);
 
+    // 2. 构建并运行：先同步完成 init + async_init，再返回「已就绪」句柄
     let app = ctx.build().expect("build failed")
                  .ins_run().await.expect("run failed");
+
+    // 3. 此后组件才完整，可安全使用（业务代码通常放在组件的 init/async_run 里）
+    let svc = app.inject::<UserService>();
     app.waiting_exit().await;
 }
 ```
@@ -212,25 +217,29 @@ impl UserService {
 ## BuildContext & App
 
 ```rust
-// 构建阶段：加载配置 + 自动注册所有组件
-let mut ctx = BuildContext::new(Some("configs/app.toml"));
-let db = ctx.inject::<DbPool>();
+// 构建阶段：加载配置 + 自动注册所有组件（此时仅 inner_init 完成）
+let ctx = BuildContext::new(Some("configs/app.toml"));
 
-// App 阶段：先完成 init + async_init，再返回可用句柄
+// 构建并运行：先同步完成 init + async_init，再返回「可用」句柄
 let app = ctx.build()?.ins_run().await?;
+
+// ins_run 返回后组件才完整，此时注入获取的是已初始化的实例
 let db = app.inject::<DbPool>();
 
 // 阻塞等待退出信号（Ctrl+C / SIGTERM）后优雅关闭
 app.waiting_exit().await;
 ```
 
+> ⚠️ **关键认知**：`BuildContext` 阶段 `inject` 拿到的实例只完成了 `build + inner_init`，`init` / `async_init` **尚未执行**，不能当作成品去调用业务方法（如建立连接、注册 AOP 拦截链）。组件真正「可用」是在 `app.ins_run()` 返回之后。绝大多数使用应放在组件自身的 `init` / `async_run` 回调里，或在 `ins_run()` 之后通过 `app.inject::<T>()` 获取。
+
 | 阶段 | 方法 | 说明 |
 |------|------|------|
-| 构建 | `BuildContext::new(Option<path>)` | 加载配置 + 注册组件 |
-| 解析 | `ctx.inject::<T>()` / `ctx.try_inject::<T>()` | 注入组件（`Arc<T>`） |
-| 构建 | `ctx.build() -> RIE<App>` | 移交 store 给 App |
+| 构建 | `BuildContext::new(Option<path>)` | 加载配置 + 注册并构建组件（仅 `inner_init`） |
+| 解析 | `ctx.inject::<T>()` / `ctx.try_inject::<T>()` | 构建期注入（`Arc<T>`，实例不完整） |
+| 构建 | `ctx.build() -> RIE<App>` | 移交 store 给 App（仍不执行 init/async_init） |
 | 运行 | `ctx.build_and_run().await` | 构建并阻塞运行到退出 |
-| 运行 | `app.ins_run(self).await -> RIE<Arc<App>>` | 先完成初始化再返回句柄 |
+| 运行 | `app.ins_run(self).await -> RIE<Arc<App>>` | 先完成 `init`+`async_init` 再返回**已就绪**句柄 |
+| 运行 | `app.inject::<T>()` / `app.try_inject::<T>()` | 运行期注入（`Arc<T>`，实例已完整初始化） |
 | 运行 | `app.waiting_exit().await` | 等待退出信号并优雅关闭 |
 | 关闭 | `app.shutdown().await` | 逆序关闭所有组件 |
 

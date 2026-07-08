@@ -63,34 +63,41 @@ pub struct UserService {
 
 #[tokio::main]
 async fn main() {
-    // 1. 构建阶段：加载配置（可选）、扫描并注册所有 #[derive(Component)]
-    let mut ctx = BuildContext::new::<std::path::PathBuf>(None);
+    // 1. 构建阶段：加载配置、扫描并注册所有 #[derive(Component)]。
+    //    此时组件仅完成 build + inner_init，init / async_init 尚未执行，
+    //    实例「不完整」，不能当成品去调用业务方法（如 db 连接）。
+    let ctx = BuildContext::new::<std::path::PathBuf>(None);
 
-    // 2. 注入组件（返回 Arc<T>），可直接使用
-    let svc = ctx.inject::<UserService>();
-    println!("user service ready: {}", svc.db.is_connected());
-
-    // 3. 构建 App 并运行（init + async_init 先同步完成，async_run 后台持续）
+    // 2. 构建 App 并运行：先同步完成 init + async_init，再返回「已就绪」句柄。
+    //    ⚠️ 组件真正可用，是在 ins_run() 返回之后，而不是在 BuildContext 阶段。
     let app = ctx.build().expect("build failed").ins_run().await.expect("run failed");
+
+    // 3. 此后组件才完整：init / async_init 已执行完毕，可安全使用。
+    let svc = app.inject::<UserService>();
+    println!("user service ready");
 
     // 4. 等待退出信号（Ctrl+C / SIGTERM）后优雅关闭
     app.waiting_exit().await;
 }
 ```
 
+> 组件之间的依赖由框架在构建期自动注入，**业务代码通常不需要手动 inject**。
+> 真正「使用」组件（调用其业务方法）应放在某个组件的 `async_run` / `init` 回调里，
+> 或在 `ins_run()` 返回后通过 `app.inject::<T>()` 获取——此时组件已完全初始化。
+
 构建与运行的三种常用形态：
 
 ```rust
-// 形式 A：构建出 App 句柄，自行控制运行
+// 形式 A：构建出 App 句柄，自行控制运行（ins_run 返回即代表 init+async_init 完成）
 let app = ctx.build()?.ins_run().await?;
 app.waiting_exit().await;
 
 // 形式 B：一行启动并阻塞到退出（内部等价于 A）
 ctx.build_and_run().await?;
 
-// 形式 C：仅构建 App，不运行后台任务（测试/纯注入场景）
+// 形式 C：仅构建 App，不运行任何生命周期（测试 / 仅查看组件实例，不可当成品使用）
 let app = ctx.build()?;
-let svc = app.inject::<UserService>();
+// 注意：此时 init / async_init 未执行，app.inject::<T>() 拿到的实例仍不完整
 ```
 
 ---
@@ -127,7 +134,7 @@ pub trait Component: Send + Sync + 'static {
 | 方法 | 说明 |
 |------|------|
 | `BuildContext::new::<P>(Option<config_path>)` | 加载配置 + 自动注册所有组件 |
-| `ctx.inject::<T>()` | 注入组件，返回 `Arc<T>`（未注册则 panic，附已注册列表） |
+| `ctx.inject::<T>()` | 注入组件，返回 `Arc<T>`（未注册则 panic，附已注册列表）。**构建期仅完成 `inner_init`，`init`/`async_init` 尚未执行，实例不完整，不可当成品使用** |
 | `ctx.try_inject::<T>()` | 同上，失败时返回 `None` |
 | `ctx.store()` | 获取底层 `Store` 引用 |
 | `ctx.len()` / `ctx.is_empty()` | 已注册组件数量 |
