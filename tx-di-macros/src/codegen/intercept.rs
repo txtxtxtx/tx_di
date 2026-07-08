@@ -9,28 +9,10 @@ use syn::Ident;
 
 use crate::codegen::CodeGenContext;
 
-/// 生成 `interceptor_chain()` 关联函数
-pub fn gen_interceptor_chain_fn(ctx: &CodeGenContext) -> TokenStream2 {
-    let struct_name = &ctx.struct_name;
-    if ctx.comp_attr.interceptors.is_empty() {
-        return quote! {};
-    }
-    quote! {
-        impl #struct_name {
-            #[doc(hidden)]
-            fn interceptor_chain() -> &'static ::std::sync::Mutex<
-                ::std::option::Option<::std::sync::Arc<::tx_di_core::aop::InterceptorChain>>
-            > {
-                static CHAIN: ::std::sync::Mutex<
-                    ::std::option::Option<::std::sync::Arc<::tx_di_core::aop::InterceptorChain>>
-                > = ::std::sync::Mutex::new(::std::option::Option::None);
-                &CHAIN
-            }
-        }
-    }
-}
-
 /// 生成 `init` 覆写（初始化拦截器链 + 调用用户 app_init）
+///
+/// 拦截器链按「组件实例指针」存入全局表（见 `tx_di_core::aop::set_interceptor_chain`），
+/// 由 `#[intercept]` 方法通过 `self` 指针取出，从而支持同进程多 App 互不干扰。
 pub fn gen_interceptor_init_override(ctx: &CodeGenContext) -> TokenStream2 {
     let interceptors = &ctx.comp_attr.interceptors;
     if interceptors.is_empty() {
@@ -54,7 +36,6 @@ pub fn gen_interceptor_init_override(ctx: &CodeGenContext) -> TokenStream2 {
 
     let user_init = if has_app_init {
         quote! {
-            let comp: ::std::sync::Arc<Self> = ::tx_di_core::inject_from_store(&app.store);
             self::app_init(comp, app)
         }
     } else {
@@ -64,11 +45,12 @@ pub fn gen_interceptor_init_override(ctx: &CodeGenContext) -> TokenStream2 {
     quote! {
         #[inline]
         fn init(app: &::std::sync::Arc<::tx_di_core::App>) -> ::tx_di_core::RIE<()> {
+            let comp: ::std::sync::Arc<Self> = ::tx_di_core::inject_from_store(&app.store);
             let mut chain = ::tx_di_core::aop::InterceptorChain::new();
             #(#push_code)*
-            *Self::interceptor_chain().lock().unwrap() = ::std::option::Option::Some(
-                ::std::sync::Arc::new(chain)
-            );
+            let __key = ::std::sync::Arc::as_ptr(&comp) as usize;
+            eprintln!("[DIAG init] AopBiz key={} present_before={}", __key, ::tx_di_core::aop::get_interceptor_chain(__key).is_some());
+            ::tx_di_core::aop::set_interceptor_chain(__key, ::std::sync::Arc::new(chain));
             #user_init
         }
     }

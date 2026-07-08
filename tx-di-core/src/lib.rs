@@ -38,6 +38,7 @@ pub use toml::map;
 // 注意：derive 宏 `Component` 和 trait `Component` 同名但不同命名空间，可以共存
 // `tx_cst` 和 `component` 是 derive 辅助属性，不需要单独 re-export
 pub use tx_di_macros::Component;   // derive 宏（宏命名空间）
+pub use tx_di_macros::intercept;    // AOP 方法拦截属性宏（#[intercept]）
 pub use tx_error::{AppErrCode, AppError, AppResult, CodeMsg};
 pub use crate::error::DiErr;
 pub use tx_common::{ApiR, ApiRes, FormattedDateTime, RCode};

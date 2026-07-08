@@ -193,3 +193,32 @@ impl Interceptor for MetricsInterceptor {
         Ok(())
     }
 }
+
+// ── 拦截器链存储（per-instance）──────────────────────────────────────────────
+//
+// 拦截器链按「组件实例指针」存储，而非 per-type 全局静态。这样同进程内多个
+// App（如并行运行的测试）各自持有独立组件实例，其拦截链互不干扰，不会出现
+// 某一 App 的 init 覆盖另一 App 拦截链的竞态问题。
+//
+// key = `Arc<Self>` 的内部指针（`Arc::as_ptr` 与 `&self as *const Self` 一致）。
+
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::sync::OnceLock;
+
+static INTERCEPTOR_CHAINS: OnceLock<Mutex<HashMap<usize, Arc<InterceptorChain>>>> =
+    OnceLock::new();
+
+fn chains_map() -> &'static Mutex<HashMap<usize, Arc<InterceptorChain>>> {
+    INTERCEPTOR_CHAINS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// 按组件实例指针设置拦截器链（由 `#[component(intercept(...))]` 生成的 `init` 调用）
+pub fn set_interceptor_chain(key: usize, chain: Arc<InterceptorChain>) {
+    chains_map().lock().unwrap().insert(key, chain);
+}
+
+/// 按组件实例指针获取拦截器链（由 `#[intercept]` 方法调用）
+pub fn get_interceptor_chain(key: usize) -> Option<Arc<InterceptorChain>> {
+    chains_map().lock().unwrap().get(&key).cloned()
+}

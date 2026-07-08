@@ -137,13 +137,9 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
     let factory_fn = factory::gen_factory_fn(&ctx);
     let meta_entry = meta_entry::gen_meta_entry(&ctx, factory_fn);
 
-    // 拦截器代码生成（关联函数 + init 覆写）
-    let interceptor_chain_fn = intercept::gen_interceptor_chain_fn(&ctx);
-
     // 组装最终输出：derive 宏只追加 impl 和 linkme 注册，不重新输出结构体
     Ok(quote! {
         #component_impl
-        #interceptor_chain_fn
         #meta_entry
     })
 }

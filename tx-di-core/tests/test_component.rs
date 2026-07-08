@@ -27,6 +27,7 @@ use tx_di_core::{
     Store, inject_all_traits_from_store, inject_from_store, inject_trait_from_store,
 };
 use tx_di_core::aop::{CallContext, CallResult, Interceptor, InterceptorChain};
+use tx_di_core::intercept;
 
 // ══════════════════════════════════════════════════════════════════════════
 // 测试组件定义
