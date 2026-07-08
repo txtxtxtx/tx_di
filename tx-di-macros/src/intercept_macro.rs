@@ -76,7 +76,6 @@ fn generate_intercepted_fn(input_fn: &ItemFn) -> TokenStream2 {
                 #(#arg_calls)*;
 
             let __key = self as *const Self as usize;
-            eprintln!("[DIAG method] key={} found={}", __key, ::tx_di_core::aop::get_interceptor_chain(__key).is_some());
             let __chain = ::tx_di_core::aop::get_interceptor_chain(__key)
                 .expect("[di] 拦截器链未初始化：请确认组件已通过 #[component(intercept(...))] 声明，且 App 已运行初始化阶段");
             __chain.before_all(&__ctx).unwrap_or_else(|e| {

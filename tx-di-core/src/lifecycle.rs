@@ -353,6 +353,11 @@ impl App {
     }
 
     /// 异步运行 App，返回 Arc<App>
+    ///
+    /// 初始化阶段（`init` + `async_init`）会在返回 `Arc<App>` **之前**同步完成，
+    /// 以确保组件完全就绪（如 AOP 拦截链注册、跨组件协作初始化）后再交予调用方使用。
+    /// 仅长期运行的后台任务（`async_run`）放入独立 task 中持续运行，
+    /// 直到 `shutdown_token` 触发才退出。
     pub async fn ins_run(self) -> RIE<Arc<App>> {
         let app = Arc::new(App {
             store: self.store,
@@ -361,9 +366,15 @@ impl App {
             task_handle: self.task_handle,
         });
 
+        // 初始化阶段必须先完成，否则调用方立即访问组件时会因尚未就绪而失败
+        // （例如被 #[component(intercept(...))] 标记的组件其拦截链在 init 中注册）。
+        App::init(&app)?;
+        App::async_init(&app).await?;
+
+        // 仅长期后台任务（async_run）放入独立 task 运行，直到 token 触发退出
         let app_clone = app.clone();
         let app_handler = tokio::spawn(async move {
-            if let Err(e) = App::run(app_clone.clone(), app_clone.shutdown_token.clone()).await {
+            if let Err(e) = App::comp_run(app_clone.clone(), app_clone.shutdown_token.clone()).await {
                 tracing::error!("[di] App 运行失败: {:?}，将执行 shutdown", e);
                 app_clone.shutdown().await;
             }

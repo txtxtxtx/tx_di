@@ -49,7 +49,6 @@ pub fn gen_interceptor_init_override(ctx: &CodeGenContext) -> TokenStream2 {
             let mut chain = ::tx_di_core::aop::InterceptorChain::new();
             #(#push_code)*
             let __key = ::std::sync::Arc::as_ptr(&comp) as usize;
-            eprintln!("[DIAG init] AopBiz key={} present_before={}", __key, ::tx_di_core::aop::get_interceptor_chain(__key).is_some());
             ::tx_di_core::aop::set_interceptor_chain(__key, ::std::sync::Arc::new(chain));
             #user_init
         }

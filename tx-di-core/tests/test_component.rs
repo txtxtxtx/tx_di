@@ -667,11 +667,9 @@ impl AopBiz {
     }
 }
 
-#[test]
-fn test_aop_intercept_macro_end_to_end() {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        let app = BuildContext::new::<PathBuf>(None).build().unwrap();
+#[tokio::test]
+async fn test_aop_intercept_macro_end_to_end() {
+    let app = BuildContext::new::<PathBuf>(None).build().unwrap();
         let arc = app.ins_run().await.unwrap();
 
         let biz = inject_from_store::<AopBiz>(&arc.store());
@@ -702,7 +700,6 @@ fn test_aop_intercept_macro_end_to_end() {
             let _ = tokio::time::timeout(Duration::from_secs(2), handle).await;
         }
         arc.shutdown().await;
-    });
 }
 
 
