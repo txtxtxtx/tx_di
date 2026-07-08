@@ -1,0 +1,40 @@
+---
+description: tx-di 插件使用文档索引与查阅规则
+alwaysApply: true
+enabled: true
+updatedAt: 2026-07-08T22:02:00.000Z
+provider: 
+---
+
+# tx-di 插件使用规范
+
+每个 `tx-di` 插件都有一份独立的使用文档，位于插件根目录的 `README.md`。**当不清楚某个插件如何启用、配置 key、公共组件、API 用法时，必须先阅读该插件的使用文档，不要凭猜测使用。**
+
+## 插件清单与文档路径
+
+| 插件 | 文档路径 | 用途 | 关键依赖 |
+|------|----------|------|----------|
+| `tx_di_log` | `plugins/tx_di_log/README.md` | 日志（tracing 订阅者，最先初始化） | 无 |
+| `tx_di_cache` | `plugins/tx_di_cache/README.md` | 缓存抽象（MemoryCache / RedisCache） | 无 |
+| `tx_di_registry` | `plugins/tx_di_registry/README.md` | 服务注册发现 + 配置中心（Nacos，TODO 占位） | 无 |
+| `tx_di_axum` | `plugins/tx_di_axum/README.md` | Web 服务（axum HTTP） | `tx_di_log` |
+| `tx_di_job` | `plugins/tx_di_job/README.md` | 定时任务调度（Cron） | `tx_di_toasty` |
+| `tx_di_sa_token` | `plugins/tx_di_sa_token/README.md` | 认证授权（sa-token） | `tx_di_axum` |
+| `tx_di_sip` | `plugins/tx_di_sip/README.md` | SIP 协议栈（rsipstack，L0） | 无 |
+| `tx_di_gb28181` | `plugins/tx_di_gb28181/README.md` | GB28181 国标视频监控服务端（上级平台） | `tx_di_sip` |
+| `tx_di_gb_dev` | `plugins/tx_di_gb_dev/README.md` | GB28181 设备端（UAC，向上级注册） | `tx_di_sip`（非 gb28181） |
+| `tx_di_file` | `plugins/tx_di_file/README.md` | 统一文件存储（OpenDAL，本地/S3） | 无 |
+| `tx_di_toasty` | `plugins/tx_di_toasty/README.md` | 数据库 ORM（Toasty，SQLite/PG/MySQL/DynamoDB） | 无 |
+
+## 通用使用约定（来自文档，务必遵守）
+
+1. **插件需显式 `use` 触发 linkme 注册**：`tx_di_axum`、`tx_di_sip`、`tx_di_log` 等插件必须在使用方 crate 中 `use tx_di_xxx;`（空导入），否则被链接器优化掉、组件不注册，功能静默失效。
+2. **初始化顺序由 `init_sort` 决定**（值越小越先执行）：
+   - 最早：`tx_di_log`(`i32::MIN`)、`tx_di_cache`/`tx_di_job`/`tx_di_sa_token` 的 Config(`i32::MIN+1`)、`tx_di_toasty`(`i32::MIN+2`)、`tx_di_file`(`i32::MIN+3`)、`tx_di_registry` Config(`i32::MIN`)。
+   - 中间：`tx_di_sip`(10000)、`tx_di_gb28181`(10001)、`tx_di_gb_dev`(30000)。
+   - 最晚：`tx_di_axum`(`i32::MAX`)、`tx_di_registry` Plugin(`i32::MAX-50`)、`tx_di_job` Plugin(`i32::MAX-10`)。
+3. **依赖链**：用 `tx_di_gb28181` 必须同时启用 `tx_di_sip`；用 `tx_di_gb_dev` 必须启用 `tx_di_sip`（不是 `gb28181`）；用 `tx_di_job` 必须启用 `tx_di_toasty`；用 `tx_di_sa_token` 必须启用 `tx_di_axum`。
+4. **配置 key**：均以 `[xxx_config]` 等形式由 `#[component(conf [= "key"])]` 决定，详见各文档的配置小节。
+5. **`ins_run()` 在返回前已完成 `init` + `async_init`**（`tx_di_core/src/lifecycle.rs` 已修复），调用方可在 `ins_run().await` 之后立即使用组件。
+
+> 文档为权威来源；若代码与文档冲突，以代码为准并同步更新对应 `README.md`。

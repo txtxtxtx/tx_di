@@ -1,139 +1,85 @@
-# tx_di_toasty
+# tx_di_toasty — 数据库 ORM 插件使用文档
 
-基于 [Toasty ORM](https://github.com/tokio-rs/toasty) 的 tx-di 数据库插件。自动管理数据库连接、连接池、Schema 推送，通过 DI 注入到业务组件。
+基于 [Toasty ORM](https://github.com/tokio-rs/toasty) 的 `tx-di` 数据库插件，封装连接、连接池、模型注册与 Schema 推送。
 
-## 支持数据库
+## 用途
 
-| Feature | 数据库 | 连接串格式 |
-|---------|--------|-----------|
-| `sqlite`（默认） | SQLite | `sqlite://path/to/db.db` 或 `sqlite://memory` |
-| `postgresql` | PostgreSQL | `postgresql://user:pass@host:port/database` |
-| `mysql` | MySQL | `mysql://user:pass@host:port/database` |
-| `dynamodb` | DynamoDB | `dynamodb://endpoint/region/table_prefix` |
+- 通过 DI 自动完成数据库初始化；支持 **SQLite / PostgreSQL / MySQL / DynamoDB**（由 `database_url` scheme 自动选驱动）。
+- 业务组件注入 `Arc<ToastyPlugin>` 或 `ToastyDb` 即可使用 Toasty 的 Repository/查询 API。
 
-## 安装
+## 启用
+
+`Cargo.toml`（按需开启数据库 feature）：
 
 ```toml
-[dependencies]
 tx_di_toasty = { path = "plugins/tx_di_toasty", features = ["sqlite"] }
+# 可选: postgresql / mysql / dynamodb（可多选）
 ```
 
 ## 配置
 
+TOML 节名为 `[toasty_config]`：
+
 ```toml
-# configs/app.toml
 [toasty_config]
-database_url = "sqlite://app.db"
-auto_schema = true              # 启动时自动创建/更新表
-max_pool_size = 10              # 连接池大小（默认 num_cpus * 2）
-table_name_prefix = ""          # 表名前缀
-pool_pre_ping = false           # 取连接前先 ping
+database_url = "sqlite://gb28181.db"
+auto_schema = true               # 启动时自动 push_schema 建表
+max_pool_size = 10
+table_name_prefix = "app_"
+pool_pre_ping = false
+default_admin_password = "admin123"
 ```
 
-### 完整配置项
+| 字段 | 类型 | 默认值 |
+|------|------|--------|
+| `database_url` | `String` | `"sqlite://gb28181.db"` |
+| `auto_schema` | `bool` | `true` |
+| `max_pool_size` | `Option<usize>` | `None`（驱动默认） |
+| `table_name_prefix` | `Option<String>` | `None` |
+| `pool_wait_timeout_secs` | `Option<u64>` | `None` |
+| `pool_create_timeout_secs` | `Option<u64>` | `None` |
+| `pool_health_check_interval_secs` | `Option<u64>` | `None`（默认 60） |
+| `pool_max_connection_lifetime_secs` | `Option<u64>` | `None` |
+| `pool_max_connection_idle_time_secs` | `Option<u64>` | `None` |
+| `pool_pre_ping` | `bool` | `false` |
+| `default_admin_password` | `String` | `"admin123"` |
 
-| 字段 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `database_url` | String | `sqlite://gb28181.db` | 数据库连接串 |
-| `auto_schema` | bool | `true` | 启动时自动推送 Schema |
-| `max_pool_size` | usize | `num_cpus * 2` | 连接池最大连接数 |
-| `table_name_prefix` | String | 无 | 表名前缀 |
-| `pool_wait_timeout_secs` | u64 | 无限 | 获取连接最大等待时间 |
-| `pool_create_timeout_secs` | u64 | 无 | 建立新连接最大时间 |
-| `pool_health_check_interval_secs` | u64 | 60 | 连接健康检查间隔（0 禁用） |
-| `pool_max_connection_lifetime_secs` | u64 | 无 | 连接最大存活时间 |
-| `pool_max_connection_idle_time_secs` | u64 | 无 | 连接最大空闲时间 |
-| `pool_pre_ping` | bool | `false` | 取连接前 ping |
-| `default_admin_password` | String | `admin123` | 空库时自动创建的管理员密码 |
+## 公共组件
 
-## 使用
+| 结构体 | `#[component(...)]` | 说明 |
+|--------|----------------------|------|
+| `ToastyConfig` | `conf`, `init`, `init_sort = i32::MIN + 2` | 配置载体 |
+| `ToastyPlugin` | `app_async_init`, `init_sort = i32::MIN + 2` | 数据库门面 |
 
-### 1. 注册模型（build 之前）
+`ToastyPlugin` 方法：`register_models(ModelSet)`（build 前，静态合并）、`db() -> &ToastyDb`（async_init 后，未就绪会 panic）、`try_db() -> Option<&ToastyDb>`、`build_db_with_models(...)`（测试）。`type ToastyDb = toasty::Db`。
 
-```rust
-use tx_di_toasty::ToastyPlugin;
-
-// 可多次调用，模型会合并
-ToastyPlugin::register_models(toasty::models!(User, Device));
-ToastyPlugin::register_models(toasty::models!(AuditLog));
-```
-
-### 2. 启动应用
+## 使用方式
 
 ```rust
-use tx_di_core::BuildContext;
-
-#[tokio::main]
-async fn main() {
-    let ctx = BuildContext::new(Some("configs/app.toml"));
-    let app = ctx.build().unwrap().ins_run().await.unwrap();
-
-    // 获取数据库实例
-    let plugin = app.inject::<ToastyPlugin>();
-    let db = plugin.db();
-}
-```
-
-### 3. 在组件中注入
-
-```rust
-use tx_di_core::{tx_comp, App, RIE, CancellationToken};
+use tx_di_core::{BuildContext, tx_comp};
 use tx_di_toasty::{ToastyPlugin, ToastyDb};
 
-#[tx_comp(init)]
-pub struct UserService {
-    pub toasty: Arc<ToastyPlugin>,
-}
+// build 之前注册模型
+ToastyPlugin::register_models(toasty::models!(User, Device));
 
-impl CompInit for UserService {
-    tx_di_core::async_method!(
-        fn async_init_impl(ctx: Arc<App>, _token: CancellationToken) -> RIE<()> {
-            let plugin = ctx.inject::<ToastyPlugin>();
-            let db = plugin.db();
+#[tokio::main]
+async fn main() -> tx_di_core::RIE<()> {
+    let app = BuildContext::new::<std::path::PathBuf>(Some("configs/app.toml"))
+        .build()?.ins_run().await?;
 
-            // 使用 db 进行查询
-            let users = toasty::stmt!(User::find_all()).collect(db).await?;
-            Ok(())
-        }
-    );
+    let plugin = app.inject::<ToastyPlugin>();
+    let db: &ToastyDb = plugin.db();
 
-    fn init_sort() -> i32 { 100 }
+    let users = toasty::stmt!(User::find_all()).collect(db).await?;
+    Ok(())
 }
 ```
 
-### 4. 测试中手动构建
+## 注意事项
 
-```rust
-use tx_di_toasty::{ToastyPlugin, ToastyConfig};
-
-let config = ToastyConfig {
-    database_url: "sqlite://:memory:".into(),
-    auto_schema: true,
-    ..Default::default()
-};
-
-let db = ToastyPlugin::build_db_with_models(
-    toasty::models!(User),
-    &config,
-).await?;
-```
-
-## API
-
-### ToastyPlugin
-
-| 方法 | 说明 |
-|------|------|
-| `register_models(models)` | 注册模型（build 前调用，可多次） |
-| `db() -> &ToastyDb` | 获取数据库实例（async_init 后） |
-| `try_db() -> Option<&ToastyDb>` | 安全获取 |
-| `build_db_with_models(models, config)` | 手动构建（测试用） |
-| `build_schema(models)` | 仅构建 Schema（迁移工具用） |
-
-### ToastyConfig
-
-从 TOML `[toasty_config]` 自动加载的配置组件。
-
-### ToastyDb
-
-`toasty::Db` 的类型别名，Toasty ORM 的核心数据库实例。
+1. **模型注册时序**：必须在 `BuildContext::build()` / `run()` **之前**调用 `ToastyPlugin::register_models(...)`，否则 async_init 时模型为空。可多次调用合并。
+2. **`auto_schema` 会回写配置文件**：推送 Schema 成功后会把 `auto_schema = true` 改为 `false`（按行替换、保留注释）。若想每次启动都建表需手动改回/重新部署配置。
+3. `db()` 在 async_init 完成前调用会 panic；用 `try_db()` 安全检查。业务组件 `init_sort` 应大于 `i32::MIN + 2` 确保数据库先就绪。
+4. **feature 是编译期开关**：启用哪个数据库 feature 只是开启驱动编译；真正选哪种库由运行时 `database_url` scheme 决定。未启用对应 feature 而用该 scheme 会编译/运行时错误。
+5. `default_admin_password` 当前**未被实际使用**（未实现空库自动建 admin 逻辑），不应依赖。
+6. `auto_schema=true` 即开发期自动 `push_schema()`，并非版本化迁移；生产建议设 `false` 自行管理。
