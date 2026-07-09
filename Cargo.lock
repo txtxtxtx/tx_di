@@ -8613,7 +8613,7 @@ dependencies = [
  "toml 1.1.2+spec-1.1.0",
  "tracing",
  "tracing-subscriber",
- "tx-di-macros 0.3.0",
+ "tx-di-macros 0.4.0",
  "tx_common 0.1.0",
  "tx_di_log",
  "tx_error 0.1.0",
@@ -8636,7 +8636,7 @@ dependencies = [
  "tokio-util 0.7.18",
  "toml 1.1.2+spec-1.1.0",
  "tracing",
- "tx-di-macros 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tx-di-macros 0.3.0",
  "tx_common 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tx_error 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -8644,6 +8644,8 @@ dependencies = [
 [[package]]
 name = "tx-di-macros"
 version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dda13f7c491638d20acca40f206b29836c32430dbdbea0166c58bfa3b58da4c0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8652,9 +8654,7 @@ dependencies = [
 
 [[package]]
 name = "tx-di-macros"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dda13f7c491638d20acca40f206b29836c32430dbdbea0166c58bfa3b58da4c0"
+version = "0.4.0"
 dependencies = [
  "proc-macro2",
  "quote",
