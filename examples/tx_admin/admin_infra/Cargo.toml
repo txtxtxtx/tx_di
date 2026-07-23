@@ -14,7 +14,7 @@ tx_di_job = { path = "../../../plugins/tx_di_job" }
 tx-di-core = { path = "../../../tx-di-core" }
 tx_error = { path = "../../../common/tx_error" }
 tx_common = { path = "../../../common/crates/tx_common" }
-toasty = { version = "0.7", features = ["jiff"] }
+toasty = { workspace = true, features = ["jiff", "serde"] }
 jiff = { workspace = true }
 async-trait = { workspace = true }
 serde = { workspace = true }

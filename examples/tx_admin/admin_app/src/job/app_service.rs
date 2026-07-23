@@ -30,7 +30,7 @@ impl JobAppService {
         creator: Option<String>,
     ) -> AppResult<JobResponse> {
         let now = jiff::Timestamp::now();
-        let job_id = tx_common::id::next_id() as i64;
+        let job_id = tx_common::id::next_id();
 
         let job = InfrustJob {
             id: job_id,
@@ -61,7 +61,7 @@ impl JobAppService {
         req: UpdateJobRequest,
         updater: Option<String>,
     ) -> AppResult<JobResponse> {
-        let mut job = self.repo().get_job_by_id(req.id as i64).await?;
+        let mut job = self.repo().get_job_by_id(req.id).await?;
         let now = jiff::Timestamp::now();
 
         job.name = req.name;
@@ -80,12 +80,12 @@ impl JobAppService {
 
     /// 删除定时任务（软删除）
     pub async fn delete_job(&self, id: u64, _updater: Option<String>) -> AppResult<()> {
-        self.repo().delete_job(id as i64).await
+        self.repo().delete_job(id).await
     }
 
     /// 根据 ID 获取定时任务详情
     pub async fn get_job(&self, id: u64) -> AppResult<JobResponse> {
-        let job = self.repo().get_job_by_id(id as i64).await?;
+        let job = self.repo().get_job_by_id(id).await?;
         Ok(job_to_response(job))
     }
 
@@ -132,7 +132,7 @@ impl JobAppService {
         status: i32,
         updater: Option<String>,
     ) -> AppResult<JobResponse> {
-        let mut job = self.repo().get_job_by_id(id as i64).await?;
+        let mut job = self.repo().get_job_by_id(id).await?;
         let now = jiff::Timestamp::now();
 
         job.status = match status {
@@ -148,7 +148,7 @@ impl JobAppService {
 
     /// 分页查询任务执行日志
     pub async fn get_job_log_page(&self, req: ListJobLogsRequest) -> AppResult<Page<JobLogResponse>> {
-        let all = self.repo().get_all_job_logs(req.job_id.map(|id| id as i64)).await?;
+        let all = self.repo().get_all_job_logs(req.job_id).await?;
 
         // 内存筛选
         let filtered: Vec<InfrustJobLog> = all
@@ -179,25 +179,25 @@ impl JobAppService {
 
     /// 根据 ID 获取任务执行日志详情
     pub async fn get_job_log(&self, id: u64) -> AppResult<JobLogResponse> {
-        let log = self.repo().get_job_log_by_id(id as i64).await?;
+        let log = self.repo().get_job_log_by_id(id).await?;
         Ok(job_log_to_response(log))
     }
 
     /// 清空任务执行日志
     pub async fn clean_job_logs(&self, job_id: Option<u64>) -> AppResult<()> {
-        self.repo().clean_job_logs(job_id.map(|id| id as i64)).await
+        self.repo().clean_job_logs(job_id).await
     }
 
     /// 手动执行定时任务
     pub async fn run_job(&self, id: u64, operator: Option<String>) -> AppResult<()> {
-        let job_id = id as i64;
+        let job_id = id;
 
         // 1. 获取任务
         let job = self.repo().get_job_by_id(job_id).await?;
 
         // 2. 创建执行日志（开始执行）
         let now = jiff::Timestamp::now();
-        let log_id = tx_common::id::next_id() as i64;
+        let log_id = tx_common::id::next_id();
         let log = InfrustJobLog {
             id: log_id,
             job_id,

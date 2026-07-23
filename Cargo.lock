@@ -155,7 +155,7 @@ dependencies = [
  "async-trait",
  "jiff",
  "serde",
- "toasty 0.7.0",
+ "toasty 0.8.0",
  "tokio",
  "tracing",
  "tx-di-core 0.4.0",
@@ -8090,12 +8090,9 @@ dependencies = [
  "index_vec",
  "indexmap 2.14.0",
  "inventory",
- "jiff",
  "serde_core",
  "serde_json",
  "toasty-core 0.7.0",
- "toasty-driver-mysql 0.7.0",
- "toasty-driver-postgresql 0.7.0",
  "toasty-driver-sqlite 0.7.0",
  "toasty-macros 0.7.0",
  "tokio",
@@ -8124,8 +8121,8 @@ dependencies = [
  "serde_json",
  "toasty-core 0.8.0",
  "toasty-driver-dynamodb",
- "toasty-driver-mysql 0.8.0",
- "toasty-driver-postgresql 0.8.0",
+ "toasty-driver-mysql",
+ "toasty-driver-postgresql",
  "toasty-driver-sqlite 0.8.0",
  "toasty-macros 0.8.0",
  "tokio",
@@ -8146,7 +8143,6 @@ dependencies = [
  "hashbrown 0.17.1",
  "heck 0.5.0",
  "indexmap 2.14.0",
- "jiff",
  "pluralizer",
  "tokio-stream",
  "uuid",
@@ -8189,24 +8185,6 @@ dependencies = [
 
 [[package]]
 name = "toasty-driver-mysql"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f916b8020c7834fbb855557f667e3a8ae4d1c3d561cdacc27da1c0a995ef556"
-dependencies = [
- "async-trait",
- "jiff",
- "mysql_async",
- "serde_json",
- "toasty-core 0.7.0",
- "toasty-sql 0.7.0",
- "tokio",
- "tracing",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "toasty-driver-mysql"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "54e1c2662616badda6f9e5841d8c336773c4c83c0639d1a36ba3d674b6caf84e"
@@ -8218,34 +8196,6 @@ dependencies = [
  "toasty-core 0.8.0",
  "toasty-sql 0.8.0",
  "tokio",
- "tracing",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "toasty-driver-postgresql"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "640ba7f423e027aa6f2088df3bbccb3ebb8f1c988b2d0796bb64e80fc1efa747"
-dependencies = [
- "async-trait",
- "fallible-iterator 0.2.0",
- "hashbrown 0.17.1",
- "jiff",
- "lru",
- "percent-encoding",
- "postgres-protocol",
- "postgres-types",
- "rustls 0.23.42",
- "rustls-pemfile",
- "rustls-platform-verifier",
- "rustls-webpki 0.103.13",
- "toasty-core 0.7.0",
- "toasty-sql 0.7.0",
- "tokio",
- "tokio-postgres",
- "tokio-postgres-rustls",
  "tracing",
  "url",
  "uuid",
@@ -8350,7 +8300,6 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2848a892303d9d63485a8f16d9c1b692b145c09940d2cdeefaf0f837e1bf6a49"
 dependencies = [
- "jiff",
  "serde_json",
  "toasty-core 0.7.0",
 ]
