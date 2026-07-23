@@ -109,9 +109,7 @@ impl FileAppService {
         }
 
         // 3. 回退到插件默认存储
-        self.file_plugin
-            .default_storage()
-            .ok_or_else(|| FilePluginErr::DefaultStorageNotFound.into())
+        self.file_plugin.default_storage()
     }
 
     /// 获取本地文件服务的根目录

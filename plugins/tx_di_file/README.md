@@ -75,7 +75,7 @@ pub struct MyService { pub file_plugin: Arc<FilePlugin> }
 
 impl MyService {
     async fn demo(&self) -> tx_error::AppResult<()> {
-        let local = self.file_plugin.default_storage().unwrap();
+        let local = self.file_plugin.default_storage()?;
         local.upload("avatars/1.png", b"hello", Some("image/png")).await?;
         let data = local.download("avatars/1.png").await?;
 

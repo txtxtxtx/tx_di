@@ -21,13 +21,15 @@ impl Default for StorageBackend {
     }
 }
 
-impl From<i32> for StorageBackend {
-    fn from(v: i32) -> Self {
+impl TryFrom<i32> for StorageBackend {
+    type Error = String;
+
+    fn try_from(v: i32) -> Result<Self, Self::Error> {
         match v {
-            1 => Self::S3,
-            2 => Self::Database,
-            0 => Self::Local,
-            _ => unreachable!("只能是 0 1 2 "),
+            0 => Ok(Self::Local),
+            1 => Ok(Self::S3),
+            2 => Ok(Self::Database),
+            _ => Err(format!("无效的 StorageBackend 值: {}", v)),
         }
     }
 }

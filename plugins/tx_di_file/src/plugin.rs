@@ -26,14 +26,15 @@ use tx_error::{AppError, AppResult};
 /// }
 ///
 /// impl MyService {
-///     async fn do_something(&self) {
-///         let storage = self.file_plugin.default_storage().unwrap();
+///     async fn do_something(&self) -> tx_error::AppResult<()> {
+///         let storage = self.file_plugin.default_storage()?;
 ///         storage.upload("test.txt", b"hello", None).await?;
+///         Ok(())
 ///     }
 /// }
 /// ```
 #[derive(Debug, Component)]
-#[component(app_async_init, init_sort = i32::MIN + 3)]
+#[component(app_async_init, shutdown, init_sort = i32::MIN + 3)]
 pub struct FilePlugin {
     /// 配置引用
     pub config: Arc<FileConfig>,
@@ -50,8 +51,12 @@ impl FilePlugin {
     }
 
     /// 获取默认存储后端（`sys:local`）
-    pub fn default_storage(&self) -> Option<Arc<dyn FileStorage>> {
+    pub fn default_storage(&self) -> AppResult<Arc<dyn FileStorage>> {
         self.get_storage(&sys_key("local"))
+            .ok_or_else(|| AppError::with_context(
+                FilePluginErr::DefaultStorageNotFound,
+                "sys:local",
+            ))
     }
 
     /// 添加一个存储后端
@@ -146,4 +151,14 @@ async fn app_async_init(comp: Arc<FilePlugin>, _app: Arc<App>) -> RIE<()> {
     );
 
     Ok(())
+}
+
+/// `#[component(shutdown)]` 回调：清理所有后端
+///
+/// 清空 backend map，释放对所有 `Arc<dyn FileStorage>` 的引用。
+/// OpenDAL `Operator` 内部使用 `Arc` 共享，无需显式 close，
+/// 但清理 DashMap 可确保后端引用在应用关闭时被正确丢弃。
+fn shutdown(_comp: &FilePlugin) {
+    _comp.backends.clear();
+    tracing::info!("文件存储后端已清理");
 }

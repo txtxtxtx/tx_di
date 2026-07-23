@@ -7,7 +7,7 @@ use super::{FileInfo, FileStorage, guess_mime_type};
 use crate::config::{FileConfig, S3Config, StorageBackend, StorageConfig};
 use crate::error::{map_opendal_error, FilePluginErr};
 use async_trait::async_trait;
-use futures::Stream;
+use futures::{Stream, StreamExt};
 use opendal::Operator;
 use std::pin::Pin;
 use tokio::io::{AsyncRead, AsyncReadExt};
@@ -26,13 +26,16 @@ pub struct OpendalStorage {
     operator: Operator,
     /// 文件访问基础 URL（本地存储时用于拼接公开 URL）
     base_url: String,
+    /// 存储后端类型（用于后端特定行为，如本地需 create_dir）
+    backend: StorageBackend,
 }
 
 impl OpendalStorage {
-    /// 从 `FileConfig` 构建本地存储实例（兼容旧代码）
+    /// 从 `FileConfig` 构建本地存储实例
     ///
     /// 仅提取 `base_path` 和 `base_url` 创建 `sys:local` 对应的后端。
     /// 如需创建 S3 或其他后端，请使用 `from_storage_config` / `new_s3`。
+    #[deprecated(since = "0.2.0", note = "请使用 `new_local()` 代替")]
     pub fn new(config: &FileConfig) -> AppResult<Self> {
         Self::new_local(&config.base_path, &config.base_url)
     }
@@ -79,6 +82,7 @@ impl OpendalStorage {
         Ok(Self {
             operator,
             base_url: cfg.base_url.clone(),
+            backend: cfg.backend.clone(),
         })
     }
 
@@ -153,32 +157,39 @@ impl FileStorage for OpendalStorage {
         &self,
         path: &str,
         reader: &mut (dyn AsyncRead + Unpin + Send),
-        _content_type: Option<&str>,
+        content_type: Option<&str>,
     ) -> AppResult<String> {
-        // 确保父目录存在（本地存储需要）
-        if let Some(parent) = std::path::Path::new(path).parent() {
-            if let Some(parent_str) = parent.to_str() {
-                if !parent_str.is_empty() {
-                    // OpenDAL Fs 服务要求 create_dir 路径以 `/` 结尾
-                    let dir_path = if parent_str.ends_with('/') {
-                        parent_str.to_string()
-                    } else {
-                        format!("{}/", parent_str)
-                    };
-                    self.operator
-                        .create_dir(&dir_path)
-                        .await
-                        .map_err(|e| map_opendal_error(e, path))?;
+        // 本地文件系统需先确保父目录存在
+        if self.backend == StorageBackend::Local {
+            if let Some(parent) = std::path::Path::new(path).parent() {
+                if let Some(parent_str) = parent.to_str() {
+                    if !parent_str.is_empty() {
+                        // OpenDAL Fs 服务要求 create_dir 路径以 `/` 结尾
+                        let dir_path = if parent_str.ends_with('/') {
+                            parent_str.to_string()
+                        } else {
+                            format!("{}/", parent_str)
+                        };
+                        self.operator
+                            .create_dir(&dir_path)
+                            .await
+                            .map_err(|e| map_opendal_error(e, path))?;
+                    }
                 }
             }
         }
 
         // 流式写入：通过 OpenDAL Writer 分块传输，不缓冲全文件
-        let mut writer = self
-            .operator
-            .writer(path)
-            .await
-            .map_err(|e| map_opendal_error(e, path))?;
+        // 若有 content_type 则通过 writer_with 传入
+        let mut writer = {
+            let builder = self.operator.writer_with(path);
+            if let Some(ct) = content_type {
+                builder.content_type(ct).await
+            } else {
+                builder.await
+            }
+        }
+        .map_err(|e| map_opendal_error(e, path))?;
 
         let mut buf = vec![0u8; 8192];
         loop {
@@ -268,45 +279,41 @@ impl FileStorage for OpendalStorage {
         &self,
         prefix: &str,
     ) -> AppResult<Pin<Box<dyn Stream<Item = AppResult<FileInfo>> + Send>>> {
-        let prefix_owned = prefix.to_string();
-        let operator = self.operator.clone();
-        let base_url = self.base_url.clone();
-
-        // 使用 async-stream 方式：先获取所有条目再转为 Stream
-        // OpenDAL 的 list 返回 entries，分页由内部处理
-        let entries = operator
-            .list(&prefix_owned)
+        // 使用 lister 实现真·流式列出，避免一次性加载全部条目
+        let lister = self
+            .operator
+            .lister(prefix)
             .await
-            .map_err(|e| map_opendal_error(e, &prefix_owned))?;
+            .map_err(|e| map_opendal_error(e, prefix))?;
 
-        let items: Vec<_> = entries
-            .into_iter()
-            .filter(|e| {
-                // 只返回文件，过滤目录
-                e.metadata().mode().is_file()
-            })
-            .map(|entry| {
-                let path = entry.path().to_string();
-                let metadata = entry.metadata();
-                let safe_path = path.trim_start_matches('/');
-                let url = format!(
-                    "{}/{}",
-                    base_url.trim_end_matches('/'),
-                    safe_path
-                );
-                Ok(FileInfo {
-                    path,
-                    size: metadata.content_length(),
-                    content_type: metadata
-                        .content_type()
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| guess_mime_type(entry.name())),
-                    url: Some(url),
-                })
-            })
-            .collect();
+        let base_url_trimmed = self.base_url.trim_end_matches('/').to_string();
 
-        Ok(Box::pin(futures::stream::iter(items)))
+        let stream = lister.filter_map(move |entry| {
+            let base_url = base_url_trimmed.clone();
+            async move {
+                match entry {
+                    Ok(e) if e.metadata().mode().is_file() => {
+                        let path = e.path().to_string();
+                        let metadata = e.metadata();
+                        let safe_path = path.trim_start_matches('/');
+                        let url = format!("{}/{}", base_url, safe_path);
+                        Some(Ok(FileInfo {
+                            path,
+                            size: metadata.content_length(),
+                            content_type: metadata
+                                .content_type()
+                                .map(|s| s.to_string())
+                                .unwrap_or_else(|| guess_mime_type(e.name())),
+                            url: Some(url),
+                        }))
+                    }
+                    Ok(_) => None, // 跳过目录
+                    Err(err) => Some(Err(map_opendal_error(err, ""))),
+                }
+            }
+        });
+
+        Ok(Box::pin(stream))
     }
 
     async fn presigned_url(
@@ -322,14 +329,17 @@ impl FileStorage for OpendalStorage {
             .await
         {
             Ok(req) => Ok(req.uri().to_string()),
-            Err(e) => {
-                // 本地存储不支持签名，返回公开 URL
+            Err(e) if e.kind() == opendal::ErrorKind::Unsupported => {
+                // 本地存储不支持签名，回退到公开 URL
                 tracing::debug!(
                     path = %path,
-                    error = %e,
                     "后端不支持 presign，回退到公开 URL"
                 );
                 Ok(self.file_url(path))
+            }
+            Err(e) => {
+                // 真实错误（认证失败、网络超时等）不应静默回退
+                Err(map_opendal_error(e, path))
             }
         }
     }

@@ -44,7 +44,7 @@
 //! let plugin = app.inject::<FilePlugin>();
 //!
 //! // 获取默认存储
-//! let local = plugin.default_storage().unwrap();
+//! let local = plugin.default_storage()?;
 //!
 //! // 获取指定后端
 //! let s3 = plugin.get_storage("sys:s3-images").unwrap();
