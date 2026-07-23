@@ -30,6 +30,11 @@ pub struct JobConfig {
     /// 任务执行线程池大小 4
     #[serde(default = "default_thread_pool_size")]
     pub thread_pool_size: usize,
+
+    /// 内部函数执行器超时（秒） 300s 5 分钟
+    /// 若内部处理器阻塞超过此时间，将强制中止并标记超时
+    #[serde(default = "default_internal_timeout")]
+    pub internal_timeout_secs: u64,
 }
 
 impl Default for JobConfig {
@@ -41,6 +46,7 @@ impl Default for JobConfig {
             python_timeout_secs: default_python_timeout(),
             python_path: default_python_path(),
             thread_pool_size: default_thread_pool_size(),
+            internal_timeout_secs: default_internal_timeout(),
         }
     }
 }
@@ -80,6 +86,10 @@ fn default_thread_pool_size() -> usize {
     4
 }
 
+fn default_internal_timeout() -> u64 {
+    300 // 5 分钟
+}
+
 impl JobConfig {
     /// 获取 Shell 执行超时
     pub fn shell_timeout(&self) -> Duration {
@@ -94,5 +104,10 @@ impl JobConfig {
     /// 获取轮询间隔
     pub fn poll_interval(&self) -> Duration {
         Duration::from_secs(self.poll_interval_secs)
+    }
+
+    /// 获取内部函数执行超时
+    pub fn internal_timeout(&self) -> Duration {
+        Duration::from_secs(self.internal_timeout_secs)
     }
 }

@@ -78,7 +78,7 @@ dependencies = [
  "tonic",
  "tower 0.5.3",
  "tracing",
- "tx-di-core 0.3.0",
+ "tx-di-core 0.4.0",
  "tx_common 0.1.0",
  "tx_di_axum",
  "tx_di_file",
@@ -111,7 +111,7 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.19",
  "tracing",
- "tx-di-core 0.3.0",
+ "tx-di-core 0.4.0",
  "tx_common 0.1.0",
  "tx_di_file",
  "tx_di_job",
@@ -141,7 +141,7 @@ dependencies = [
  "serde_with",
  "tokio",
  "tracing",
- "tx-di-core 0.3.0",
+ "tx-di-core 0.4.0",
  "tx_common 0.1.0",
  "tx_error 0.1.0",
 ]
@@ -158,7 +158,7 @@ dependencies = [
  "toasty 0.7.0",
  "tokio",
  "tracing",
- "tx-di-core 0.3.0",
+ "tx-di-core 0.4.0",
  "tx_common 0.1.0",
  "tx_di_job",
  "tx_di_toasty",
@@ -2151,7 +2151,7 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.19",
  "tracing",
- "tx-di-core 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tx-di-core 0.3.0",
  "tx_di_log",
 ]
 
@@ -2778,7 +2778,7 @@ dependencies = [
  "tokio-util 0.7.19",
  "toml 1.1.3+spec-1.1.0",
  "tracing",
- "tx-di-core 0.3.0",
+ "tx-di-core 0.4.0",
  "tx_di_axum",
  "tx_di_gb_dev",
  "tx_di_log",
@@ -8094,10 +8094,9 @@ dependencies = [
  "serde_core",
  "serde_json",
  "toasty-core 0.7.0",
- "toasty-driver-dynamodb",
  "toasty-driver-mysql 0.7.0",
  "toasty-driver-postgresql 0.7.0",
- "toasty-driver-sqlite",
+ "toasty-driver-sqlite 0.7.0",
  "toasty-macros 0.7.0",
  "tokio",
  "tokio-stream",
@@ -8124,8 +8123,10 @@ dependencies = [
  "serde_core",
  "serde_json",
  "toasty-core 0.8.0",
+ "toasty-driver-dynamodb",
  "toasty-driver-mysql 0.8.0",
  "toasty-driver-postgresql 0.8.0",
+ "toasty-driver-sqlite 0.8.0",
  "toasty-macros 0.8.0",
  "tokio",
  "tokio-stream",
@@ -8170,9 +8171,9 @@ dependencies = [
 
 [[package]]
 name = "toasty-driver-dynamodb"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94e5b7c9fc5e3c10d1883beab14c7caec3def0e3903c518d6ed139818308c315"
+checksum = "594f5fe60986529702ace74de50981ec4b81e162bab59327af94a741b61a3e8c"
 dependencies = [
  "async-trait",
  "aws-config",
@@ -8180,7 +8181,7 @@ dependencies = [
  "hashbrown 0.17.1",
  "serde",
  "serde_json",
- "toasty-core 0.7.0",
+ "toasty-core 0.8.0",
  "tracing",
  "url",
  "uuid",
@@ -8290,6 +8291,24 @@ dependencies = [
  "serde_json",
  "toasty-core 0.7.0",
  "toasty-sql 0.7.0",
+ "tracing",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "toasty-driver-sqlite"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea37246ed83dbe2bdb3fbcef72c4f1cb7ff25c9b12753e509b84ee89c4893af5"
+dependencies = [
+ "async-trait",
+ "percent-encoding",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "toasty-core 0.8.0",
+ "toasty-sql 0.8.0",
  "tracing",
  "url",
  "uuid",
@@ -8910,26 +8929,6 @@ checksum = "8464ec13c3691491391d9fce00f6416c9a48e46972f72d7865688be2080192c9"
 [[package]]
 name = "tx-di-core"
 version = "0.3.0"
-dependencies = [
- "anyhow",
- "criterion",
- "dashmap",
- "linkme",
- "serde",
- "tokio",
- "tokio-util 0.7.19",
- "toml 1.1.3+spec-1.1.0",
- "tracing",
- "tracing-subscriber",
- "tx-di-macros 0.3.0",
- "tx_common 0.1.0",
- "tx_di_log",
- "tx_error 0.1.0",
-]
-
-[[package]]
-name = "tx-di-core"
-version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e917c65ba99d737fbf6ffe28373745fe2b67a5bb9b83fb8eca6568d147e8b9d8"
 dependencies = [
@@ -8944,14 +8943,36 @@ dependencies = [
  "tokio-util 0.7.19",
  "toml 1.1.3+spec-1.1.0",
  "tracing",
- "tx-di-macros 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tx-di-macros 0.3.0",
  "tx_common 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tx_error 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
+name = "tx-di-core"
+version = "0.4.0"
+dependencies = [
+ "anyhow",
+ "criterion",
+ "dashmap",
+ "linkme",
+ "serde",
+ "tokio",
+ "tokio-util 0.7.19",
+ "toml 1.1.3+spec-1.1.0",
+ "tracing",
+ "tracing-subscriber",
+ "tx-di-macros 0.4.0",
+ "tx_common 0.1.0",
+ "tx_di_log",
+ "tx_error 0.1.0",
+]
+
+[[package]]
 name = "tx-di-macros"
 version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dda13f7c491638d20acca40f206b29836c32430dbdbea0166c58bfa3b58da4c0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8960,9 +8981,7 @@ dependencies = [
 
 [[package]]
 name = "tx-di-macros"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dda13f7c491638d20acca40f206b29836c32430dbdbea0166c58bfa3b58da4c0"
+version = "0.4.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -9010,7 +9029,7 @@ dependencies = [
  "tower 0.5.3",
  "tower-http",
  "tracing",
- "tx-di-core 0.3.0",
+ "tx-di-core 0.4.0",
  "tx_common 0.1.0",
  "tx_di_log",
  "tx_error 0.1.0",
@@ -9030,7 +9049,7 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.19",
  "tracing",
- "tx-di-core 0.3.0",
+ "tx-di-core 0.4.0",
  "tx_error 0.1.0",
 ]
 
@@ -9051,7 +9070,7 @@ dependencies = [
  "tokio-util 0.7.19",
  "toml 0.5.11",
  "tracing",
- "tx-di-core 0.3.0",
+ "tx-di-core 0.4.0",
  "tx_error 0.1.0",
  "windows 0.58.0",
 ]
@@ -9073,7 +9092,7 @@ dependencies = [
  "tokio-stream",
  "tokio-util 0.7.19",
  "tracing",
- "tx-di-core 0.3.0",
+ "tx-di-core 0.4.0",
  "tx_error 0.1.0",
  "uuid",
 ]
@@ -9094,7 +9113,7 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.19",
  "tracing",
- "tx-di-core 0.3.0",
+ "tx-di-core 0.4.0",
  "tx_di_sip",
  "tx_error 0.1.0",
  "tx_gb28181",
@@ -9115,7 +9134,7 @@ dependencies = [
  "tokio-util 0.7.19",
  "toml 1.1.3+spec-1.1.0",
  "tracing",
- "tx-di-core 0.3.0",
+ "tx-di-core 0.4.0",
  "tx_di_sip",
  "tx_gb28181",
 ]
@@ -9126,6 +9145,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "chrono",
  "cron",
  "dashmap",
  "jiff",
@@ -9136,7 +9156,7 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.19",
  "tracing",
- "tx-di-core 0.3.0",
+ "tx-di-core 0.4.0",
  "tx_common 0.1.0",
  "tx_di_toasty",
  "tx_error 0.1.0",
@@ -9153,7 +9173,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
- "tx-di-core 0.3.0",
+ "tx-di-core 0.4.0",
 ]
 
 [[package]]
@@ -9171,7 +9191,7 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.19",
  "tracing",
- "tx-di-core 0.3.0",
+ "tx-di-core 0.4.0",
  "tx_error 0.1.0",
 ]
 
@@ -9187,7 +9207,7 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.19",
  "tracing",
- "tx-di-core 0.3.0",
+ "tx-di-core 0.4.0",
  "tx_di_axum",
 ]
 
@@ -9206,7 +9226,7 @@ dependencies = [
  "tokio-util 0.7.19",
  "toml 1.1.3+spec-1.1.0",
  "tracing",
- "tx-di-core 0.3.0",
+ "tx-di-core 0.4.0",
  "tx_error 0.1.0",
 ]
 
@@ -9217,12 +9237,12 @@ dependencies = [
  "anyhow",
  "serde",
  "serde_json",
- "toasty 0.7.0",
+ "toasty 0.8.0",
  "tokio",
  "tokio-util 0.7.19",
  "toml 1.1.3+spec-1.1.0",
  "tracing",
- "tx-di-core 0.3.0",
+ "tx-di-core 0.4.0",
  "tx_error 0.1.0",
 ]
 
@@ -9269,7 +9289,7 @@ dependencies = [
  "serde_repr",
  "tokio",
  "tracing",
- "tx-di-core 0.3.0",
+ "tx-di-core 0.4.0",
 ]
 
 [[package]]

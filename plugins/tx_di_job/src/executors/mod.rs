@@ -19,7 +19,7 @@ pub trait JobExecutor: Send + Sync {
 }
 
 /// 任务执行器类型
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExecutorType {
     Internal,  // 内部函数
     Shell,      // Shell 脚本

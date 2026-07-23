@@ -25,7 +25,7 @@ use sa_token_plugin_axum::RedisStorage;
 /// is_read_header = true
 /// ```
 #[derive(Debug, Clone, Deserialize, Component)]
-#[component(conf = "sa_token_config", init, init_sort = i32::MIN + 1)]
+#[component(conf = "sa_token", init, init_sort = i32::MIN + 1)]
 pub struct SaTokenConf {
     /// Token 名称（读取 Token 的 Header/Parameter/Cookie 键名）
     #[serde(default = "default_token_name")]

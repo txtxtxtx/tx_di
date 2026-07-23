@@ -53,6 +53,10 @@ pub enum JobErr {
     /// PythonExecutor 重复初始化
     #[err(1010, "JobPlugin: python_executor 已初始化")]
     PythonExecutorAlreadyInit,
+
+    /// Semaphore 重复初始化
+    #[err(1011, "JobPlugin: semaphore 已初始化")]
+    SemaphoreAlreadyInit,
 }
 
 // ── 执行结果 ────────────────────────────────────────────────

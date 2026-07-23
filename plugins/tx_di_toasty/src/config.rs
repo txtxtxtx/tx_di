@@ -15,7 +15,7 @@ use tx_di_core::{Component, RIE, Store};
 /// table_name_prefix = ""
 /// ```
 #[derive(Debug, Clone, Deserialize, Component)]
-#[component(conf, init, init_sort = i32::MIN + 2)]
+#[component(conf = "toasty", init, init_sort = i32::MIN + 2)]
 pub struct ToastyConfig {
     /// 数据库连接字符串
     ///

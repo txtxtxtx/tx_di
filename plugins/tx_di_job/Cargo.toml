@@ -34,6 +34,9 @@ tx_common.workspace = true
 # Cron 表达式解析
 cron.workspace = true
 
+# 时间处理（cron 的 includes 需要 chrono::DateTime）
+chrono.workspace = true
+
 # 时间处理
 jiff.workspace = true
 
