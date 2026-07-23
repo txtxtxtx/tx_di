@@ -126,8 +126,7 @@ pub mod executors;
 pub use config::JobConfig;
 pub use err::JobErr;
 pub use err::JobResult;
-// 重导出 tx_error 核心类型，方便外部使用
-pub use tx_error::{AppError, AppResult};
+
 pub use models::{InfrustJob, InfrustJobLog, AuditFields, SoftDelete, register_models, ExecutionStatus, JobStatus};
 pub use repository::JobRepository;
 pub use comp::JobPlugin;

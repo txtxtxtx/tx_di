@@ -5,7 +5,7 @@ use tx_di_core::{Component, RIE, Store};
 
 /// Job 插件配置
 #[derive(Debug, Clone, Serialize, Deserialize, Component)]
-#[component(conf, init, init_sort = i32::MIN + 1)]
+#[component(conf = "job", init, init_sort = i32::MIN + 1)]
 pub struct JobConfig {
     /// 是否启用调度器 默认 启用
     #[serde(default = "default_enabled")]
