@@ -28,6 +28,7 @@ use tx_di_core::{
 };
 use tx_di_core::aop::{CallContext, CallResult, Interceptor, InterceptorChain};
 use tx_di_core::intercept;
+#[allow(unused_imports)]
 use tx_di_log::LogPlugins;
 
 // ══════════════════════════════════════════════════════════════════════════
