@@ -10,6 +10,8 @@ use async_trait::async_trait;
 use futures::{Stream, StreamExt};
 use opendal::Operator;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tx_error::{AppError, AppResult};
 
@@ -28,6 +30,10 @@ pub struct OpendalStorage {
     base_url: String,
     /// 存储后端类型（用于后端特定行为，如本地需 create_dir）
     backend: StorageBackend,
+    /// 优雅关闭：是否正在 draining（由 FilePlugin 设置，共享引用）
+    draining: Arc<AtomicBool>,
+    /// 优雅关闭：是否已请求取消所有进行中的上传（由 FilePlugin 设置，共享引用）
+    cancelled: Arc<AtomicBool>,
 }
 
 impl OpendalStorage {
@@ -83,6 +89,8 @@ impl OpendalStorage {
             operator,
             base_url: cfg.base_url.clone(),
             backend: cfg.backend.clone(),
+            draining: Arc::new(AtomicBool::new(false)),
+            cancelled: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -140,6 +148,19 @@ impl OpendalStorage {
         Ok(Some(op))
     }
 
+    /// 设置优雅关闭追踪器（由 FilePlugin 在初始化时调用）
+    ///
+    /// 将 draining / cancelled 标志位替换为 FilePlugin 提供的共享引用，
+    /// 使存储后端能参与插件级别的优雅关闭协调。
+    pub(crate) fn set_graceful_tracker(
+        &mut self,
+        draining: Arc<AtomicBool>,
+        cancelled: Arc<AtomicBool>,
+    ) {
+        self.draining = draining;
+        self.cancelled = cancelled;
+    }
+
     /// 获取文件的公开访问 URL
     fn file_url(&self, path: &str) -> String {
         let safe_path = path.trim_start_matches('/');
@@ -159,6 +180,14 @@ impl FileStorage for OpendalStorage {
         reader: &mut (dyn AsyncRead + Unpin + Send),
         content_type: Option<&str>,
     ) -> AppResult<String> {
+        // ── 优雅关闭：draining 中拒绝新写入 ──
+        if self.draining.load(Ordering::Acquire) {
+            return Err(AppError::with_context(
+                FilePluginErr::ServerDraining,
+                path.to_string(),
+            ));
+        }
+
         // 本地文件系统需先确保父目录存在
         if self.backend == StorageBackend::Local {
             if let Some(parent) = std::path::Path::new(path).parent() {
@@ -193,6 +222,18 @@ impl FileStorage for OpendalStorage {
 
         let mut buf = vec![0u8; 8192];
         loop {
+            // ── 优雅关闭：收到取消信号则中止上传 ──
+            if self.cancelled.load(Ordering::Acquire) {
+                tracing::info!(path = %path, "上传被取消，中止写入");
+                if let Err(e) = writer.abort().await {
+                    tracing::warn!(path = %path, error = %e, "Writer abort 失败");
+                }
+                return Err(AppError::with_context(
+                    FilePluginErr::ServerDraining,
+                    path.to_string(),
+                ));
+            }
+
             let n = reader
                 .read(&mut buf)
                 .await

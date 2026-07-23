@@ -54,6 +54,10 @@ pub enum FilePluginErr {
     /// 尝试获取默认存储后端，但默认后端不存在
     #[err(5004, "未找到默认存储后端")]
     DefaultStorageNotFound,
+
+    /// 服务正在关闭，拒绝新的写入请求
+    #[err(5005, "服务正在关闭，拒绝新的写入请求")]
+    ServerDraining,
 }
 
 /// 将 OpenDAL 错误映射为 `AppError`

@@ -8,6 +8,7 @@ use crate::error::FilePluginErr;
 use crate::storage::{FileStorage, OpendalStorage};
 use crate::{sys_key, SYS_PREFIX};
 use dashmap::DashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tx_di_core::App;
 use tx_di_core::{Component, DepsTuple, RIE};
@@ -42,6 +43,14 @@ pub struct FilePlugin {
     /// 存储后端容器（key 依前缀区分：`sys:` 系统，`user:` 用户自定义）
     #[tx_cst(DashMap::new())]
     pub backends: DashMap<String, Arc<dyn FileStorage>>,
+
+    /// 优雅关闭：draining 标志位（Arc 共享，shutdown 时设为 true，拒绝新写入）
+    #[tx_cst(Arc::new(AtomicBool::new(false)))]
+    pub draining: Arc<AtomicBool>,
+
+    /// 优雅关闭：取消标志位（Arc 共享，shutdown 时设为 true，in-flight 上传主动 abort）
+    #[tx_cst(Arc::new(AtomicBool::new(false)))]
+    pub cancelled: Arc<AtomicBool>,
 }
 
 impl FilePlugin {
@@ -122,14 +131,16 @@ async fn app_async_init(comp: Arc<FilePlugin>, _app: Arc<App>) -> RIE<()> {
     }
 
     // ── 1. 注册系统默认本地存储 sys:local ──────────────
-    let local = OpendalStorage::new_local(&config.base_path, &config.base_url)?;
+    let mut local = OpendalStorage::new_local(&config.base_path, &config.base_url)?;
+    local.set_graceful_tracker(comp.draining.clone(), comp.cancelled.clone());
     comp.backends.insert(sys_key("local"), Arc::new(local));
 
     // ── 2. 注册配置文件中的额外后端 sys:<name> ───────────
     for extra in &config.extra_storages {
         let key = sys_key(&extra.name);
         match OpendalStorage::from_storage_config(extra) {
-            Ok(storage) => {
+            Ok(mut storage) => {
+                storage.set_graceful_tracker(comp.draining.clone(), comp.cancelled.clone());
                 comp.backends.insert(key, Arc::new(storage));
             }
             Err(e) => {
@@ -153,12 +164,28 @@ async fn app_async_init(comp: Arc<FilePlugin>, _app: Arc<App>) -> RIE<()> {
     Ok(())
 }
 
-/// `#[component(shutdown)]` 回调：清理所有后端
+/// `#[component(shutdown)]` 回调：立即中止所有上传
 ///
-/// 清空 backend map，释放对所有 `Arc<dyn FileStorage>` 的引用。
-/// OpenDAL `Operator` 内部使用 `Arc` 共享，无需显式 close，
-/// 但清理 DashMap 可确保后端引用在应用关闭时被正确丢弃。
-fn shutdown(_comp: &FilePlugin) {
-    _comp.backends.clear();
-    tracing::info!("文件存储后端已清理");
+/// # 关闭流程（全部同步，零等待）
+///
+/// 1. 设置 `draining = true`  → 新请求立即得到 `ServerDraining` 错误
+/// 2. 设置 `cancelled = true` → in-flight 的 `write_stream` 在下一次循环迭代中
+///    检测到后调用 `writer.abort()` 并返回错误
+/// 3. `backends.clear()`      → 移除所有后端引用
+///
+/// # 为什么不等上传完成？
+///
+/// 上传只是事务的一部分——文件写完后还需更新数据库记录。
+/// shutdown 时数据库层也在关闭，事务无法完整提交，完成上传只会产生孤儿文件。
+/// 立即 abort 确保 S3 不会遗留未完成的 multipart upload，本地不会留残缺文件。
+fn shutdown(comp: &FilePlugin) {
+    // ── 1. 拒绝新请求 ──
+    comp.draining.store(true, Ordering::SeqCst);
+
+    // ── 2. 通知 in-flight 上传主动 abort ──
+    comp.cancelled.store(true, Ordering::SeqCst);
+
+    // ── 3. 清理后端引用（in-flight upload 持有的 Arc 不受影响，abort 完自动释放） ──
+    comp.backends.clear();
+    tracing::info!("FilePlugin 已关闭（draining + cancelled，进行中的上传将自动 abort）");
 }
