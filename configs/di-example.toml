@@ -1,4 +1,4 @@
-[log_config]
+[log]
 level = "debug"             # 日志级别
 prefix = "di-axum"          # 日志前缀
 dir = "./logs"              # 日志目录

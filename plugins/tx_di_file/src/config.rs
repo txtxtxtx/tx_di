@@ -130,7 +130,7 @@ impl Default for StorageConfig {
 /// endpoint = "http://localhost:9000"
 /// ```
 #[derive(Debug, Clone, Deserialize, Component)]
-#[component(conf, init, init_sort = i32::MIN + 3)]
+#[component(conf = "file", init, init_sort = i32::MIN + 3)]
 pub struct FileConfig {
     /// 本地存储根路径（sys:local 使用）
     #[serde(default = "default_base_path")]

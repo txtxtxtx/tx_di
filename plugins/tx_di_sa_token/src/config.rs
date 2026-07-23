@@ -13,10 +13,10 @@ use sa_token_plugin_axum::RedisStorage;
 
 /// sa-token 配置结构体
 ///
-/// 从 TOML 配置文件 `[sa_token_config]` 节自动加载。
+/// 从 TOML 配置文件 `[sa_token]` 节自动加载。
 ///
 /// ```toml
-/// [sa_token_config]
+/// [sa_token]
 /// token_name = "Authorization"
 /// timeout = 86400
 /// is_concurrent = true

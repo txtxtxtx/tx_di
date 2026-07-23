@@ -41,10 +41,10 @@ async fn main() -> tx_di_core::RIE<()> {
 
 ## 配置
 
-TOML 节名为 `[log_config]`：
+TOML 节名为 `[log]`：
 
 ```toml
-[log_config]
+[log]
 level = "info"                  # 全局级别: off/error/warn/info/debug/trace
 console_output = true           # 是否输出到控制台（默认 true）
 time_format = "local"           # utc / local
@@ -52,7 +52,7 @@ retention_days = 90             # 日志文件保留天数
 prefix = "tx_di"                # 日志文件名前缀
 dir = "./logs"                  # 日志文件目录
 
-[log_config.modules]            # 模块级别日志覆盖（可选）
+[log.modules]                   # 模块级别日志覆盖（可选）
 "my_app::database" = "debug"
 "third_party_lib" = "warn"
 ```

@@ -18,10 +18,10 @@ tx_di_toasty = { path = "plugins/tx_di_toasty", features = ["sqlite"] }
 
 ## 配置
 
-TOML 节名为 `[toasty_config]`：
+TOML 节名为 `[toasty]`：
 
 ```toml
-[toasty_config]
+[toasty]
 database_url = "sqlite://gb28181.db"
 auto_schema = true               # 启动时自动 push_schema 建表
 max_pool_size = 10

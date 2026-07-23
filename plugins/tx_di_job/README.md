@@ -8,7 +8,7 @@
 - 三类执行器：**内部 Rust 函数**、**Shell 脚本**、**Python 脚本**。
 - 重试机制、执行超时监控、执行日志落库、任务 CRUD / 暂停 / 恢复 / 手动触发。
 
-> 强依赖 `tx_di_toasty`（任务与日志存于数据库），需配置 `[toasty_config]` 且数据库可达。
+> 强依赖 `tx_di_toasty`（任务与日志存于数据库），需配置 `[toasty]` 且数据库可达。
 
 ## 启用
 
@@ -23,16 +23,17 @@ tx_di_toasty = { path = "plugins/tx_di_toasty", features = ["sqlite"] }
 
 ## 配置
 
-TOML 节名为 `[job_config]`：
+TOML 节名为 `[job]`：
 
 ```toml
-[job_config]
+[job]
 enabled = true
 poll_interval_secs = 1
 shell_timeout_secs = 300
 python_timeout_secs = 300
 python_path = "/usr/bin/python3"
 thread_pool_size = 4
+internal_timeout_secs = 300
 ```
 
 | 字段 | 类型 | 默认值 | 说明 |
@@ -42,7 +43,8 @@ thread_pool_size = 4
 | `shell_timeout_secs` | `u64` | `300` | Shell 执行超时 |
 | `python_timeout_secs` | `u64` | `300` | Python 执行超时 |
 | `python_path` | `PathBuf` | `/usr/bin/python3` | Python 解释器路径 |
-| `thread_pool_size` | `usize` | `4` | 预留字段（当前未实际使用） |
+| `thread_pool_size` | `usize` | `4` | 最大并发执行任务数 |
+| `internal_timeout_secs` | `u64` | `300` | 内部函数执行器超时秒数 |
 
 ## 公共组件
 
@@ -101,7 +103,7 @@ async fn main() -> tx_di_core::RIE<()> {
    | `0 0 2 * * *` | 6 | 每天凌晨 2 点 |
    | `0 2 * * *` | 5 | 同上，向后兼容（内部自动补 `0`(秒) 和 `*`(年)） |
 2. **同一分钟只触发一次**（去重）；错过的时间窗口不会补执行（无 misfire 策略）。
-3. 调度器单任务顺序执行，长任务会阻塞后续判断。
-4. `thread_pool_size` 当前未使用。
+3. 调度器将任务分派到独立 tokio 任务中并发执行，受 `thread_pool_size` 限制最大并发数；超过上限的任 务跳过下一轮重试。
+4. 内部函数执行器受 `internal_timeout_secs` 超时保护，防止死循环卡死整个调度器。
 5. 重试执行 1 + retry_count 次，每次独立写一条 `InfrustJobLog`。
 6. 数据库强依赖（`auto_schema` 自动建表 `infrust_job`/`infrust_job_log`）。

@@ -1,7 +1,7 @@
 # tx_di 配置文件示例
 # 此文件用于演示从配置文件加载组件配置
 
-[log_config]
+[log]
 level = "debug"             # 日志级别
 prefix = "di-axum"          # 日志前缀
 dir = "./logs"              # 日志目录
