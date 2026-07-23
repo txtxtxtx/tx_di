@@ -7,6 +7,7 @@
 
 #![allow(dead_code)]
 
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, OnceLock, RwLock};
 
 use tx_di_toasty::ToastyPlugin;
@@ -225,6 +226,8 @@ pub async fn create_file_app() -> (FileAppService, Arc<FileService>, Arc<ToastyF
     let plugin = Arc::new(FilePlugin {
         config,
         backends,
+        draining: Arc::new(AtomicBool::new(false)),
+        cancelled: Arc::new(AtomicBool::new(false)),
     });
 
     let app = FileAppService::new(svc.clone(), plugin, file_config_repo);
