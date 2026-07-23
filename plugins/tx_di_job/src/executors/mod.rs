@@ -15,7 +15,7 @@ pub use python::PythonJobExecutor;
 #[async_trait]
 pub trait JobExecutor: Send + Sync {
     /// 执行任务
-    async fn execute(&self, job_id: i64, handler_name: &str, param: Option<&str>) -> JobResult;
+    async fn execute(&self, job_id: u64, handler_name: &str, param: Option<&str>) -> JobResult;
 }
 
 /// 任务执行器类型

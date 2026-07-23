@@ -72,7 +72,7 @@ impl JobRepository {
     }
 
     /// 软删除任务
-    pub async fn delete_job(&self, job_id: i64) -> AppResult<()> {
+    pub async fn delete_job(&self, job_id: u64) -> AppResult<()> {
         let mut db = self.tp.db().clone();
         let result = InfrustJob::all()
             .filter(InfrustJob::fields().id().eq(job_id))
@@ -96,7 +96,7 @@ impl JobRepository {
     }
 
     /// 按 ID 查询任务（排除已删除）
-    pub async fn get_job_by_id(&self, job_id: i64) -> AppResult<InfrustJob> {
+    pub async fn get_job_by_id(&self, job_id: u64) -> AppResult<InfrustJob> {
         let mut db = self.tp.db().clone();
         let job = InfrustJob::all()
             .filter(InfrustJob::fields().id().eq(job_id))
@@ -188,7 +188,7 @@ impl JobRepository {
     }
 
     /// 分页查询任务的执行日志（id 倒序，全部在数据库层完成）
-    pub async fn get_job_logs(&self, job_id: i64, page: tx_common::page::Page<InfrustJobLog>) -> AppResult<Vec<InfrustJobLog>> {
+    pub async fn get_job_logs(&self, job_id: u64, page: tx_common::page::Page<InfrustJobLog>) -> AppResult<Vec<InfrustJobLog>> {
         let mut db = self.tp.db().clone();
         let offset = page.offset() as usize;
 
@@ -216,7 +216,7 @@ impl JobRepository {
     }
 
     /// 按 ID 查询执行日志
-    pub async fn get_job_log_by_id(&self, log_id: i64) -> AppResult<InfrustJobLog> {
+    pub async fn get_job_log_by_id(&self, log_id: u64) -> AppResult<InfrustJobLog> {
         let mut db = self.tp.db().clone();
         let log = InfrustJobLog::all()
             .filter(InfrustJobLog::fields().id().eq(log_id))
@@ -233,7 +233,7 @@ impl JobRepository {
     }
 
     /// 清空执行日志（软删除），按 job_id 过滤，None 表示清空所有
-    pub async fn clean_job_logs(&self, job_id: Option<i64>) -> AppResult<()> {
+    pub async fn clean_job_logs(&self, job_id: Option<u64>) -> AppResult<()> {
         let mut db = self.tp.db().clone();
         let mut query = InfrustJobLog::all()
             .filter(InfrustJobLog::fields().soft_delete().eq(SoftDelete::NORMAL));
@@ -267,7 +267,7 @@ impl JobRepository {
     }
 
     /// 查询所有未删除的执行日志（id 倒序），可选择性按 job_id 过滤
-    pub async fn get_all_job_logs(&self, job_id: Option<i64>) -> AppResult<Vec<InfrustJobLog>> {
+    pub async fn get_all_job_logs(&self, job_id: Option<u64>) -> AppResult<Vec<InfrustJobLog>> {
         let mut db = self.tp.db().clone();
         let mut query = InfrustJobLog::all()
             .filter(InfrustJobLog::fields().soft_delete().eq(SoftDelete::NORMAL));

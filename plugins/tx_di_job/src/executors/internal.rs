@@ -65,7 +65,7 @@ impl InternalJobExecutor {
 
 #[async_trait]
 impl JobExecutor for InternalJobExecutor {
-    async fn execute(&self, job_id: i64, handler_name: &str, param: Option<&str>) -> JobResult {
+    async fn execute(&self, job_id: u64, handler_name: &str, param: Option<&str>) -> JobResult {
         tracing::info!(job_id = job_id, handler = handler_name, "执行内部任务");
 
         let handler_arc = match self.handlers.get(handler_name) {

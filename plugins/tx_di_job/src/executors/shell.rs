@@ -38,7 +38,7 @@ impl ShellJobExecutor {
 
 #[async_trait]
 impl JobExecutor for ShellJobExecutor {
-    async fn execute(&self, job_id: i64, handler_name: &str, param: Option<&str>) -> JobResult {
+    async fn execute(&self, job_id: u64, handler_name: &str, param: Option<&str>) -> JobResult {
         info!(job_id = job_id, script = handler_name, "执行 Shell 脚本");
         
         // 检查脚本是否存在

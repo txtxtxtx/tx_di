@@ -73,7 +73,7 @@ pub enum ExecutionStatus {
 #[derive(Debug, Clone, Serialize, Deserialize, Model)]
 pub struct InfrustJob {
     #[key]
-    pub id: i64,
+    pub id: u64,
     pub name: String,
     pub status: JobStatus,
     pub handler_name: String,
@@ -114,9 +114,9 @@ impl InfrustJob {
 #[derive(Debug, Clone, Serialize, Deserialize, Model)]
 pub struct InfrustJobLog {
     #[key]
-    pub id: i64,
+    pub id: u64,
     #[index]
-    pub job_id: i64,
+    pub job_id: u64,
     pub handler_name: String,
     pub handler_param: Option<String>,
     pub execute_index: i16,

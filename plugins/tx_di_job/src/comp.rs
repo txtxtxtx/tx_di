@@ -107,7 +107,7 @@ impl JobPlugin {
     /// 根据 handler_name 自动识别执行器类型并执行任务（不依赖插件自身的任务表）
     pub async fn execute_by_type(
         &self,
-        job_id: i64,
+        job_id: u64,
         handler_name: &str,
         handler_param: Option<&str>,
     ) -> JobResult {
@@ -147,7 +147,7 @@ impl JobPlugin {
     }
 
     /// 手动触发任务执行
-    pub async fn trigger_job(&self, job_id: i64) -> RIE<()> {
+    pub async fn trigger_job(&self, job_id: u64) -> RIE<()> {
         info!(job_id = job_id, "手动触发任务执行");
 
         let job = self.repo().get_job_by_id(job_id).await?;
@@ -168,7 +168,7 @@ impl JobPlugin {
         self.validate_cron_expression(cron_expression)?;
 
         let now = Timestamp::now();
-        let job_id = tx_common::id::next_id() as i64;
+        let job_id = tx_common::id::next_id();
 
         let job = InfrustJob {
             id: job_id,
@@ -198,7 +198,7 @@ impl JobPlugin {
     /// 更新任务
     pub async fn update_job(
         &self,
-        job_id: i64,
+        job_id: u64,
         name: Option<&str>,
         handler_name: Option<&str>,
         cron_expression: Option<&str>,
@@ -229,7 +229,7 @@ impl JobPlugin {
     }
 
     /// 删除任务（软删除）
-    pub async fn delete_job(&self, job_id: i64) -> RIE<()> {
+    pub async fn delete_job(&self, job_id: u64) -> RIE<()> {
         info!(job_id = job_id, "删除任务");
 
         self.repo().delete_job(job_id).await?;
@@ -239,7 +239,7 @@ impl JobPlugin {
     }
 
     /// 暂停任务
-    pub async fn pause_job(&self, job_id: i64) -> RIE<()> {
+    pub async fn pause_job(&self, job_id: u64) -> RIE<()> {
         info!(job_id = job_id, "暂停任务");
 
         let mut job = self.repo().get_job_by_id(job_id).await?;
@@ -254,7 +254,7 @@ impl JobPlugin {
     }
 
     /// 恢复任务
-    pub async fn resume_job(&self, job_id: i64) -> RIE<()> {
+    pub async fn resume_job(&self, job_id: u64) -> RIE<()> {
         info!(job_id = job_id, "恢复任务");
 
         let mut job = self.repo().get_job_by_id(job_id).await?;
@@ -277,7 +277,7 @@ impl JobPlugin {
     /// 查询任务执行日志（分页，id 倒序）
     pub async fn get_job_logs(
         &self,
-        job_id: i64,
+        job_id: u64,
         page: Page<InfrustJobLog>,
     ) -> RIE<Vec<InfrustJobLog>> {
         let logs = self.repo().get_job_logs(job_id, page).await?;
@@ -354,7 +354,7 @@ impl JobPlugin {
     async fn execute_single_attempt(&self, job: &InfrustJob, execute_index: i16) -> RIE<JobResult> {
         let begin = Timestamp::now();
 
-        let log_id = tx_common::id::next_id() as i64;
+        let log_id = tx_common::id::next_id();
         let mut log = InfrustJobLog {
             id: log_id,
             job_id: job.id,
@@ -418,9 +418,9 @@ impl JobPlugin {
 
         let mut interval = tokio::time::interval(self.config.poll_interval());
         // 跟踪每个任务的上次触发时间槽: (年, 月, 日, 时, 分)
-        let mut last_trigger: HashMap<i64, (i16, i8, i8, i8, i8)> = HashMap::new();
+        let mut last_trigger: HashMap<u64, (i16, i8, i8, i8, i8)> = HashMap::new();
         // 缓存已解析的 Cron Schedule，避免每轮循环重复解析
-        let mut cached_schedules: HashMap<i64, cron::Schedule> = HashMap::new();
+        let mut cached_schedules: HashMap<u64, cron::Schedule> = HashMap::new();
 
         loop {
             tokio::select! {
@@ -438,7 +438,7 @@ impl JobPlugin {
                     };
 
                     // 清理已移除任务的缓存
-                    let active_ids: std::collections::HashSet<i64> =
+                    let active_ids: std::collections::HashSet<u64> =
                         jobs.iter().map(|j| j.id).collect();
                     last_trigger.retain(|id, _| active_ids.contains(id));
                     cached_schedules.retain(|id, _| active_ids.contains(id));
