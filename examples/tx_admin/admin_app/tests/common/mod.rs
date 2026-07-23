@@ -188,7 +188,6 @@ use dashmap::DashMap;
 use tx_di_file::sys_key;
 use tx_di_file::FilePlugin;
 use tx_di_file::FileConfig;
-use tx_di_file::StorageBackend;
 use tx_di_file::storage::{FileStorage, OpendalStorage};
 
 pub async fn create_file_service() -> (

@@ -107,7 +107,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.19",
- "toasty 0.7.0",
+ "toasty 0.8.0",
  "tokio",
  "tokio-util 0.7.19",
  "tracing",
@@ -8093,7 +8093,6 @@ dependencies = [
  "serde_core",
  "serde_json",
  "toasty-core 0.7.0",
- "toasty-driver-sqlite 0.7.0",
  "toasty-macros 0.7.0",
  "tokio",
  "tokio-stream",
@@ -8123,7 +8122,7 @@ dependencies = [
  "toasty-driver-dynamodb",
  "toasty-driver-mysql",
  "toasty-driver-postgresql",
- "toasty-driver-sqlite 0.8.0",
+ "toasty-driver-sqlite",
  "toasty-macros 0.8.0",
  "tokio",
  "tokio-stream",
@@ -8194,7 +8193,7 @@ dependencies = [
  "mysql_async",
  "serde_json",
  "toasty-core 0.8.0",
- "toasty-sql 0.8.0",
+ "toasty-sql",
  "tokio",
  "tracing",
  "url",
@@ -8220,27 +8219,10 @@ dependencies = [
  "rustls-platform-verifier",
  "rustls-webpki 0.103.13",
  "toasty-core 0.8.0",
- "toasty-sql 0.8.0",
+ "toasty-sql",
  "tokio",
  "tokio-postgres",
  "tokio-postgres-rustls",
- "tracing",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "toasty-driver-sqlite"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd09e84ccfbd608949bc501c30e1c62334ddf07eb1c30976b2c470dfd19aef3e"
-dependencies = [
- "async-trait",
- "rusqlite",
- "serde",
- "serde_json",
- "toasty-core 0.7.0",
- "toasty-sql 0.7.0",
  "tracing",
  "url",
  "uuid",
@@ -8258,7 +8240,7 @@ dependencies = [
  "serde",
  "serde_json",
  "toasty-core 0.8.0",
- "toasty-sql 0.8.0",
+ "toasty-sql",
  "tracing",
  "url",
  "uuid",
@@ -8292,16 +8274,6 @@ dependencies = [
  "quote",
  "syn 2.0.119",
  "toasty-core 0.8.0",
-]
-
-[[package]]
-name = "toasty-sql"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2848a892303d9d63485a8f16d9c1b692b145c09940d2cdeefaf0f837e1bf6a49"
-dependencies = [
- "serde_json",
- "toasty-core 0.7.0",
 ]
 
 [[package]]
