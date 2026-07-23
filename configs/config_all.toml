@@ -9,14 +9,14 @@
 #  日志配置 (LogConfig) — 初始化优先级: i32::MIN (最先初始化)
 #  控制日志输出级别、文件轮转、控制台输出等行为。
 # -----------------------------------------------------------------------------
-[log_config]
+[log]
 
 # 全局日志级别，可选值: off / error / warn / info / debug / trace
 level = "info"
 
 # 按模块路径覆盖日志级别（key = 模块路径，value = 级别）
 # 例如只对数据库模块开启 debug 日志，其余保持 info
-[log_config.modules]
+[log.modules]
 # "tx_di_toasty" = "debug"
 # "tx_di_sip"    = "trace"
 
@@ -122,7 +122,7 @@ log_messages = false
 #  数据库配置 (ToastyConfig) — 基于 Toasty ORM 的数据库访问层
 #  初始化优先级: i32::MIN + 2（在日志和 SaToken 之后初始化）
 # -----------------------------------------------------------------------------
-[toasty_config]
+[toasty]
 
 # 数据库连接字符串，支持以下格式:
 #   SQLite:     "sqlite://path/to/db.db" 或 "sqlite::memory:"（内存数据库）
@@ -167,7 +167,7 @@ default_admin_password = "admin123"
 #  文件存储配置 (FileConfig) — 支持本地存储和 S3 兼容存储
 #  初始化优先级: i32::MIN + 3
 # -----------------------------------------------------------------------------
-[file_config]
+[file]
 
 # 存储后端: "local"（本地文件系统）或 "s3"（S3 兼容存储）
 backend = "local"
@@ -186,7 +186,7 @@ base_url = ""
 # allowed_extensions = ["jpg", "jpeg", "png", "gif", "pdf", "doc", "docx", "xls", "xlsx", "zip"]
 
 # S3 兼容存储配置（backend = "s3" 时生效）
-[file_config.s3]
+[file.s3]
 
 # S3 存储桶名称
 bucket = ""
@@ -211,7 +211,7 @@ force_path_style = false
 #  Sa-Token 认证配置 (SaTokenConf) — 轻量级权限认证框架
 #  初始化优先级: i32::MIN + 1
 # -----------------------------------------------------------------------------
-[sa_token_config]
+[sa_token]
 
 # Token 名称，同时也是 HTTP Header / Cookie / Query Param 的 key
 token_name = "Authorization"
@@ -421,7 +421,128 @@ timeout_secs = 10
 
 
 # -----------------------------------------------------------------------------
-#  CAN 总线配置 (CanConfig) — 车载 CAN/CAN FD 通信
+#  缓存配置 (CacheConfig) — 内存缓存 / Redis 缓存抽象层
+#  初始化优先级: i32::MIN + 1
+#  支持两种后端: MemoryCache（内存）和 RedisCache（Redis）
+# -----------------------------------------------------------------------------
+[cache_config]
+
+# 默认 TTL（秒），0 或省略表示永不过期
+default_ttl_secs = 3600
+
+# 键前缀（用于隔离不同应用的缓存键，避免键冲突）
+# key_prefix = "myapp:"
+
+# 内存缓存最大条目数（0 = 无限制）
+memory_max_capacity = 10000
+
+# Redis 连接 URL（仅编译 feature="redis" 时生效）
+# 格式: "redis://127.0.0.1:6379" 或 "rediss://user:pass@host:6380/0"
+# 不配置则仅使用内存缓存
+# redis_url = "redis://127.0.0.1:6379"
+
+# Redis 连接池大小（仅 feature="redis" 时生效）
+redis_pool_size = 10
+
+# Redis 连接超时（秒）
+redis_timeout_secs = 5
+
+
+# -----------------------------------------------------------------------------
+#  注册中心配置 (RegistryConfig) — 服务注册发现 + 配置中心（Nacos）
+#  初始化优先级: i32::MIN（与 LogConfig 同级，最先初始化）
+#  注意: Nacos 集成当前为 TODO 占位，实际功能待实现
+# -----------------------------------------------------------------------------
+[registry_config]
+
+# 主开关：是否启用注册中心功能
+enabled = false
+
+# Nacos 服务地址
+nacos_addr = "http://127.0.0.1:8848"
+
+# 命名空间
+namespace = "public"
+
+# 分组
+group = "DEFAULT_GROUP"
+
+# 本地服务名（注册到 Nacos 时的服务标识）
+service_name = "unknown-service"
+
+# 是否自动注册本地端点
+auto_register = true
+
+# 心跳间隔（秒）
+heartbeat_secs = 5
+
+
+# -----------------------------------------------------------------------------
+#  定时任务调度配置 (JobConfig) — Cron 定时任务调度器
+#  强依赖 tx_di_toasty，任务与日志存于数据库
+#  初始化优先级: i32::MIN + 1
+# -----------------------------------------------------------------------------
+[job]
+
+# 主开关：是否启用调度器
+enabled = true
+
+# 调度器轮询间隔（秒）。每隔 n 秒检查一次 cron 表达式是否到期
+# 建议保持 1s 以获得秒级精度
+poll_interval_secs = 1
+
+# Shell 脚本执行超时（秒），超过此时间未完成则强制中止
+shell_timeout_secs = 300
+
+# Python 脚本执行超时（秒），超过此时间未完成则强制中止
+python_timeout_secs = 300
+
+# Python 解释器路径
+python_path = "/usr/bin/python3"
+
+# 最大并发执行任务数。超过此上限的任务跳过本周期，下一轮重试
+thread_pool_size = 4
+
+# 内部函数执行器超时（秒）。内部处理器阻塞超过此时间则标记超时
+# 防止死循环或长时间阻塞卡死调度器
+internal_timeout_secs = 300
+
+
+# -----------------------------------------------------------------------------
+#  GB28181 设备端配置 (GbDevConfig) — 国标设备模拟器
+#  向上级平台注册，实现设备模拟/接入
+#  初始化优先级: 30000
+# -----------------------------------------------------------------------------
+[gb_dev]
+
+# 主开关：是否启用设备端
+enabled = false
+
+# 上级平台地址（完整 SIP URI）
+# 格式: "sip:平台ID@IP:端口"
+# platform_uri = "sip:34020000002000000001@192.168.1.1:5060"
+
+# 本设备 ID（20 位国标编码）
+# device_id = "34020000001320000001"
+
+# 注册用户名（一般等于 device_id）
+# username = "34020000001320000001"
+
+# 注册密码
+# password = "12345678"
+
+# 认证域（realm），留空表示接受任意挑战
+# realm = "3402000000"
+
+# 注册有效期（秒），到期前需重新注册
+register_ttl = 3600
+
+# 心跳间隔（秒）
+heartbeat_secs = 60
+
+# 协议版本，可选: "v2016" / "v2022"
+# 驱动出网编码与指令集裁剪
+version = "v2022"
 #  注意: 此配置不由 DI 框架自动加载，需手动调用 CanConfig::load_from_toml()
 # -----------------------------------------------------------------------------
 [can_config]
