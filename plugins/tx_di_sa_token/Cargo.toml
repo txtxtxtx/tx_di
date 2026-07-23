@@ -17,9 +17,6 @@ memory = ["sa-token-plugin-axum/memory"]
 ## Redis 存储（适用于生产环境，支持分布式部署）
 redis = ["sa-token-plugin-axum/redis"]
 
-## 数据库存储（适用于需要持久化的场景）
-database = ["sa-token-plugin-axum/database"]
-
 [dependencies]
 tx-di-core = { path = "../../tx-di-core" }
 tx_di_axum = { path = "../tx_di_axum" }

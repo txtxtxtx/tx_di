@@ -11,10 +11,6 @@ use sa_token_plugin_axum::MemoryStorage;
 #[cfg(feature = "redis")]
 use sa_token_plugin_axum::RedisStorage;
 
-#[cfg(feature = "database")]
-use sa_token_plugin_axum::DatabaseStorage;
-
-
 /// sa-token 配置结构体
 ///
 /// 从 TOML 配置文件 `[sa_token_config]` 节自动加载。
@@ -73,10 +69,6 @@ pub struct SaTokenConf {
     #[serde(default = "default_true")]
     pub is_read_cookie: bool,
 
-    /// Token 前缀（如 "Bearer "），设置后 Header 中的 Token 需带此前缀
-    #[serde(default)]
-    pub token_prefix: Option<String>,
-
     /// 是否输出操作日志
     #[serde(default)]
     pub is_log: bool,
@@ -119,7 +111,6 @@ impl Default for SaTokenConf {
             is_read_body: false,
             is_read_header: true,
             is_read_cookie: true,
-            token_prefix: None,
             is_log: false,
             jwt_secret_key: None,
             jwt_algorithm: None,
@@ -163,9 +154,6 @@ impl SaTokenConf {
             .is_share(self.is_share)
             .token_style(parse_token_style(&self.token_style));
 
-        if let Some(ref prefix) = self.token_prefix {
-            b = b.token_prefix(prefix);
-        }
         if let Some(ref key) = self.jwt_secret_key {
             b = b.jwt_secret_key(key);
         }
@@ -190,17 +178,8 @@ impl SaTokenConf {
             Arc::new(RedisStorage::new(&redis_url))
         }
         
-        #[cfg(feature = "database")]
-        {
-            tracing::info!("使用数据库存储后端 (DatabaseStorage)");
-            // TODO: 从配置中读取数据库连接信息
-            let db_url = std::env::var("DATABASE_URL")
-                .unwrap_or_else(|_| "sqlite://sa_token.db".to_string());
-            Arc::new(DatabaseStorage::new(&db_url))
-        }
-        
         // 如果没有启用任何存储特性，默认使用内存存储
-        #[cfg(not(any(feature = "memory", feature = "redis", feature = "database")))]
+        #[cfg(not(any(feature = "memory", feature = "redis")))]
         {
             tracing::warn!("未启用任何存储特性，使用默认内存存储");
             Arc::new(MemoryStorage::new())
