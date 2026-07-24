@@ -92,6 +92,7 @@ fn make_independent_metas(n: usize) -> Vec<ComponentMeta> {
                 async_init_fn: noop_async_init,
                 async_run_fn: noop_async_run,
                 shutdown_fn: noop_shutdown,
+                has_async_run: true
             }
         })
         .collect()
@@ -128,6 +129,7 @@ fn make_chain_metas(n: usize) -> Vec<ComponentMeta> {
             async_init_fn: noop_async_init,
             async_run_fn: noop_async_run,
             shutdown_fn: noop_shutdown,
+            has_async_run: true
         })
         .collect()
 }
