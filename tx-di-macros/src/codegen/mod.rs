@@ -174,8 +174,12 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
     let has_async_run = ctx.comp_attr.has_app_async_run;
     let meta_entry = meta_entry::gen_meta_entry(&ctx, factory_fn, has_async_run);
 
+    // 拦截器链 static + helper（模块级，放 impl 块外）
+    let interceptor_items = intercept::gen_static_and_helper(&ctx);
+
     // 组装最终输出：derive 宏只追加 impl 和 linkme 注册，不重新输出结构体
     Ok(quote! {
+        #interceptor_items
         #component_impl
         #meta_entry
     })

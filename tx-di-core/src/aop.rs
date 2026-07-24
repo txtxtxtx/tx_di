@@ -1,43 +1,28 @@
 //! AOP 拦截器 — 横切关注点分离
 //!
-//! 拦截器通过 DI 框架管理：拦截器本身也是 `#[derive(Component)]`，
-//! 可依赖其他服务。通过 `#[component(intercept(InterceptorType))]` 显式声明
-//! 需要哪些拦截器，框架在 App 阶段从 Store 中精确注入。
+//! 拦截器链存储在组件实例自身的隐藏字段中（`OnceLock<Arc<InterceptorChain>>`），
+//! 不依赖全局表，无锁、无泄漏、无 ABA 风险。
 //!
 //! # 使用方式
 //!
 //! ```ignore
-//! // 1. 定义拦截器（也是 DI 组件）
 //! #[derive(Component)]
-//! pub struct AuthInterceptor {
-//!     pub session: Arc<SessionService>,   // DI 自动注入
-//! }
+//! pub struct AuthInterceptor { pub session: Arc<SessionService> }
 //! impl Interceptor for AuthInterceptor {
-//!     fn before(&self, ctx: &CallContext) -> RIE<()> {
-//!         tracing::info!("参数: {:?}", ctx.args);
-//!         Ok(())
-//!     }
-//!     fn after(&self, ctx: &CallContext, result: &mut CallResult) {
-//!         match result {
-//!             CallResult::Ok => tracing::info!("成功"),
-//!             CallResult::Err(e) => tracing::warn!("失败: {}", e),
-//!         }
-//!     }
+//!     fn before(&self, ctx: &CallContext) -> RIE<()> { Ok(()) }
 //! }
 //!
-//! // 2. 业务组件声明需要哪些拦截器
 //! #[derive(Component)]
-//! #[component(intercept(AuthInterceptor, AuditInterceptor))]
+//! #[component(intercept(AuthInterceptor))]
 //! pub struct UserService;
 //!
 //! impl UserService {
 //!     #[intercept]
-//!     pub fn get_user(&self, user_id: u64) -> RIE<User> {
-//!         // 业务逻辑
-//!     }
+//!     pub fn get_user(&self, user_id: u64) -> RIE<User> { ... }
 //! }
 //! ```
 
+use std::any::TypeId;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -45,80 +30,120 @@ use crate::component::Component;
 use crate::store::Store;
 use crate::RIE;
 
-// ── CallContext ─────────────────────────────────────────────────────────────
-
-/// 调用上下文 — 传递给拦截器的上下文信息
-pub struct CallContext {
-    /// 方法名
-    pub method_name: &'static str,
-    /// 参数 Debug 表示（用于日志/监控拦截器）
-    pub args: Vec<ArgValue>,
-}
-
-impl CallContext {
-    /// 创建新的调用上下文
-    pub fn new(method_name: &'static str) -> Self {
-        CallContext {
-            method_name,
-            args: Vec::new(),
-        }
-    }
-    /// 添加参数（Debug 表示）
-    pub fn with_arg(mut self, arg: ArgValue) -> Self {
-        self.args.push(arg);
-        self
-    }
-}
-
 // ── ArgValue ────────────────────────────────────────────────────────────────
 
-/// 参数值（用于日志和调试）
+/// 参数值（用于日志和调试，支持 serde 反序列化恢复复杂类型）
 #[derive(Debug, Clone)]
 pub enum ArgValue {
     I64(i64),
+    U64(u64),
+    F64(f64),
     Str(String),
     Bool(bool),
-    Other(String),
+    /// 任意类型的 serde JSON 表示
+    Serialized {
+        type_id: TypeId,
+        type_name: &'static str,
+        json: String,
+    },
 }
 
-impl From<i64> for ArgValue {
-    fn from(v: i64) -> Self { ArgValue::I64(v) }
+impl From<i64> for ArgValue { fn from(v: i64) -> Self { ArgValue::I64(v) } }
+impl From<u64> for ArgValue { fn from(v: u64) -> Self { ArgValue::U64(v) } }
+impl From<f64> for ArgValue { fn from(v: f64) -> Self { ArgValue::F64(v) } }
+impl From<&str> for ArgValue { fn from(v: &str) -> Self { ArgValue::Str(v.to_string()) } }
+impl From<String> for ArgValue { fn from(v: String) -> Self { ArgValue::Str(v) } }
+impl From<bool> for ArgValue { fn from(v: bool) -> Self { ArgValue::Bool(v) } }
+
+// ── CallContext ─────────────────────────────────────────────────────────────
+
+/// 调用上下文 — 传递给拦截器的上下文信息
+#[derive(Clone)]
+pub struct CallContext {
+    /// 方法名
+    pub method_name: &'static str,
+    /// 命名参数列表
+    pub args: Vec<(/* name */ &'static str, ArgValue)>,
 }
-impl From<&str> for ArgValue {
-    fn from(v: &str) -> Self { ArgValue::Str(v.to_string()) }
-}
-impl From<String> for ArgValue {
-    fn from(v: String) -> Self { ArgValue::Str(v) }
-}
-impl From<bool> for ArgValue {
-    fn from(v: bool) -> Self { ArgValue::Bool(v) }
+
+impl CallContext {
+    pub fn new(method_name: &'static str) -> Self {
+        CallContext { method_name, args: Vec::new() }
+    }
+
+    /// 添加命名参数
+    pub fn with_arg(mut self, name: &'static str, val: ArgValue) -> Self {
+        self.args.push((name, val));
+        self
+    }
+
+    /// 按名称查找参数
+    pub fn get_arg(&self, name: &str) -> Option<&ArgValue> {
+        self.args.iter().find(|(n, _)| *n == name).map(|(_, v)| v)
+    }
 }
 
 // ── CallResult ──────────────────────────────────────────────────────────────
 
-/// 调用结果（`after` 可修改此值以加工返回描述）
+/// 调用结果（`after` / `around` 可读取或修改）
 #[derive(Debug)]
 pub enum CallResult {
     Ok,
+    /// 错误消息字符串
     Err(String),
 }
+
+impl CallResult {
+    /// 转换为 `RIE<()>`，供调用方传播
+    pub fn into_result(self) -> RIE<()> {
+        match self {
+            CallResult::Ok => Ok(()),
+            CallResult::Err(msg) => Err(crate::error::AppError::with_context(
+                crate::error::DiErr::InjectError,
+                msg,
+            )),
+        }
+    }
+}
+
+// ── CallFn ──────────────────────────────────────────────────────────────────
+
+/// 可执行的业务调用（类似 `FnOnce()`, 用于 `around` 包装）
+pub trait CallFn: Send {
+    fn execute(self: Box<Self>) -> CallResult;
+}
+
+impl<F: FnOnce() -> CallResult + Send> CallFn for F {
+    fn execute(self: Box<Self>) -> CallResult { self() }
+}
+
+pub type BoxCall = Box<dyn CallFn>;
 
 // ── Interceptor trait ───────────────────────────────────────────────────────
 
 /// AOP 拦截器 trait
 ///
 /// - `before`：只读上下文，返回 `Err` 阻止方法执行
-/// - `after`：可修改 `CallResult` 以加工返回描述（日志/监控用）
+/// - `after`：可读取 `CallResult`
+/// - `around`：完全包裹调用，可短路 / 重试 / 替换返回
 pub trait Interceptor: Send + Sync + 'static {
     #[allow(unused_variables)]
     fn before(&self, ctx: &CallContext) -> RIE<()> { Ok(()) }
+
     #[allow(unused_variables)]
-    fn after(&self, ctx: &CallContext, result: &mut CallResult) {}
+    fn after(&self, ctx: &CallContext, result: &CallResult) {}
+
+    /// around 拦截（默认委托给 call 执行业务逻辑）
+    fn around(&self, _ctx: &CallContext, call: BoxCall) -> CallResult {
+        call.execute()
+    }
 }
 
 // ── InterceptorChain ────────────────────────────────────────────────────────
 
-/// 拦截器链 — 按顺序执行多个拦截器（非泛型，支持异构拦截器混合）
+/// 拦截器链 — 按顺序执行多个拦截器
+///
+/// 执行流程：`before_all → around_all（最内层为业务 body）→ after_all`
 pub struct InterceptorChain {
     interceptors: Vec<Arc<dyn Interceptor>>,
 }
@@ -127,29 +152,58 @@ impl InterceptorChain {
     pub fn new() -> Self {
         InterceptorChain { interceptors: Vec::new() }
     }
+
     /// 添加拦截器（按值，自动 `Arc<dyn Interceptor>`）
     pub fn push<I: Interceptor>(&mut self, interceptor: I) {
         self.interceptors.push(Arc::new(interceptor));
     }
+
     /// 添加已 `Arc` 包装的拦截器
     pub fn push_arc(&mut self, interceptor: Arc<dyn Interceptor>) {
         self.interceptors.push(interceptor);
     }
-    /// before_all — 顺序执行，任一 Err 即停止
+
+    /// `before_all` — 顺序执行，任一 Err 即停止
     pub fn before_all(&self, ctx: &CallContext) -> RIE<()> {
-        for interceptor in &self.interceptors {
-            interceptor.before(ctx)?;
+        for ic in &self.interceptors {
+            ic.before(ctx)?;
         }
         Ok(())
     }
-    /// after_all — 逆序执行，可传递可变 `CallResult` 让拦截器加工
-    pub fn after_all(&self, ctx: &CallContext, result: &mut CallResult) {
-        for interceptor in self.interceptors.iter().rev() {
-            interceptor.after(ctx, result);
+
+    /// `after_all` — 逆序执行
+    pub fn after_all(&self, ctx: &CallContext, result: &CallResult) {
+        for ic in self.interceptors.iter().rev() {
+            ic.after(ctx, result);
         }
     }
+
+    /// `around_all` — 构建洋葱调用链
+    ///
+    /// 最外层拦截器（声明顺序的第一个）最先执行 `around`，
+    /// 逐层包裹直至最内层的 `call`（业务 body）。
+    /// 闭包捕获 `method_name` 副本（`'static`）以满足 `Send + 'static` 约束。
+    pub fn around_all(&self, ctx: &CallContext, exec: BoxCall) -> CallResult {
+        let method_name = ctx.method_name;
+        let args = ctx.args.clone();
+        let mut call = exec;
+        for ic in self.interceptors.iter().rev() {
+            let inner = call;
+            let ic = Arc::clone(ic);
+            let mn = method_name;
+            let a = args.clone();
+            call = Box::new(move || {
+                let ctx = CallContext { method_name: mn, args: a };
+                ic.around(&ctx, inner)
+            });
+        }
+        call.execute()
+    }
 }
-impl Default for InterceptorChain { fn default() -> Self { Self::new() } }
+
+impl Default for InterceptorChain {
+    fn default() -> Self { Self::new() }
+}
 
 // ── 内置拦截器 ──────────────────────────────────────────────────────────────
 
@@ -164,10 +218,11 @@ impl Component for LoggingInterceptor {
 impl Default for LoggingInterceptor { fn default() -> Self { LoggingInterceptor } }
 impl Interceptor for LoggingInterceptor {
     fn before(&self, ctx: &CallContext) -> RIE<()> {
-        tracing::info!("→ {} {:?}", ctx.method_name, ctx.args);
+        tracing::info!("→ {} {:?}", ctx.method_name, ctx.args.iter()
+            .map(|(n, v)| format!("{}={:?}", n, v)).collect::<Vec<_>>());
         Ok(())
     }
-    fn after(&self, ctx: &CallContext, result: &mut CallResult) {
+    fn after(&self, ctx: &CallContext, result: &CallResult) {
         match result {
             CallResult::Ok => tracing::info!("← {} OK", ctx.method_name),
             CallResult::Err(e) => tracing::warn!("← {} ERR: {}", ctx.method_name, e),
@@ -180,7 +235,9 @@ pub struct MetricsInterceptor { pub counter: AtomicU64 }
 
 impl Component for MetricsInterceptor {
     type Deps = ();
-    fn build(_: Self::Deps, _store: &Store) -> Self { MetricsInterceptor { counter: AtomicU64::new(0) } }
+    fn build(_: Self::Deps, _store: &Store) -> Self {
+        MetricsInterceptor { counter: AtomicU64::new(0) }
+    }
     const SCOPE: crate::Scope = crate::Scope::Singleton;
 }
 impl MetricsInterceptor {
@@ -193,33 +250,4 @@ impl Interceptor for MetricsInterceptor {
         self.counter.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
-}
-
-// ── 拦截器链存储（per-instance）──────────────────────────────────────────────
-//
-// 拦截器链按「组件实例指针」存储，而非 per-type 全局静态。这样同进程内多个
-// App（如并行运行的测试）各自持有独立组件实例，其拦截链互不干扰，不会出现
-// 某一 App 的 init 覆盖另一 App 拦截链的竞态问题。
-//
-// key = `Arc<Self>` 的内部指针（`Arc::as_ptr` 与 `&self as *const Self` 一致）。
-
-use std::collections::HashMap;
-use std::sync::Mutex;
-use std::sync::OnceLock;
-
-static INTERCEPTOR_CHAINS: OnceLock<Mutex<HashMap<usize, Arc<InterceptorChain>>>> =
-    OnceLock::new();
-
-fn chains_map() -> &'static Mutex<HashMap<usize, Arc<InterceptorChain>>> {
-    INTERCEPTOR_CHAINS.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
-/// 按组件实例指针设置拦截器链（由 `#[component(intercept(...))]` 生成的 `init` 调用）
-pub fn set_interceptor_chain(key: usize, chain: Arc<InterceptorChain>) {
-    chains_map().lock().unwrap().insert(key, chain);
-}
-
-/// 按组件实例指针获取拦截器链（由 `#[intercept]` 方法调用）
-pub fn get_interceptor_chain(key: usize) -> Option<Arc<InterceptorChain>> {
-    chains_map().lock().unwrap().get(&key).cloned()
 }

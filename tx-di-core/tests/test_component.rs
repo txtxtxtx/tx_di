@@ -26,7 +26,7 @@ use tx_di_core::{
     App, AppError, BuildContext, CompRef, Component, DepsTuple, DiErr, RIE, Scope,
     Store, inject_all_traits_from_store, inject_from_store, inject_trait_from_store,
 };
-use tx_di_core::aop::{CallContext, CallResult, Interceptor, InterceptorChain};
+use tx_di_core::aop::{BoxCall, CallContext, CallResult, Interceptor, InterceptorChain};
 use tx_di_core::intercept;
 #[allow(unused_imports)]
 use tx_di_log::LogPlugins;
@@ -521,7 +521,7 @@ fn test_interceptor_before_after() {
             self.before_called.store(true, Ordering::SeqCst);
             Ok(())
         }
-        fn after(&self, _ctx: &CallContext, _result: &mut CallResult) {
+        fn after(&self, _ctx: &CallContext, _result: &CallResult) {
             self.after_called.store(true, Ordering::SeqCst);
         }
     }
@@ -556,7 +556,7 @@ fn test_interceptor_chain() {
             self.counter.fetch_add(1, Ordering::SeqCst);
             Ok(())
         }
-        fn after(&self, _ctx: &CallContext, _result: &mut CallResult) {
+        fn after(&self, _ctx: &CallContext, _result: &CallResult) {
             self.counter.fetch_add(1, Ordering::SeqCst);
         }
     }
@@ -580,7 +580,7 @@ fn test_logging_interceptor() {
     use tx_di_core::aop::LoggingInterceptor;
 
     let interceptor = LoggingInterceptor;
-    let ctx = CallContext::new("test_method").with_arg("param1".into());
+    let ctx = CallContext::new("test_method").with_arg("param1", "param1".into());
     let mut result = CallResult::Ok;
     interceptor.before(&ctx).unwrap();
     interceptor.after(&ctx, &mut result);
@@ -627,10 +627,12 @@ fn test_interceptor_after_modify_result() {
     struct ErrEnricher;
 
     impl Interceptor for ErrEnricher {
-        fn after(&self, _ctx: &CallContext, result: &mut CallResult) {
-            if let CallResult::Err(msg) = result {
+        fn around(&self, _ctx: &CallContext, call: BoxCall) -> CallResult {
+            let mut res = call.execute();
+            if let CallResult::Err(msg) = &mut res {
                 *msg = format!("enriched: {}", msg);
             }
+            res
         }
     }
 
@@ -676,7 +678,7 @@ impl Interceptor for AopLogInterceptor {
         tracing::info!("[AOP-Interceptor] before: method={}", ctx.method_name);
         Ok(())
     }
-    fn after(&self, ctx: &CallContext, result: &mut CallResult) {
+    fn after(&self, ctx: &CallContext, result: &CallResult) {
         tracing::info!(
             "[AOP-Interceptor] after: method={} result={:?}",
             ctx.method_name,

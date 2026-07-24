@@ -114,9 +114,8 @@ pub fn gen_component_impl(ctx: &CodeGenContext) -> TokenStream2 {
         shutdown,
     } = gen_lifecycle_overrides(ctx);
 
-    // ── 拦截器 init 覆写（如果有 interceptors，由 intercept 模块生成）─────
-    // 拦截器 init 已包含用户 app_init 调用，所以有 interceptors 时不用 lifecycle 的 app_init
-    let interceptor_init = intercept::gen_interceptor_init_override(ctx);
+    // ── 拦截器 init 覆写（如果有 interceptors，用 intercept 模块生成的）─────
+    let interceptor_init = intercept::gen_init_override(ctx);
     let has_interceptors = !ctx.comp_attr.interceptors.is_empty();
     let app_init_final = if has_interceptors {
         interceptor_init

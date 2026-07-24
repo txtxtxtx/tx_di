@@ -30,6 +30,7 @@ pub mod topology;
 pub use dashmap::DashMap;
 pub use linkme;
 pub use serde;
+pub use serde_json;
 pub use toml::Value;
 pub use toml::map;
 pub use tracing;
@@ -58,6 +59,6 @@ pub use registry::{ComponentMeta, COMPONENT_REGISTRY};
 pub use scope::Scope;
 pub use store::{Store, CompRef, TraitImplEntry, TraitImplMap, inject_from_store, try_inject_from_store, inject_trait_from_store, try_inject_trait_from_store, inject_all_traits_from_store};
 pub use topology::topo_sort;
-pub use aop::{CallContext, CallResult, Interceptor, InterceptorChain};
+pub use aop::{CallContext, CallResult, ArgValue, CallFn, BoxCall, Interceptor, InterceptorChain};
 
 
