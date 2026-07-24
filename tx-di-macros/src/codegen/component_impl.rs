@@ -57,7 +57,7 @@ pub fn gen_component_impl(ctx: &CodeGenContext) -> TokenStream2 {
                     .inject_fields
                     .iter()
                     .position(|(name, _)| name == fname)
-                    .unwrap();
+                    .expect("按名称查找注入字段索引不应失败——该字段已被分类为 Inject");
                 let idx_lit = proc_macro2::Literal::usize_unsuffixed(idx);
                 quote! { #fname: deps.#idx_lit.clone() }
             }

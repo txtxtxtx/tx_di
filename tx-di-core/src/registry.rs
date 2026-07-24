@@ -60,6 +60,9 @@ pub struct ComponentMeta {
 
     /// 优雅关闭
     pub shutdown_fn: fn(&Store),
+
+    /// 是否覆写了 `app_async_run` 回调（用于 comp_run 跳过空实现）
+    pub has_async_run: bool,
 }
 
 impl ComponentMeta {

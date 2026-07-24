@@ -144,11 +144,12 @@ impl Store {
                 Err(AppError::with_context(
                     DiErr::InjectError,
                     format!(
-                        "组件 `{}` (TypeId={:?}) 未注册。\n\
-                         请确认:\n\
-                         1. 该结构体已标注 #[derive(Component)]\n\
-                         2. 所在 crate 已在 Cargo.toml 中引入\n\
-                         当前已注册 {} 个组件",
+                        "组件注入失败: `{}` (TypeId={:?}) 未在 Store 中注册。\n\
+                         可能原因:\n\
+                         1. 组件未标注 #[derive(Component)]\n\
+                         2. 所在 crate 或插件未在 Cargo.toml 中引入\n\
+                         3. 组件未被使用 (use tx_di_xxx;) — linkme 需此触发注册\n\
+                         Store 中已注册 {} 个组件",
                         type_name, tid, count
                     ),
                 ))

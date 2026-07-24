@@ -17,8 +17,9 @@ use crate::name_utils::camel_to_screaming_snake;
 /// 生成 linkme 注册条目
 ///
 /// `factory_fn` 为 `factory` 模块生成的闭包 TokenStream。
-pub fn gen_meta_entry(ctx: &CodeGenContext, factory_fn: TokenStream2) -> TokenStream2 {
+pub fn gen_meta_entry(ctx: &CodeGenContext, factory_fn: TokenStream2, has_async_run: bool) -> TokenStream2 {
     let struct_name = &ctx.struct_name;
+    let has_async_run_lit = has_async_run;
     let vis = &ctx.vis;
     let scope_const = ctx.comp_attr.scope_tokens();
     let is_config_component = ctx.comp_attr.is_config_component();
@@ -95,13 +96,11 @@ pub fn gen_meta_entry(ctx: &CodeGenContext, factory_fn: TokenStream2) -> TokenSt
             },
             shutdown_fn: |store: &::tx_di_core::Store| {
                 if let Some(arc) = store.try_inject::<#struct_name>() {
-                    // arc 是 Arc<T>，需要获取 &T 调用 shutdown
-                    // 但 Arc 无法直接获取 &mut，shutdown 是 &self 方法
-                    // 通过 Arc::deref 获取引用
                     use std::ops::Deref;
                     arc.deref().shutdown();
                 }
             },
+            has_async_run: #has_async_run_lit,
         };
     }
 }

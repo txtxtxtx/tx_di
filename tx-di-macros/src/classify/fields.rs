@@ -6,7 +6,7 @@
 use syn::{Expr, GenericArgument, Ident, ItemStruct, PathArguments, Result as SynResult, Type};
 
 use crate::attr::field_attr::{extract_inject_expr, has_skip_attr};
-use crate::type_utils::{extract_option_inner, is_arc_dyn_trait, is_option_arc_type, is_option_type, is_plain_arc_dyn_trait, is_vec_arc_dyn_trait};
+use crate::type_utils::{extract_option_inner, is_option_arc_dyn_trait, is_option_arc_type, is_option_type, is_plain_arc_dyn_trait, is_vec_arc_dyn_trait};
 
 /// 字段注入类别
 ///
@@ -54,7 +54,7 @@ pub fn classify_fields(input: &ItemStruct) -> SynResult<Vec<(Ident, FieldKind)>>
         } else if is_vec_arc_dyn_trait(&field.ty) {
             // Vec<Arc<dyn Trait>> — 列表 trait object 注入
             FieldKind::TraitInjectList { ty: field.ty.clone() }
-        } else if is_arc_dyn_trait(&field.ty) {
+        } else if is_option_arc_dyn_trait(&field.ty) {
             // Option<Arc<dyn Trait>> — 可选 trait object 注入
             FieldKind::TraitInject { ty: field.ty.clone() }
         } else if is_option_arc_type(&field.ty) {

@@ -107,12 +107,26 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
         })
         .collect();
 
+    // Deps 元组最多支持 16 个 Arc<T> 依赖
+    const MAX_DEPS: usize = 16;
+    if inject_fields.len() > MAX_DEPS {
+        return Err(syn::Error::new_spanned(
+            &input,
+            format!(
+                "依赖组件（Arc<T> 字段）超过上限 {} 个，当前 {} 个。\
+                 请将部分字段合并为配置组件（#[component(conf)]）或拆分子组件。",
+                MAX_DEPS,
+                inject_fields.len()
+            ),
+        ));
+    }
+
     let trait_inject_fields: Vec<(Ident, Type)> = fields_info
         .iter()
         .filter_map(|(name, kind)| match kind {
             FieldKind::TraitInject { ty } => {
                 let trait_ty = extract_trait_from_option_arc(ty)
-                    .expect("is_arc_dyn_trait 已验证，提取 trait 类型不应失败");
+                    .expect("is_option_arc_dyn_trait 已验证，提取 trait 类型不应失败");
                 Some((name.clone(), trait_ty))
             }
             _ => None,
@@ -157,7 +171,8 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
     // 各子模块生成代码片段
     let component_impl = component_impl::gen_component_impl(&ctx);
     let factory_fn = factory::gen_factory_fn(&ctx);
-    let meta_entry = meta_entry::gen_meta_entry(&ctx, factory_fn);
+    let has_async_run = ctx.comp_attr.has_app_async_run;
+    let meta_entry = meta_entry::gen_meta_entry(&ctx, factory_fn, has_async_run);
 
     // 组装最终输出：derive 宏只追加 impl 和 linkme 注册，不重新输出结构体
     Ok(quote! {

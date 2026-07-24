@@ -7,6 +7,7 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use dashmap::DashMap;
 use tokio::signal;
@@ -88,9 +89,13 @@ impl BuildContext {
         let metas: Vec<&'static ComponentMeta> = COMPONENT_REGISTRY.iter().collect();
         let sorted_ids = topo_sort(&metas, &self.store.trait_impls)?;
 
-        // 3. 按拓扑顺序注册工厂
+        // 3. 按拓扑顺序注册工厂（预建 HashMap 避免 O(n²)）
+        let meta_map: std::collections::HashMap<TypeId, &ComponentMeta> = metas
+            .iter()
+            .map(|m| ((m.type_id)(), *m))
+            .collect();
         for tid in &sorted_ids {
-            if let Some(meta) = metas.iter().find(|m| (m.type_id)() == *tid) {
+            if let Some(meta) = meta_map.get(tid) {
                 self.register_factory(meta);
                 self.metas.push(meta);
             }
@@ -225,6 +230,8 @@ impl BuildContext {
             store,
             metas,
             shutdown_token,
+            shutdown_called: AtomicBool::new(false),
+            shutdown_timeout_secs: 5,
             task_handle: RwLock::new(None),
         })
     }
@@ -252,6 +259,10 @@ pub struct App {
     pub metas: Vec<&'static ComponentMeta>,
     pub shutdown_token: CancellationToken,
     pub task_handle: RwLock<Option<JoinHandle<()>>>,
+    /// 幂等门闩：shutdown 只执行一次
+    shutdown_called: AtomicBool,
+    /// 后台任务关闭超时（秒），默认 5
+    pub shutdown_timeout_secs: u64,
 }
 
 impl App {
@@ -295,9 +306,11 @@ impl App {
         Ok(())
     }
 
-    /// 异步初始化阶段：按已排序顺序（拓扑序 + init_sort）调用所有组件的 async_init()
+    /// 异步初始化阶段：按拓扑顺序串行调用所有组件的 async_init()
+    ///
+    /// metas 已按拓扑序排列，依赖者的 async_init（如建立 DB 连接）先于消费者执行。
+    /// TODO: 分层并行 — 同拓扑深度的组件可并发 exec，但需额外依赖关系分析。
     async fn async_init(app: &Arc<App>) -> RIE<()> {
-        // 同 init()，复用 BuildContext 已排好的顺序
         for meta in &app.metas {
             debug!("[di] async_init: {}", meta.name);
             (meta.async_init_fn)(app).await?;
@@ -305,13 +318,15 @@ impl App {
         Ok(())
     }
 
-    /// 并行运行所有组件的 async_run()
+    /// 并行运行所有组件的 async_run()，跳过未覆写回调的组件
     async fn comp_run(app: Arc<App>, token: CancellationToken) -> RIE<()> {
         let mut handles = Vec::new();
 
-        // 先收集所有 meta 引用，避免借用 app.metas
         let metas: Vec<&'static ComponentMeta> = app.metas.clone();
         for meta in metas {
+            if !meta.has_async_run {
+                continue; // 未覆写 async_run，跳过
+            }
             let app_clone = app.clone();
             let token_clone = token.clone();
             let name = meta.name;
@@ -351,6 +366,8 @@ impl App {
             metas: self.metas,
             shutdown_token: self.shutdown_token,
             task_handle: self.task_handle,
+            shutdown_called: AtomicBool::new(false),
+            shutdown_timeout_secs: 5,
         });
 
         // 初始化阶段必须先完成，否则调用方立即访问组件时会因尚未就绪而失败
@@ -375,15 +392,16 @@ impl App {
         Ok(app)
     }
 
-    /// 优雅关闭所有组件
+    /// 优雅关闭所有组件（幂等：多次调用只执行一次）
     pub async fn shutdown(&self) {
+        if self.shutdown_called.swap(true, Ordering::SeqCst) {
+            return; // 已执行过 shutdown，跳过
+        }
         let metas: Vec<&ComponentMeta> = self.metas.clone();
-        // 逆序关闭（后注册的先关闭）
         for meta in metas.iter().rev() {
             debug!("[di] shutdown: {}", meta.name);
             (meta.shutdown_fn)(&self.store);
         }
-        // 清理 Prototype 实例的追踪记录
         self.store.shutdown_prototypes();
     }
 
@@ -395,7 +413,8 @@ impl App {
         self.shutdown_token.cancel();
 
         if let Some(handle) = self.task_handle.write().await.take() {
-            match tokio::time::timeout(std::time::Duration::from_secs(5), handle).await {
+            let timeout = std::time::Duration::from_secs(self.shutdown_timeout_secs);
+            match tokio::time::timeout(timeout, handle).await {
                 Ok(Ok(())) => {
                     info!("后台任务已正常关闭");
                 }
@@ -403,7 +422,7 @@ impl App {
                     tracing::error!("后台任务退出时发生错误: {:?}", e);
                 }
                 Err(_) => {
-                    tracing::warn!("后台任务关闭超时（5秒），强制退出");
+                    tracing::warn!("后台任务关闭超时（{}秒），强制退出", self.shutdown_timeout_secs);
                 }
             }
         }

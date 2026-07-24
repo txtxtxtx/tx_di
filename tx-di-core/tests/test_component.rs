@@ -447,7 +447,7 @@ fn test_store_inject_returns_error() {
     assert_eq!(err.code(), -4);
     let ctx_msg = err.context().expect("应携带 context");
     assert!(ctx_msg.contains("Unregistered"));
-    assert!(ctx_msg.contains("未注册"));
+    assert!(ctx_msg.contains("未在 Store 中注册"));
 }
 
 // ── 7. BuildContext & App ────────────────────────────────────────────────

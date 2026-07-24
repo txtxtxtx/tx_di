@@ -53,16 +53,6 @@ impl CompAttr {
         self.conf.is_some()
     }
 
-    /// 是否有任何生命周期覆写被启用
-    #[allow(dead_code)]
-    pub fn has_any_lifecycle(&self) -> bool {
-        self.has_init
-            || self.has_app_init
-            || self.has_app_async_init
-            || self.has_app_async_run
-            || self.has_shutdown
-    }
-
     /// 生成 scope 对应的 TokenStream
     pub fn scope_tokens(&self) -> TokenStream2 {
         match self.scope {

@@ -3,8 +3,6 @@
 //! 提供 `Arc<T>`、`Option<T>`、`Arc<dyn Trait>`、`Option<Arc<dyn Trait>>` 等
 //! 类型的检测与内部类型提取，供字段分类使用。
 
-use proc_macro2::TokenStream as TokenStream2;
-use quote::quote;
 use syn::{GenericArgument, PathArguments, Type};
 
 /// 如果 `ty` 是 `Arc<T>`（支持 `Arc<T>` 或 `std::sync::Arc<T>` 等路径），
@@ -76,7 +74,7 @@ pub fn extract_trait_from_option_arc(ty: &Type) -> Option<Type> {
 }
 
 /// 检查类型是否为 `Option<Arc<dyn Trait>>` 形式
-pub fn is_arc_dyn_trait(ty: &Type) -> bool {
+pub fn is_option_arc_dyn_trait(ty: &Type) -> bool {
     extract_trait_from_option_arc(ty).is_some()
 }
 
@@ -110,15 +108,6 @@ pub fn extract_trait_from_vec_arc(ty: &Type) -> Option<Type> {
 /// 检查类型是否为 `Vec<Arc<dyn Trait>>` 形式
 pub fn is_vec_arc_dyn_trait(ty: &Type) -> bool {
     extract_trait_from_vec_arc(ty).is_some()
-}
-
-/// 将类型按 `Arc<T>` 解包后生成 TokenStream（若不是 Arc 则原样输出）
-///
-/// 保留用于需要在宏展开中输出内部类型的场景。
-#[allow(dead_code)]
-pub fn strip_arc_tokens(ty: &Type) -> TokenStream2 {
-    let inner = strip_arc_type(ty);
-    quote! { #inner }
 }
 
 /// 检查类型是否可参与 DI 注入（`Arc<T>`、`Option<Arc<T>>` 等）
