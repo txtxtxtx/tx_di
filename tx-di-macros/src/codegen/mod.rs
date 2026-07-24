@@ -66,7 +66,10 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
     if !generics.params.is_empty() {
         return Err(syn::Error::new_spanned(
             &input.ident,
-            "泛型结构体请使用 #[component(for(Type1, Type2))] 指定具体类型参数",
+            "不支持泛型结构体。\n\
+             替代方案:\n\
+             1. 使用 newtype 包装具体类型 (例如 struct MyDbPool(DbPool<Postgres>))\n\
+             2. 手动为具体类型实现 Component trait",
         ));
     }
 

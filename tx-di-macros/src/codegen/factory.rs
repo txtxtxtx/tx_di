@@ -2,7 +2,7 @@
 //!
 //! 根据是否为配置组件生成两条不同的工厂路径：
 //! - 配置组件：从 `AppAllConfig` 反序列化
-//! - 普通组件：`Deps::resolve` → `build` → `inner_init`
+//! - 普通组件：`Deps::resolve` → `build` → 注入必选 trait → `inner_init`
 
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
@@ -52,12 +52,13 @@ pub fn gen_factory_fn(ctx: &CodeGenContext) -> TokenStream2 {
             }
         }
     } else {
-        // ── 普通组件：resolve → build → inner_init ───────────────────
+        // ── 普通组件：resolve → build(store) → inner_init ────────────
+        // build 接收 store 以直接注入 trait object 依赖（无需 unsafe）。
         quote! {
             |store: &::tx_di_core::Store| {
                 let deps = <#struct_name as ::tx_di_core::Component>::Deps::resolve(store)
                     .unwrap_or_else(|e| panic!("{}", e));
-                let mut instance = <#struct_name as ::tx_di_core::Component>::build(deps);
+                let mut instance = <#struct_name as ::tx_di_core::Component>::build(deps, store);
                 if let Err(e) = <#struct_name as ::tx_di_core::Component>::inner_init(&mut instance, store) {
                     panic!("[di] 组件 '{}' inner_init 失败: {}", stringify!(#struct_name), e);
                 }

@@ -132,6 +132,12 @@ pub struct DataConsumer {
     pub provider: Option<Arc<dyn DataProvider>>,
 }
 
+// 必选 trait 注入：Arc<dyn DataProvider>（非 Option 包裹）
+#[derive(Component)]
+pub struct RequiredTraitConsumer {
+    pub provider: Arc<dyn DataProvider>,
+}
+
 // ── 5. 配置组件 ─────────────────────────────────────────────────────────
 
 #[derive(Component, serde::Deserialize, Default)]
@@ -370,6 +376,15 @@ fn test_trait_object_via_store() {
     assert_eq!(provider.get_data(), "mysql_data");
 }
 
+#[test]
+fn test_required_trait_inject() {
+    // 必选 trait 注入：Arc<dyn DataProvider> 非 Option，
+    // 验证 factory 在 build 之后、inner_init 之前正确注入
+    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let consumer = ctx.inject::<RequiredTraitConsumer>();
+    assert_eq!(consumer.provider.get_data(), "mysql_data");
+}
+
 // ── 5. 配置组件 ─────────────────────────────────────────────────────────
 
 #[test]
@@ -408,7 +423,7 @@ fn test_store_try_inject_unregistered() {
     struct Unregistered;
     impl Component for Unregistered {
         type Deps = ();
-        fn build(_: ()) -> Self { Unregistered }
+        fn build(_: (), _store: &Store) -> Self { Unregistered }
     }
 
     let ctx = BuildContext::new::<std::path::PathBuf>(None);
@@ -421,7 +436,7 @@ fn test_store_inject_returns_error() {
     struct Unregistered2;
     impl Component for Unregistered2 {
         type Deps = ();
-        fn build(_: ()) -> Self { Unregistered2 }
+        fn build(_: (), _store: &Store) -> Self { Unregistered2 }
     }
 
     let ctx = BuildContext::new::<std::path::PathBuf>(None);
@@ -747,7 +762,7 @@ fn test_inject_unregistered_panics() {
     struct Ghost;
     impl Component for Ghost {
         type Deps = ();
-        fn build(_: ()) -> Self { Ghost }
+        fn build(_: (), _store: &Store) -> Self { Ghost }
     }
 
     let ctx = BuildContext::new::<std::path::PathBuf>(None);
@@ -1232,7 +1247,7 @@ fn test_deps_tuple_ten_elements() {
 struct DowncastTarget;
 impl Component for DowncastTarget {
     type Deps = ();
-    fn build(_: ()) -> Self {
+    fn build(_: (), _store: &Store) -> Self {
         DowncastTarget
     }
 }
@@ -1258,7 +1273,7 @@ fn test_inject_or_panic_unregistered() {
     struct Phantom;
     impl Component for Phantom {
         type Deps = ();
-        fn build(_: ()) -> Self {
+        fn build(_: (), _store: &Store) -> Self {
             Phantom
         }
     }

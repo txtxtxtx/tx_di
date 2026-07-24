@@ -40,10 +40,11 @@ pub trait Component: Send + Sync + 'static {
     /// 无依赖时用 `()`。
     type Deps: DepsTuple;
 
-    /// 从依赖构建组件实例
+    /// 从依赖和 Store 构建组件实例
     ///
-    /// 这是一个纯函数，不接触 Store，只接收已解析的依赖。
-    fn build(deps: Self::Deps) -> Self;
+    /// 接收已解析的 Deps 元组和 Store 引用。
+    /// Store 用于注入 trait object 依赖（`Arc<dyn Trait>` / `Option<Arc<dyn Trait>>` / `Vec<Arc<dyn Trait>>`）。
+    fn build(deps: Self::Deps, store: &Store) -> Self;
 
     /// 作用域，默认 Singleton
     const SCOPE: Scope = Scope::Singleton;

@@ -105,16 +105,11 @@ impl From<CompAttrArgs> for CompAttr {
 }
 
 /// 作用域属性
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum ScopeAttr {
+    #[default]
     Singleton,
     Prototype,
-}
-
-impl Default for ScopeAttr {
-    fn default() -> Self {
-        ScopeAttr::Singleton
-    }
 }
 
 impl Parse for CompAttrArgs {
@@ -218,14 +213,15 @@ impl Parse for CompAttrArgs {
                     content.parse_terminated(Type::parse, Token![,])?;
                 interceptors = types.into_iter().collect();
             } else if key == "for" {
-                // 泛型具体化 — 暂时跳过，后续实现
-                if input.peek(syn::token::Paren) {
-                    let _content: syn::ExprParen = input.parse()?;
-                }
+                return Err(syn::Error::new_spanned(
+                    key,
+                    "#[component(for(...))] 尚未实现。\n\
+                     替代方案: 使用 newtype 包装具体类型，或手动为具体类型实现 Component trait。",
+                ));
             } else {
                 return Err(syn::Error::new_spanned(
                     key,
-                    "#[component] 支持 scope / init / app_init / app_async_init / app_async_run / shutdown / init_sort / conf / as_trait / intercept / for 参数",
+                    "#[component] 支持 scope / init / app_init / app_async_init / app_async_run / shutdown / init_sort / conf / as_trait / intercept 参数",
                 ));
             }
 

@@ -3,7 +3,8 @@
 //! 当存在 trait inject 字段或 `#[component(init)]` 时，覆盖默认的
 //! `inner_init` 实现：
 //! - 可选 trait inject 字段：`self.field = Some(inject_trait_from_store(...))`
-//! - 必选 trait inject 字段：`ptr::write` 覆盖零值占位
+//! - 必选 trait inject 字段：已在 factory 中注入，此处无需处理
+//! - 列表 trait inject 字段：`self.field = inject_all_traits_from_store(...)`
 //! - `#[component(init)]`：调用用户定义的 `init` 函数
 
 use proc_macro2::TokenStream as TokenStream2;
@@ -14,7 +15,7 @@ use crate::codegen::CodeGenContext;
 /// 生成 `inner_init` 方法实现；无需覆盖时返回空 TokenStream
 pub fn gen_inner_init(ctx: &CodeGenContext) -> TokenStream2 {
     let has_trait_inject =
-        !ctx.trait_inject_fields.is_empty() || !ctx.required_trait_fields.is_empty() || !ctx.list_trait_fields.is_empty();
+        !ctx.trait_inject_fields.is_empty() || !ctx.list_trait_fields.is_empty();
 
     if !has_trait_inject && !ctx.comp_attr.has_init {
         return quote! {};
@@ -27,23 +28,6 @@ pub fn gen_inner_init(ctx: &CodeGenContext) -> TokenStream2 {
         .map(|(fname, ty)| {
             quote! {
                 self.#fname = Some(::tx_di_core::inject_trait_from_store::<#ty>(store));
-            }
-        })
-        .collect();
-
-    // 必选 trait inject 字段赋值（ptr::write 覆盖零值占位，避免 drop 无效 Arc）
-    let required_assigns: Vec<TokenStream2> = ctx
-        .required_trait_fields
-        .iter()
-        .map(|(fname, ty)| {
-            quote! {
-                // 用 ptr::write 覆盖零值占位，避免 drop 无效 Arc
-                unsafe {
-                    ::core::ptr::write(
-                        &mut self.#fname,
-                        ::tx_di_core::inject_trait_from_store::<#ty>(store),
-                    );
-                }
             }
         })
         .collect();
@@ -64,7 +48,6 @@ pub fn gen_inner_init(ctx: &CodeGenContext) -> TokenStream2 {
             #[inline]
             fn inner_init(&mut self, store: &::tx_di_core::Store) -> ::tx_di_core::RIE<()> {
                 #( #optional_assigns )*
-                #( #required_assigns )*
                 #( #list_assigns )*
                 self::init(self, store)
             }
@@ -74,7 +57,6 @@ pub fn gen_inner_init(ctx: &CodeGenContext) -> TokenStream2 {
             #[inline]
             fn inner_init(&mut self, store: &::tx_di_core::Store) -> ::tx_di_core::RIE<()> {
                 #( #optional_assigns )*
-                #( #required_assigns )*
                 #( #list_assigns )*
                 Ok(())
             }

@@ -30,11 +30,7 @@ pub fn extract_inject_expr(attrs: &[Attribute]) -> SynResult<Option<Expr>> {
 /// 检查属性列表中是否包含 `#[tx_cst(skip)]` 属性
 pub fn has_skip_attr(attrs: &[Attribute]) -> bool {
     attrs.iter().any(|attr| {
-        if attr.path().is_ident(TX_CST) {
-            if let Ok(ident) = attr.parse_args::<Ident>() {
-                return ident == "skip";
-            }
-        }
-        false
+        attr.path().is_ident(TX_CST)
+            && matches!(attr.parse_args::<Ident>(), Ok(ident) if ident == "skip")
     })
 }

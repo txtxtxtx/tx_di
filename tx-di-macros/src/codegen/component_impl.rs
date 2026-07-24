@@ -13,6 +13,7 @@ use crate::codegen::inner_init::gen_inner_init;
 use crate::codegen::intercept;
 use crate::codegen::lifecycle::{gen_lifecycle_overrides, LifecycleOverrides};
 use crate::codegen::CodeGenContext;
+use crate::type_utils::strip_arc_type;
 
 /// 生成 `impl ::tx_di_core::Component for #struct_name { ... }`
 pub fn gen_component_impl(ctx: &CodeGenContext) -> TokenStream2 {
@@ -37,7 +38,7 @@ pub fn gen_component_impl(ctx: &CodeGenContext) -> TokenStream2 {
         quote! { (#(std::sync::Arc<#dep_types>),*) }
     };
 
-    // ── build 方法体（不含 trait inject 字段，那些在 inner_init 中填充）──
+    // ── build 方法体（trait inject 字段在此直接注入，无需 unsafe）──
     let build_fields: Vec<TokenStream2> = ctx
         .fields_info
         .iter()
@@ -58,12 +59,12 @@ pub fn gen_component_impl(ctx: &CodeGenContext) -> TokenStream2 {
                 // 可选 trait inject：用 None 占位，在 inner_init 中填充
                 quote! { #fname: None }
             }
-            FieldKind::TraitInjectRequired { .. } => {
-                // 必选 trait inject：用零值占位，inner_init 中通过 ptr::write 覆盖（避免 drop）
-                // SAFETY: zeroed Arc<dyn Trait> 是托管内存的无效状态，
-                // 但 inner_init 紧接着就会用 ptr::write 写入真实值，不会读取或 drop 该占位值。
+            FieldKind::TraitInjectRequired { ty } => {
+                // 必选 trait inject：build 阶段直接从 Store 注入真实值（安全，无 unsafe）
+                // ty 是完整的 `Arc<dyn Trait>` 类型，strip_arc 提取出 `dyn Trait`
+                let trait_ty = strip_arc_type(ty);
                 quote! {
-                    #fname: unsafe { ::core::mem::zeroed() }
+                    #fname: ::tx_di_core::inject_trait_from_store::<#trait_ty>(store)
                 }
             }
             FieldKind::TraitInjectList { .. } => {
@@ -122,7 +123,7 @@ pub fn gen_component_impl(ctx: &CodeGenContext) -> TokenStream2 {
         impl ::tx_di_core::Component for #struct_name {
             type Deps = #deps_type_final;
 
-            fn build(deps: Self::Deps) -> Self {
+            fn build(deps: Self::Deps, store: &::tx_di_core::Store) -> Self {
                 #build_body
             }
 

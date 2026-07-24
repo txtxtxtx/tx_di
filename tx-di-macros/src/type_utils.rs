@@ -14,30 +14,26 @@ pub fn strip_arc_type(ty: &Type) -> Type {
         _ => return ty.clone(),
     };
     let segs = &path.segments;
-    if segs.len() == 1 && segs[0].ident == "Arc" {
-        if let PathArguments::AngleBracketed(ab) = &segs[0].arguments {
-            if ab.args.len() == 1 {
-                if let GenericArgument::Type(inner) = &ab.args[0] {
-                    return inner.clone();
-                }
-            }
-        }
+    if segs.len() == 1
+        && segs[0].ident == "Arc"
+        && let PathArguments::AngleBracketed(ab) = &segs[0].arguments
+        && ab.args.len() == 1
+        && let GenericArgument::Type(inner) = &ab.args[0]
+    {
+        return inner.clone();
     }
     ty.clone()
 }
 
 /// 提取 `Option<T>` 中的 T 类型
 pub fn extract_option_inner(ty: &Type) -> Option<Type> {
-    if let Type::Path(type_path) = ty {
-        if let Some(segment) = type_path.path.segments.last() {
-            if segment.ident == "Option" {
-                if let PathArguments::AngleBracketed(args) = &segment.arguments {
-                    if let Some(GenericArgument::Type(inner_ty)) = args.args.first() {
-                        return Some(inner_ty.clone());
-                    }
-                }
-            }
-        }
+    if let Type::Path(type_path) = ty
+        && let Some(segment) = type_path.path.segments.last()
+        && segment.ident == "Option"
+        && let PathArguments::AngleBracketed(args) = &segment.arguments
+        && let Some(GenericArgument::Type(inner_ty)) = args.args.first()
+    {
+        return Some(inner_ty.clone());
     }
     None
 }
@@ -59,10 +55,10 @@ pub fn extract_trait_from_arc(ty: &Type) -> Option<Type> {
     if segs.len() != 1 || segs[0].ident != "Arc" {
         return None;
     }
-    if let PathArguments::AngleBracketed(ab) = &segs[0].arguments {
-        if let Some(GenericArgument::Type(trait_ty @ Type::TraitObject(_))) = ab.args.first() {
-            return Some(trait_ty.clone());
-        }
+    if let PathArguments::AngleBracketed(ab) = &segs[0].arguments
+        && let Some(GenericArgument::Type(trait_ty @ Type::TraitObject(_))) = ab.args.first()
+    {
+        return Some(trait_ty.clone());
     }
     None
 }
@@ -82,10 +78,10 @@ pub fn extract_trait_from_option_arc(ty: &Type) -> Option<Type> {
     if segs.len() != 1 || segs[0].ident != "Arc" {
         return None;
     }
-    if let PathArguments::AngleBracketed(ab) = &segs[0].arguments {
-        if let Some(GenericArgument::Type(trait_ty @ Type::TraitObject(_))) = ab.args.first() {
-            return Some(trait_ty.clone());
-        }
+    if let PathArguments::AngleBracketed(ab) = &segs[0].arguments
+        && let Some(GenericArgument::Type(trait_ty @ Type::TraitObject(_))) = ab.args.first()
+    {
+        return Some(trait_ty.clone());
     }
     None
 }
@@ -112,11 +108,11 @@ pub fn extract_trait_from_vec_arc(ty: &Type) -> Option<Type> {
     if segs.len() != 1 || segs[0].ident != "Vec" {
         return None;
     }
-    if let PathArguments::AngleBracketed(ab) = &segs[0].arguments {
-        if let Some(GenericArgument::Type(arc_ty)) = ab.args.first() {
-            // arc_ty 应该是 Arc<dyn Trait>
-            return extract_trait_from_arc(arc_ty);
-        }
+    if let PathArguments::AngleBracketed(ab) = &segs[0].arguments
+        && let Some(GenericArgument::Type(arc_ty)) = ab.args.first()
+    {
+        // arc_ty 应该是 Arc<dyn Trait>
+        return extract_trait_from_arc(arc_ty);
     }
     None
 }

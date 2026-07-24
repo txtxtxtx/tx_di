@@ -42,6 +42,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::component::Component;
+use crate::store::Store;
 use crate::RIE;
 
 // ── CallContext ─────────────────────────────────────────────────────────────
@@ -157,7 +158,7 @@ pub struct LoggingInterceptor;
 
 impl Component for LoggingInterceptor {
     type Deps = ();
-    fn build(_: Self::Deps) -> Self { LoggingInterceptor }
+    fn build(_: Self::Deps, _store: &Store) -> Self { LoggingInterceptor }
     const SCOPE: crate::Scope = crate::Scope::Singleton;
 }
 impl Default for LoggingInterceptor { fn default() -> Self { LoggingInterceptor } }
@@ -179,7 +180,7 @@ pub struct MetricsInterceptor { pub counter: AtomicU64 }
 
 impl Component for MetricsInterceptor {
     type Deps = ();
-    fn build(_: Self::Deps) -> Self { MetricsInterceptor { counter: AtomicU64::new(0) } }
+    fn build(_: Self::Deps, _store: &Store) -> Self { MetricsInterceptor { counter: AtomicU64::new(0) } }
     const SCOPE: crate::Scope = crate::Scope::Singleton;
 }
 impl MetricsInterceptor {
