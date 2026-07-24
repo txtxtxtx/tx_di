@@ -587,6 +587,8 @@ inner_init.rs            → TraitInjectRequired → ptr::write() 覆盖
 
 ## 第 1 批：稳定性修复（P1，预计 3-5 天）
 
+> **Fix 1.2 (原) 已移除**：经核实 `auto_register_all` 中 `self.metas.push()` 按拓扑排序结果 push（`sorted_ids`），shutdown 用 `metas.iter().rev()` 就是拓扑逆序，无需修复。
+
 ### Fix 1.1 — Prototype shutdown 支持 【§3.3】
 
 **目标**：让 Prototype 组件的 `#[component(shutdown)]` 回调切实被调用。
@@ -623,109 +625,82 @@ meta_entry.rs:95 → store.try_inject::<T>() → Prototype 不在 store → None
 
 ---
 
-### Fix 1.2 — shutdown 顺序修正为拓扑逆序 【§5.2】
-
-**目标**：shutdown 按照构建时的拓扑顺序**严格逆序**执行，确保被依赖者不会先于依赖者关闭。
-
-**当前代码**：`lifecycle.rs:392-398` 用 `metas.iter().rev()`（逆注册顺序），不等于逆拓扑顺序。
-
-**修复方案**：
-
-1. **`tx-di-core/src/lifecycle.rs`**（`App` 结构体）：
-   - 新增字段 `sorted_metas: Vec<&'static ComponentMeta>`（按拓扑顺序存储）
-
-2. **`tx-di-core/src/lifecycle.rs`**（`BuildContext::build`）：
-   - 将已排序的 `self.metas` 存入 `App.sorted_metas`
-
-3. **`tx-di-core/src/lifecycle.rs`**（`App::init` / `App::async_init`）：
-   - 改用 `sorted_metas` 保证顺序一致
-
-4. **`tx-di-core/src/lifecycle.rs`**（`App::shutdown`）：
-   - 改为 `self.sorted_metas.iter().rev()` — 拓扑逆序
-
-**测试**：
-- 新增 test：A 依赖 B，B 的 shutdown 计数器晚于 A 的 shutdown 计数器递增
-
----
-
-### Fix 1.3 — 拓扑排序错误传播（不转 panic）【§2.2】
+### Fix 1.2 — 拓扑排序错误传播（不转 panic）【§2.2】
 
 **目标**：将 `auto_register_all` 中的 `.unwrap_or_else(panic!)` 改为错误传播。
+
+**当前代码**：`lifecycle.rs:104` — `topo_sort(...).unwrap_or_else(|e| panic!("{}", e))`
 
 **修复方案**：
 
 1. **`tx-di-core/src/lifecycle.rs:86-115`**：
    - `auto_register_all` 返回值从 `()` 改为 `RIE<()>`
-   - 将 `topo_sort(...).unwrap_or_else(|e| panic!("{}", e))` 改为 `topo_sort(...)?`
+   - 将 panic 改为 `topo_sort(...).map_err(|e| AppError::with_context(DiErr::RegistryError, ...))?`
 
 2. **`tx-di-core/src/lifecycle.rs:69-83`**（`BuildContext::new`）：
-   - 由于 `auto_register_all` 现在返回 `Result`，需要处理错误
-   - **方案 A**：`new` 也返回 `RIE<Self>`（breaking change）
-   - **方案 B**：保持 `new` 的签名，内部 `auto_register_all().expect("...")` 并在 new 上标注 `# Panics`
-   - **推荐方案 A**，统一错误处理
+   - 同样改为返回 `RIE<Self>`
+   - 内部调用 `auto_register_all()?`
 
 **影响范围**：
-- 所有调用 `BuildContext::new()` 的地方需要改为 `BuildContext::new(...)?` 或 `.unwrap()`
-- 示例代码和测试代码需同步更新
+- 所有调用 `BuildContext::new()` 的地方改为 `BuildContext::new(...)?` 或 `.unwrap()`
+- 测试和示例代码需同步更新
 
 ---
 
-### Fix 1.4 — 消除 config / factory 中的 panic 路径 【§2.3, §2.4】
+### Fix 1.3 — 消除 config / factory 中的 panic 路径 【§2.3, §2.4】
 
-**目标**：将配置加载和工厂中的 `panic!` 全部转为 `Result` 错误。
+**目标**：将配置加载和工厂中的 `panic!` 全部转为 `RIE<T>` 错误。
+
+> 统一使用 `RIE<T>`（即 `Result<T, AppError>`），不引入新的 Result 别名。
 
 **修复方案**：
 
 1. **`tx-di-core/src/config.rs`**（`AppAllConfig::new` / `load_config`）：
-   - 返回类型从 `Self` / `Value` 改为 `RIE<Self>` / `RIE<Value>`
-   - 所有 `unwrap_or_else(panic!)` → `map_err(|e| AppError::with_context(DiErr::ConfigError, ...))?`
-   - 新增错误码 `DiErr::ConfigError`
+   - 返回类型改为 `RIE<Self>` / `RIE<Value>`
+   - `unwrap_or_else(panic!)` → `map_err(...)?`
+   - 新增错误码 `DiErr::ConfigError`（`error.rs`）
 
-2. **`tx-di-macros/src/codegen/factory.rs:32-33,42,59,61-62`**：
-   - 配置反序列化失败、Deps::resolve 失败、inner_init 失败
-   - 改为：在 factory 闭包中返回 `Result<Arc<T>, AppError>` 而非直接 panic
-   - 需要修改 `CompRef::Factory` 的闭包签名：`Fn(&Store) -> Result<Arc<dyn Any + Send + Sync>, AppError>`
+2. **`tx-di-macros/src/codegen/factory.rs`**：
+   - 配置反序列化失败、`Deps::resolve` 失败、`inner_init` 失败 → 不再 `panic!`，改为 `return Err(AppError::...)`
+   - **CompRef::Factory 闭包签名**：`Fn(&Store) -> Result<Arc<dyn Any + Send + Sync>, AppError>`
 
 3. **`tx-di-core/src/store.rs`**（`CompRef` 枚举）：
    - `Factory` 变体闭包返回类型改为 `Result<Arc<dyn Any + Send + Sync>, AppError>`
-   - `inject` 方法中 `CompRef::Factory(f) => f(self)` 改为 `CompRef::Factory(f) => f(self)?`
+   - `inject` 中 `CompRef::Factory(f) => f(self)` → `CompRef::Factory(f) => f(self)?`
 
-4. **`tx-di-core/src/store.rs:221-226, 233-241`**（`inject_trait_from_store`）：
-   - 改为返回 `Result<Arc<T>, AppError>` 而非 panic
-
-5. **`tx-di-core/src/error.rs`**：
-   - 新增 `ConfigError` 和 `TraitInjectError` 错误码
+4. **`tx-di-core/src/store.rs`**（`inject_trait_from_store`）：
+   - 返回 `RIE<Arc<T>>` 而非 panic
 
 **影响范围**：
-- CompRef::Factory 闭包签名变更 → 所有注册工厂的地方
-- BuildContext::register_factory → 需处理 Result
-- Store::inject → 需处理 Result
+- `CompRef::Factory` 闭包签名变更 → `register_factory`、`meta_entry`、`Store::inject` 链路
 
 ---
 
-### Fix 1.5 — 修复"可选" trait 注入 【§2.5】
+### Fix 1.4 — 修复"可选" trait 注入 【§2.5】
 
 **目标**：`Option<Arc<dyn Trait>>` 无实现时返回 None（不崩溃），`Vec<Arc<dyn Trait>>` 无实现时返回空 Vec。
 
 **修复方案**：
 
 1. **`tx-di-core/src/store.rs`**：
-   - 新增 `try_inject_trait_from_store<T>(store) -> Option<Arc<T>>`，不 panic 版
-   - 新增 `inject_available_traits_from_store<T>(store) -> Vec<Arc<T>>`，注入所有已注册实现（不存在时返回空 Vec）
+   - 新增 `try_inject_trait_from_store<T>(store: &Store) -> Option<Arc<T>>`
+   - 新增 `inject_available_traits_from_store<T>(store: &Store) -> Vec<Arc<T>>`
 
 2. **`tx-di-macros/src/codegen/inner_init.rs`**：
-   - `TraitInject`（Option 字段）改用 `try_inject_trait_from_store`
-   - `TraitInjectList`（Vec 字段）改用 `inject_available_traits_from_store`
+   - `TraitInject`（Option）改用 `try_inject_trait_from_store`
+   - `TraitInjectList`（Vec）改用 `inject_available_traits_from_store`
 
 3. **`tx-di-macros/src/codegen/meta_entry.rs`**：
-   - `trait_inject_fields` 和 `list_trait_fields` **不加入** dep_type_ids（不构成硬依赖）
+   - `trait_inject_fields` 和 `list_trait_fields` **不加入** `dep_type_ids`（不构成硬依赖，可选 trait 无实现不应阻止拓扑排序）
 
 4. **`tx-di-core/src/topology.rs`**：
-   - 拓扑排序对 trait 依赖未找到实现时，跳过（而非报错）
+   - 对仅出现在 optional/list trait 中的 TypeId，未找到实现时跳过
 
-### Fix 1.6 — 修复 `#[intercept]` return/? 绕过 after + before Err→panic 【§2.7, §2.8】
+---
 
-**目标**：body 内 `return`/`?` 不跳过 after；before Err 返回 Result 而非 panic。
+### Fix 1.5 — 修复 `#[intercept]` return/? 绕过 after + before Err→panic 【§2.7, §2.8】
+
+**目标**：body 内 `return`/`?` 不跳过 after 拦截器；before Err 返回 Result 而非 panic。
 
 **修复方案**：
 
@@ -733,6 +708,57 @@ meta_entry.rs:95 → store.try_inject::<T>() → Prototype 不在 store → None
    - sync 方法：body 包进 `|| { #body }()` 立即调用闭包
    - async 方法：body 包进 `async move { #body }.await`
    - Result 返回类型：before Err → `return Err(e.into())`
+   - 非 Result 返回类型：before Err → 保持 `panic!` 但标注文档
+
+**验证标准**：
+- 新增 test：方法中 `return` 后 after 仍被调用
+- 新增 test：before 返回 Err 时，Result 方法拿到 Err
+
+---
+
+### Fix 1.6 — 修复 `#[tx_cst(expr)]` 被静默忽略 【§4.5】
+
+**目标**：`#[tx_cst(expr)]` 优先级高于类型推断——用户显式意图无条件胜出。
+
+**问题详解**：
+
+`classify/fields.rs` 的分类顺序：
+```
+① #[tx_cst(skip)]?          → Skip       ← skip 最先（没问题）
+② Arc<dyn Trait>?           → TraitInjectRequired
+③ Vec<Arc<dyn Trait>>?      → TraitInjectList
+④ Option<Arc<dyn Trait>>?   → TraitInject
+⑤ Option<T>?               → Optional    ← 类型判断在 expr 之前！
+⑥ #[tx_cst(expr)]?          → Custom      ← expr 排第 6，晚了！
+⑦ 其它                     → Inject
+```
+
+当用户写：
+```rust
+#[tx_cst(Some(Default::default()))]   // 想用这个表达式
+pub cache: Option<Arc<dyn CacheTrait>>, // 类型却是 Option<Arc<dyn Trait>>
+```
+分类到步骤 ④ 匹配 → 归为 `TraitInject` → 填 `None` → **`#[tx_cst(...)]` 被静默跳过**。
+
+**修复方案**：
+
+**`tx-di-macros/src/classify/fields.rs`** — 调整分类顺序为：
+```
+① #[tx_cst(skip)]?     → Skip
+② #[tx_cst(expr)]?     → Custom        ← expr 提前到第二，用户显式意图优先
+③ Arc<dyn Trait>?      → TraitInjectRequired
+④ Vec<Arc<dyn Trait>>? → TraitInjectList
+⑤ Option<Arc<dyn Trait>>? → TraitInject
+⑥ Option<T>?           → Optional
+⑦ 其它                 → Inject
+```
+- ② 提前到所有类型判断之前
+- 不做 `compile_error!`，不做 `warn`——`#[tx_cst(expr)]` 就是最终值，用户写了就按用户的来
+- 步骤 ③~⑦ 只对**没有 `#[tx_cst]` 属性**的字段生效
+
+**验证**：
+- 编译测试：`#[tx_cst(Some(...))]` + `Option<Arc<dyn Trait>>` → 使用 expr 赋值，不报错
+- 编译测试：`#[tx_cst(default_expr)]` + `String` → 使用 expr 赋值
    - 非 Result 返回类型：before Err → `panic!`（标注文档）或 `compile_error!`
 
 **验证标准**：
@@ -1139,10 +1165,10 @@ Prototype 组件 + #[component(shutdown)] + 全局计数器
 ## 执行路线图
 
 ```
-Week 1: 第 0 批 (P0) ──────── 消除 unsafe + 泛型处理
-        第 1 批 (P1) 开始 ─── Prototype lifecycle + 拓扑逆序
-Week 2: 第 1 批 (P1) 完成 ─── optional trait 修复 + #[intercept] 修复
-        + #[tx_cst] 优先修复 + config panic 消除
+Week 1: 第 0 批 (P0) ✅ 完成 ─ 消除 unsafe + 泛型处理
+        第 1 批 (P1) 开始 ─── Prototype shutdown + 错误传播
+Week 2: 第 1 批 (P1) 完成 ─── config panic 消除 + #[intercept] 修复
+        + optional trait + #[tx_cst] 优先级修复
 Week 3: 第 2 批 (P2) 开始 ─── 类型检测 + DashMap 改造 + 死锁修复
         + 宏卫生 + 非 Arc 编译期报错 + 配置严格模式
 Week 4: 第 2 批 (P2) 完成 ─── OptionalInject + AOP 增强 + 条件装配
