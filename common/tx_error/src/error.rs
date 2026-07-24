@@ -121,9 +121,14 @@ impl AppError {
     /// 获取 `AppErrCode`（丢弃上下文和内部错误细节）
     pub fn err_code(&self) -> AppErrCode {
         match self {
+            #[allow(clippy::explicit_auto_deref)]
             Self::ErrCode { domain, code, message } => AppErrCode::new(*domain, *code, *message),
+            #[allow(clippy::explicit_auto_deref)]
             Self::WithContext { domain, code, message, .. } => AppErrCode::new(*domain, *code, *message),
-            Self::Internal(_) => AppErrCode::new("SYS", 90000, "Internal error"),
+            Self::Internal(e) => {
+                tracing::error!("internal error: {e:?}");
+                AppErrCode::new("SYS", 90000, "Internal error")
+            }
         }
     }
 
