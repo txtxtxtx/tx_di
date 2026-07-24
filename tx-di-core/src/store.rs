@@ -27,6 +27,8 @@ pub struct Store {
     inner: DashMap<TypeId, CompRef>,
     /// trait 实现的映射表（trait TypeId → 实现列表），由 BuildContext 在构建时填充
     pub(crate) trait_impls: TraitImplMap,
+    /// Prototype 实例追踪（TypeId → Weak 引用列表），用于 shutdown 时通知存活实例
+    pub(crate) prototype_instances: DashMap<TypeId, Vec<std::sync::Weak<dyn Any + Send + Sync>>>,
 }
 
 impl Store {
@@ -35,6 +37,7 @@ impl Store {
         Store {
             inner: DashMap::new(),
             trait_impls: DashMap::new(),
+            prototype_instances: DashMap::new(),
         }
     }
 
@@ -43,7 +46,30 @@ impl Store {
         Store {
             inner,
             trait_impls: DashMap::new(),
+            prototype_instances: DashMap::new(),
         }
+    }
+
+    /// 记录 Prototype 实例（类型擦除版，用于 register_factory）
+    ///
+    /// 每次工厂创建新实例后调用，将 `Arc` 转为 `Weak` 存储，便于 shutdown 时通知存活实例。
+    pub(crate) fn track_prototype_raw(&self, instance: &Arc<dyn Any + Send + Sync>) {
+        let tid = (&**instance).type_id();
+        let weak = Arc::downgrade(instance);
+        self.prototype_instances.entry(tid).or_default().push(weak);
+    }
+
+    /// 关闭所有存活的 Prototype 实例
+    ///
+    /// 清理所有已过期的 Weak 条目。
+    pub fn shutdown_prototypes(&self) {
+        self.prototype_instances.retain(|_tid, weaks| {
+            weaks.retain(|weak| {
+                // 实例仍存活（强引用未全部释放），保留 Weak；否则移除
+                weak.upgrade().is_some()
+            });
+            !weaks.is_empty()
+        });
     }
 
     /// 获取内部 DashMap 的引用
@@ -241,7 +267,24 @@ pub fn inject_trait_from_store<T: ?Sized + Any + Send + Sync + 'static>(
         })
 }
 
-/// 从 Store 中注入 trait object 的所有实现
+/// 从 Store 中尝试注入 trait object（不 panic 版）
+///
+/// 若 trait 无实现或实现未就绪，返回 None。用于可选 trait 注入（`Option<Arc<dyn Trait>>`）。
+pub fn try_inject_trait_from_store<T: ?Sized + Any + Send + Sync + 'static>(
+    store: &Store,
+) -> Option<Arc<T>> {
+    let tid = TypeId::of::<T>();
+
+    let entry = store.trait_impls.get(&tid)?.first().cloned()?;
+    let concrete = store.inner().get(&(entry.concrete_tid)()).map(|r| match &*r {
+        CompRef::Cached(any_arc) => any_arc.clone(),
+        CompRef::Factory(f) => f(store),
+    })?;
+    let trait_any = (entry.upcast)(concrete);
+    trait_any.downcast_ref::<Arc<T>>().cloned()
+}
+
+/// 从 Store 中注入 trait object 的所有实现（无实现时返回空 Vec）
 pub fn inject_all_traits_from_store<T: ?Sized + Any + Send + Sync + 'static>(
     store: &Store,
 ) -> Vec<Arc<T>> {
@@ -253,20 +296,13 @@ pub fn inject_all_traits_from_store<T: ?Sized + Any + Send + Sync + 'static>(
         .map(|entries| {
             entries
                 .iter()
-                .map(|entry| {
-                    let concrete = store
-                        .inner()
-                        .get(&(entry.concrete_tid)())
-                        .map(|r| match &*r {
-                            CompRef::Cached(any_arc) => any_arc.clone(),
-                            CompRef::Factory(f) => f(store),
-                        })
-                        .expect("[di] trait 具体实现未注册到 store");
+                .filter_map(|entry| {
+                    let concrete = store.inner().get(&(entry.concrete_tid)()).map(|r| match &*r {
+                        CompRef::Cached(any_arc) => any_arc.clone(),
+                        CompRef::Factory(f) => f(store),
+                    })?;
                     let trait_any = (entry.upcast)(concrete);
-                    trait_any
-                        .downcast_ref::<Arc<T>>()
-                        .expect("[di] trait upcast 类型不匹配")
-                        .clone()
+                    trait_any.downcast_ref::<Arc<T>>().cloned()
                 })
                 .collect()
         })

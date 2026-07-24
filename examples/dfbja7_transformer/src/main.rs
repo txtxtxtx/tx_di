@@ -23,7 +23,7 @@ async fn main() -> anyhow::Result<()> {
     let app = BuildContext::new(
         // Some(path)
         None::<String>
-    )
+    )?
         .build()?
         .ins_run()
         .await?;

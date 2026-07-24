@@ -18,6 +18,7 @@ use tracing::{debug, info};
 
 use crate::component::Component;
 use crate::config::AppAllConfig;
+use crate::error::{AppError, DiErr};
 use crate::registry::{ComponentMeta, COMPONENT_REGISTRY};
 use crate::scope::Scope;
 use crate::store::{CompRef, Store, TraitImplEntry};
@@ -66,24 +67,24 @@ impl BuildContext {
     ///
     /// * `config_path` - 可选的配置文件路径
     #[inline]
-    pub fn new<P: Into<PathBuf>>(config_path: Option<P>) -> Self {
+    pub fn new<P: Into<PathBuf>>(config_path: Option<P>) -> RIE<Self> {
         let mut ctx = Self {
             store: Store::new(),
             metas: vec![],
         };
 
         // 加载配置文件并放入 store
-        let app_configs = AppAllConfig::new(config_path);
+        let app_configs = AppAllConfig::new(config_path)?;
         ctx.store.insert_cached(app_configs);
 
         // 自动扫描并注册所有组件
-        ctx.auto_register_all();
+        ctx.auto_register_all()?;
 
-        ctx
+        Ok(ctx)
     }
 
     /// 自动注册所有通过 `#[derive(Component)]` 标记的组件
-    fn auto_register_all(&mut self) {
+    fn auto_register_all(&mut self) -> RIE<()> {
         // 1. 填充 trait_impls（每个 Store 拥有独立的 trait 映射，无全局污染）
         for meta in COMPONENT_REGISTRY.iter() {
             if !meta.trait_impls.is_empty() {
@@ -101,9 +102,7 @@ impl BuildContext {
 
         // 2. 拓扑排序
         let metas: Vec<&'static ComponentMeta> = COMPONENT_REGISTRY.iter().collect();
-        let sorted_ids = topo_sort(&metas, &self.store.trait_impls).unwrap_or_else(|e| {
-            panic!("{}", e);
-        });
+        let sorted_ids = topo_sort(&metas, &self.store.trait_impls)?;
 
         // 3. 按拓扑顺序注册工厂
         for tid in &sorted_ids {
@@ -112,6 +111,8 @@ impl BuildContext {
                 self.metas.push(meta);
             }
         }
+
+        Ok(())
     }
 
     /// 注册组件工厂
@@ -133,7 +134,10 @@ impl BuildContext {
                 let closure =
                     move |store: &Store| -> Arc<dyn Any + Send + Sync> {
                         let boxed = factory(store);
-                        Arc::from(boxed)
+                        let arc: Arc<dyn Any + Send + Sync> = Arc::from(boxed);
+                        // 追踪 Prototype 实例，以便 shutdown 时通知
+                        store.track_prototype_raw(&arc);
+                        arc
                     };
                 self.store
                     .inner()
@@ -196,16 +200,14 @@ impl BuildContext {
             }
         }
 
-        let ans = topo_sort(&metas, &temp_trait_impls).map_err(|e| {
-            crate::AppError::Internal(anyhow::anyhow!("{}", e))
-        })?;
+        let ans = topo_sort(&metas, &temp_trait_impls)?;
 
         debug!("组件注册表（拓扑排序后）：");
         debug!("{:20} {:10} deps", "name", "scope");
         for tid in ans.iter() {
             let meta = metas[id_to_idx
                 .get(tid)
-                .ok_or_else(|| crate::AppError::Internal(anyhow::anyhow!("RegistryError")))?
+                .ok_or_else(|| AppError::with_context(DiErr::RegistryError, "RegistryError"))?
                 .0];
             let dep_names: Vec<&str> = meta
                 .dep_type_ids
@@ -252,8 +254,9 @@ impl BuildContext {
 }
 
 impl Default for BuildContext {
+    /// 使用默认配置路径创建 BuildContext。测试/演示用途，失败时 panic。
     fn default() -> Self {
-        Self::new::<PathBuf>(None)
+        Self::new::<PathBuf>(None).expect("BuildContext::default() 失败")
     }
 }
 
@@ -396,6 +399,8 @@ impl App {
             debug!("[di] shutdown: {}", meta.name);
             (meta.shutdown_fn)(&self.store);
         }
+        // 清理 Prototype 实例的追踪记录
+        self.store.shutdown_prototypes();
     }
 
     /// 等待退出信号并优雅关闭

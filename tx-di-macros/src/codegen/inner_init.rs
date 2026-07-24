@@ -21,13 +21,13 @@ pub fn gen_inner_init(ctx: &CodeGenContext) -> TokenStream2 {
         return quote! {};
     }
 
-    // 可选 trait inject 字段赋值
+    // 可选 trait inject 字段赋值（使用 try_inject，无实现时返回 None）
     let optional_assigns: Vec<TokenStream2> = ctx
         .trait_inject_fields
         .iter()
         .map(|(fname, ty)| {
             quote! {
-                self.#fname = Some(::tx_di_core::inject_trait_from_store::<#ty>(store));
+                self.#fname = ::tx_di_core::try_inject_trait_from_store::<#ty>(store);
             }
         })
         .collect();

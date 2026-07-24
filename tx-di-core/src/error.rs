@@ -17,10 +17,14 @@ use crate::CodeMsg;
 pub enum DiErr {
     #[err(-1, "组件注册表错误")]
     RegistryError,
-    #[err(-2, "async_init_fn 错误")]
+    #[err(-2, "async_init 错误")]
     AsyncInitError,
     #[err(-3, "任务 panic")]
     TaskPanic,
     #[err(-4, "组件注入错误")]
     InjectError,
+    #[err(-5, "配置错误")]
+    ConfigError,
+    #[err(-6, "trait 注入错误")]
+    TraitInjectError,
 }

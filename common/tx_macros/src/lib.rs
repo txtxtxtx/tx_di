@@ -1,5 +1,4 @@
 mod code_msg;
-mod utils;
 
 use proc_macro::TokenStream;
 

@@ -37,10 +37,11 @@ pub fn gen_meta_entry(ctx: &CodeGenContext, factory_fn: TokenStream2) -> TokenSt
             .iter()
             .map(|(_, ty)| quote! { || std::any::TypeId::of::<#ty>() })
             .collect();
+        // trait 依赖（必选 + 可选 + 列表）均参与拓扑排序以建立注册顺序
         let trait_fns: Vec<TokenStream2> = ctx
-            .trait_inject_fields
+            .required_trait_fields
             .iter()
-            .chain(ctx.required_trait_fields.iter())
+            .chain(ctx.trait_inject_fields.iter())
             .chain(ctx.list_trait_fields.iter())
             .map(|(_, ty)| quote! { || std::any::TypeId::of::<#ty>() })
             .collect();

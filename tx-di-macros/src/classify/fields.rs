@@ -43,6 +43,9 @@ pub fn classify_fields(input: &ItemStruct) -> SynResult<Vec<(Ident, FieldKind)>>
         let inject_expr = extract_inject_expr(&field.attrs)?;
         let kind = if has_skip_attr(&field.attrs) {
             FieldKind::Skip
+        } else if let Some(expr) = inject_expr {
+            // #[tx_cst(expr)] 优先级最高，先于所有类型推断
+            FieldKind::Custom { expr }
         } else if is_plain_arc_dyn_trait(&field.ty) {
             // Arc<dyn Trait> — 必选 trait object 注入
             FieldKind::TraitInjectRequired { ty: field.ty.clone() }
@@ -54,8 +57,6 @@ pub fn classify_fields(input: &ItemStruct) -> SynResult<Vec<(Ident, FieldKind)>>
             FieldKind::TraitInject { ty: field.ty.clone() }
         } else if is_option_type(&field.ty) {
             FieldKind::Optional { _ty: field.ty.clone() }
-        } else if let Some(expr) = inject_expr {
-            FieldKind::Custom { expr }
         } else {
             FieldKind::Inject { ty: field.ty.clone() }
         };

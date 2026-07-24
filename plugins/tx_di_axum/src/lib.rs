@@ -38,7 +38,7 @@ mod tests {
     async fn it_works() {
         // D:\proj\tx_di\configs\di-config.toml
         // C:\a_me\proj\rust\tx_di\configs\di-config.toml
-        let ctx = BuildContext::new(Some(r"D:\proj\tx_di\configs\di-config.toml"));
+        let ctx = BuildContext::new(Some(r"D:\proj\tx_di\configs\di-config.toml")).unwrap();
         // 运行 app
         let app = ctx.build()
             .unwrap()

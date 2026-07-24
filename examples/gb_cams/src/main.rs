@@ -27,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
 
     WebPlugin::add_router(api::router().into());
 
-    let ctx = BuildContext::new(Some(config_path));
+    let ctx = BuildContext::new(Some(config_path)).unwrap();
     let cam_config = ctx.inject::<GbCamsConfig>();
 
 

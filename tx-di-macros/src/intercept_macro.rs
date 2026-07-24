@@ -67,6 +67,30 @@ fn generate_intercepted_fn(input_fn: &ItemFn) -> TokenStream2 {
         }
     };
 
+    let before_block = if is_result_ret {
+        // Result 返回类型：before Err 应返回 Err 而非 panic
+        quote! {
+            if let Err(e) = __chain.before_all(&__ctx) {
+                return ::std::result::Result::Err(::std::convert::Into::into(e));
+            }
+        }
+    } else {
+        // 非 Result：before Err 才 panic（无其他传播通道）
+        quote! {
+            __chain.before_all(&__ctx).unwrap_or_else(|e| {
+                panic!("[di] 拦截器拒绝 method={}: {}", stringify!(#fn_name), e)
+            });
+        }
+    };
+
+    // 将 body 包入闭包 / async 块，防止 return / ? 跳出外层函数从而跳过 after 拦截器
+    let body_wrap = if is_async {
+        quote! { async move { #body }.await }
+    } else {
+        // sync：立即调用闭包
+        quote! { (|| #body)() }
+    };
+
     let async_prefix = if is_async { quote! { async } } else { quote! {} };
 
     quote! {
@@ -78,12 +102,10 @@ fn generate_intercepted_fn(input_fn: &ItemFn) -> TokenStream2 {
             let __key = self as *const Self as usize;
             let __chain = ::tx_di_core::aop::get_interceptor_chain(__key)
                 .expect("[di] 拦截器链未初始化：请确认组件已通过 #[component(intercept(...))] 声明，且 App 已运行初始化阶段");
-            __chain.before_all(&__ctx).unwrap_or_else(|e| {
-                panic!("[di] 拦截器拒绝 method={}: {}", stringify!(#fn_name), e)
-            });
+            #before_block
 
-            // Phase 2: 执行业务逻辑（包裹函数本身已是 async，原 body 直接在异步上下文中执行）
-            let __result = #body;
+            // Phase 2: 执行业务逻辑（闭包/async 块防止 return/? 绕过 after）
+            let __result = #body_wrap;
 
             // Phase 3: after 拦截（可加工 CallResult）
             #after_block

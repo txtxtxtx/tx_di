@@ -531,7 +531,7 @@ fn bench_app_build(c: &mut Criterion) {
 
     group.bench_function("build_empty", |b| {
         b.iter_batched(
-            || BuildContext::new::<PathBuf>(None),
+            || BuildContext::new::<PathBuf>(None).unwrap(),
             |ctx| {
                 let app = ctx.build().unwrap();
                 black_box(app);

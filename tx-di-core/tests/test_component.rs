@@ -252,7 +252,7 @@ pub struct ManyDeps {
 
 #[test]
 fn test_basic_inject() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let db = ctx.inject::<DbPool>();
 
     let _ = db;
@@ -260,7 +260,7 @@ fn test_basic_inject() {
 
 #[test]
 fn test_single_dependency() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let svc = ctx.inject::<UserService>();
     // 验证依赖注入正确，DbPool 字段值来自 #[tx_cst]
     assert_eq!(svc.db.url, "sqlite");
@@ -269,7 +269,7 @@ fn test_single_dependency() {
 
 #[test]
 fn test_multiple_dependencies() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let svc = ctx.inject::<OrderService>();
     let _ = svc.db;
     let _ = svc.redis;
@@ -277,7 +277,7 @@ fn test_multiple_dependencies() {
 
 #[test]
 fn test_deep_dependency_chain() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let ctrl = ctx.inject::<UserController>();
     // 三层依赖链都应正确解析
     let _ = ctrl.service;
@@ -287,7 +287,7 @@ fn test_deep_dependency_chain() {
 
 #[test]
 fn test_many_dependencies() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let svc = ctx.inject::<ManyDeps>();
     let _ = svc.d1;
     let _ = svc.d2;
@@ -300,7 +300,7 @@ fn test_many_dependencies() {
 
 #[test]
 fn test_singleton_returns_same_instance() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let db1 = ctx.inject::<DbPool>();
     let db2 = ctx.inject::<DbPool>();
     assert!(Arc::ptr_eq(&db1, &db2), "Singleton 应返回同一实例");
@@ -308,7 +308,7 @@ fn test_singleton_returns_same_instance() {
 
 #[test]
 fn test_prototype_returns_new_instance() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let req1 = ctx.inject::<RequestContext>();
     let req2 = ctx.inject::<RequestContext>();
     assert!(!Arc::ptr_eq(&req1, &req2), "Prototype 应返回不同实例");
@@ -318,7 +318,7 @@ fn test_prototype_returns_new_instance() {
 fn test_prototype_in_dependency() {
     // Prototype 组件被 Singleton 组件依赖时
     // 每次 inject Singleton 返回同一个，但内部 Prototype 是创建时的那个
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let svc1 = ctx.inject::<UserService>();
     let svc2 = ctx.inject::<UserService>();
     // Singleton: svc1 和 svc2 是同一个
@@ -331,21 +331,21 @@ fn test_prototype_in_dependency() {
 
 #[test]
 fn test_custom_string_value() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let logger = ctx.inject::<Logger>();
     assert_eq!(logger.level, "info");
 }
 
 #[test]
 fn test_custom_int_value() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let logger = ctx.inject::<Logger>();
     assert_eq!(logger.max_size, 42);
 }
 
 #[test]
 fn test_skip_field_uses_default() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let cache = ctx.inject::<Cache>();
     assert!(cache.temp.is_empty(), "skip 字段应为 Default");
     assert_eq!(cache.key, "cache_key");
@@ -353,7 +353,7 @@ fn test_skip_field_uses_default() {
 
 #[test]
 fn test_option_field_is_none() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let opt = ctx.inject::<OptionalFields>();
     assert!(opt.maybe_db.is_none(), "Option 字段应为 None");
     assert!(opt.skipped.is_empty());
@@ -363,7 +363,7 @@ fn test_option_field_is_none() {
 
 #[test]
 fn test_trait_object_inject() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let consumer = ctx.inject::<DataConsumer>();
     assert_eq!(consumer.provider.as_ref().unwrap().get_data(), "mysql_data");
 }
@@ -371,7 +371,7 @@ fn test_trait_object_inject() {
 #[test]
 fn test_trait_object_via_store() {
     use tx_di_core::inject_trait_from_store;
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let provider: Arc<dyn DataProvider> = inject_trait_from_store(ctx.store());
     assert_eq!(provider.get_data(), "mysql_data");
 }
@@ -380,7 +380,7 @@ fn test_trait_object_via_store() {
 fn test_required_trait_inject() {
     // 必选 trait 注入：Arc<dyn DataProvider> 非 Option，
     // 验证 factory 在 build 之后、inner_init 之前正确注入
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let consumer = ctx.inject::<RequiredTraitConsumer>();
     assert_eq!(consumer.provider.get_data(), "mysql_data");
 }
@@ -390,7 +390,7 @@ fn test_required_trait_inject() {
 #[test]
 fn test_config_component_default() {
     // 无配置文件，应使用 Default
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let config = ctx.inject::<TestConfig>();
     assert_eq!(config.port, 0);
     assert!(config.app_name.is_empty());
@@ -400,20 +400,20 @@ fn test_config_component_default() {
 
 #[test]
 fn test_store_contains() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     assert!(ctx.store().contains::<DbPool>());
     assert!(ctx.store().contains::<UserService>());
 }
 
 #[test]
 fn test_store_len() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     assert!(ctx.len() > 0, "Store 应包含至少一个组件");
 }
 
 #[test]
 fn test_store_try_inject_success() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     assert!(ctx.try_inject::<DbPool>().is_some());
 }
 
@@ -426,7 +426,7 @@ fn test_store_try_inject_unregistered() {
         fn build(_: (), _store: &Store) -> Self { Unregistered }
     }
 
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     assert!(ctx.try_inject::<Unregistered>().is_none());
 }
 
@@ -439,7 +439,7 @@ fn test_store_inject_returns_error() {
         fn build(_: (), _store: &Store) -> Self { Unregistered2 }
     }
 
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let result = ctx.store().inject::<Unregistered2>();
     assert!(result.is_err());
     let err = result.unwrap_err();
@@ -454,14 +454,14 @@ fn test_store_inject_returns_error() {
 
 #[test]
 fn test_build_app() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let app = ctx.build().unwrap();
     assert!(!app.is_empty());
 }
 
 #[test]
 fn test_app_inject() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let app = ctx.build().unwrap();
     let db = app.inject::<DbPool>();
     let _ = db;
@@ -469,14 +469,14 @@ fn test_app_inject() {
 
 #[test]
 fn test_app_try_inject() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let app = ctx.build().unwrap();
     assert!(app.try_inject::<DbPool>().is_some());
 }
 
 #[test]
 fn test_app_store_access() {
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let app = ctx.build().unwrap();
     assert!(app.store().contains::<DbPool>());
 }
@@ -487,7 +487,7 @@ fn test_app_store_access() {
 fn test_shared_dependency_is_same_instance() {
     // UserService 和 OrderService 都依赖 DbPool
     // 它们应该拿到同一个 DbPool 实例
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let user_svc = ctx.inject::<UserService>();
     let order_svc = ctx.inject::<OrderService>();
     assert!(
@@ -499,7 +499,7 @@ fn test_shared_dependency_is_same_instance() {
 #[test]
 fn test_deep_chain_shared_dependency() {
     // UserController 和 UserService 都依赖 DbPool
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     let ctrl = ctx.inject::<UserController>();
     let svc = ctx.inject::<UserService>();
     assert!(Arc::ptr_eq(&ctrl.db, &svc.db));
@@ -708,7 +708,7 @@ impl AopBiz {
 #[tokio::test]
 async fn test_aop_intercept_macro_end_to_end() {
     // 引入日志插件：初始化 tracing 订阅者（默认控制台输出），便于观察 AOP 拦截流程
-    let ctx = BuildContext::new::<PathBuf>(None);
+    let ctx = BuildContext::new::<PathBuf>(None).unwrap();
     let app = ctx.build().unwrap();
     let arc = app.ins_run().await.unwrap();
     tracing::info!("[AOP] App 初始化完成，拦截链已注册");
@@ -765,7 +765,7 @@ fn test_inject_unregistered_panics() {
         fn build(_: (), _store: &Store) -> Self { Ghost }
     }
 
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
     ctx.inject::<Ghost>();
 }
 
@@ -775,7 +775,7 @@ fn test_inject_unregistered_panics() {
 fn test_concurrent_inject_singleton() {
     use std::thread;
 
-    let ctx = Arc::new(BuildContext::new::<std::path::PathBuf>(None));
+    let ctx = Arc::new(BuildContext::new::<std::path::PathBuf>(None).unwrap());
     let handles: Vec<_> = (0..8)
         .map(|_| {
             let ctx = ctx.clone();
@@ -798,7 +798,7 @@ fn test_concurrent_inject_singleton() {
 fn test_concurrent_inject_prototype() {
     use std::thread;
 
-    let ctx = Arc::new(BuildContext::new::<std::path::PathBuf>(None));
+    let ctx = Arc::new(BuildContext::new::<std::path::PathBuf>(None).unwrap());
     let handles: Vec<_> = (0..8)
         .map(|_| {
             let ctx = ctx.clone();
@@ -861,7 +861,7 @@ fn test_app_init_hook() {
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        let _ = BuildContext::new::<PathBuf>(None)
+        let _ = BuildContext::new::<PathBuf>(None).unwrap()
             .build_and_run()
             .await
             .unwrap();
@@ -879,7 +879,7 @@ fn test_app_async_init_hook() {
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        let _ = BuildContext::new::<PathBuf>(None)
+        let _ = BuildContext::new::<PathBuf>(None).unwrap()
             .build_and_run()
             .await
             .unwrap();
@@ -895,7 +895,7 @@ fn test_app_async_init_hook() {
 fn test_shutdown_hook() {
     SHUTDOWN_CALLED.store(false, Ordering::SeqCst);
 
-    let ctx = BuildContext::new::<PathBuf>(None);
+    let ctx = BuildContext::new::<PathBuf>(None).unwrap();
     let app = ctx.build().unwrap();
 
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -916,7 +916,7 @@ fn test_init_sort_ordering() {
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        let _ = BuildContext::new::<PathBuf>(None)
+        let _ = BuildContext::new::<PathBuf>(None).unwrap()
             .build_and_run()
             .await
             .unwrap();
@@ -936,7 +936,7 @@ fn test_init_sort_ordering() {
 
 #[test]
 fn test_app_async_run_hook() {
-    let ctx = BuildContext::new::<PathBuf>(None);
+    let ctx = BuildContext::new::<PathBuf>(None).unwrap();
     let app = ctx.build().unwrap();
 
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -959,7 +959,7 @@ fn test_lifecycle_full_flow() {
     APP_ASYNC_INIT_CALLED.store(false, Ordering::SeqCst);
     SHUTDOWN_CALLED.store(false, Ordering::SeqCst);
 
-    let ctx = BuildContext::new::<PathBuf>(None);
+    let ctx = BuildContext::new::<PathBuf>(None).unwrap();
     let app = ctx.build().unwrap();
 
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -1075,7 +1075,7 @@ impl Reporter for JsonReporter {
 
 #[test]
 fn test_inject_all_traits_from_store() {
-    let ctx = BuildContext::new::<PathBuf>(None);
+    let ctx = BuildContext::new::<PathBuf>(None).unwrap();
     let store = ctx.store();
 
     let reporters: Vec<Arc<dyn Reporter>> = inject_all_traits_from_store(store);
@@ -1102,7 +1102,7 @@ fn test_inject_all_traits_empty() {
     pub trait NoImplementations: std::any::Any + Send + Sync {}
     let _ = std::any::type_name::<dyn NoImplementations>();
 
-    let ctx = BuildContext::new::<PathBuf>(None);
+    let ctx = BuildContext::new::<PathBuf>(None).unwrap();
     let store = ctx.store();
 
     // 注入一个没有实现的 trait
@@ -1116,7 +1116,7 @@ fn test_inject_all_traits_empty() {
 
 #[test]
 fn test_deps_tuple_resolve() {
-    let ctx = BuildContext::new::<PathBuf>(None);
+    let ctx = BuildContext::new::<PathBuf>(None).unwrap();
     let store = ctx.store();
 
     let deps = <(Arc<DbPool>, Arc<RedisClient>) as DepsTuple>::resolve(store);
@@ -1147,7 +1147,7 @@ fn test_config_with_real_file() {
     file.sync_all().unwrap();
 
     // 使用配置文件路径构建
-    let ctx = BuildContext::new(Some(config_path.clone()));
+    let ctx = BuildContext::new(Some(config_path.clone())).unwrap();
     let config = ctx.inject::<TestConfig>();
 
     assert_eq!(config.app_name, "TestApp");
@@ -1164,14 +1164,14 @@ fn test_config_with_real_file() {
 
 #[test]
 fn test_inject_from_store_fn() {
-    let ctx = BuildContext::new::<PathBuf>(None);
+    let ctx = BuildContext::new::<PathBuf>(None).unwrap();
     let db = inject_from_store::<DbPool>(ctx.store());
     assert_eq!(db.url, "sqlite");
 }
 
 #[test]
 fn test_inject_trait_from_store_fn() {
-    let ctx = BuildContext::new::<PathBuf>(None);
+    let ctx = BuildContext::new::<PathBuf>(None).unwrap();
     let provider: Arc<dyn DataProvider> = inject_trait_from_store(ctx.store());
     assert_eq!(provider.get_data(), "mysql_data");
 }
@@ -1326,7 +1326,7 @@ pub struct ReporterAggregator {
 
 #[test]
 fn test_list_trait_inject() {
-    let ctx = BuildContext::new::<PathBuf>(None);
+    let ctx = BuildContext::new::<PathBuf>(None).unwrap();
     let agg = ctx.inject::<ReporterAggregator>();
 
     // 应注入所有 Reporter 实现（JsonReporter + XmlReporter）
@@ -1350,7 +1350,7 @@ pub struct MixedConsumer {
 
 #[test]
 fn test_list_trait_inject_mixed() {
-    let ctx = BuildContext::new::<PathBuf>(None);
+    let ctx = BuildContext::new::<PathBuf>(None).unwrap();
     let consumer = ctx.inject::<MixedConsumer>();
 
     assert_eq!(consumer.db.url, "sqlite");

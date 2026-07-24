@@ -10,7 +10,9 @@ use serde::de::DeserializeOwned;
 use toml::Value::Table;
 
 use crate::component::Component;
+use crate::error::{AppError, DiErr};
 use crate::scope::Scope;
+use crate::RIE;
 
 /// 全局配置文件
 pub struct AppAllConfig {
@@ -19,70 +21,69 @@ pub struct AppAllConfig {
 
 impl AppAllConfig {
     /// 从指定路径或默认路径加载配置
-    pub fn new<P: Into<PathBuf>>(config_path: Option<P>) -> Self {
+    pub fn new<P: Into<PathBuf>>(config_path: Option<P>) -> RIE<Self> {
         let final_config_path = if let Some(path) = config_path {
             path.into()
         } else {
             // 默认使用可执行文件所在目录的 config/config.toml
-            let exe_path = std::env::current_exe().unwrap_or_else(|e| {
-                panic!(
-                    "[di] 无法获取可执行文件路径: {}。\n\
-                     请检查程序运行环境，或手动传入配置路径。",
-                    e
+            let exe_path = std::env::current_exe().map_err(|e| {
+                AppError::with_context(
+                    DiErr::ConfigError,
+                    format!(
+                        "无法获取可执行文件路径: {}。请检查程序运行环境，或手动传入配置路径。",
+                        e
+                    ),
                 )
-            });
+            })?;
 
-            let config_dir = exe_path
-                .parent()
-                .unwrap_or_else(|| {
-                    panic!(
-                        "[di] 无法获取可执行文件父目录: {:?}。\n\
-                         请手动传入配置路径。",
+            let config_dir = exe_path.parent().ok_or_else(|| {
+                AppError::with_context(
+                    DiErr::ConfigError,
+                    format!(
+                        "无法获取可执行文件父目录: {:?}。请手动传入配置路径。",
                         exe_path
-                    )
-                })
-                .join("config");
+                    ),
+                )
+            })?;
 
-            config_dir.join("config.toml")
+            config_dir.join("config").join("config.toml")
         };
 
-        crate::lifecycle::set_sys_config(
-            crate::lifecycle::CONFIG_PATH,
-            final_config_path.to_str().unwrap().to_string(),
-        );
-        let toml_value = Self::load_config(final_config_path.as_path());
-        AppAllConfig { toml_value }
+        let toml_value = Self::load_config(final_config_path.as_path())?;
+        Ok(AppAllConfig { toml_value })
     }
 
     /// 加载配置文件（如果存在）
     ///
     /// 配置文件不存在时返回空 Table（允许无配置运行）。
-    /// 配置文件存在但读取/解析失败时 panic，避免使用错误的默认值。
-    fn load_config(path: &Path) -> toml::Value {
+    /// 配置文件存在但读取/解析失败时返回 Err。
+    fn load_config(path: &Path) -> RIE<toml::Value> {
         if !path.exists() {
             eprintln!("[di] 配置文件不存在: {:?}，将使用默认配置", path);
-            return Table(toml::map::Map::new());
+            return Ok(Table(toml::map::Map::new()));
         }
 
-        let content = fs::read_to_string(path).unwrap_or_else(|e| {
-            panic!(
-                "[di] 配置文件读取失败: {:?}\n\
-                 错误: {}\n\
-                 请检查文件权限和路径是否正确。",
-                path, e
+        let content = fs::read_to_string(path).map_err(|e| {
+            AppError::with_context(
+                DiErr::ConfigError,
+                format!(
+                    "配置文件读取失败: {:?}\n错误: {}\n请检查文件权限和路径是否正确。",
+                    path, e
+                ),
             )
-        });
+        })?;
 
-        let config: toml::Value = toml::from_str(&content).unwrap_or_else(|e| {
-            panic!(
-                "[di] 配置文件解析失败: {:?}\n\
-                 错误: {}\n\
-                 请检查 TOML 语法是否正确。",
-                path, e
+        let config: toml::Value = toml::from_str(&content).map_err(|e| {
+            AppError::with_context(
+                DiErr::ConfigError,
+                format!(
+                    "配置文件解析失败: {:?}\n错误: {}\n请检查 TOML 语法是否正确。",
+                    path, e
+                ),
             )
-        });
+        })?;
         eprintln!("[di] 配置文件加载成功: {:?}", path);
-        config
+        Ok(config)
     }
 
     /// 获取配置值并反序列化

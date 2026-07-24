@@ -144,7 +144,7 @@ mod tests {
     #[test]
     fn test_log_plugins_build() {
         // LogPlugins 可以正常构建，inner_init 设置 tracing
-        let ctx = BuildContext::new::<&str>(None);
+        let ctx = BuildContext::new::<&str>(None).unwrap();
         let plugin = ctx.inject::<LogPlugins>();
 
         // 验证配置已注入
