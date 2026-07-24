@@ -1,6 +1,0 @@
-
-[log]
-level = "debug"
-prefix = "di-example"
-dir = "./logs"
-console_output = true

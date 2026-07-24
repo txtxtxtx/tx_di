@@ -1,609 +1,652 @@
-# =============================================================================
-#  tx_di 全量配置文件 (config_all.toml)
-#  包含所有可用的配置模块，按初始化优先级排列。
-#  所有字段均有默认值，可按需裁剪；未使用的 section 可直接删除。
-# =============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
+# tx_di 全量配置文件
+# ══════════════════════════════════════════════════════════════════════════════
+# 本文件包含所有插件的完整配置项、默认值和详细注释。
+# 使用时删除不需要的 section，或保留默认值即可运行。
+# ══════════════════════════════════════════════════════════════════════════════
 
 
-# -----------------------------------------------------------------------------
-#  日志配置 (LogConfig) — 初始化优先级: i32::MIN (最先初始化)
-#  控制日志输出级别、文件轮转、控制台输出等行为。
-# -----------------------------------------------------------------------------
+# ╔══════════════════════════════════════════════════════════════════════════════
+# ║ 1. tx_di_log — 日志插件
+# ║ TOML key: [log]     init_sort: i32::MIN（最早初始化）
+# ╚══════════════════════════════════════════════════════════════════════════════
 [log]
-
-# 全局日志级别，可选值: off / error / warn / info / debug / trace
+# 全局日志级别。可选: trace / debug / info / warn / error
+# 默认: "info"
 level = "info"
 
-# 按模块路径覆盖日志级别（key = 模块路径，value = 级别）
-# 例如只对数据库模块开启 debug 日志，其余保持 info
-[log.modules]
-# "tx_di_toasty" = "debug"
-# "tx_di_sip"    = "trace"
+# 模块级别日志覆盖。格式: "crate::module" = "level"
+# 默认: 空（不覆盖）
+# [log.modules]
+# "tx_di_gb28181" = "debug"
+# "tx_di_sip" = "trace"
 
-# 日志输出目录，程序会在该目录下按天生成日志文件
-# 默认: <可执行文件所在目录>/logs
-dir = "./logs"
-
-# 日志文件名前缀，生成的文件形如: tx_di_2026-06-16.log
-prefix = "tx_di"
-
-# 日志文件保留天数，超过此天数的旧日志会被自动清理
-retention_days = 90
-
-# 是否同时输出到控制台（标准输出），开发调试时建议开启
-console_output = true
-
-# 时间格式: "local" 使用本地时间，"utc" 使用 UTC 时间
-time_format = "local"
-
-# 自定义时间格式字符串（tracing-subscriber 格式）
-# 默认精确到毫秒，如 [14:30:05.123]
-time_format_str = "[hour]:[minute]:[second].[subsecond digits:3]"
-
-# 日志格式字符串（留空使用默认格式）
+# 日志格式字符串，空字符串使用默认格式
+# 默认: ""（tracing-subscriber 默认格式）
 format = ""
 
-
-# -----------------------------------------------------------------------------
-#  Web 服务配置 (WebConfig) — 基于 Axum 的 HTTP 服务器
-#  控制监听地址、端口、CORS、请求体大小、静态文件、SPA 路由、中间件等。
-# -----------------------------------------------------------------------------
-[web_config]
-
-# 监听地址，支持 IPv4 和 IPv6
-# IPv4: "0.0.0.0" 监听所有网卡，"127.0.0.1" 仅本机
-# IPv6: "::" 监听所有网卡，"::1" 仅本机
-host = "0.0.0.0"
-
-# 监听端口
-port = 8080
-
-# 是否启用 CORS（跨域资源共享）
-enable_cors = true
-
-# 最大请求体大小（字节），默认 10MB
-# 超过此大小的请求会被拒绝，返回 413
-max_body_size = 10485760
-
-# 静态文件目录，Web 服务器会自动提供该目录下的文件
-static_dir = "./static"
-
-# 请求超时时间（秒），超过此时间未完成的请求会被中断
-timeout_secs = 30
-
-# 是否启用 Swagger/OpenAPI 文档端点（需要编译时启用 api-doc feature）
-enable_api_doc = true
-
-# SPA 应用路由映射：将特定路径映射到前端构建产物目录
-# 适合前后端分离项目，前端打包后的文件放在对应目录即可
-# [web_config.spa_apps]
-# "/admin"  = "ui/admin/dist"    # 管理后台前端
-# "/portal" = "ui/portal/dist"   # 门户网站前端
-
-# 中间件层配置：(优先级, 名称) 元组数组
-# 优先级数值越小越靠近 handler（最后执行），越大越靠近外层（最先执行）
-# 可用中间件名称: "auth" / "api_log" / "trace" / "timeout" / "compression" / "cors"
-# layers = [
-#     [100, "cors"],
-#     [200, "compression"],
-#     [300, "trace"],
-#     [400, "api_log"],
-#     [500, "timeout"],
-#     [600, "auth"],
-# ]
-
-
-# -----------------------------------------------------------------------------
-#  SIP 协议配置 (SipConfig) — 用于 GB28181 等 SIP 通信场景
-# -----------------------------------------------------------------------------
-[sip_config]
-
-# SIP 监听地址
-host = "0.0.0.0"
-
-# SIP 监听端口（标准 SIP 端口为 5060）
-port = 5060
-
-# 传输协议: "udp" / "tcp" / "both"（同时监听 UDP 和 TCP）
-transport = "udp"
-
-# SIP User-Agent 头，标识本服务的名称和版本
-user_agent = "tx-di-sip/1.0.0"
-
-# 外网 IP（NAT 穿透用），设置后会在 Contact 和 Via 头中使用此地址
-# 当服务部署在 NAT 后面时必须配置，否则对端无法回连
-# external_ip = "203.0.113.100"
-
-# 是否记录 SIP 消息日志（开启后会打印收发的每条 SIP 报文，调试用）
-log_messages = false
-
-
-# -----------------------------------------------------------------------------
-#  数据库配置 (ToastyConfig) — 基于 Toasty ORM 的数据库访问层
-#  初始化优先级: i32::MIN + 2（在日志和 SaToken 之后初始化）
-# -----------------------------------------------------------------------------
-[toasty]
-
-# 数据库连接字符串，支持以下格式:
-#   SQLite:     "sqlite://path/to/db.db" 或 "sqlite::memory:"（内存数据库）
-#   PostgreSQL: "postgres://user:password@host:5432/dbname"
-#   MySQL:      "mysql://user:password@host:3306/dbname"
-database_url = "sqlite://data/app.db"
-
-# 启动时是否自动创建/更新表结构（生产环境建议关闭，使用迁移工具管理）
-auto_schema = false
-
-# 连接池最大连接数，默认为 CPU 核心数 * 2
-max_pool_size = 10
-
-# 表名前缀，所有表名会自动添加此前缀（如 "tx_" -> "tx_users"）
-# 留空则不添加前缀
-# table_name_prefix = ""
-
-# 连接池等待超时（秒），超过此时间无法获取空闲连接则报错
-# pool_wait_timeout_secs = 30
-
-# 连接创建超时（秒），建立新连接的最大等待时间
-# pool_create_timeout_secs = 10
-
-# 连接健康检查间隔（秒），后台定期检测连接是否有效
-# pool_health_check_interval_secs = 60
-
-# 连接最大生存时间（秒），超过后连接会被回收重建
-# pool_max_connection_lifetime_secs = 1800
-
-# 连接最大空闲时间（秒），空闲超过此时间的连接会被回收
-# pool_max_connection_idle_time_secs = 600
-
-# 取出连接前是否先 ping 一次（检测连接是否存活，会略微增加延迟）
-pool_pre_ping = true
-
-# 首次初始化（空数据库）时自动创建的管理员密码
-# 仅在数据库为空时生效，不会覆盖已有数据
-default_admin_password = "admin123"
-
-
-# -----------------------------------------------------------------------------
-#  文件存储配置 (FileConfig) — 支持本地存储和 S3 兼容存储
-#  初始化优先级: i32::MIN + 3
-# -----------------------------------------------------------------------------
-[file]
-
-# 存储后端: "local"（本地文件系统）或 "s3"（S3 兼容存储）
-backend = "local"
-
-# 本地存储根路径（backend = "local" 时生效）
-base_path = "./uploads"
-
-# 文件访问基础 URL，用于生成下载链接
-# 例如设置为 "http://localhost:8080/files"，则文件可通过该 URL 前缀访问
-base_url = ""
-
-# 最大文件大小（字节），0 表示不限制
-# max_file_size = 104857600  # 100MB
-
-# 允许上传的文件扩展名列表（小写），空列表表示不限制
-# allowed_extensions = ["jpg", "jpeg", "png", "gif", "pdf", "doc", "docx", "xls", "xlsx", "zip"]
-
-# S3 兼容存储配置（backend = "s3" 时生效）
-[file.s3]
-
-# S3 存储桶名称
-bucket = ""
-
-# AWS 区域（使用 MinIO 等自建服务时可随意填写）
-region = "ap-southeast-1"
-
-# S3 兼容服务端点（MinIO、阿里云 OSS 等）
-# 留空则使用 AWS 默认端点
-endpoint = ""
-
-# 访问密钥（留空则使用 AWS 默认凭证链，如环境变量或 IAM Role）
-access_key = ""
-secret_key = ""
-
-# 是否使用路径风格（path-style），MinIO 等自建服务通常需要开启
-# AWS S3 默认使用虚拟主机风格（virtual-hosted-style）
-force_path_style = false
-
-
-# -----------------------------------------------------------------------------
-#  Sa-Token 认证配置 (SaTokenConf) — 轻量级权限认证框架
-#  初始化优先级: i32::MIN + 1
-# -----------------------------------------------------------------------------
-[sa_token]
-
-# Token 名称，同时也是 HTTP Header / Cookie / Query Param 的 key
-token_name = "Authorization"
-
-# Token 有效期（秒），默认 24 小时
-# 设置为 -1 表示永不过期（不推荐用于生产环境）
-timeout = 86400
-
-# Token 最低活跃频率（秒），超过此时间无操作则 Token 失效
-# 设置为 -1 表示不限制（Token 只要未过期就一直有效）
-active_timeout = -1
-
-# 是否启用 Token 自动续期（在 active_timeout 内有访问则自动延长有效期）
-auto_renew = true
-
-# 是否允许同一账号并发登录（true = 多端同时在线，false = 后登录踢掉先登录）
-is_concurrent = true
-
-# 多人登录同一账号时是否共用同一个 Token
-# true = 共用（一个 Token 对应多次登录），false = 每次登录生成新 Token
-is_share = true
-
-# Token 生成风格:
-#   "uuid"         — 标准 UUID（默认）
-#   "simple-uuid"  — 简化 UUID（去除中划线）
-#   "random-32"    — 32 位随机字符串
-#   "random-64"    — 64 位随机字符串
-#   "random-128"   — 128 位随机字符串
-#   "jwt"          — JWT 格式（需配置 jwt_secret_key）
-#   "hash"         — 哈希值
-#   "tik"          — 唯一 tik 格式
-#   "timestamp"    — 时间戳 + 随机数
-token_style = "uuid"
-
-# 是否从请求体（Body）中读取 Token
-is_read_body = false
-
-# 是否从请求头（Header）中读取 Token
-is_read_header = true
-
-# 是否从 Cookie 中读取 Token
-is_read_cookie = true
-
-# Token 前缀，用于从 Header 值中提取 Token
-# 例如设置为 "Bearer "，则前端发送 "Authorization: Bearer xxx" 时自动提取 xxx
-token_prefix = "Bearer "
-
-# 是否输出 Sa-Token 操作日志（调试用）
-is_log = false
-
-# JWT 密钥（token_style = "jwt" 时必须配置）
-# jwt_secret_key = "your-jwt-secret-key-here"
-
-# JWT 算法，可选: HS256 / HS384 / HS512 / RS256 / RS384 / RS512
-# jwt_algorithm = "HS256"
-
-# 是否启用 nonce 防重放攻击
-enable_nonce = false
-
-# nonce 有效期（秒），-1 表示与 Token 有效期相同
-nonce_timeout = -1
-
-# 是否启用 Refresh Token（允许用 Refresh Token 换取新的 Access Token）
-enable_refresh_token = false
-
-# Refresh Token 有效期（秒），默认 7 天
-refresh_token_timeout = 604800
-
-
-# -----------------------------------------------------------------------------
-#  GB28181 平台服务配置 (Gb28181ServerConfig) — 国标视频监控平台
-#  初始化优先级: 10001
-# -----------------------------------------------------------------------------
-[gb28181_server_config]
-
-# 平台 ID（20 位国标编码），符合 GB/T 28181 编码规范
-# 编码规则: 省级(2) + 市级(2) + 区县(2) + 类型(3) + 序号(7) + 备用(4)
-platform_id = "34020000002000000001"
-
-# SIP 认证域（realm），通常为区域编码前 10 位
-realm = "3402000000"
-
-# SIP 服务 IP，用于构造 SIP URI 中的地址
-# 需要设置为设备可访问的 IP（内网或公网）
-sip_ip = "127.0.0.1"
-
-# 设备心跳超时（秒），超过此时间未收到心跳则标记设备离线
-heartbeat_timeout_secs = 120
-
-# 设备注册有效期（秒），设备需要在此时间到期前重新注册
-register_ttl = 3600
-
-# 是否启用 SIP 摘要认证（设备注册时需要提供用户名密码）
-enable_auth = true
-
-# 全局认证密码（未单独配置的设备使用此密码）
-auth_password = "12345678"
-
-# 设备白名单（为空则允许所有设备注册）
-# 只有列表中的设备 ID 才被允许注册
-# allowed_device_ids = ["34020000001320000001", "34020000001320000002"]
-
-# 设备黑名单（优先级高于白名单，黑名单中的设备一律拒绝）
-blocked_device_ids = []
-
-# 每台设备独立密码（优先级高于全局密码）
-# key = 设备 ID，value = 密码
-[gb28181_server_config.device_passwords]
-# "34020000001320000001" = "password1"
-# "34020000001320000002" = "password2"
-
-# 媒体层配置（RTP 收流相关）
-[gb28181_server_config.media]
-
-# 媒体服务器 IP，用于 SDP 中的连接地址（c= 行）
-# 设备会向此 IP 发送 RTP 流
-local_ip = "0.0.0.0"
-
-# RTP 端口范围（用于接收设备的音视频流）
-# 范围越大可支持的并发流越多，每路流需要 1 个端口
-rtp_port_start = 30000
-rtp_port_end = 30500
-
-# 级联配置（上下级平台互联）
-[gb28181_server_config.cascade]
-
-# 是否作为上级平台运行（接受下级设备/平台注册）
-enable_upper = true
-
-# 是否作为下级平台运行（向上级平台注册）
-enable_lower = false
-
-# 上级平台 SIP 地址（enable_lower = true 时生效）
-# 格式: "sip:平台ID@IP:端口"
-# upper_platform_sip = "sip:34020000002000000001@10.0.0.1:5060"
-
-# 上级平台 ID
-# upper_platform_id = "34020000002000000001"
-
-# 向上级平台注册时使用的认证密码
-# upper_auth_password = "12345678"
-
-# 媒体后端配置（流媒体服务器对接）
-[gb28181_server_config.media_backend]
-
-# 后端类型: "zlm"（ZLMediaKit）/ "mediamtx"（MediaMTX）/ "null"（不对接流媒体）
-backend_type = "zlm"
-
-# ---- ZLMediaKit 配置 ----
-[gb28181_server_config.media_backend.zlm]
-
-# ZLM HTTP API 基础地址
-base_url = "http://127.0.0.1:8080"
-
-# ZLM API 认证密钥（在 ZLM 配置文件中设置的 secret）
-secret = "035c73f7-bb6b-4889-a715-d9eb2d1925cc"
-
-# API 请求超时（秒）
-timeout_secs = 10
-
-# RTSP 端口（用于生成播放地址）
-rtsp_port = 554
-
-# RTSP over TLS 端口（0 = 不启用）
-rtsps_port = 0
-
-# RTMP 端口（用于生成 RTMP 播放地址）
-rtmp_port = 1935
-
-# HTTP API 端口（0 = 从 base_url 自动推断）
-http_port = 0
-
-# HTTPS 端口（0 = 不启用）
-https_port = 0
-
-# ---- MediaMTX 配置 ----
-# 当 backend_type = "mediamtx" 时使用以下配置
-[gb28181_server_config.media_backend.mediamtx]
-
-# MediaMTX HTTP API 地址
-api_url = "http://127.0.0.1:9997"
-
-# RTSP 播放地址前缀
-rtsp_url = "rtsp://127.0.0.1:8554"
-
-# RTSP over TLS 地址（留空 = 不启用）
-rtsps_url = ""
-
-# RTMP 播放地址前缀
-rtmp_url = "rtmp://127.0.0.1:1935"
-
-# HLS 播放地址前缀
-hls_url = "http://127.0.0.1:8888"
-
-# HLS over HTTPS 地址（留空 = 不启用）
-hls_https_url = ""
-
-# 本地 RTP 监听 IP
-rtp_ip = "0.0.0.0"
-
-# RTP 端口范围
-rtp_port_start = 30000
-rtp_port_end = 31000
-
-# API 请求超时（秒）
-timeout_secs = 10
-
-
-# -----------------------------------------------------------------------------
-#  缓存配置 (CacheConfig) — 内存缓存 / Redis 缓存抽象层
-#  初始化优先级: i32::MIN + 1
-#  支持两种后端: MemoryCache（内存）和 RedisCache（Redis）
-# -----------------------------------------------------------------------------
+# 日志文件输出目录
+# 默认: 可执行文件所在目录的 logs/ 子目录，取不到则 "./logs"
+dir = "./logs"
+
+# 日志文件保留天数
+# 默认: 90
+retention_days = 90
+
+# 是否输出到控制台
+# 默认: true
+console_output = true
+
+# 日志文件前缀
+# 默认: "tx_di"
+prefix = "tx_di"
+
+# 时间格式类型。可选: local / utc
+# 默认: "local"
+time_format = "local"
+
+# 自定义时间戳格式字符串
+# 默认: "[hour]:[minute]:[second].[subsecond digits:3]"
+time_format_str = "[hour]:[minute]:[second].[subsecond digits:3]"
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════
+# ║ 2. tx_di_cache — 缓存插件
+# ║ TOML key: [cache_config]     init_sort: i32::MIN + 1
+# ╚══════════════════════════════════════════════════════════════════════════════
 [cache_config]
-
-# 默认 TTL（秒），0 或省略表示永不过期
+# 默认 TTL（秒）。0 表示永不过期
+# 默认: 3600（1 小时）
 default_ttl_secs = 3600
 
-# 键前缀（用于隔离不同应用的缓存键，避免键冲突）
-# key_prefix = "myapp:"
+# 键前缀。用于隔离不同应用的缓存键
+# 默认: ""
+key_prefix = ""
 
-# 内存缓存最大条目数（0 = 无限制）
+# 内存缓存最大条目数。0 表示无限制
+# 默认: 10000
 memory_max_capacity = 10000
 
-# Redis 连接 URL（仅编译 feature="redis" 时生效）
-# 格式: "redis://127.0.0.1:6379" 或 "rediss://user:pass@host:6380/0"
-# 不配置则仅使用内存缓存
+# Redis 连接 URL（可选，配置后启用 Redis 后端）
+# 格式: redis://[user:pass@]host:port[/db]  或  rediss://...（TLS）
+# 默认: null（不启用 Redis）
 # redis_url = "redis://127.0.0.1:6379"
 
-# Redis 连接池大小（仅 feature="redis" 时生效）
+# Redis 连接池大小
+# 默认: 10
 redis_pool_size = 10
 
 # Redis 连接超时（秒）
+# 默认: 5
 redis_timeout_secs = 5
 
 
-# -----------------------------------------------------------------------------
-#  注册中心配置 (RegistryConfig) — 服务注册发现 + 配置中心（Nacos）
-#  初始化优先级: i32::MIN（与 LogConfig 同级，最先初始化）
-#  注意: Nacos 集成当前为 TODO 占位，实际功能待实现
-# -----------------------------------------------------------------------------
-[registry_config]
+# ╔══════════════════════════════════════════════════════════════════════════════
+# ║ 3. tx_di_toasty — ORM 数据库插件
+# ║ TOML key: [toasty]     init_sort: i32::MIN + 2
+# ║ 依赖: tx_di_log
+# ╚══════════════════════════════════════════════════════════════════════════════
+[toasty]
+# 数据库连接字符串。scheme 决定驱动（需启用对应 feature）：
+#   sqlite://path/to/db.db          SQLite（无需额外依赖）
+#   sqlite://memory                 内存数据库（测试用）
+#   postgresql://user:pass@host/db  PostgreSQL（feature = "postgresql"）
+#   mysql://user:pass@host/db       MySQL（feature = "mysql"）
+#   dynamodb://endpoint/region/...  DynamoDB（feature = "dynamodb"）
+# 默认: "sqlite://gb28181.db"
+database_url = "sqlite://gb28181.db"
 
-# 主开关：是否启用注册中心功能
-enabled = false
+# 启动时自动创建/更新数据表
+#   true  — 开发环境推荐
+#   false — 生产环境推荐（手动管理迁移）
+# 默认: true
+auto_schema = true
 
-# Nacos 服务地址
-nacos_addr = "http://127.0.0.1:8848"
+# 连接池最大连接数。不填则取 num_cpus * 2
+# 默认: null（自动）
+# max_pool_size = 10
 
-# 命名空间
-namespace = "public"
+# 表名前缀。如 "app_" → 所有表名加 "app_" 前缀
+# 默认: null（无前缀）
+# table_name_prefix = "app_"
 
-# 分组
-group = "DEFAULT_GROUP"
+# 从连接池获取空闲连接的最大等待时间（秒）
+# 默认: null（无限等待）
+# pool_wait_timeout_secs = 30
 
-# 本地服务名（注册到 Nacos 时的服务标识）
-service_name = "unknown-service"
+# 建立新连接的最大允许时间（秒）
+# 默认: null
+# pool_create_timeout_secs = 10
 
-# 是否自动注册本地端点
-auto_register = true
+# 连接池后台健康检查间隔（秒）。0 表示禁用
+# 默认: null
+# pool_health_check_interval_secs = 60
 
-# 心跳间隔（秒）
-heartbeat_secs = 5
+# 连接最大存活时间（秒）。负载均衡器场景推荐 1800（30分钟）
+# 默认: null
+# pool_max_connection_lifetime_secs = 1800
+
+# 连接最大空闲时间（秒）。超时连接将被驱逐
+# 默认: null
+# pool_max_connection_idle_time_secs = 300
+
+# 每次取出连接前是否先 ping。高可用场景推荐开启
+# 默认: false
+pool_pre_ping = false
+
+# 数据库为空时自动创建的 admin 账号默认密码
+# 默认: "admin123"
+default_admin_password = "admin123"
 
 
-# -----------------------------------------------------------------------------
-#  定时任务调度配置 (JobConfig) — Cron 定时任务调度器
-#  强依赖 tx_di_toasty，任务与日志存于数据库
-#  初始化优先级: i32::MIN + 1
-# -----------------------------------------------------------------------------
+# ╔══════════════════════════════════════════════════════════════════════════════
+# ║ 4. tx_di_file — 统一文件存储插件
+# ║ TOML key: [file]     init_sort: i32::MIN + 3
+# ╚══════════════════════════════════════════════════════════════════════════════
+[file]
+# 本地存储根路径
+# 默认: "./uploads"
+base_path = "./uploads"
+
+# 文件访问基础 URL（用于生成下载链接）
+# 默认: ""
+base_url = "http://localhost:8080/files"
+
+# 单个文件最大大小（字节）。0 表示不限制
+# 默认: 0（不限制）
+max_file_size = 10485760    # 10MB
+
+# 允许的文件扩展名（小写）。空列表表示不限制
+# 默认: []
+allowed_extensions = ["jpg", "png", "pdf", "docx"]
+
+# ── 额外存储后端（可多个） ─────────────────────────────────────────────
+# [[file.extra_storages]]
+# name = "s3-main"                # 后端名称（映射为 sys:<name> 或 user:<name>）
+# backend = "s3"                  # local / s3 / database
+# base_path = ""                  # 本地路径（backend="local" 时生效）
+# base_url = ""                   # 访问 URL
+# [file.extra_storages.s3]
+# bucket = "my-bucket"            # S3 bucket 名称
+# region = "ap-southeast-1"       # AWS 区域
+# endpoint = "http://localhost:9000"  # S3 兼容端点（MinIO 等）
+# access_key = ""                 # Access Key
+# secret_key = ""                 # Secret Key
+# force_path_style = true         # 强制路径风格（MinIO 需 true）
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════
+# ║ 5. tx_di_axum — Web 服务器插件
+# ║ TOML key: [web_config]     init_sort: i32::MAX（最后启动）
+# ║ 依赖: tx_di_log
+# ╚══════════════════════════════════════════════════════════════════════════════
+[web_config]
+# 监听地址。IPv4: "127.0.0.1"、"0.0.0.0"  IPv6: "::1"、"::"
+# 默认: "127.0.0.1"
+host = "127.0.0.1"
+
+# 监听端口
+# 默认: 8080
+port = 8080
+
+# 是否启用 CORS（跨域资源共享）
+# 默认: false
+enable_cors = true
+
+# 最大请求体大小（字节）
+# 默认: 10485760（10MB）
+max_body_size = 10485760
+
+# 静态文件托管目录
+# 默认: "./static"
+static_dir = "./static"
+
+# SPA 应用映射（可选）。格式: { 路由前缀 = 静态目录 }
+# 所有 /admin 下的请求 fallback 到 admin-spa/index.html
+# [web_config.spa_apps]
+# "/admin" = "./admin-spa"
+# "/portal" = "./portal-spa"
+
+# 请求超时时间（秒）
+# 默认: 30
+timeout_secs = 30
+
+# 中间件注册列表。格式: [(priority, "layer_name"), ...]
+# 可用中间件名见 tx_di_axum README
+# [web_config.layers]
+# layers = [[100, "cors"], [200, "compression"]]
+
+# 是否启用 API 文档端点（需启用 api-doc feature，默认开启）
+# /swagger-ui — 接口文档页面
+# /api-docs/openapi.json — OpenAPI 规范 JSON
+# 默认: true
+enable_api_doc = true
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════
+# ║ 6. tx_di_sa_token — 认证鉴权插件
+# ║ TOML key: [sa_token]     init_sort: i32::MIN + 1
+# ║ 依赖: tx_di_axum
+# ║ feature: memory（默认）/ redis / database（存储后端）
+# ╚══════════════════════════════════════════════════════════════════════════════
+[sa_token]
+# Token 读取键名（Header / Parameter / Cookie 中查找的键）
+# 默认: "Authorization"
+token_name = "Authorization"
+
+# Token 有效期（秒），-1 表示永不过期
+# 默认: 86400（24 小时）
+timeout = 86400
+
+# Token 最低活跃频率（秒），-1 表示不限制。配合 auto_renew 使用
+# 默认: -1（不限制）
+active_timeout = -1
+
+# 是否开启自动续签。true 时，active_timeout 作为自动续签时长
+# 默认: false
+auto_renew = false
+
+# 是否允许同一账号并发登录
+# 默认: true
+is_concurrent = true
+
+# 多人登录同一账号时是否共享一个 Token
+# 默认: true
+is_share = true
+
+# Token 风格。可选:
+#   uuid / simple-uuid / random-32 / random-64 / random-128
+#   jwt / hash / tik / timestamp
+# 默认: "uuid"
+token_style = "uuid"
+
+# 是否从请求体读取 Token
+# 默认: false
+is_read_body = false
+
+# 是否从 Header 读取 Token
+# 默认: true
+is_read_header = true
+
+# 是否从 Cookie 读取 Token
+# 默认: true
+is_read_cookie = true
+
+# 是否输出操作日志
+# 默认: false
+is_log = false
+
+# JWT 密钥（token_style = "jwt" 时使用）
+# 默认: null
+# jwt_secret_key = "your-secret-key"
+
+# JWT 算法（token_style = "jwt" 时使用）
+# 默认: null（HS256）
+# jwt_algorithm = "HS256"
+
+# 是否启用防重放攻击（nonce 机制）
+# 默认: false
+enable_nonce = false
+
+# Nonce 有效期（秒），-1 表示使用 token timeout
+# 默认: -1
+nonce_timeout = -1
+
+# 是否启用 Refresh Token
+# 默认: false
+enable_refresh_token = false
+
+# Refresh Token 有效期（秒）
+# 默认: 604800（7 天）
+refresh_token_timeout = 604800
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════
+# ║ 7. tx_di_job — 定时任务插件
+# ║ TOML key: [job]     init_sort: i32::MIN + 1
+# ║ 依赖: tx_di_toasty（持久化任务状态到数据库）
+# ╚══════════════════════════════════════════════════════════════════════════════
 [job]
-
-# 主开关：是否启用调度器
+# 是否启用调度器
+# 默认: true
 enabled = true
 
-# 调度器轮询间隔（秒）。每隔 n 秒检查一次 cron 表达式是否到期
-# 建议保持 1s 以获得秒级精度
+# 调度器轮询间隔（秒）
+# 默认: 1
 poll_interval_secs = 1
 
-# Shell 脚本执行超时（秒），超过此时间未完成则强制中止
+# Shell 脚本执行超时（秒）
+# 默认: 300（5 分钟）
 shell_timeout_secs = 300
 
-# Python 脚本执行超时（秒），超过此时间未完成则强制中止
+# Python 脚本执行超时（秒）
+# 默认: 300（5 分钟）
 python_timeout_secs = 300
 
 # Python 解释器路径
+# 默认: "/usr/bin/python3"
 python_path = "/usr/bin/python3"
 
-# 最大并发执行任务数。超过此上限的任务跳过本周期，下一轮重试
+# 任务执行线程池大小
+# 默认: 4
 thread_pool_size = 4
 
-# 内部函数执行器超时（秒）。内部处理器阻塞超过此时间则标记超时
-# 防止死循环或长时间阻塞卡死调度器
+# 内部函数执行器超时（秒）
+# 默认: 300（5 分钟）
 internal_timeout_secs = 300
 
 
-# -----------------------------------------------------------------------------
-#  GB28181 设备端配置 (GbDevConfig) — 国标设备模拟器
-#  向上级平台注册，实现设备模拟/接入
-#  初始化优先级: 30000
-# -----------------------------------------------------------------------------
-[gb_dev]
-
-# 主开关：是否启用设备端
+# ╔══════════════════════════════════════════════════════════════════════════════
+# ║ 8. tx_di_registry — 服务注册发现插件
+# ║ TOML key: [registry_config]     init_sort: i32::MIN（配置）/ i32::MAX - 50（运行）
+# ║ feature: nacos（默认）
+# ╚══════════════════════════════════════════════════════════════════════════════
+[registry_config]
+# 主开关：是否启用注册中心
+# 默认: false
 enabled = false
 
+# Nacos 服务地址
+# 默认: "http://127.0.0.1:8848"
+nacos_addr = "http://127.0.0.1:8848"
+
+# 命名空间
+# 默认: "public"
+namespace = "public"
+
+# 分组
+# 默认: "DEFAULT_GROUP"
+group = "DEFAULT_GROUP"
+
+# 本地服务名（注册到 Nacos 的 service name）
+# 默认: "unknown-service"
+service_name = "my-service"
+
+# 是否自动注册本地端点
+# 默认: true
+auto_register = true
+
+# 心跳间隔（秒）
+# 默认: 5
+heartbeat_secs = 5
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════
+# ║ 9. tx_di_sip — SIP 协议栈插件（服务端）
+# ║ TOML key: [sip_config]     init_sort: 10000
+# ╚══════════════════════════════════════════════════════════════════════════════
+[sip_config]
+# 监听地址。IPv4: "0.0.0.0"（所有接口）、IPv6: "::"（双栈）
+# 默认: "0.0.0.0"
+host = "0.0.0.0"
+
+# SIP 监听端口
+# 默认: 5060
+port = 5060
+
+# 传输层协议。可选: udp / tcp / both / tls / ws
+# 默认: "both"（国标推荐，兼容老设备 UDP、NAT 友好 TCP）
+transport = "both"
+
+# User-Agent 字符串
+# 默认: "tx-di-sip/1.0.0"
+user_agent = "tx-di-sip/1.0.0"
+
+# 对外可见公网 IP（NAT 穿透，用于 Contact/Via 头）
+# 不填则使用 host 字段的值
+# 默认: null
+# external_ip = "203.0.113.1"
+
+# 是否开启详细 SIP 消息日志
+# 默认: false
+log_messages = false
+
+# SIP 认证域（realm）。不填则接受任意域的挑战
+# 默认: null
+# realm = "3402000000"
+
+# REGISTER/INVITE 等请求的超时重试次数
+# 默认: 1
+retry_count = 1
+
+# SIP 请求超时时间（秒）
+# 默认: 30
+request_timeout_secs = 30
+
+# 是否启用 SIP 服务。水平扩容时可设为 false 仅做客户端
+# 默认: true
+enabled = true
+
+# 分发队列容量（生产者→消费者 channel）
+# 默认: 10000
+dispatch_queue_size = 10000
+
+# 并发 handler 上限（Semaphore 背压）
+# 默认: 1000
+max_concurrent_handlers = 1000
+
+# ── TLS 配置（transport = "tls" 时生效） ────────────────────────────────
+# [sip_config.tls]
+# cert_pem = "/path/to/server-cert.pem"
+# key_pem = "/path/to/server-key.pem"
+# ca_certs = "/path/to/ca.pem"          # 可选，启用双向 TLS (mTLS)
+# client_cert = "/path/to/client-cert.pem"  # 可选，作为客户端时使用
+# client_key = "/path/to/client-key.pem"
+
+# ── SIP 客户端注册配置 ──────────────────────────────────────────────────
+[sip_client]
+# 注册服务器地址。格式: "192.168.1.1:5060" 或 "sip:192.168.1.1:5060"
+# 默认: ""
+registrar = "sip:192.168.1.1:5060"
+
+# 注册用户名（通常为平台/设备 ID）
+# 默认: ""
+username = "34020000001320000001"
+
+# 注册密码
+# 默认: ""
+password = "12345678"
+
+# 认证域（realm），null 表示接受任意挑战
+# 默认: null
+# realm = "3402000000"
+
+# 注册有效期（秒）
+# 默认: 3600
+expires = 3600
+
+# 续期间隔（秒）。0 表示自动取 expires/2（至少 30 秒）
+# 默认: 0
+renew_secs = 0
+
+# 是否启用客户端注册
+# 默认: false
+enabled = false
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════
+# ║ 10. tx_di_gb28181 — GB28181 上级平台服务端
+# ║ TOML key: [gb28181_server_config]     init_sort: 10001
+# ║ 依赖: tx_di_sip
+# ╚══════════════════════════════════════════════════════════════════════════════
+[gb28181_server_config]
+# 本平台 ID（20 位编号，GB28181 规范）
+# 默认: "34020000002000000001"
+platform_id = "34020000002000000001"
+
+# 认证域（realm），用于 SIP 摘要认证
+# 默认: "3402000000"
+realm = "3402000000"
+
+# 平台 SIP 服务对外暴露的 IP（用于构造 SIP URI）
+# 默认: "127.0.0.1"
+sip_ip = "127.0.0.1"
+
+# 设备心跳超时时间（秒）。超时未收到心跳则视为离线
+# 默认: 120
+heartbeat_timeout_secs = 120
+
+# 设备注册有效期上限（秒），回写到 200 OK 的 Contact Expires
+# 默认: 3600
+register_ttl = 3600
+
+# 是否开启摘要认证（生产环境建议开启）
+# 默认: false
+enable_auth = false
+
+# 全局认证密码（所有设备共用）
+# 默认: "12345678"
+auth_password = "12345678"
+
+# 按设备 ID 配置独立密码（优先级高于 auth_password）
+# [gb28181_server_config.device_passwords]
+# "34020000001320000001" = "device1_pass"
+# "34020000001320000002" = "device2_pass"
+
+# ── 设备访问控制 ─────────────────────────────────────────────────────────
+# 设备注册白名单（device_id 列表）。非空时仅白名单中的设备允许注册
+# 默认: []（不启用白名单，允许所有设备）
+# allowed_device_ids = ["34020000001320000001", "34020000001320000002"]
+
+# 设备注册黑名单（device_id 列表）。黑名单中的设备始终被拒绝，优先级高于白名单
+# 默认: []
+# blocked_device_ids = ["34020000001990000099"]
+
+# ── 协议版本 ──────────────────────────────────────────────────────────────
+# 默认协议版本（新注册设备未在下表命中时使用）
+# 可选: v2016 / v2022
+# 默认: v2022
+default_version = "v2022"
+
+# 按设备 ID 覆盖协议版本（混合组网：部分 2016 老设备 + 2022 新设备）
+# [gb28181_server_config.device_versions]
+# "34020000001320000001" = "v2016"
+
+# ── 媒体层配置 ───────────────────────────────────────────────────────────
+[gb28181_server_config.media]
+# 媒体服务器本机 IP（用于 SDP c= 行，0.0.0.0 表示自动探测）
+# 默认: "0.0.0.0"
+local_ip = "0.0.0.0"
+
+# RTP 端口起始值（动态分配时从此端口开始，0 表示由流媒体服务器自动分配）
+# 默认: 30000
+rtp_port_start = 30000
+
+# RTP 端口结束值
+# 默认: 30500
+rtp_port_end = 30500
+
+# NAT 穿透时对外暴露的公网 IP（用于 SDP c= 行）
+# 不填则使用 local_ip / sip_ip
+# 默认: null
+# nat_external_ip = "203.0.113.1"
+
+# ── 流媒体后端（新版统一配置） ──────────────────────────────────────────
+[gb28181_server_config.media_backend]
+# 后端类型。可选: zlm（ZLM）、mediamtx（MediaMTX）、null（禁用）
+# 默认: null（不启用）
+backend_type = "zlm"
+
+# ── ZLM (ZLMediaKit) 配置 ────────────────────────────────────────────────
+[gb28181_server_config.media_backend.zlm]
+# ZLM API 基础 URL
+# 默认: ""
+base_url = "http://127.0.0.1:8080"
+
+# ZLM API 密钥（secret）
+# 默认: ""
+secret = ""
+
+# API 请求超时（秒）
+# 默认: 10
+timeout_secs = 10
+
+# RTSP 服务端口（对设备直播推流的推送目标）。0 表示禁用
+# 默认: 554
+rtsp_port = 554
+
+# RTSP over TLS 端口（加密推流）。0 表示禁用
+# 默认: 0
+rtsps_port = 0
+
+# RTMP 服务端口（推流目标，部分设备使用）。0 表示禁用
+# 默认: 1935
+rtmp_port = 1935
+
+# HTTP 服务端口（拉流 / HLS / FLV）
+# 默认: 8080
+http_port = 8080
+
+# HTTPS 服务端口
+# 默认: 8081
+https_port = 8081
+
+# ── 级联配置（上下级平台互联） ──────────────────────────────────────────
+[gb28181_server_config.cascade]
+# 本平台是否作为上级（接收下级设备/平台注册）
+# 默认: true
+enable_upper = true
+
+# 本平台是否作为下级（向上级平台注册）
+# 默认: false
+enable_lower = false
+
+# 上级平台 SIP 地址（enable_lower = true 时必填）
+# 默认: null
+# upper_platform_sip = "sip:192.168.1.1:5060"
+
+# 上级平台 ID
+# 默认: null
+# upper_platform_id = "34020000002000000001"
+
+# 向上级注册的密码
+# 默认: null
+# upper_auth_password = "12345678"
+
+# 上级平台协议版本（决定出网目录 XML 字符集：v2016→GB2312，v2022→GB18030）
+# 默认: v2022
+upper_version = "v2022"
+
+
+# ╔══════════════════════════════════════════════════════════════════════════════
+# ║ 11. tx_di_gb_dev — GB28181 设备端（UAC，向上级注册）
+# ║ TOML key: [gb_dev]     init_sort: 30000
+# ║ 依赖: tx_di_sip
+# ╚══════════════════════════════════════════════════════════════════════════════
+[gb_dev]
 # 上级平台地址（完整 SIP URI）
-# 格式: "sip:平台ID@IP:端口"
+# 格式: "sip:platform_id@host:port"
+# 默认: ""
 # platform_uri = "sip:34020000002000000001@192.168.1.1:5060"
 
-# 本设备 ID（20 位国标编码）
+# 本设备 ID（注册用户名，通常为 20 位编码）
+# 默认: ""
 # device_id = "34020000001320000001"
 
 # 注册用户名（一般等于 device_id）
+# 默认: ""
 # username = "34020000001320000001"
 
 # 注册密码
+# 默认: ""
 # password = "12345678"
 
-# 认证域（realm），留空表示接受任意挑战
+# 认证域（realm）。null 表示接受任意挑战
+# 默认: null
 # realm = "3402000000"
 
-# 注册有效期（秒），到期前需重新注册
+# 注册有效期（秒）
+# 默认: 3600
 register_ttl = 3600
 
 # 心跳间隔（秒）
+# 默认: 60
 heartbeat_secs = 60
 
-# 协议版本，可选: "v2016" / "v2022"
-# 驱动出网编码与指令集裁剪
+# 协议版本。可选: v2016 / v2022
+# 默认: v2022
 version = "v2022"
-#  注意: 此配置不由 DI 框架自动加载，需手动调用 CanConfig::load_from_toml()
-# -----------------------------------------------------------------------------
-[can_config]
 
-# 总线适配器类型:
-#   "socketcan" — Linux SocketCAN（需内核支持）
-#   "pcan"      — PEAK PCAN 适配器
-#   "kvaser"    — Kvaser 适配器
-#   "simbus"    — 模拟总线（开发调试用）
-adapter = "simbus"
-
-# CAN 接口名称
-# Linux: "can0", "vcan0" 等
-# Windows: "PCAN_USBBUS1" 等
-interface = "vcan0"
-
-# 仲裁段比特率（bps），标准 CAN 通常为 500000
-bitrate = 500000
-
-# CAN FD 数据段比特率（bps），仅 enable_fd = true 时生效
-fd_bitrate = 2000000
-
-# 是否启用 CAN FD（灵活数据速率，支持最大 64 字节帧）
-enable_fd = false
-
-# 接收队列大小（帧数），队列满时新帧会被丢弃
-rx_queue_size = 512
-
-# 发送超时（毫秒）
-tx_timeout_ms = 100
-
-# ISO-TP 传输层配置（用于 UDS 诊断通信）
-# ISO-TP 发送 CAN ID（通常是诊断仪 -> ECU）
-isotp_tx_id = 0x7E0
-
-# ISO-TP 接收 CAN ID（通常是 ECU -> 诊断仪）
-isotp_rx_id = 0x7E8
-
-# ISO-TP 块大小（连续帧数量），0 = 由 ECU 决定
-isotp_block_size = 0
-
-# ISO-TP STmin（连续帧最小间隔，毫秒），0 = 尽快发送
-isotp_st_min_ms = 0
-
-# UDS 诊断超时配置
-# P2 超时（毫秒）— ECU 处理请求的最大等待时间
-uds_p2_timeout_ms = 150
-
-# P2* 超时（毫秒）— ECU 请求扩展响应的最大等待时间
-uds_p2_star_timeout_ms = 5000
-
-
-# -----------------------------------------------------------------------------
-#  应用自定义配置示例 (AppConfig)
-#  以下是自定义应用配置的示例，可根据项目需要自由扩展。
-#  只要 struct 实现了 #[tx_comp(conf)] 并 derive Deserialize，即可自动加载。
-# -----------------------------------------------------------------------------
-[app_config]
-
-# 应用名称
-app_name = "tx-di-app"
-
-# 应用端口（用于自定义服务，与 web_config.port 独立）
-port = 9000
+# 是否启用设备端
+# 默认: false
+enabled = false
