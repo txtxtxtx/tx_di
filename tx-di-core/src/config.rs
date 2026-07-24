@@ -17,6 +17,8 @@ use crate::RIE;
 /// 全局配置文件
 pub struct AppAllConfig {
     pub toml_value: toml::Value,
+    /// 实际加载的配置文件路径
+    pub config_path: PathBuf,
 }
 
 impl AppAllConfig {
@@ -50,7 +52,10 @@ impl AppAllConfig {
         };
 
         let toml_value = Self::load_config(final_config_path.as_path())?;
-        Ok(AppAllConfig { toml_value })
+        Ok(AppAllConfig {
+            toml_value,
+            config_path: final_config_path,
+        })
     }
 
     /// 加载配置文件（如果存在）

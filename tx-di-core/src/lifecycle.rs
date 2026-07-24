@@ -6,7 +6,7 @@
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 
 use dashmap::DashMap;
 use tokio::signal;
@@ -27,22 +27,6 @@ use crate::RIE;
 
 /// 内部上下文类型别名
 pub type InnerContext = DashMap<TypeId, CompRef>;
-
-/// 全局系统配置
-static SYS_CONFIG: LazyLock<DashMap<String, String>> = LazyLock::new(DashMap::new);
-
-/// 获取全局配置
-pub fn get_sys_config(key: &str) -> Option<String> {
-    SYS_CONFIG.get(key).map(|v| v.value().clone())
-}
-
-/// 设置全局配置
-pub fn set_sys_config(key: &str, value: String) {
-    SYS_CONFIG.insert(key.to_string(), value);
-}
-
-/// 配置路径 key
-pub const CONFIG_PATH: &str = "config_path";
 
 // ── BuildContext ──────────────────────────────────────────────────────────
 

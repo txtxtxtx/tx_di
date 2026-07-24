@@ -31,7 +31,8 @@ use std::path::PathBuf;
 use crate::config::ToastyConfig;
 use std::sync::{Arc, OnceLock, RwLock};
 use toasty::ModelSet;
-use tx_di_core::{get_sys_config, App, CONFIG_PATH};
+use tx_di_core::inject_from_store;
+use tx_di_core::{App, AppAllConfig};
 use tx_di_core::{Component, DepsTuple, RIE};
 use crate::ToastyErr;
 
@@ -232,9 +233,8 @@ async fn app_async_init(comp: Arc<ToastyPlugin>, _app: Arc<App>) -> RIE<()> {
             .await
             .map_err(|_| ToastyErr::SchemaPushFailed)?;
         tracing::debug!("Schema 推送完成");
-        if let Some(config_path) = get_sys_config(CONFIG_PATH) {
-            ToastyPlugin::change_auto_schema_closed(config_path.into());
-        }
+        let app_config = inject_from_store::<AppAllConfig>(&_app.store);
+        ToastyPlugin::change_auto_schema_closed(app_config.config_path.clone());
     }
     // 写入 OnceLock
     comp.db.set(db).expect(&ToastyErr::AlreadyInitialized.to_string());

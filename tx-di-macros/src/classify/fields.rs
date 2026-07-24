@@ -3,10 +3,10 @@
 //! 遍历结构体字段，根据类型形态和 `#[tx_cst]` 属性将其归类为
 //! `FieldKind`，供后续代码生成使用。
 
-use syn::{Expr, Ident, ItemStruct, Result as SynResult, Type};
+use syn::{Expr, GenericArgument, Ident, ItemStruct, PathArguments, Result as SynResult, Type};
 
 use crate::attr::field_attr::{extract_inject_expr, has_skip_attr};
-use crate::type_utils::{is_arc_dyn_trait, is_option_type, is_plain_arc_dyn_trait, is_vec_arc_dyn_trait};
+use crate::type_utils::{extract_option_inner, is_arc_dyn_trait, is_option_arc_type, is_option_type, is_plain_arc_dyn_trait, is_vec_arc_dyn_trait};
 
 /// 字段注入类别
 ///
@@ -25,6 +25,8 @@ pub enum FieldKind {
     Custom { expr: Expr },
     /// 可选普通依赖（`Option<T>`，非 trait），build 时填 None
     Optional { _ty: Type },
+    /// 可选组件注入（`Option<Arc<T>>`），已注册则注入，未注册则 None
+    OptionalInject { inner_ty: Type },
     /// 跳过注入（`#[tx_cst(skip)]`），使用 Default
     Skip,
 }
@@ -55,6 +57,20 @@ pub fn classify_fields(input: &ItemStruct) -> SynResult<Vec<(Ident, FieldKind)>>
         } else if is_arc_dyn_trait(&field.ty) {
             // Option<Arc<dyn Trait>> — 可选 trait object 注入
             FieldKind::TraitInject { ty: field.ty.clone() }
+        } else if is_option_arc_type(&field.ty) {
+            // Option<Arc<T>> — 可选普通组件注入（非 trait object）
+            let inner = extract_option_inner(&field.ty).unwrap();
+            // strip Arc to get T
+            if let Type::Path(tp) = &inner
+                && let Some(last) = tp.path.segments.last()
+                && let PathArguments::AngleBracketed(ab) = &last.arguments
+                && let Some(GenericArgument::Type(t)) = ab.args.first()
+            {
+                FieldKind::OptionalInject { inner_ty: t.clone() }
+            } else {
+                // fallback: 无法解析内层则归为 Optional（安全回退）
+                FieldKind::Optional { _ty: field.ty.clone() }
+            }
         } else if is_option_type(&field.ty) {
             FieldKind::Optional { _ty: field.ty.clone() }
         } else {

@@ -120,9 +120,11 @@ impl Store {
         let tid = TypeId::of::<T>();
         let type_name = std::any::type_name::<T>();
 
-        match self.inner.get(&tid) {
+        // clone 出 CompRef 后释放 DashMap shard 锁，避免 factory 回调中重入死锁
+        let comp_ref = self.inner.get(&tid).map(|e| e.clone());
+        match comp_ref {
             Some(entry) => {
-                let any_arc = match &*entry {
+                let any_arc = match &entry {
                     CompRef::Cached(arc) => arc.clone(),
                     CompRef::Factory(f) => f(self),
                 };
@@ -196,6 +198,23 @@ impl Default for Store {
 /// 从 Store 中注入依赖（类型安全版本）
 ///
 /// 供宏生成的 `build` 方法调用。
+/// 从 Store 中尝试按类型注入组件（不 panic 版）
+///
+/// 组件已注册时返回 `Some(Arc<T>)`，未注册时返回 `None`。
+/// 用于 `Option<Arc<T>>` 可选组件注入。
+pub fn try_inject_from_store<T: Any + Send + Sync + 'static>(store: &Store) -> Option<Arc<T>> {
+    let tid = TypeId::of::<T>();
+    let comp_ref = store.inner().get(&tid).map(|e| e.clone());
+    match comp_ref {
+        Some(entry) => match &entry {
+            CompRef::Cached(arc) => arc.clone().downcast::<T>().ok(),
+            CompRef::Factory(f) => f(store).downcast::<T>().ok(),
+        },
+        None => None,
+    }
+}
+
+/// 通过 Store 注入已注册组件
 ///
 /// # Panics
 ///

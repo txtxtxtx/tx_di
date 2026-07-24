@@ -45,6 +45,12 @@ pub fn gen_component_impl(ctx: &CodeGenContext) -> TokenStream2 {
         .map(|(fname, kind)| match kind {
             FieldKind::Skip => quote! { #fname: Default::default() },
             FieldKind::Optional { .. } => quote! { #fname: None },
+            FieldKind::OptionalInject { inner_ty } => {
+                // 可选组件注入：已注册则注入，未注册则 None
+                quote! {
+                    #fname: ::tx_di_core::try_inject_from_store::<#inner_ty>(store)
+                }
+            }
             FieldKind::Inject { .. } => {
                 // 从 deps 元组中解构
                 let idx = ctx

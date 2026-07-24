@@ -28,7 +28,7 @@ pub fn gen_factory_fn(ctx: &CodeGenContext) -> TokenStream2 {
                 let app_config = ::tx_di_core::inject_from_store::<::tx_di_core::AppAllConfig>(store);
                 let config_key = #config_key;
                 let mut config = if let Some(value) = app_config.get_value(config_key) {
-                    <#struct_name as serde::Deserialize>::deserialize(value.clone())
+                    <#struct_name as ::tx_di_core::serde::Deserialize>::deserialize(value.clone())
                         .unwrap_or_else(|e| {
                             panic!(
                                 "[di] 配置组件 '{}' 反序列化失败 (key='{}'): {}\n\
@@ -38,7 +38,7 @@ pub fn gen_factory_fn(ctx: &CodeGenContext) -> TokenStream2 {
                         })
                 } else {
                     let empty_table = ::tx_di_core::Value::Table(::tx_di_core::map::Map::new());
-                    <#struct_name as serde::Deserialize>::deserialize(empty_table)
+                    <#struct_name as ::tx_di_core::serde::Deserialize>::deserialize(empty_table)
                         .unwrap_or_else(|e| {
                             panic!(
                                 "[di] 配置组件 '{}' 缺少配置 key='{}', 且默认值反序列化也失败: {}\n\
@@ -47,7 +47,7 @@ pub fn gen_factory_fn(ctx: &CodeGenContext) -> TokenStream2 {
                             )
                         })
                 };
-                ::tracing::debug!("{} build 成功", stringify!(#struct_name));
+                ::tx_di_core::tracing::debug!("{} build 成功", stringify!(#struct_name));
                 Box::new(config) as Box<dyn std::any::Any + Send + Sync>
             }
         }
@@ -62,7 +62,7 @@ pub fn gen_factory_fn(ctx: &CodeGenContext) -> TokenStream2 {
                 if let Err(e) = <#struct_name as ::tx_di_core::Component>::inner_init(&mut instance, store) {
                     panic!("[di] 组件 '{}' inner_init 失败: {}", stringify!(#struct_name), e);
                 }
-                ::tracing::debug!("{} build 成功", stringify!(#struct_name));
+                ::tx_di_core::tracing::debug!("{} build 成功", stringify!(#struct_name));
                 Box::new(instance) as Box<dyn std::any::Any + Send + Sync>
             }
         }
