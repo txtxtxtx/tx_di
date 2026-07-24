@@ -2,7 +2,7 @@
 
 类型驱动的 Rust 依赖注入（DI）框架 + 插件生态。`Component` trait 声明依赖，`#[derive(Component)]` 自动注册，`linkme` 编译期收集，运行期拓扑排序注入，并提供 Web / 缓存 / 文件 / 任务 / 鉴权 / 国标（GB28181）等插件。
 
-当前版本：`tx-di-core 0.3.0` / `tx-di-macros 0.3.0`
+当前版本：`tx-di-core 0.4.0` / `tx-di-macros 0.4.0`
 
 ---
 
@@ -13,7 +13,7 @@
 - **编译期收集**：基于 `linkme` 的自定义 link section，零运行时注册开销
 - **运行期解析**：拓扑排序 + `DashMap` 存储，自动处理依赖顺序与循环检测
 - **完整生命周期**：`build → inner_init → init → async_init → async_run → shutdown`
-- **AOP**：`Interceptor` trait + `#[intercept]` 方法宏，零额外运行时开销
+- **AOP**：`Interceptor` trait + `#[intercept]` 方法宏 + `around` 包装/短路，类型级 OnceLock 存储
 - **插件生态**：Web / 日志 / 缓存 / 文件 / 定时任务 / 鉴权 / 国标视频等开箱即用
 
 ---
@@ -24,7 +24,7 @@
 
 ```toml
 [dependencies]
-tx-di-core = "0.3.0"
+tx-di-core = "0.4.0"
 ```
 
 工作区内开发通常用 path 依赖：
@@ -38,9 +38,9 @@ tx-di-core = { path = "./tx-di-core" }
 
 ```rust
 use std::sync::Arc;
-use tx_di_core::{Component, BuildContext};
+use tx_di_core::{Component, BuildContext, RIE};
 
-// 无依赖单例（用 Default 自动构造）
+// 无依赖单例
 #[derive(Component, Default)]
 pub struct DbPool;
 
@@ -51,18 +51,18 @@ pub struct UserService {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> tx_di_core::RIE<()> {
     // 1. 构建阶段：加载配置 + 自动注册并构建所有组件
-    //    ⚠️ 此时仅 build + inner_init 完成，组件「不完整」，不可当成品使用
-    let ctx = BuildContext::new::<std::path::PathBuf>(None);
+    //    new() 返回 RIE<BuildContext>（配置加载/拓扑排序失败会 Err）
+    let ctx = BuildContext::new::<std::path::PathBuf>(None)?;
 
     // 2. 构建并运行：先同步完成 init + async_init，再返回「已就绪」句柄
-    let app = ctx.build().expect("build failed")
-                 .ins_run().await.expect("run failed");
+    let app = ctx.build()?.ins_run().await?;
 
-    // 3. 此后组件才完整，可安全使用（业务代码通常放在组件的 init/async_run 里）
+    // 3. ins_run 返回后组件才完整，此时注入获取的是已初始化的实例
     let svc = app.inject::<UserService>();
     app.waiting_exit().await;
+    Ok(())
 }
 ```
 
@@ -87,25 +87,31 @@ async fn main() {
 | `#[component(as_trait = dyn Trait)]` | 注册为 trait 实现，可按接口注入 |
 | `#[component(intercept(T1, T2))]` | 声明 AOP 拦截器，配合方法上的 `#[intercept]` |
 
-> 回调函数名与属性名保持一致（如 `init` 标志 → `fn init`）。宏生成的覆写方法带 `#[inline]`，空回调会被编译器消除。
+> 回调函数名与属性名保持一致（如 `app_init` 标志 → `fn app_init`）。宏生成的覆写方法带 `#[inline]`，空回调会被编译器消除。
 
 ### 字段属性 `#[tx_cst(...)]`
 
 | 写法 | 语义 |
 |------|------|
 | `field: Arc<T>` | 从 DI 容器注入 |
-| `#[tx_cst(expr)]` | 用表达式赋值，不从容器注入 |
-| `#[tx_cst(skip)]` | 跳过，使用 `Default::default()` |
-| `Option<T>` / `Option<Arc<dyn Trait>>` | 自动设为 `None`（普通 / 可选 trait 注入） |
+| `field: Option<Arc<T>>` | **可选组件注入**：已注册则注入，未注册则 `None` |
+| `field: Option<Arc<dyn Trait>>` | **可选 trait 注入**：有实现则 `Some`，无则 `None` |
+| `field: Arc<dyn Trait>` | **必选 trait 注入**（必须有实现） |
+| `field: Vec<Arc<dyn Trait>>` | **列表 trait 注入**：所有实现，无实现则空 Vec |
+| `#[tx_cst(expr)]` | 用表达式赋值，**优先级最高**，覆盖类型推断 |
+| `#[tx_cst(skip)]` | 跳过注入，使用 `Default::default()` |
 
 ```rust
 #[derive(Component)]
 pub struct MyService {
     pub db: Arc<DbPool>,                                  // DI 注入
+    pub cache: Option<Arc<RedisClient>>,                   // 可选注入
+    pub repo: Arc<dyn UserRepository>,                     // 必选 trait
+    pub middlewares: Vec<Arc<dyn SipMiddleware>>,          // 列表 trait
     #[tx_cst("0.0.0.0:8080".to_string())]
-    pub addr: String,                                     // 自定义值
+    pub addr: String,                                      // 自定义值
     #[tx_cst(skip)]
-    pub temp: Vec<u8>,                                    // 跳过
+    pub temp: Vec<u8>,                                     // 跳过
 }
 ```
 
@@ -115,8 +121,8 @@ pub struct MyService {
 
 ```rust
 pub trait Component: Send + Sync + 'static {
-    type Deps: DepsTuple;                 // 依赖元组，编译期类型可知
-    fn build(deps: Self::Deps) -> Self;   // 从依赖构造实例（纯函数）
+    type Deps: DepsTuple;                              // 依赖元组，编译期类型可知
+    fn build(deps: Self::Deps, store: &Store) -> Self; // 从依赖 + Store 构造（trait 注入用 Store）
     const SCOPE: Scope = Scope::Singleton;
 
     // 生命周期钩子（全部有默认实现，按需覆写）
@@ -129,7 +135,11 @@ pub trait Component: Send + Sync + 'static {
 }
 ```
 
-`RIE<T>` 是 `AppResult<T>` 的别名；错误统一为 `tx_error::AppError`，DI 框架自带 `DiErr` 错误码（`RegistryError` / `AsyncInitError` / `TaskPanic` / `InjectError`）。
+`RIE<T>` 是 `AppResult<T>` 的别名（`Result<T, AppError>`）。`DiErr` 错误码：`RegistryError` / `InjectError` / `ConfigError` / `TraitInjectError` / `AsyncInitError` / `TaskPanic`。
+
+### 依赖上限
+
+最多 **16 个 `Arc<T>` 依赖字段**，超过时编译期报错并给出迁移建议（合并为配置组件或拆分子组件）。
 
 ---
 
@@ -138,7 +148,9 @@ pub trait Component: Send + Sync + 'static {
 | 作用域 | 行为 |
 |--------|------|
 | **Singleton**（默认） | 全局唯一，首次注入时构建并缓存 `Arc<T>` |
-| **Prototype** | 每次注入调用工厂，构造新实例 |
+| **Prototype** | 每次注入调用工厂，构造新实例。关闭时自动追踪存活实例 |
+
+> Prototype 组件的 `#[component(shutdown)]` 回调也会被正确调用。
 
 ---
 
@@ -163,6 +175,8 @@ pub struct AppConfig {
 }
 ```
 
+配置加载失败时返回 `Err` 而非 panic；`AppAllConfig` 提供 `get()`（宽松）和 `get_strict()`（严格）两种读取模式。
+
 ---
 
 ## Trait Object 注入
@@ -183,20 +197,34 @@ pub struct UserService {
 }
 ```
 
+`Arc<dyn Trait>` 必选注入在 build 阶段直接从 Store 获取（安全，无 unsafe）。`Option<Arc<dyn Trait>>` 可选注入无实现时返回 `None`，不阻止启动。
+
 ---
 
 ## AOP 拦截器
 
-拦截器本身也是 `#[derive(Component)]`，可依赖其他服务；在组件上用 `#[component(intercept(T))]` 声明，并在方法上加 `#[intercept]`。
+拦截器本身也是 `#[derive(Component)]`，可依赖其他服务。拦截器链按**类型级 `OnceLock`** 存储（无全局表、无锁、无泄漏），在 `init` 阶段由 `#[component(intercept(...))]` 自动初始化。
 
 ```rust
+use tx_di_core::aop::{Interceptor, CallContext, CallResult, BoxCall};
+
 #[derive(Component, Default)]
 pub struct AuthInterceptor;
 
-impl tx_di_core::aop::Interceptor for AuthInterceptor {
-    fn before(&self, ctx: &tx_di_core::aop::CallContext) -> tx_di_core::RIE<()> {
+impl Interceptor for AuthInterceptor {
+    fn before(&self, ctx: &CallContext) -> tx_di_core::RIE<()> {
         tracing::info!("→ {}", ctx.method_name);
         Ok(())
+    }
+    fn after(&self, ctx: &CallContext, result: &CallResult) {
+        match result {
+            CallResult::Ok => tracing::info!("← OK"),
+            CallResult::Err(e) => tracing::warn!("← ERR: {}", e),
+        }
+    }
+    fn around(&self, ctx: &CallContext, call: BoxCall) -> CallResult {
+        // 可完全替换/包装/重试业务逻辑
+        call.execute()
     }
 }
 
@@ -210,15 +238,31 @@ impl UserService {
 }
 ```
 
-框架内置 `LoggingInterceptor`、`MetricsInterceptor`。
+**执行流程**：`before → body → after`（`around` 为高级 API，用于短路/重试/包装）。
+
+**参数传递**：`#[intercept]` 方法的参数通过 `CallContext::args` 传入拦截器。简单类型（`i64`/`u64`/`f64`/`bool`/`String`）直接映射；复杂类型通过 serde JSON 序列化存入 `ArgValue::Serialized`，拦截器可反序列化还原。
+
+```rust
+impl Interceptor for AuditInterceptor {
+    fn before(&self, ctx: &CallContext) -> tx_di_core::RIE<()> {
+        if let Some(ArgValue::Serialized { json, .. }) = ctx.get_arg("req") {
+            let req: UserReq = serde_json::from_str(json).unwrap();
+            // ...
+        }
+        Ok(())
+    }
+}
+```
+
+框架内置 `LoggingInterceptor`（INFO 级别 before/after 日志）和 `MetricsInterceptor`（计数器）。
 
 ---
 
 ## BuildContext & App
 
 ```rust
-// 构建阶段：加载配置 + 自动注册所有组件（此时仅 inner_init 完成）
-let ctx = BuildContext::new(Some("configs/app.toml"));
+// 构建阶段：加载配置 + 自动注册所有组件（仅 inner_init 完成）
+let ctx = BuildContext::new(Some("configs/app.toml"))?;
 
 // 构建并运行：先同步完成 init + async_init，再返回「可用」句柄
 let app = ctx.build()?.ins_run().await?;
@@ -230,18 +274,18 @@ let db = app.inject::<DbPool>();
 app.waiting_exit().await;
 ```
 
-> ⚠️ **关键认知**：`BuildContext` 阶段 `inject` 拿到的实例只完成了 `build + inner_init`，`init` / `async_init` **尚未执行**，不能当作成品去调用业务方法（如建立连接、注册 AOP 拦截链）。组件真正「可用」是在 `app.ins_run()` 返回之后。绝大多数使用应放在组件自身的 `init` / `async_run` 回调里，或在 `ins_run()` 之后通过 `app.inject::<T>()` 获取。
+> **关键认知**：`BuildContext` 阶段 `inject` 拿到的实例只完成了 `build + inner_init`，`init` / `async_init` **尚未执行**。组件真正「可用」是在 `app.ins_run()` 返回之后。
 
 | 阶段 | 方法 | 说明 |
 |------|------|------|
-| 构建 | `BuildContext::new(Option<path>)` | 加载配置 + 注册并构建组件（仅 `inner_init`） |
+| 构建 | `BuildContext::new(Option<path>) -> RIE<Self>` | 加载配置 + 注册并构建组件（仅 `inner_init`） |
 | 解析 | `ctx.inject::<T>()` / `ctx.try_inject::<T>()` | 构建期注入（`Arc<T>`，实例不完整） |
 | 构建 | `ctx.build() -> RIE<App>` | 移交 store 给 App（仍不执行 init/async_init） |
 | 运行 | `ctx.build_and_run().await` | 构建并阻塞运行到退出 |
-| 运行 | `app.ins_run(self).await -> RIE<Arc<App>>` | 先完成 `init`+`async_init` 再返回**已就绪**句柄 |
+| 运行 | `app.ins_run(self) -> RIE<Arc<App>>` | 先完成 `init`+`async_init` 再返回**已就绪**句柄 |
 | 运行 | `app.inject::<T>()` / `app.try_inject::<T>()` | 运行期注入（`Arc<T>`，实例已完整初始化） |
-| 运行 | `app.waiting_exit().await` | 等待退出信号并优雅关闭 |
-| 关闭 | `app.shutdown().await` | 逆序关闭所有组件 |
+| 运行 | `app.waiting_exit().await` | 等待退出信号并优雅关闭（超时默认 5s，可通过 `shutdown_timeout_secs` 配置） |
+| 关闭 | `app.shutdown().await` | 幂等关闭（多次调用安全），逆序关闭所有组件 + Prototype 实例 |
 
 ---
 
@@ -255,9 +299,10 @@ use tx_di_axum;   // 触发 Web 组件注册
 use tx_di_log;    // 触发日志组件注册
 
 #[tokio::main]
-async fn main() {
-    let ctx = BuildContext::new(Some("configs/app.toml"));
-    ctx.build_and_run().await.expect("启动失败");
+async fn main() -> tx_di_core::RIE<()> {
+    let ctx = BuildContext::new(Some("configs/app.toml"))?;
+    ctx.build_and_run().await?;
+    Ok(())
 }
 ```
 
@@ -289,7 +334,7 @@ async fn main() {
 | 配置组件需 `Deserialize + Default` | serde 反序列化 |
 | trait 注入需 `Trait: Any + Send + Sync` | 需 `TypeId::of::<dyn Trait>()` |
 | 避免循环依赖 | 拓扑排序检测，启动时返回 `RegistryError` |
-| 最多 16 个依赖 | `DepsTuple` 元组实现上限 |
+| 最多 16 个 `Arc<T>` 依赖 | `DepsTuple` 元组实现上限，编译期检查 |
 
 ---
 
@@ -300,10 +345,7 @@ tx_di/
 ├── tx-di-core/        # DI 框架核心（Component / BuildContext / App / Store / AOP）
 ├── tx-di-macros/      # #[derive(Component)] 与 #[intercept] 过程宏
 ├── plugins/           # 插件生态（见上方「插件」）
-│   ├── tx_di_log/  tx_di_axum/  tx_di_cache/  tx_di_file/
-│   ├── tx_di_job/  tx_di_toasty/  tx_di_registry/  tx_di_sa_token/
-│   └── tx_di_sip/  tx_di_gb28181/  tx_di_gb_dev/
-├── common/            # 公共库（tx_error / tx_common / tx_gb28181 等）
+├── common/            # 公共库（tx_error / tx_common 等）
 ├── configs/           # 示例 TOML 配置
 └── examples/          # 示例工程
 ```
