@@ -33,15 +33,13 @@ pub struct User {
     #[default("".to_string())]
     pub avatar: String,
 
-    /// 角色列表（JSON 数组存储）
-    #[default(Vec::new())]
-    #[serialize(json)]
-    pub roles: Vec<String>,
+    /// 角色列表（JSON 存储）
+    #[default(toasty::Json(Vec::new()))]
+    pub roles: toasty::Json<Vec<String>>,
 
-    /// 权限列表（JSON 数组存储）
-    #[default(Vec::new())]
-    #[serialize(json)]
-    pub permissions: Vec<String>,
+    /// 权限列表（JSON 存储）
+    #[default(toasty::Json(Vec::new()))]
+    pub permissions: toasty::Json<Vec<String>>,
 
     /// 状态：0-禁用 1-启用
     #[default(1)]

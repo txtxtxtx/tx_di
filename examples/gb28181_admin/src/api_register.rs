@@ -25,7 +25,7 @@ use bcrypt::{hash, DEFAULT_COST};
 use toasty::Db;
 use tracing::{error, info, warn};
 use tx_di_axum::WebPlugin;
-use tx_di_core::{BuildContext, CompInit, InnerContext, RIE, tx_comp, App, CancellationToken, BoxFuture};
+use tx_di_core::{App, Component, DepsTuple, RIE};
 use tx_di_gb28181::Gb28181Server;
 use tx_di_sa_token::SaTokenPlugin;
 use tx_di_toasty::ToastyPlugin;
@@ -37,87 +37,85 @@ use crate::models::GbDeviceRecord;
 
 /// 静态 DB 引用，供事件监听器回写数据库
 ///
-/// 在 `async_init` 中设置，在 `inner_init` 中注册的事件监听器会稍后读取。
+/// 在 `app_async_init` 中设置，在 `app_init` 中注册的事件监听器会稍后读取。
 static DB: OnceLock<Db> = OnceLock::new();
 
-/// API 路由注册组件
+/// API 路由注册组件（v2 架构）
 ///
-/// init_sort = i32::MAX - 100，早于 WebPlugin（i32::MAX）执行，
-/// 确保路由在 WebPlugin::merge_routers() 之前注册到 ROUTER_REGISTRY。
-#[tx_comp(init)]
-pub struct ApiRegisterComponent {}
+/// - `app_init`（同步，早于所有 async_init）：注册事件监听器 + 注册数据库模型
+///   —— 必须早于 ToastyPlugin 建表（init_sort = i32::MAX - 100 晚于 toasty 的 MIN+2，
+///   但 toasty 建表在其自身 async_init，而 register_models 走 init 阶段，仍先于它）
+/// - `app_async_init`：连接 DB、种子数据、恢复设备、注册 axum 路由
+///
+/// init_sort = i32::MAX - 100，早于 WebPlugin（i32::MAX）的 async_init 执行路由注册。
+#[derive(Component)]
+#[component(app_init, app_async_init, init_sort = i32::MAX - 100)]
+pub struct ApiRegisterComponent;
 
-impl CompInit for ApiRegisterComponent {
+/// `#[component(app_init)]` 回调：注册事件监听器 + 注册数据库模型（同步）
+fn app_init(comp: Arc<ApiRegisterComponent>, app: &Arc<App>) -> RIE<()> {
+    let toasty_plugin = app.inject::<ToastyPlugin>();
 
-    fn inner_init(&mut self, ctx: &InnerContext) -> RIE<()>{
-        let ctx: BuildContext = ctx.into();
-        let toasty_plugin = ctx.inject::<ToastyPlugin>();
-
-        // 1. 注册事件监听器（用于 SSE 推送）
-        Gb28181Server::on_event(|event| async move {
-            api::sse::broadcast_event(event);
-            Ok(())
-        });
-
-        // 2. 注册事件监听器（用于 DB 同步 — 持久化设备注册状态）
-        Gb28181Server::on_event(|event| async move {
-            if let Some(db) = DB.get() {
-                let mut db = db.clone();
-                if let Err(e) = sync_event_to_db(event, &mut db).await {
-                    error!(error = %e, "设备状态 DB 同步失败");
-                }
-            }
-            Ok(())
-        });
-
-        // 3. 【关键】在 BuildContext::new() 之后、build() 之前注册数据库模型
-        //    可以多次调用 register_models()，模型会合并（重复 ModelId 自动覆盖）
-        toasty_plugin.register_models(toasty::models!(
-            models::User,
-            models::GbDeviceRecord,
-            models::GbSessionRecord,
-            models::GbAlarmRecord,
-            models::GbAuditLog,
-            models::GbDeviceGroup,
-            models::GbDeviceGroupMember,
-            models::GbRegisterAudit,
-        ));
+    // 1. 注册事件监听器（用于 SSE 推送）
+    Gb28181Server::on_event(|event| async move {
+        api::sse::broadcast_event(event);
         Ok(())
-    }
+    });
 
-    fn async_init(ctx: Arc<App>, _token: CancellationToken) -> BoxFuture {
-        Box::pin(async move {
-            let toasty_plugin = ctx.inject::<ToastyPlugin>();
-            let db = toasty_plugin.db().clone();
-
-            // 4. 设置静态 DB（事件监听器将在后续事件中可用）
-            let _ = DB.set(db.clone());
-
-            // 4.5 种子数据：数据库为空时创建默认管理员
-            let toasty_config = ctx.inject::<tx_di_toasty::ToastyConfig>();
-            if let Err(e) = seed_default_admin(&db, &toasty_config.default_admin_password).await {
-                error!(error = %e, "创建默认管理员失败");
+    // 2. 注册事件监听器（用于 DB 同步 — 持久化设备注册状态）
+    Gb28181Server::on_event(|event| async move {
+        if let Some(db) = DB.get() {
+            let mut db = db.clone();
+            if let Err(e) = sync_event_to_db(event, &mut db).await {
+                error!(error = %e, "设备状态 DB 同步失败");
             }
+        }
+        Ok(())
+    });
 
-            // 5. 从数据库恢复之前在线设备到内存注册表
-            if let Err(e) = restore_devices_from_db(&db, &ctx).await {
-                error!(error = %e, "从数据库恢复设备状态失败");
-            }
+    // 3. 【关键】在数据库连接/建表前注册数据库模型
+    //    可以多次调用 register_models()，模型会合并（重复 ModelId 自动覆盖）
+    toasty_plugin.register_models(toasty::models!(
+        models::User,
+        models::GbDeviceRecord,
+        models::GbSessionRecord,
+        models::GbAlarmRecord,
+        models::GbAuditLog,
+        models::GbDeviceGroup,
+        models::GbDeviceGroupMember,
+        models::GbRegisterAudit,
+    ));
+    info!("ApiRegisterComponent init：事件监听器与数据库模型已注册");
+    Ok(())
+}
 
-            // 6. 获取 sa_token 插件实例，提取 SaTokenState
-            let sa_plugin = ctx.inject::<SaTokenPlugin>();
-            let sa_state = sa_plugin.state().clone();
+/// `#[component(app_async_init)]` 回调：DB 初始化 + 路由注册
+async fn app_async_init(comp: Arc<ApiRegisterComponent>, app: Arc<App>) -> RIE<()> {
+    let toasty_plugin = app.inject::<ToastyPlugin>();
+    let db = toasty_plugin.db().clone();
 
-            // 7. 注册带 State 的 API 路由
-            WebPlugin::add_axum_router(api::router(db, sa_state));
-            info!("gb28181_admin 初始化完成");
-            Ok(())
-        })
+    // 4. 设置静态 DB（事件监听器将在后续事件中可用）
+    let _ = DB.set(db.clone());
+
+    // 4.5 种子数据：数据库为空时创建默认管理员
+    let toasty_config = app.inject::<tx_di_toasty::ToastyConfig>();
+    if let Err(e) = seed_default_admin(&db, &toasty_config.default_admin_password).await {
+        error!(error = %e, "创建默认管理员失败");
     }
 
-    fn init_sort() -> i32 {
-        i32::MAX - 100
+    // 5. 从数据库恢复之前在线设备到内存注册表
+    if let Err(e) = restore_devices_from_db(&db, &app).await {
+        error!(error = %e, "从数据库恢复设备状态失败");
     }
+
+    // 6. 获取 sa_token 插件实例，提取 SaTokenState
+    let sa_plugin = app.inject::<SaTokenPlugin>();
+    let sa_state = sa_plugin.state().clone();
+
+    // 7. 注册带 State 的 API 路由
+    WebPlugin::add_axum_router(api::router(db, sa_state));
+    info!("gb28181_admin 初始化完成");
+    Ok(())
 }
 
 // ── 事件 → DB 同步 ────────────────────────────────────────────────────────────
@@ -278,8 +276,8 @@ async fn seed_default_admin(db: &Db, default_password: &str) -> RIE<()> {
     let password_hash = hash(default_password, DEFAULT_COST)
         .map_err(|e| anyhow::anyhow!("密码哈希失败: {e}"))?;
 
-    let roles: Vec<String> = vec!["admin".to_string()];
-    let permissions: Vec<String> = Vec::new();
+    let roles: toasty::Json<Vec<String>> = toasty::Json(vec!["admin".to_string()]);
+    let permissions: toasty::Json<Vec<String>> = toasty::Json(Vec::new());
 
     match toasty::create!(User {
         username: "admin".to_string(),

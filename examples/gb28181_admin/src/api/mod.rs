@@ -59,6 +59,13 @@ use tx_di_sa_token::{
 };
 use tx_di_toasty::ToastyDb;
 
+/// axum handler 统一返回类型（v2 重建，替代旧 `tx_di_axum::R`）
+///
+/// `ApiR<T>` 已实现 `IntoResponse`（JSON 包装，code/msg/data 结构）。
+/// - `R::ok(data)` → 成功响应
+/// - `R::error(code, msg)` → 业务错误响应
+pub type R<T> = tx_di_core::ApiR<T>;
+
 /// 构建 /api/v1/ 路由树
 ///
 /// 返回 `Router`（即 `Router<()>`），State 已在函数内部通过

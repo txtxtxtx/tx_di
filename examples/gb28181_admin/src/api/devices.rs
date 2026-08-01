@@ -13,7 +13,8 @@ use axum::extract::{Json as ExtJson, Path, Query as AxumQuery, State};
 use serde::Deserialize;
 use toasty::Db;
 use toasty::stmt::{List, Paginate, Query as ToastyQuery};
-use tx_di_axum::{DiComp, R};
+use crate::api::R;
+use tx_di_axum::DiComp;
 use tx_di_gb28181::Gb28181Server;
 use tx_di_gb28181::xml::{PtzCommand, PtzSpeed};
 

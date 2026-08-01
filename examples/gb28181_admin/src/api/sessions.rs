@@ -7,7 +7,8 @@ use axum::{
     extract::{Path, Json as ExtJson},
 };
 use serde::{Deserialize, Serialize};
-use tx_di_axum::{DiComp, R};
+use crate::api::R;
+use tx_di_axum::DiComp;
 use tx_di_gb28181::{Gb28181Server, PlayUrls};
 
 use crate::dto::SessionDto;

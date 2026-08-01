@@ -15,7 +15,7 @@ use axum::{
 use bcrypt::{hash, verify, DEFAULT_COST};
 use serde::{Deserialize, Serialize};
 use tx_di_sa_token::{StpUtil, LoginIdExtractor};
-use tx_di_axum::R;
+use crate::api::R;
 use tx_di_toasty::ToastyDb;
 use crate::models::User;
 
@@ -163,11 +163,12 @@ pub async fn create_user(
     let password_hash = hash(&req.password, DEFAULT_COST).unwrap_or_default();
 
     // 用 toasty create! 宏插入（User 已通过 use crate::models::User 引入）
+    // toasty 0.8：Vec 字段需 toasty::Json<T> 包装
     let user = toasty::create!(User {
         username: req.username,
         password_hash,
         nickname: req.nickname,
-        roles: req.roles,
+        roles: toasty::Json(req.roles),
     })
     .exec(&mut db)
     .await;
@@ -227,7 +228,7 @@ pub async fn update_user(
         user.nickname = nickname;
     }
     if let Some(roles) = req.roles {
-        user.roles = roles;
+        user.roles = toasty::Json(roles);
     }
     if let Some(status) = req.status {
         user.status = status;
