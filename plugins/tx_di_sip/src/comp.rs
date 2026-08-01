@@ -27,6 +27,7 @@ use crate::sender::SipSender;
 use anyhow::anyhow;
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
+use rsipstack::dialog::dialog_layer::DialogLayer;
 use rsipstack::transaction::transaction::Transaction;
 use rsipstack::transport::SipAddr;
 use rsipstack::transport::TransportLayer;
@@ -101,6 +102,14 @@ pub struct SipPlugin {
     /// 启动时刻（用于指标 uptime）
     #[tx_cst(OnceLock::new())]
     start_at: OnceLock<Instant>,
+
+    /// 对话层（单例：dialog 注册表/状态通道共享，修「sender() 每次新建 DialogLayer」隐藏 bug）
+    #[tx_cst(OnceLock::new())]
+    dialog_layer: OnceLock<Arc<DialogLayer>>,
+
+    /// 发送器缓存（sender() 不再每次重建）
+    #[tx_cst(OnceLock::new())]
+    sender_cache: OnceLock<SipSender>,
 }
 
 /// 应用异步初始化（替代原 CompInit self-inject 反模式）
@@ -120,8 +129,18 @@ async fn app_async_init(comp: Arc<SipPlugin>, app: Arc<App>) -> RIE<()> {
         .with_cancel_token(token.clone())
         .with_transport_layer(transport_layer)
         .with_user_agent(&comp.config.user_agent)
+        .with_option(comp.config.endpoint_option())
         .build();
     comp.set_end_point(endpoint)?;
+
+    // 初始化共享 DialogLayer 与 Sender 缓存
+    let endpoint_inner = comp.endpoint.get().unwrap().inner.clone();
+    comp.dialog_layer
+        .set(Arc::new(DialogLayer::new(endpoint_inner.clone())))
+        .ok();
+    comp.sender_cache
+        .set(SipSender::new(endpoint_inner, comp.config.clone(), comp.dialog_layer()))
+        .ok();
 
     // 收集中间件并注入 router（DI 收集，替代全局 REGISTRY，修 P1/P2）
     let mws = inject_all_traits_from_store::<dyn SipMiddleware>(&app.store);
@@ -269,10 +288,14 @@ impl SipPlugin {
             .map_err(|_e| SipErr::EndpointAlreadySet)?)
     }
 
-    /// 获取 SIP 发送器
+    /// 获取 SIP 发送器（缓存复用，端点就绪后可用）
     ///
     /// 需要在 `app_async_init` 完成后（即 `build_and_run()` 返回后）使用。
     pub fn sender(&self) -> RIE<SipSender> {
+        if let Some(s) = self.sender_cache.get() {
+            return Ok(s.clone());
+        }
+        // 退化路径：缓存未建立（如禁用 enabled=false）时按旧逻辑构建
         let inner = self
             .endpoint
             .get()
@@ -280,7 +303,16 @@ impl SipPlugin {
             .ok_or("未设置sip端点")?
             .inner
             .clone();
-        Ok(SipSender::new(inner, self.config.clone()))
+        Ok(SipSender::new(inner, self.config.clone(), self.dialog_layer()))
+    }
+
+    /// 获取共享 DialogLayer（单例，UAS 管理器/业务层复用）
+    pub fn dialog_layer(&self) -> Arc<DialogLayer> {
+        self.dialog_layer
+            .get_or_init(|| Arc::new(DialogLayer::new(
+                self.endpoint.get().expect("sip 端点未设置").inner.clone(),
+            )))
+            .clone()
     }
 
     /// 设置取消令牌（只能成功一次）

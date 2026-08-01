@@ -23,7 +23,7 @@ use tokio::time::{Duration, interval};
 use tracing::{error, info, warn};
 use rsipstack::dialog::client_dialog::ClientInviteDialog;
 use tx_di_core::{App, Component, DepsTuple, RIE};
-use tx_di_sip::SipPlugin;
+use tx_di_sip::{InviteHandle, SipClient, SipPlugin, SipUasManager};
 
 /// 活跃媒体会话信息
 #[derive(Clone)]
@@ -37,6 +37,8 @@ pub struct SessionInfo {
     pub is_realtime: bool,
     /// SIP 对话句柄（UAC INVITE 创建），用于主动发送 BYE 挂断
     pub dialog: ClientInviteDialog,
+    /// INVITE 会话句柄（含状态流 + 生命周期清理；会话结束时需 cleanup）
+    pub handle: InviteHandle,
 }
 
 impl std::fmt::Debug for SessionInfo {
@@ -50,6 +52,7 @@ impl std::fmt::Debug for SessionInfo {
             .field("stream_id", &self.stream_id)
             .field("is_realtime", &self.is_realtime)
             .field("dialog", &"<ClientInviteDialog>")
+            .field("handle", &"<InviteHandle>")
             .finish()
     }
 }
@@ -87,9 +90,13 @@ pub struct Gb28181Server {
     pub device_registry: DeviceRegistry,
     /// sip 插件
     pub sip_plugin: Arc<SipPlugin>,
+    /// 通用注册客户端（级联下级注册生命周期托管）
+    pub sip_client: Arc<SipClient>,
     /// 每设备独立 SN 序列号
     #[tx_cst(DashMap::new())]
     pub sn_map: DashMap<String, AtomicU32>,
+    /// UAS INVITE 会话管理器（接收设备 INVITE：广播/对讲音频推流）
+    pub uas: Arc<SipUasManager>,
     /// 活跃媒体会话表（call_id → SessionInfo）
     #[tx_cst(DashMap::new())]
     pub sessions: DashMap<String, SessionInfo>,
@@ -116,18 +123,19 @@ async fn app_async_init(comp: Arc<Gb28181Server>, _app: Arc<App>) -> RIE<()> {
         // 存储 media backend
         let _ = comp.media.set(media_backend.clone());
 
-        // ── 级联：下级平台模式（向上级注册）────────────────────────────────
+        // ── 级联：下级平台模式（向上级注册，生命周期托管给 SipClient）────────
         if config.cascade.enable_lower {
             if let Some(cascade_lower) = crate::cascade::CascadeLower::new(
                 &config.cascade,
                 &config.platform_id,
                 &config.sip_ip,
                 sip_plugin.clone(),
+                comp.sip_client.clone(),
                 registry.clone(),
             ) {
                 let cancel_token = sip_plugin.get_cancel_token()?;
                 cascade_lower.start(cancel_token);
-                info!("下级平台级联任务已启动");
+                info!("下级平台级联任务已启动（注册托管 SipClient）");
             } else {
                 warn!("enabled_lower=true 但缺少 upper_platform_sip 或 upper_platform_id 配置");
             }

@@ -17,18 +17,18 @@
 
 use crate::config::CascadeConfig;
 use crate::device_registry::DeviceRegistry;
-use rsipstack::sip::StatusCode;
 use tx_gb28181::GbVersion;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::time::interval;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 use tx_di_core::RIE;
-use tx_di_sip::SipPlugin;
+use tx_di_sip::{SipClient, SipClientConfig, SipPlugin};
 
 /// 下级平台级联管理器
+///
+/// **注册/续期/重连/注销生命周期由 [`tx_di_sip::SipClient`] 统一管理**：
+/// 本模块只负责「配置 SipClient + 周期目录推送回调」。
 pub struct CascadeLower {
     /// 上级平台 SIP URI（如 "sip:192.168.1.1:5060"）
     upper_sip: String,
@@ -44,6 +44,8 @@ pub struct CascadeLower {
     expires: u32,
     /// SIP 插件引用
     sip_plugin: Arc<SipPlugin>,
+    /// 通用注册客户端（注册生命周期托管）
+    sip_client: Arc<SipClient>,
     /// 设备注册表（用于构建目录）
     device_registry: DeviceRegistry,
     /// 序列号
@@ -61,6 +63,7 @@ impl CascadeLower {
         platform_id: &str,
         sip_ip: &str,
         sip_plugin: Arc<SipPlugin>,
+        sip_client: Arc<SipClient>,
         device_registry: DeviceRegistry,
     ) -> Option<Self> {
         let upper_sip = config.upper_platform_sip.as_ref()?;
@@ -78,6 +81,7 @@ impl CascadeLower {
             auth_password,
             expires: 3600,
             sip_plugin,
+            sip_client,
             device_registry,
             seq: AtomicU32::new(1),
             upper_version: config.upper_version,
@@ -85,89 +89,68 @@ impl CascadeLower {
         })
     }
 
-    /// 启动级联后台任务
-    pub fn start(self, cancel_token: CancellationToken) {
-        tokio::spawn(async move {
-            if let Err(e) = self.run(cancel_token).await {
-                error!(error = %e, "下级平台级联任务异常退出");
-            }
-        });
-    }
+    /// 启动级联：配置 SipClient（注册 + 周期目录推送）
+    pub fn start(self, _cancel_token: CancellationToken) {
+        let upper = self.upper_sip.clone();
+        let local_id = self.local_platform_id.clone();
+        let pwd = self.auth_password.clone();
+        let expires = self.expires;
+        // 提前取 Arc<SipClient>（后续 self 被 Arc::new 移动）
+        let sip_client = self.sip_client.clone();
 
-    /// 主循环
-    async fn run(self, cancel_token: CancellationToken) -> RIE<()> {
         info!(
-            upper = %self.upper_sip,
+            upper = %upper,
             upper_id = %self.upper_platform_id,
-            "🔗 下级平台级联任务启动"
+            "🔗 下级平台级联任务启动（注册托管 SipClient）"
         );
 
-        // 首次注册
-        if let Err(e) = self.register().await {
-            warn!(error = %e, "首次级联注册失败，将在下一个周期重试");
+        // 1) 注册参数注入 SipClient（优先于 [sip_client] TOML）
+        let reg_cfg = SipClientConfig {
+            registrar: upper,
+            username: local_id,
+            password: pwd,
+            realm: None,
+            expires,
+            renew_secs: 0,
+            // 目录推送间隔 = expires/2（与原循环一致）
+            keepalive_secs: (expires / 2).max(30),
+            max_retries: 5,
+            backoff_base_secs: 2,
+            enabled: true,
+        };
+        if let Err(e) = sip_client.set_registration(reg_cfg) {
+            error!(error = %e, "级联：注册参数注入 SipClient 失败");
+            return;
         }
 
-        // 定期续约（expires/2 间隔）
-        let renew_interval = Duration::from_secs((self.expires / 2).max(30) as u64);
-        let mut ticker = interval(renew_interval);
-        ticker.tick().await; // 跳过立即触发
-
-        loop {
-            tokio::select! {
-                biased;
-                _ = cancel_token.cancelled() => {
-                    // 发送注销
-                    if self.registered.load(Ordering::Relaxed) {
-                        let _ = self.unregister().await;
-                    }
-                    info!("下级平台级联任务已停止");
-                    return Ok(());
-                }
-                _ = ticker.tick() => {
-                    if let Err(e) = self.register().await {
-                        warn!(error = %e, "级联注册续约失败");
-                    } else {
-                        // 注册成功后推送目录
-                        if let Err(e) = self.push_catalog().await {
-                            warn!(error = %e, "级联目录推送失败");
-                        }
-                    }
-                }
-            }
+        // 2) 周期回调：推送目录（注册成功后由 SipClient 周期触发）
+        let cascade = Arc::new(self);
+        let c = cascade.clone();
+        if let Err(e) = sip_client.on_keepalive(move || {
+            let c = c.clone();
+            async move { c.push_catalog().await }
+        }) {
+            error!(error = %e, "级联：注册 keepalive 回调失败");
+            return;
         }
-    }
 
-    /// 向上级平台发送 REGISTER（复用 `SipSender::register` 的自动 401 重认证）
-    async fn register(&self) -> RIE<()> {
-        let sender = self.sip_plugin.sender()?;
-        let resp = sender
-            .register(&self.upper_sip, &self.local_platform_id, &self.auth_password)
-            .await?;
-
-        match resp.status_code {
-            StatusCode::OK => {
-                self.registered.store(true, Ordering::Relaxed);
+        // 3) 注册状态同步（registered 标志 + 日志）
+        let c = cascade.clone();
+        let _ = sip_client.on_registered(move |ok: bool| {
+            c.registered.store(ok, Ordering::Relaxed);
+            if ok {
                 info!("✅ 下级平台注册到上级成功");
+            } else {
+                warn!("下级平台注册失败/断开");
             }
-            _ => {
-                warn!(status = %resp.status_code, "上级平台返回非预期状态码");
-            }
-        }
-        Ok(())
-    }
+        });
 
-    /// 向上级平台注销（Expires: 0，复用 `SipSender::unregister`）
-    async fn unregister(&self) -> RIE<()> {
-        let sender = self.sip_plugin.sender()?;
-        sender
-            .unregister(&self.upper_sip, &self.local_platform_id, &self.auth_password)
-            .await?;
-        self.registered.store(false, Ordering::Relaxed);
-        info!("下级平台已向上级注销");
-        Ok(())
+        // 注意：`cascade` 的 Arc 引用由回调闭包持有（SipClient 的 hook 存活期间对象存活）
     }
 
     /// 推送设备目录到上级平台（按上级版本编码出网 XML）
+    ///
+    /// 由 SipClient 的 keepalive 回调周期触发（注册成功后）。
     async fn push_catalog(&self) -> RIE<()> {
         let devices = self.device_registry.all_devices();
         if devices.is_empty() {

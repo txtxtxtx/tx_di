@@ -89,9 +89,15 @@ fn extract_tag(header_value: &str) -> Option<String> {
 ///
 /// 适用于需要在收到 in-dialog 请求（BYE / INFO / MESSAGE）时，
 /// 快速定位原始对话（如媒体会话、设备通道）的场景。
-#[derive(Default)]
+#[derive(Clone)]
 pub struct InDialogTable<T: Clone + Send + Sync + 'static> {
     map: DashMap<DialogKey, Arc<T>>,
+}
+
+impl<T: Clone + Send + Sync + 'static> Default for InDialogTable<T> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<T: Clone + Send + Sync + 'static> InDialogTable<T> {
@@ -148,6 +154,11 @@ impl<T: Clone + Send + Sync + 'static> InDialogTable<T> {
     /// 是否为空
     pub fn is_empty(&self) -> bool {
         self.map.is_empty()
+    }
+
+    /// 遍历所有关联的上下文（值克隆，线程安全）
+    pub fn iter_values(&self) -> Vec<Arc<T>> {
+        self.map.iter().map(|kv| kv.value().clone()).collect()
     }
 }
 

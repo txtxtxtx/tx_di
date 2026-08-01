@@ -130,6 +130,33 @@ pub struct SipConfig {
     /// 原通过环境变量 `SIP_MAX_HANDLERS` 配置，现统一进配置文件。
     #[serde(default = "default_max_concurrent_handlers")]
     pub max_concurrent_handlers: usize,
+
+    /// 出站请求应用层超时（秒），默认 5
+    ///
+    /// 作用于 send_message/notify/subscribe/info 等出站命令；
+    /// 0 表示回退到事务层超时（t1x64）。
+    #[serde(default = "default_outbound_timeout_secs")]
+    pub outbound_timeout_secs: u64,
+
+    /// 事务层 Timer T1（毫秒），默认 500 —— RTT 估计，UDP 重传基数
+    #[serde(default = "default_t1_ms")]
+    pub t1_ms: u64,
+
+    /// 事务层最大超时（毫秒），默认 32000（64×T1）
+    ///
+    /// 出站请求在事务层的等待上限；Timer B/F 到期自动回 408。
+    #[serde(default = "default_t1x64_ms")]
+    pub t1x64_ms: u64,
+
+    /// 事务层 Timer C（秒），默认 180 —— INVITE 事务超时
+    #[serde(default = "default_timerc_secs")]
+    pub timerc_secs: u64,
+
+    /// 传输层 IP 白名单（CIDR），命中才允许入站（UDP 包 / TCP 连接）
+    ///
+    /// 空数组 = 不启用白名单（放行所有）。
+    #[serde(default)]
+    pub ip_whitelist: Vec<String>,
 }
 
 /// TLS 传输配置
@@ -171,6 +198,11 @@ impl Default for SipConfig {
             enabled: default_enabled(),
             dispatch_queue_size: default_dispatch_queue_size(),
             max_concurrent_handlers: default_max_concurrent_handlers(),
+            outbound_timeout_secs: default_outbound_timeout_secs(),
+            t1_ms: default_t1_ms(),
+            t1x64_ms: default_t1x64_ms(),
+            timerc_secs: default_timerc_secs(),
+            ip_whitelist: Vec::new(),
         }
     }
 }
@@ -206,6 +238,27 @@ impl SipConfig {
     pub fn enable_tcp(&self) -> bool {
         matches!(self.transport, SipTransport::Tcp | SipTransport::Both)
     }
+
+    /// 构造 rsipstack 事务层配置（超时/定时器透传）
+    pub fn endpoint_option(&self) -> rsipstack::transaction::endpoint::EndpointOption {
+        use std::time::Duration;
+        rsipstack::transaction::endpoint::EndpointOption {
+            t1: Duration::from_millis(self.t1_ms),
+            t4: Duration::from_secs(5),
+            t1x64: Duration::from_millis(self.t1x64_ms),
+            timerc: Duration::from_secs(self.timerc_secs),
+            callid_suffix: None,
+        }
+    }
+
+    /// 出站请求超时（秒）；0 表示回退到事务层 t1x64
+    pub fn outbound_timeout(&self) -> std::time::Duration {
+        if self.outbound_timeout_secs > 0 {
+            std::time::Duration::from_secs(self.outbound_timeout_secs)
+        } else {
+            std::time::Duration::from_millis(self.t1x64_ms)
+        }
+    }
 }
 
 pub(crate) fn default_host() -> String {
@@ -238,4 +291,20 @@ pub(crate) fn default_dispatch_queue_size() -> usize {
 
 pub(crate) fn default_max_concurrent_handlers() -> usize {
     1000
+}
+
+pub(crate) fn default_outbound_timeout_secs() -> u64 {
+    5
+}
+
+pub(crate) fn default_t1_ms() -> u64 {
+    500
+}
+
+pub(crate) fn default_t1x64_ms() -> u64 {
+    32_000
+}
+
+pub(crate) fn default_timerc_secs() -> u64 {
+    180
 }

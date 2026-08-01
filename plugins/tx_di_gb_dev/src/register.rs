@@ -1,15 +1,14 @@
-//! 设备端注册生命周期与 MESSAGE 处理
+//! 设备端 MESSAGE 处理与心跳发送
 //!
-//! - [`run_lifecycle`]：向上级平台 `REGISTER` + 周期心跳 `Keepalive`，取消时 `UNREGISTER`。
-//! - [`handle_device_message`]：处理平台下发的 `MESSAGE`（目录/设备信息/状态查询/PTZ 控制），
-//!   经 [`crate::handler::DeviceHandler`] 取业务数据并回网（按版本编码）。
+//! - 注册/续期/心跳周期/重连由 [`tx_di_sip::SipClient`] 统一管理（见 plugin.rs），
+//!   本模块只保留：
+//!   - [`do_keepalive`](Gb28181Device::do_keepalive)：发一次 GB Keepalive MESSAGE（SipClient 心跳回调）
+//!   - [`handle_device_message`]：处理平台下发的 `MESSAGE`（目录/设备信息/状态查询/PTZ 控制），
+//!     经 [`crate::handler::DeviceHandler`] 取业务数据并回网（按版本编码）。
 
 use std::sync::Arc;
-use std::time::Duration;
 
 use rsipstack::sip::{HeadersExt, StatusCode};
-use tokio::time::interval;
-use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 use tx_di_core::RIE;
 use tx_di_sip::SipTx;
@@ -25,7 +24,7 @@ use crate::handler::DeviceHandler;
 use crate::plugin::Gb28181Device;
 
 /// 从 `platform_uri` 提取注册服务器地址（host:port，去掉 `sip://` 前缀与 `@` 之前部分）
-fn registrar_of(cfg: &GbDevConfig) -> String {
+pub(crate) fn registrar_of(cfg: &GbDevConfig) -> String {
     let s = if let Some(idx) = cfg.platform_uri.find('@') {
         &cfg.platform_uri[idx + 1..]
     } else {
@@ -50,35 +49,9 @@ fn bare_uri_of(header_value: &str) -> String {
 }
 
 impl Gb28181Device {
-    /// 向上级平台注册一次（复用 `SipSender::register` 的自动 401 重认证）
-    pub async fn do_register(&self) -> RIE<()> {
-        let sender = self.sip.sender()?;
-        sender
-            .register(
-                &registrar_of(&self.config),
-                &self.config.username,
-                &self.config.password,
-            )
-            .await?;
-        info!(device_id = %self.config.device_id, "设备注册成功");
-        Ok(())
-    }
-
-    /// 向上级平台注销（Expires: 0）
-    pub async fn do_unregister(&self) -> RIE<()> {
-        let sender = self.sip.sender()?;
-        sender
-            .unregister(
-                &registrar_of(&self.config),
-                &self.config.username,
-                &self.config.password,
-            )
-            .await?;
-        info!(device_id = %self.config.device_id, "设备已注销");
-        Ok(())
-    }
-
     /// 发送一次心跳 Keepalive（按版本编码出网）
+    ///
+    /// 由 [`tx_di_sip::SipClient`] 的 keepalive 回调按周期调用。
     pub async fn do_keepalive(&self) -> RIE<()> {
         let sender = self.sip.sender()?;
         let sn = self.next_sn();
@@ -92,46 +65,6 @@ impl Gb28181Device {
         info!(device_id = %self.config.device_id, sn = sn, "心跳已发送");
         Ok(())
     }
-}
-
-/// 设备注册生命周期：注册 → 周期心跳 → 取消时注销
-pub async fn run_lifecycle(dev: &Arc<Gb28181Device>, token: CancellationToken) -> RIE<()> {
-    // 首次注册（失败不致命，心跳周期前会重试）
-    if let Err(e) = dev.do_register().await {
-        warn!(error = %e, "设备初次注册失败，将在心跳周期重试");
-    }
-
-    let dev2 = dev.clone();
-    let task_token = token.clone();
-    let hb = dev.config.heartbeat_secs.max(5);
-    tokio::spawn(async move {
-        let mut ticker = interval(Duration::from_secs(hb as u64));
-        loop {
-            tokio::select! {
-                biased;
-                _ = task_token.cancelled() => {
-                    if let Err(e) = dev2.do_unregister().await {
-                        warn!(error = %e, "设备注销失败");
-                    }
-                    info!("设备续期任务已停止");
-                    return;
-                }
-                _ = ticker.tick() => {
-                    // 周期续期注册 + 心跳
-                    if let Err(e) = dev2.do_register().await {
-                        warn!(error = %e, "设备续期注册失败");
-                    }
-                    if let Err(e) = dev2.do_keepalive().await {
-                        warn!(error = %e, "设备心跳发送失败");
-                    }
-                }
-            }
-        }
-    });
-
-    token.cancelled().await;
-    info!("Gb28181Device 生命周期结束");
-    Ok(())
 }
 
 /// 根据指令类型，向业务回调取数据并构建待回网 XML（不含发送）

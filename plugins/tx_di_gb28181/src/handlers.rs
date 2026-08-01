@@ -29,7 +29,7 @@ use rsipstack::sip::{Header, HeadersExt, StatusCode};
 use std::sync::Arc;
 use tracing::{info, warn};
 use tx_di_core::RIE;
-use tx_di_sip::SipTx;
+use tx_di_sip::{SipTx, SipUasManager};
 
 /// 创建简单的 SIP 响应处理器（回复 200 OK）
 fn create_ok_handler(method_name: &'static str) -> impl Fn(SipTx) -> std::pin::Pin<Box<dyn Future<Output = RIE<()>> + Send>> + Send + Sync + 'static {
@@ -76,7 +76,181 @@ pub fn register_server_handlers(server: Arc<Gb28181Server>) -> RIE<()> {
     // OPTIONS — 探活 / keep-alive
     sip_plugin.add_handler(Some("OPTIONS"), 0, create_ok_handler("OPTIONS"))?;
 
+    // INVITE — 设备发起的 INVITE（语音广播/对讲推音频，UAS 方向）
+    let uas_inv = server.uas.clone();
+    let srv_inv = server.clone();
+    sip_plugin.add_handler(Some("INVITE"), 0, move |tx: SipTx| {
+        let uas = uas_inv.clone();
+        let srv = srv_inv.clone();
+        async move { handle_device_invite(&srv, &uas, &tx).await }
+    })?;
+
+    // BYE — 会话挂断（UAS 会话清理 + 回复 200）
+    let uas_bye = server.uas.clone();
+    sip_plugin.add_handler(Some("BYE"), 0, move |tx: SipTx| {
+        let uas = uas_bye.clone();
+        async move { uas.on_bye(&tx).await }
+    })?;
+
     Ok(())
+}
+
+/// 处理设备发起的 INVITE（语音广播/对讲推音频，UAS 方向）
+///
+/// 流程：解析设备 SDP → 分配 RTP 接收端口 → 回 200 OK（SDP answer）→
+/// 监听会话状态，Terminated 时清理端口与事件。
+async fn handle_device_invite(
+    server: &Arc<Gb28181Server>,
+    uas: &Arc<SipUasManager>,
+    tx: &SipTx,
+) -> RIE<()> {
+    use crate::media::OpenRtpRequest;
+    use rsipstack::sip::StatusCode;
+
+    // 从 From 头提取设备 ID
+    let from_str = tx
+        .request()
+        .from_header()
+        .map(|h| h.value().to_string())
+        .unwrap_or_default();
+    let device_id = extract_user_from_sip_uri(&from_str).unwrap_or_else(|| from_str.clone());
+
+    // 解析 SDP 会话类型（s= 行），如 Broadcast / Talk
+    let sdp_body = String::from_utf8_lossy(&tx.request().body).to_string();
+    let session_name = sdp_body
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("s="))
+        .unwrap_or("Broadcast")
+        .to_string();
+
+    info!(
+        device_id = %device_id,
+        session = %session_name,
+        "📥 收到设备 INVITE（UAS）"
+    );
+
+    // 创建 UAS 会话（回 100 Trying，注册 dialog）
+    let session = match uas.on_invite(tx, &device_id).await {
+        Ok(s) => s,
+        Err(e) => {
+            warn!(device_id = %device_id, error = %e, "创建设备 INVITE 会话失败");
+            tx.reply(StatusCode::ServerInternalError)
+                .await
+                .map_err(|e| anyhow::anyhow!("回复 INVITE 500 失败: {}", e))?;
+            return Ok(());
+        }
+    };
+
+    // 分配 RTP 接收端口
+    let media = match server.media.get() {
+        Some(m) => m.clone(),
+        None => {
+            warn!("MediaBackend 未初始化，拒绝设备 INVITE");
+            let _ = uas.reject(&session, Some(StatusCode::ServerInternalError));
+            return Ok(());
+        }
+    };
+    let sn = server.next_sn_for(&device_id);
+    let stream_id = format!("uas_{}_{}", device_id, sn);
+    let rtp = match media.open_rtp_server(OpenRtpRequest::udp(&stream_id)).await {
+        Ok(h) => h,
+        Err(e) => {
+            warn!(device_id = %device_id, error = %e, "分配 RTP 端口失败，拒绝设备 INVITE");
+            let _ = uas.reject(&session, Some(StatusCode::ServerInternalError));
+            return Ok(());
+        }
+    };
+
+    // 构建接收侧 SDP answer（PCMA 音频；广播/对讲主要收音频流）
+    let media_ip = server.media_ip();
+    let answer = build_uas_sdp_answer(&media_ip, rtp.port, &session_name, &format!("{:010}", sn));
+
+    if let Err(e) = uas.accept(&session, answer.as_bytes(), None) {
+        warn!(device_id = %device_id, error = %e, "接受设备 INVITE 失败");
+        let _ = media.close_rtp_server(&stream_id).await;
+        let _ = tx.reply(StatusCode::ServerInternalError).await;
+        return Ok(());
+    }
+
+    info!(
+        device_id = %device_id,
+        session = %session_name,
+        rtp_port = rtp.port,
+        "✅ 已接受设备 INVITE（200 OK）"
+    );
+
+    // 记录广播会话 + 事件
+    server.broadcast_sessions.insert(device_id.clone(), rtp.port);
+    tokio::spawn(emit(Gb28181Event::BroadcastSessionStarted {
+        device_id: device_id.clone(),
+        audio_port: rtp.port,
+    }));
+
+    // 状态监听：Terminated → 清理端口 + 会话 + 事件
+    let srv2 = server.clone();
+    let uas2 = uas.clone();
+    let sess2 = session.clone();
+    let stream_id2 = stream_id.clone();
+    let device_id2 = device_id.clone();
+    tokio::spawn(async move {
+        let mut finished = false;
+        if let Some(mut rx) = sess2.take_state_rx() {
+            while let Some(state) = rx.recv().await {
+                if matches!(state, rsipstack::dialog::dialog::DialogState::Terminated(..)) {
+                    finished = true;
+                    break;
+                }
+            }
+        }
+        if !finished {
+            // 无状态流或超时：兜底延迟清理
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        }
+        srv2.broadcast_sessions.remove(&device_id2);
+        if let Some(m) = srv2.media.get() {
+            let _ = m.close_rtp_server(&stream_id2).await;
+        }
+        let _ = uas2.hangup(&sess2).await;
+        tokio::spawn(emit(Gb28181Event::BroadcastSessionEnded {
+            device_id: device_id2,
+        }));
+    });
+
+    Ok(())
+}
+
+/// 构建 UAS 接收侧 SDP answer（广播/对讲：音频 PCMA 8）
+///
+/// 设备 → 平台方向：平台作为接收方回 recvonly。
+fn build_uas_sdp_answer(media_ip: &str, rtp_port: u16, session_name: &str, ssrc: &str) -> String {
+    let session_id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let (addr_type, addr) = if media_ip.contains(':') {
+        ("IP6", media_ip)
+    } else {
+        ("IP4", media_ip)
+    };
+    format!(
+        "v=0\r\n\
+         o=- {session_id} {session_id} IN {addr_type} {addr}\r\n\
+         s={session_name}\r\n\
+         c=IN {addr_type} {addr}\r\n\
+         t=0 0\r\n\
+         m=audio {rtp_port} RTP/AVP 8\r\n\
+         a=recvonly\r\n\
+         a=rtcp:{rtcp_port}\r\n\
+         a=rtpmap:8 PCMA/8000\r\n\
+         y={ssrc}\r\n",
+        session_id = session_id,
+        addr_type = addr_type,
+        addr = addr,
+        session_name = session_name,
+        rtp_port = rtp_port,
+        rtcp_port = rtp_port + 1,
+        ssrc = ssrc
+    )
 }
 
 // ── REGISTER ─────────────────────────────────────────────────────────────────

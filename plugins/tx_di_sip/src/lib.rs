@@ -63,16 +63,20 @@ mod sender;
 pub mod client;
 mod sip_tx;
 mod dialog;
+pub mod server_dialog;
+pub mod registration;
 
 pub use config::*;
 pub use comp::*;
 pub use err::SipErr;
 pub use handler::SipRouter;
 pub use middleware::{SipMiddleware, SipNextFn, SipNextFut};
-pub use sender::SipSender;
+pub use sender::{SipSender, InviteHandle};
 pub use client::{SipClient, SipClientConfig};
 pub use sip_tx::SipTx;
 pub use dialog::{DialogKey, InDialogTable};
+pub use server_dialog::{SipUasManager, UasSession};
+pub use registration::{SipRegistration, SipRegistrationStore, RegistrationHandle};
 
 #[cfg(test)]
 mod tests {
@@ -568,6 +572,11 @@ mod tests {
             enabled: true,
             dispatch_queue_size: 10_000,
             max_concurrent_handlers: 1000,
+            outbound_timeout_secs: crate::config::default_outbound_timeout_secs(),
+            t1_ms: crate::config::default_t1_ms(),
+            t1x64_ms: crate::config::default_t1x64_ms(),
+            timerc_secs: crate::config::default_timerc_secs(),
+            ip_whitelist: Vec::new(),
         }
     }
 

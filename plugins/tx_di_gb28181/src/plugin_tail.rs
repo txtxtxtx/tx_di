@@ -21,8 +21,6 @@ use crate::xml::{
     GuardMode, PlaybackControl, PtzCommand, PtzPreciseParam, ZoomRect,
 };
 use rsipstack::dialog::dialog::DialogState;
-use rsipstack::dialog::invitation::InviteOption;
-use rsipstack::sip as rsip;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tracing::{info, warn};
 use tx_gb28181::device::GbDevice;
@@ -35,7 +33,7 @@ impl Gb28181Server {
     ///
     /// 优先级：`nat_external_ip`（NAT 公网）> `media.local_ip`（非未指定）> `sip_ip`。
     /// NAT 场景下直接返回公网 IP，使对端能正确回包。
-    fn media_ip(&self) -> String {
+    pub(crate) fn media_ip(&self) -> String {
         if let Some(nat) = &self.config.media.nat_external_ip {
             return nat.clone();
         }
@@ -45,7 +43,6 @@ impl Gb28181Server {
             self.config.media.local_ip.clone()
         }
     }
-
     /// 获取设备信息
     pub fn get_device(&self, device_id: &str) -> Option<GbDevice> {
         self.device_registry.get(device_id)
@@ -359,6 +356,9 @@ impl Gb28181Server {
                 }
             }
 
+            // v2：清理 DialogLayer 中的 dialog（防内存泄漏）
+            sess.handle.cleanup();
+
             info!(call_id = %call_id, "📴 主动挂断");
 
             tokio::spawn(event::emit(Gb28181Event::SessionEnded {
@@ -417,31 +417,13 @@ impl Gb28181Server {
         );
 
         let sender = self.sip_plugin.sender()?;
-        let dialog_layer = sender.dialog_layer();
-        let (state_tx, mut state_rx) = dialog_layer.new_dialog_state_channel();
+        // v2：InviteHandle（含状态流 + 最终响应）
+        let handle = sender
+            .invite(&caller_str, &callee_str, Some(sdp_offer.into_bytes()), None)
+            .await?;
 
-        let caller_uri = rsip::Uri::try_from(caller_str.as_str())
-            .map_err(|_| GbErr::InvalidUri)?;
-        let callee_uri = rsip::Uri::try_from(callee_str.as_str())
-            .map_err(|_| GbErr::InvalidUri)?;
-
-        let invite_option = InviteOption {
-            caller: caller_uri.clone(),
-            callee: callee_uri,
-            contact: caller_uri,
-            content_type: Some("application/sdp".to_string()),
-            offer: Some(sdp_offer.into_bytes().into()),
-            credential: None,
-            ..Default::default()
-        };
-
-        let (dialog, resp) = dialog_layer
-            .do_invite(invite_option, state_tx)
-            .await
-            .map_err(|_| GbErr::InviteFailed)?;
-
-        let call_id = dialog.id().call_id.clone();
-        let image_url = if let Some(response) = resp {
+        let call_id = handle.call_id.clone();
+        let image_url = if let Some(response) = handle.final_response.as_ref() {
             let body = std::str::from_utf8(&response.body)
                 .unwrap_or_default()
                 .to_string();
@@ -463,19 +445,26 @@ impl Gb28181Server {
 
         let media_clone = self.media.get().expect("MediaBackend not initialized").clone();
         let call_id_clone = call_id.clone();
+        let handle_clone = handle.clone();
         let _device_id_owned = device_id.to_string();
         let _channel_id_owned = channel_id.to_string();
 
+        // 抓拍为短会话：监听 Terminated → 关 RTP + 清理 dialog（防泄漏）
+        let mut state_rx = handle.take_state_rx();
         tokio::spawn(async move {
-            while let Some(state) = state_rx.recv().await {
-                if matches!(state, DialogState::Terminated(_, _)) {
-                    info!(
-                        call_id = %call_id_clone,
-                        "📸 抓拍会话结束"
-                    );
-                    let _ = media_clone.close_rtp_server(&stream_id).await;
-                    break;
+            if let Some(rx) = state_rx.as_mut() {
+                while let Some(state) = rx.recv().await {
+                    if matches!(state, DialogState::Terminated(_, _)) {
+                        info!(call_id = %call_id_clone, "📸 抓拍会话结束");
+                        let _ = media_clone.close_rtp_server(&stream_id).await;
+                        handle_clone.cleanup();
+                        break;
+                    }
                 }
+            } else {
+                // 无状态流（异常）：延迟后兜底清理
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                handle_clone.cleanup();
             }
         });
 
@@ -625,32 +614,16 @@ impl Gb28181Server {
         );
 
         let sender = self.sip_plugin.sender()?;
-        let dialog_layer = sender.dialog_layer();
-        let (state_tx, mut state_rx) = dialog_layer.new_dialog_state_channel();
+        // v2：InviteHandle（含状态流 + 最终响应）
+        let handle = sender
+            .invite(&caller_str, &callee_str, Some(sdp_offer.into_bytes()), None)
+            .await?;
 
-        let caller_uri = rsip::Uri::try_from(caller_str.as_str())
-            .map_err(|_| GbErr::InvalidUri)?;
-        let callee_uri = rsip::Uri::try_from(callee_str.as_str())
-            .map_err(|_| GbErr::InvalidUri)?;
+        let call_id = handle.call_id.clone();
+        let dialog = handle.dialog.clone();
 
-        let invite_option = InviteOption {
-            caller: caller_uri.clone(),
-            callee: callee_uri,
-            contact: caller_uri,
-            content_type: Some("application/sdp".to_string()),
-            offer: Some(sdp_offer.into_bytes().into()),
-            credential: None,
-            ..Default::default()
-        };
-
-        let (dialog, resp) = dialog_layer
-            .do_invite(invite_option, state_tx)
-            .await
-            .map_err(|_| GbErr::InviteFailed)?;
-
-        let call_id = dialog.id().call_id.clone();
-
-        let (device_ip, device_audio_port) = if let Some(response) = resp {
+        let (device_ip, device_audio_port) = if let Some(response) = handle.final_response.as_ref()
+        {
             let body = std::str::from_utf8(&response.body).unwrap_or_default();
             if let Some(audio_info) = parse_audio_sdp(body) {
                 (audio_info.device_ip, audio_info.device_port)
@@ -670,6 +643,7 @@ impl Gb28181Server {
             stream_id: stream_id.clone(),
             is_realtime: true,
             dialog,
+            handle: handle.clone(),
         };
         self.sessions.insert(call_id.clone(), session);
 
@@ -680,34 +654,45 @@ impl Gb28181Server {
         let channel_id_owned = channel_id.to_string();
         let device_ip_owned = device_ip.clone();
         let device_audio_port_owned = device_audio_port;
+        let handle_clone = handle.clone();
+        let mut state_rx = handle.take_state_rx();
 
         tokio::spawn(async move {
-            while let Some(state) = state_rx.recv().await {
-                match state {
-                    DialogState::Confirmed(id, _) => {
-                        info!(call_id = %call_id_clone, dialog_id = %id, "🎤 对讲会话已确认");
-                        tokio::spawn(event::emit(Gb28181Event::AudioTalkbackStarted {
-                            device_id: device_id_owned.clone(),
-                            channel_id: channel_id_owned.clone(),
-                            call_id: call_id_clone.clone(),
-                            device_ip: device_ip_owned.clone(),
-                            device_port: device_audio_port_owned,
-                        }));
-                    }
-                    DialogState::Terminated(id, _) => {
-                        info!(call_id = %call_id_clone, dialog_id = %id, "🎤 对讲会话结束");
-                        // 若已通过 hangup 主动挂断并清理，则跳过避免重复处理
-                        if sessions_clone.contains_key(&call_id_clone) {
-                            let _ = media_clone.close_rtp_server(&stream_id).await;
-                            sessions_clone.remove(&call_id_clone);
-                            tokio::spawn(event::emit(Gb28181Event::AudioTalkbackEnded {
+            if let Some(rx) = state_rx.as_mut() {
+                while let Some(state) = rx.recv().await {
+                    match state {
+                        DialogState::Confirmed(id, _) => {
+                            info!(call_id = %call_id_clone, dialog_id = %id, "🎤 对讲会话已确认");
+                            tokio::spawn(event::emit(Gb28181Event::AudioTalkbackStarted {
                                 device_id: device_id_owned.clone(),
+                                channel_id: channel_id_owned.clone(),
                                 call_id: call_id_clone.clone(),
+                                device_ip: device_ip_owned.clone(),
+                                device_port: device_audio_port_owned,
                             }));
                         }
-                        break;
+                        DialogState::Terminated(id, _) => {
+                            info!(call_id = %call_id_clone, dialog_id = %id, "🎤 对讲会话结束");
+                            // 若已通过 hangup 主动挂断并清理，则跳过避免重复处理
+                            if sessions_clone.contains_key(&call_id_clone) {
+                                let _ = media_clone.close_rtp_server(&stream_id).await;
+                                sessions_clone.remove(&call_id_clone);
+                                handle_clone.cleanup();
+                                tokio::spawn(event::emit(Gb28181Event::AudioTalkbackEnded {
+                                    device_id: device_id_owned.clone(),
+                                    call_id: call_id_clone.clone(),
+                                }));
+                            }
+                            break;
+                        }
+                        _ => {}
                     }
-                    _ => {}
+                }
+            } else {
+                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                if sessions_clone.contains_key(&call_id_clone) {
+                    sessions_clone.remove(&call_id_clone);
+                    handle_clone.cleanup();
                 }
             }
         });
@@ -1099,7 +1084,7 @@ impl Gb28181Server {
     }
 
     /// 为指定设备获取下一个 SN 序列号（每设备独立计数）
-    fn next_sn_for(&self, device_id: &str) -> u32 {
+    pub(crate) fn next_sn_for(&self, device_id: &str) -> u32 {
         self.sn_map
             .entry(device_id.to_string())
             .or_insert_with(|| AtomicU32::new(1))
@@ -1203,34 +1188,14 @@ impl Gb28181Server {
             if is_realtime { "实时点播" } else { "历史回放" }
         );
 
-        // 创建SIP对话层并建立状态通道
+        // 创建 SIP 会话（v2：InviteHandle，含状态流 + 生命周期清理）
         let sender = self.sip_plugin.sender()?;
-        let dialog_layer = sender.dialog_layer();
-        let (state_tx, mut state_rx) = dialog_layer.new_dialog_state_channel();
+        let handle = sender
+            .invite(&caller_str, &callee_str, Some(sdp_offer.into_bytes()), None)
+            .await?;
 
-        // 解析主叫和被叫SIP URI
-        let caller_uri = rsip::Uri::try_from(caller_str.as_str())
-            .map_err(|_| GbErr::InvalidUri)?;
-        let callee_uri = rsip::Uri::try_from(callee_str.as_str())
-            .map_err(|_| GbErr::InvalidUri)?;
-
-        let invite_option = InviteOption {
-            caller: caller_uri.clone(),
-            callee: callee_uri,
-            contact: caller_uri,
-            content_type: Some("application/sdp".to_string()),
-            offer: Some(sdp_offer.into_bytes().into()),
-            credential: None,
-            ..Default::default()
-        };
-
-        // 发送SIP INVITE请求并等待响应
-        let (dialog, _resp) = dialog_layer
-            .do_invite(invite_option, state_tx)
-            .await
-            .map_err(|_| GbErr::InviteFailed)?;
-
-        let call_id = dialog.id().call_id.clone();
+        let call_id = handle.call_id.clone();
+        let dialog = handle.dialog.clone();
 
         // 创建会话信息并保存到会话管理器
         let session = SessionInfo {
@@ -1242,6 +1207,7 @@ impl Gb28181Server {
             stream_id: stream_id.clone(),
             is_realtime,
             dialog,
+            handle: handle.clone(),
         };
         self.sessions.insert(call_id.clone(), session);
 
@@ -1257,52 +1223,67 @@ impl Gb28181Server {
         let rtp_port_clone = rtp_port;
         let ssrc_clone = ssrc.clone();
         let stream_id_clone = stream_id.clone();
+        let handle_clone = handle.clone();
+        let mut state_rx = handle.take_state_rx();
 
         // 启动异步任务监听会话状态变化（确认/终止）
         tokio::spawn(async move {
-            while let Some(state) = state_rx.recv().await {
-                match state {
-                    DialogState::Confirmed(id, _resp) => {
-                        // 会话已确认：触发SessionStarted事件
-                        info!(
-                            call_id = %call_id_clone,
-                            dialog_id = %id,
-                            "✅ 点播会话已确认"
-                        );
-                        tokio::spawn(event::emit(Gb28181Event::SessionStarted {
-                            device_id: device_id_owned.clone(),
-                            channel_id: channel_id_owned.clone(),
-                            call_id: call_id_clone.clone(),
-                            rtp_port: rtp_port_clone,
-                            ssrc: ssrc_clone.clone(),
-                        }));
-                    }
-                    DialogState::Terminated(id, reason) => {
-                        // 会话已终止：清理资源、关闭RTP端口、触发SessionEnded事件
-                        info!(
-                            call_id = %call_id_clone,
-                            dialog_id = %id,
-                            reason = ?reason,
-                            "📹 点播会话结束"
-                        );
-
-                        // 若已通过 hangup 主动挂断并清理，则跳过避免重复处理
-                        if sessions_clone.contains_key(&call_id_clone) {
-                            if let Err(e) = media_clone.close_rtp_server(&stream_id_clone).await {
-                                warn!(call_id = %call_id_clone, error = %e, "关闭 RTP 端口失败");
-                            }
-
-                            sessions_clone.remove(&call_id_clone);
-
-                            tokio::spawn(event::emit(Gb28181Event::SessionEnded {
+            if let Some(rx) = state_rx.as_mut() {
+                while let Some(state) = rx.recv().await {
+                    match state {
+                        DialogState::Confirmed(id, _resp) => {
+                            // 会话已确认：触发SessionStarted事件
+                            info!(
+                                call_id = %call_id_clone,
+                                dialog_id = %id,
+                                "✅ 点播会话已确认"
+                            );
+                            tokio::spawn(event::emit(Gb28181Event::SessionStarted {
                                 device_id: device_id_owned.clone(),
                                 channel_id: channel_id_owned.clone(),
                                 call_id: call_id_clone.clone(),
+                                rtp_port: rtp_port_clone,
+                                ssrc: ssrc_clone.clone(),
                             }));
                         }
-                        break;
+                        DialogState::Terminated(id, reason) => {
+                            // 会话已终止：清理资源、关闭RTP端口、触发SessionEnded事件
+                            info!(
+                                call_id = %call_id_clone,
+                                dialog_id = %id,
+                                reason = ?reason,
+                                "📹 点播会话结束"
+                            );
+
+                            // 若已通过 hangup 主动挂断并清理，则跳过避免重复处理
+                            if sessions_clone.contains_key(&call_id_clone) {
+                                if let Err(e) =
+                                    media_clone.close_rtp_server(&stream_id_clone).await
+                                {
+                                    warn!(call_id = %call_id_clone, error = %e, "关闭 RTP 端口失败");
+                                }
+
+                                sessions_clone.remove(&call_id_clone);
+                                // v2：清理 DialogLayer 中的 dialog（防内存泄漏）
+                                handle_clone.cleanup();
+
+                                tokio::spawn(event::emit(Gb28181Event::SessionEnded {
+                                    device_id: device_id_owned.clone(),
+                                    channel_id: channel_id_owned.clone(),
+                                    call_id: call_id_clone.clone(),
+                                }));
+                            }
+                            break;
+                        }
+                        _ => {}
                     }
-                    _ => {}
+                }
+            } else {
+                // 异常兜底：无状态流时延迟清理
+                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                if sessions_clone.contains_key(&call_id_clone) {
+                    sessions_clone.remove(&call_id_clone);
+                    handle_clone.cleanup();
                 }
             }
         });

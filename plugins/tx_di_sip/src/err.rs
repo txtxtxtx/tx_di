@@ -43,4 +43,16 @@ pub enum SipErr {
     /// SIP 事务已被取出（无法再回复）
     #[err(-12, "SIP 事务已被取出")]
     TransactionMissing,
+    /// 请求超时
+    #[err(-13, "请求超时")]
+    RequestTimeout,
+    /// 未注册
+    #[err(-14, "未注册")]
+    NotRegistered,
+    /// UAS INVITE 会话失败
+    #[err(-15, "UAS INVITE 会话失败")]
+    UasInviteFailed,
+    /// 传输层不可用
+    #[err(-16, "传输层不可用")]
+    TransportDown,
 }
