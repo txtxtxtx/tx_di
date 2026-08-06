@@ -35,6 +35,19 @@ pub struct JobConfig {
     /// 若内部处理器阻塞超过此时间，将强制中止并标记超时
     #[serde(default = "default_internal_timeout")]
     pub internal_timeout_secs: u64,
+
+    /// 是否启用分布式锁（多实例部署时防止同一任务重复执行）
+    ///
+    /// 依赖已注册的 `Arc<dyn CacheService>`（如 `RedisCache`）。
+    /// 未注册缓存服务或 `distributed_lock=false` 时保持原有行为（仅单实例调度）。
+    #[serde(default)]
+    pub distributed_lock: bool,
+
+    /// 分布式锁持有时间（秒），默认 300s。
+    ///
+    /// 任务执行超过此时间锁自动过期，其他实例可在下一轮接管。
+    #[serde(default = "default_lock_timeout")]
+    pub lock_timeout_secs: u64,
 }
 
 impl Default for JobConfig {
@@ -47,6 +60,8 @@ impl Default for JobConfig {
             python_path: default_python_path(),
             thread_pool_size: default_thread_pool_size(),
             internal_timeout_secs: default_internal_timeout(),
+            distributed_lock: false,
+            lock_timeout_secs: default_lock_timeout(),
         }
     }
 }
@@ -87,6 +102,10 @@ fn default_thread_pool_size() -> usize {
 }
 
 fn default_internal_timeout() -> u64 {
+    300 // 5 分钟
+}
+
+fn default_lock_timeout() -> u64 {
     300 // 5 分钟
 }
 

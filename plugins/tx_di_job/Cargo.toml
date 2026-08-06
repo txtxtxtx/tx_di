@@ -28,6 +28,9 @@ tokio = { workspace = true, features = ["full", "process"] }
 toasty = { workspace = true, features = ["serde", "jiff"] }
 tx_di_toasty = { path = "../tx_di_toasty" }
 
+# 缓存依赖（分布式锁：通过注入的 CacheService 实现跨实例互斥）
+tx_di_cache = { path = "../tx_di_cache" }
+
 # 公共工具（雪花 ID 等）
 tx_common.workspace = true
 

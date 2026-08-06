@@ -16,7 +16,11 @@ use crate::models::{
 };
 use crate::repository::JobRepository;
 use tx_common::page::Page;
+use tx_di_cache::CacheService;
 use tx_di_toasty::ToastyPlugin;
+
+/// 分布式锁 key 前缀（跨实例共享的调度互斥锁）
+const JOB_LOCK_KEY_PREFIX: &str = "tx_di_job:lock:";
 
 /// Job 插件组件
 ///
@@ -75,6 +79,9 @@ pub struct JobPlugin {
     /// 并发执行信号量（限制同时运行的任务数）
     #[tx_cst(OnceLock::new())]
     pub semaphore: OnceLock<Arc<tokio::sync::Semaphore>>,
+
+    /// 缓存服务（分布式锁用）。未注册缓存服务时为 `None`，此时锁功能自动降级。
+    pub cache: Option<Arc<dyn CacheService>>,
 }
 
 impl JobPlugin {
@@ -468,6 +475,50 @@ impl JobPlugin {
                             continue;
                         }
 
+                        // 多实例部署时通过分布式锁互斥，避免同一任务被多实例重复执行。
+                        // 锁 key 按任务隔离，value 携带实例标识，执行完成后仅释放自己持有的锁。
+                        let mut release_lock: Option<(Arc<dyn CacheService>, String, String)> = None;
+                        if self.config.distributed_lock {
+                            if let Some(cache) = &self.cache {
+                                let lock_key = format!("{}{}", JOB_LOCK_KEY_PREFIX, job.id);
+                                let token = format!(
+                                    "{}:{}:{}",
+                                    std::process::id(),
+                                    job.id,
+                                    now_chrono.timestamp()
+                                );
+                                let lock_timeout =
+                                    Duration::from_secs(self.config.lock_timeout_secs);
+                                let acquired = match cache
+                                    .set_nx(&lock_key, token.as_bytes(), Some(lock_timeout))
+                                    .await
+                                {
+                                    Ok(v) => v,
+                                    Err(e) => {
+                                        error!(
+                                            job_id = job.id,
+                                            error = %e,
+                                            "分布式锁获取失败，跳过本次调度"
+                                        );
+                                        continue;
+                                    }
+                                };
+                                if !acquired {
+                                    debug!(
+                                        job_id = job.id,
+                                        job_name = %job.name,
+                                        "分布式锁被其他实例持有，跳过本次调度"
+                                    );
+                                    continue;
+                                }
+                                release_lock = Some((cache.clone(), lock_key, token));
+                            } else {
+                                warn!(
+                                    "distributed_lock=true 但未注册 CacheService，锁功能降级为本地互斥"
+                                );
+                            }
+                        }
+
                         // 获取并发执行许可（非阻塞）
                         let permit = match semaphore.clone().try_acquire_owned() {
                             Ok(p) => p,
@@ -477,6 +528,12 @@ impl JobPlugin {
                                     thread_pool_size = self.config.thread_pool_size,
                                     "执行器池已满，跳过本次调度，任务将在下一轮尝试"
                                 );
+                                // 释放已获取的分布式锁，避免残留
+                                if let Some((cache, lock_key, token)) = &release_lock {
+                                    let _ = cache
+                                        .compare_and_del(lock_key, token.as_bytes())
+                                        .await;
+                                }
                                 continue;
                             }
                         };
@@ -499,6 +556,19 @@ impl JobPlugin {
                                     error = %e,
                                     "任务执行失败"
                                 );
+                            }
+                            // 执行完成释放分布式锁（仅释放自己持有的锁）
+                            if let Some((cache, lock_key, token)) = &release_lock {
+                                if let Err(e) = cache
+                                    .compare_and_del(lock_key, token.as_bytes())
+                                    .await
+                                {
+                                    error!(
+                                        job_id = job.id,
+                                        error = %e,
+                                        "释放分布式锁失败（将由 TTL 兜底）"
+                                    );
+                                }
                             }
                         });
 
