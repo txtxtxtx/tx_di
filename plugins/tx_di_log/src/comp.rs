@@ -32,6 +32,16 @@ fn init(this: &mut LogPlugins, _store: &Store) -> RIE<()> {
         return Ok(());
     }
 
+    // 生产部署通过 APP_HOME 锚定日志目录，避免依赖进程工作目录
+    if !this.config.dir.is_absolute() {
+        let resolved = std::path::PathBuf::from(tx_di_core::resolve_data_path(
+            &this.config.dir.to_string_lossy(),
+        ));
+        let mut cfg = (*this.config).clone();
+        cfg.dir = resolved;
+        this.config = Arc::new(cfg);
+    }
+
     if !this.config.dir.exists() {
         fs::create_dir_all(&this.config.dir)?;
     }
