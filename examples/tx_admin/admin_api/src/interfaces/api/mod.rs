@@ -14,6 +14,7 @@ mod file_api;
 pub mod monitor_api;
 mod tool_api;
 mod job_api;
+mod health_api;
 
 use tx_di_axum::Router;
 
@@ -24,6 +25,7 @@ pub fn open_router() -> Router {
     Router::new()
         .merge(auth_api::open_router())
         .merge(file_api::open_router())
+        .merge(health_api::open_router())
 }
 
 /// 注册所有受保护 HTTP 路由（需要登录认证）

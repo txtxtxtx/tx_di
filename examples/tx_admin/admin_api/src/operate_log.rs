@@ -71,8 +71,13 @@ use tower::{Layer, Service};
 use tracing::{debug, warn};
 use tx_di_sa_token::StpUtil;
 
-/// 有界 channel 容量：缓冲 4096 条日志，超出则丢弃（避免阻塞 HTTP 响应）
-pub const OPERATE_LOG_CHANNEL_CAP: usize = 4096;
+/// 有界 channel 容量：缓冲 65536 条日志。
+/// 满时生产者最多等待 `OPERATE_LOG_SEND_TIMEOUT`（见 send 逻辑），
+/// 超时是最后兜底（消费者过慢的极端情况），正常情况下不丢日志。
+pub const OPERATE_LOG_CHANNEL_CAP: usize = 65536;
+
+/// 操作日志发送最大等待时间：channel 满时在此时间内等待消费者消化
+const OPERATE_LOG_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
 
 /// 操作日志条目，在请求完成后通过 channel 发送给消费者
 #[derive(Debug, Clone)]
@@ -171,7 +176,7 @@ impl Service<Request<Body>> for OperateLogMiddleware {
             let (user_id, user_name, tenant_id) =
                 extract_user_info().await;
 
-            match tx.try_send(OperateLogEntry {
+            let entry = OperateLogEntry {
                 method,
                 uri,
                 status,
@@ -181,13 +186,16 @@ impl Service<Request<Body>> for OperateLogMiddleware {
                 user_id,
                 user_name,
                 tenant_id,
-            }) {
-                Ok(()) => {}
-                Err(mpsc::error::TrySendError::Full(_)) => {
-                    warn!("操作日志 channel 已满 (cap={})，丢弃日志", OPERATE_LOG_CHANNEL_CAP);
-                }
-                Err(mpsc::error::TrySendError::Closed(_)) => {
+            };
+            // 审计日志不静默丢弃：channel 满时最多等待 OPERATE_LOG_SEND_TIMEOUT，
+            // 超时或消费者退出才放弃（并输出告警便于排查）。
+            match tokio::time::timeout(OPERATE_LOG_SEND_TIMEOUT, tx.send(entry)).await {
+                Ok(Ok(())) => {}
+                Ok(Err(_)) => {
                     // channel 已关闭，消费者已退出，静默忽略
+                }
+                Err(_) => {
+                    warn!("操作日志 channel 积压超过 {OPERATE_LOG_SEND_TIMEOUT:?}，丢弃 1 条日志（消费者处理过慢）");
                 }
             }
 

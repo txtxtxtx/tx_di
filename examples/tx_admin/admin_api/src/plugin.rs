@@ -2,7 +2,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::info;
 use tx_di_axum::{WebPlugin, WebConfig, add_layer};
-use tx_di_core::{App, Component, DepsTuple, RIE};
+use tx_di_core::{App, AppAllConfig, Component, DepsTuple, RIE};
 use tx_di_sa_token::{SaTokenPlugin, SaTokenLayer, SaCheckLoginLayer};
 use admin_app::log::app_service::OperateLogAppService;
 use admin_proto::CreateOperateLogRequest;
@@ -38,8 +38,17 @@ use admin_proto::admin::tool::tool_service_server::ToolServiceServer;
 use admin_proto::admin::job::job_service_server::JobServiceServer;
 use admin_proto::admin::job::job_log_service_server::JobLogServiceServer;
 
-/// gRPC 默认端口
+/// gRPC 默认端口（可被 `GRPC_PORT` 环境变量或 `[grpc_config] port` 配置覆盖）
 const DEFAULT_GRPC_PORT: u16 = 50051;
+
+/// 解析 gRPC 监听端口，优先级：环境变量 `GRPC_PORT` > 配置 `[grpc_config].port` > 默认值
+fn resolve_grpc_port(config: &AppAllConfig) -> u16 {
+    std::env::var("GRPC_PORT")
+        .ok()
+        .and_then(|v| v.parse::<u16>().ok())
+        .or_else(|| config.get::<u16>("grpc_config.port"))
+        .unwrap_or(DEFAULT_GRPC_PORT)
+}
 
 #[derive(Component)]
 #[component(app_async_init, init_sort = i32::MAX - 100)]
@@ -106,7 +115,7 @@ async fn app_async_init(_comp: Arc<AdminPlugin>, app: Arc<App>) -> RIE<()> {
 
     // ════════════════════ gRPC Server ════════════════════
 
-    let grpc_port = DEFAULT_GRPC_PORT;
+    let grpc_port = resolve_grpc_port(&app.inject::<AppAllConfig>());
     let grpc_addr: std::net::SocketAddr = format!("0.0.0.0:{}", grpc_port).parse()
         .map_err(|e: std::net::AddrParseError| anyhow::anyhow!("gRPC 地址解析失败: {}", e))?;
 
