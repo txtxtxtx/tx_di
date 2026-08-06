@@ -538,7 +538,7 @@ host = "::"
 database_url = "sqlite:examples/tx_admin/data/tx_admin.db"
 auto_schema = false
 
-[sa_token_config]
+[sa_token]
 timeout = 86400
 token_name = "Authorization"
 
