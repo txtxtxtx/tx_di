@@ -1,7 +1,9 @@
 use std::sync::Arc;
 use tx_error::{AppError, AppResult};
 use crate::err::JobErr;
-use crate::models::{InfrustJob, InfrustJobLog, JobStatus, AuditFields, SoftDelete};
+use crate::models::{
+    AuditFields, ExecutionStatus, InfrustJob, InfrustJobLog, JobStatus, SoftDelete,
+};
 use tx_di_toasty::ToastyPlugin;
 
 /// toasty::Error → AppError 辅助转换
@@ -204,6 +206,47 @@ impl JobRepository {
         Ok(logs)
     }
 
+    /// 分页查询任务（SQL 层过滤 + COUNT + LIMIT/OFFSET，ID 倒序）
+    ///
+    /// 返回 `(列表, 总数)`，替代原先"全表加载 + 内存分页"。
+    pub async fn find_job_page(
+        &self,
+        name: Option<&str>,
+        status: Option<i32>,
+        page_num: i64,
+        page_size: i64,
+    ) -> AppResult<(Vec<InfrustJob>, i64)> {
+        let mut db = self.tp.db().clone();
+        let build = |name: Option<&str>, status: Option<i32>| {
+            let mut q = InfrustJob::all()
+                .filter(InfrustJob::fields().soft_delete().eq(SoftDelete::NORMAL));
+            if let Some(n) = name {
+                q = q.filter(InfrustJob::fields().name().like(format!("%{n}%")));
+            }
+            if let Some(st) = status {
+                let s = if st == 0 { JobStatus::Paused } else { JobStatus::Running };
+                q = q.filter(InfrustJob::fields().status().eq(s));
+            }
+            q
+        };
+
+        let total = build(name, status)
+            .count()
+            .exec(&mut db)
+            .await
+            .map_err(to_err)?;
+        let offset = ((page_num - 1) * page_size).max(0) as usize;
+        let size = page_size as usize;
+        let rows = build(name, status)
+            .order_by(InfrustJob::fields().id().desc())
+            .limit(size)
+            .offset(offset)
+            .exec(&mut db)
+            .await
+            .map_err(to_err)?;
+        Ok((rows, total as i64))
+    }
+
     /// 查询所有未删除的任务（id 倒序）
     pub async fn get_all_jobs(&self) -> AppResult<Vec<InfrustJob>> {
         let mut db = self.tp.db().clone();
@@ -264,6 +307,47 @@ impl JobRepository {
                 .map_err(to_err)?;
         }
         Ok(())
+    }
+
+    /// 分页查询任务日志（按 job_id + 状态过滤，SQL 层 COUNT + LIMIT/OFFSET，ID 倒序）
+    ///
+    /// 返回 `(列表, 总数)`，替代原先"全表加载 + 内存分页"。
+    pub async fn find_job_log_page(
+        &self,
+        job_id: Option<u64>,
+        status: Option<i32>,
+        page_num: i64,
+        page_size: i64,
+    ) -> AppResult<(Vec<InfrustJobLog>, i64)> {
+        let mut db = self.tp.db().clone();
+        let build = |job_id: Option<u64>, status: Option<i32>| {
+            let mut q = InfrustJobLog::all()
+                .filter(InfrustJobLog::fields().soft_delete().eq(SoftDelete::NORMAL));
+            if let Some(jid) = job_id {
+                q = q.filter(InfrustJobLog::fields().job_id().eq(jid));
+            }
+            if let Some(st) = status {
+                let s = if st == 0 { ExecutionStatus::Failed } else { ExecutionStatus::Success };
+                q = q.filter(InfrustJobLog::fields().status().eq(s));
+            }
+            q
+        };
+
+        let total = build(job_id, status)
+            .count()
+            .exec(&mut db)
+            .await
+            .map_err(to_err)?;
+        let offset = ((page_num - 1) * page_size).max(0) as usize;
+        let size = page_size as usize;
+        let rows = build(job_id, status)
+            .order_by(InfrustJobLog::fields().id().desc())
+            .limit(size)
+            .offset(offset)
+            .exec(&mut db)
+            .await
+            .map_err(to_err)?;
+        Ok((rows, total as i64))
     }
 
     /// 查询所有未删除的执行日志（id 倒序），可选择性按 job_id 过滤
