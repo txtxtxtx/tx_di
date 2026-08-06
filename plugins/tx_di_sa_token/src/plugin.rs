@@ -2,7 +2,7 @@
 
 use crate::config::SaTokenConf;
 use std::sync::Arc;
-use tx_di_core::{Component, DepsTuple, RIE, Store};
+use tx_di_core::{App, Component, DepsTuple, RIE};
 use tracing::info;
 
 /// sa-token 插件
@@ -37,7 +37,7 @@ use tracing::info;
 /// StpUtil::logout(&sa_token_state);
 /// ```
 #[derive(Component)]
-#[component(init, init_sort = i32::MIN + 1)]
+#[component(app_async_init, init_sort = i32::MIN + 1)]
 pub struct SaTokenPlugin {
     /// 配置引用
     pub config: Arc<SaTokenConf>,
@@ -65,16 +65,19 @@ impl SaTokenPlugin {
     }
 }
 
-/// `#[component(init)]` 回调：构建 SaToken 状态
-fn init(this: &mut SaTokenPlugin, _store: &Store) -> RIE<()> {
+/// `#[component(app_async_init)]` 回调：构建 SaToken 状态
+///
+/// 异步构建：Redis 存储后端需要异步建连，因此从 `init`（同步）移到 `async_init` 阶段。
+/// 依赖 SaToken 状态的组件需在 `async_init` 之后使用（`state()` 已做防御性 panic）。
+async fn app_async_init(comp: Arc<SaTokenPlugin>, _app: Arc<App>) -> RIE<()> {
     info!("SaTokenPlugin 初始化");
-    let config = this.config.clone();
+    let config = comp.config.clone();
     info!("正在构建 SaToken 状态...");
     // 使用 Builder 模式构建 SaTokenState
     let builder = sa_token_plugin_axum::SaTokenStateBuilder::default();
-    let state = config.apply_to_builder(builder).build();
+    let state = config.apply_to_builder(builder).await?.build();
     // 写入 OnceLock
-    if this.state.set(state).is_err() {
+    if comp.state.set(state).is_err() {
         tracing::warn!("SaTokenPlugin: state concurrently initialized");
     }
     // todo 注册权限拦截器

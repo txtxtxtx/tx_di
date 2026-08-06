@@ -4,9 +4,11 @@ use serde::Deserialize;
 use std::sync::Arc;
 use tx_di_core::{Component, RIE, Store};
 use sa_token_plugin_axum::SaStorage;
-// 根据特性导入不同的存储后端
-#[cfg(feature = "memory")]
-use sa_token_plugin_axum::MemoryStorage;
+// MemoryStorage 直接从独立 crate 导入（sa-token-plugin-axum 仅在 memory feature 下 re-export）。
+// 条件：memory feature 启用（memory 分支）或 redis 未启用（fallback 分支）时需要。
+// 注意不能只用 `not(redis)`：feature union 下可能同时启用 memory + redis。
+#[cfg(any(feature = "memory", not(feature = "redis")))]
+use sa_token_storage_memory::MemoryStorage;
 
 #[cfg(feature = "redis")]
 use sa_token_plugin_axum::RedisStorage;
@@ -96,6 +98,13 @@ pub struct SaTokenConf {
     /// Refresh Token 有效期（秒），默认 7 天
     #[serde(default = "default_refresh_token_timeout")]
     pub refresh_token_timeout: i64,
+
+    /// Redis 连接字符串（`features = ["redis"]` 时生效）
+    ///
+    /// 优先级：`redis_url` 配置 > 环境变量 `REDIS_URL` > 默认 `redis://127.0.0.1:6379`。
+    /// 生产多实例部署必须配置此项（会话需跨实例共享）。
+    #[serde(default)]
+    pub redis_url: Option<String>,
 }
 
 impl Default for SaTokenConf {
@@ -118,17 +127,29 @@ impl Default for SaTokenConf {
             nonce_timeout: default_nonce_timeout(),
             enable_refresh_token: false,
             refresh_token_timeout: default_refresh_token_timeout(),
+            redis_url: None,
         }
     }
 }
 
 /// `#[component(init)]` 回调：配置加载后打印日志
 fn init(this: &mut SaTokenConf, _store: &Store) -> RIE<()> {
+    #[cfg(feature = "redis")]
+    let storage_backend = format!(
+        "redis (url: {})",
+        this.redis_url
+            .clone()
+            .or_else(|| std::env::var("REDIS_URL").ok())
+            .unwrap_or_else(|| "redis://127.0.0.1:6379".to_string())
+    );
+    #[cfg(not(feature = "redis"))]
+    let storage_backend = "memory".to_string();
     tracing::info!(
         token_name = %this.token_name,
         timeout = this.timeout,
         is_concurrent = this.is_concurrent,
         token_style = %this.token_style,
+        storage = %storage_backend,
         "SaToken 配置已加载"
     );
     Ok(())
@@ -137,12 +158,14 @@ fn init(this: &mut SaTokenConf, _store: &Store) -> RIE<()> {
 /// 将自定义配置转换为 SaTokenStateBuilder 的链式调用
 impl SaTokenConf {
     /// 应用配置到 SaTokenStateBuilder
-    pub fn apply_to_builder(
+    ///
+    /// 异步：Redis 存储后端需要异步建连，必须在 `async_init` 阶段调用。
+    pub async fn apply_to_builder(
         &self,
         builder: sa_token_plugin_axum::SaTokenStateBuilder,
-    ) -> sa_token_plugin_axum::SaTokenStateBuilder {
+    ) -> RIE<sa_token_plugin_axum::SaTokenStateBuilder> {
         // 根据特性选择存储后端
-        let storage = Self::create_storage();
+        let storage = self.create_storage().await?;
         
         let mut b = builder
             .storage(storage)
@@ -158,31 +181,45 @@ impl SaTokenConf {
             b = b.jwt_secret_key(key);
         }
 
-        b
+        Ok(b)
     }
     
-    /// 根据编译特性创建存储后端
-    fn create_storage() -> Arc<dyn SaStorage + Send + Sync> {
-        #[cfg(feature = "memory")]
-        {
-            tracing::info!("使用内存存储后端 (MemoryStorage)");
-            Arc::new(MemoryStorage::new())
-        }
-        
+    /// 根据编译特性创建存储后端（异步：Redis 需要建连）
+    ///
+    /// 注意：使用 `return` 而非尾部表达式，以兼容 Cargo feature 合并场景
+    /// （workspace 中不同 crate 可能同时启用 memory 与 redis feature）。
+    async fn create_storage(&self) -> RIE<Arc<dyn SaStorage + Send + Sync>> {
         #[cfg(feature = "redis")]
         {
             tracing::info!("使用 Redis 存储后端 (RedisStorage)");
-            // TODO: 从配置中读取 Redis 连接信息
-            let redis_url = std::env::var("REDIS_URL")
-                .unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
-            Arc::new(RedisStorage::new(&redis_url))
+            // 优先级：配置 redis_url > 环境变量 REDIS_URL > 默认地址
+            let redis_url = self
+                .redis_url
+                .clone()
+                .or_else(|| std::env::var("REDIS_URL").ok())
+                .unwrap_or_else(|| "redis://127.0.0.1:6379".to_string());
+            let storage = RedisStorage::new(&redis_url, "sa-token:")
+                .await
+                .map_err(|e| {
+                    tx_di_core::AppError::with_context(
+                        tx_di_core::DiErr::InjectError,
+                        format!("Redis 存储连接失败 ({}): {}", redis_url, e),
+                    )
+                })?;
+            return Ok(Arc::new(storage));
         }
-        
+
+        #[cfg(feature = "memory")]
+        {
+            tracing::info!("使用内存存储后端 (MemoryStorage)");
+            return Ok(Arc::new(MemoryStorage::new()));
+        }
+
         // 如果没有启用任何存储特性，默认使用内存存储
         #[cfg(not(any(feature = "memory", feature = "redis")))]
         {
             tracing::warn!("未启用任何存储特性，使用默认内存存储");
-            Arc::new(MemoryStorage::new())
+            Ok(Arc::new(MemoryStorage::new()))
         }
     }
 }

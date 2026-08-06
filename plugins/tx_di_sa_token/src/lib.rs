@@ -49,5 +49,7 @@ pub use sa_token_plugin_axum::{
     sa_check_permissions_and, sa_check_permissions_or,
     sa_check_roles_and, sa_check_roles_or,
     sa_ignore,
-    SaStorage, MemoryStorage,
+    SaStorage,
 };
+// MemoryStorage 从独立 crate 导出（与 sa-token-plugin-axum 的 feature 解耦，始终可用）
+pub use sa_token_storage_memory::MemoryStorage;

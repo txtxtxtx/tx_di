@@ -21,6 +21,7 @@ redis = ["sa-token-plugin-axum/redis"]
 tx-di-core = { path = "../../tx-di-core" }
 tx_di_axum = { path = "../tx_di_axum" }
 sa-token-plugin-axum = { workspace = true, features = ["axum-08"] }
+sa-token-storage-memory = { version = "0.1.18", default-features = false }
 axum = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
