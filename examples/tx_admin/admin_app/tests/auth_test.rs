@@ -24,7 +24,7 @@ use admin_domain::log::service::LoginLogService;
 use admin_app::log::app_service::LoginLogAppService;
 use admin_app::auth::session_service::AuthSessionService;
 use std::sync::OnceLock;
-use tx_di_sa_token::{SaTokenConf, SaTokenStateBuilder};
+use tx_di_sa_token::{MemoryStorage, SaTokenStateBuilder};
 
 /// 创建认证测试环境
 ///
@@ -38,11 +38,13 @@ async fn create_auth_test_env() -> (
     Arc<ToastyRoleRepository>,
 ) {
     // 初始化 SaToken 全局状态（仅执行一次）
+    // 测试使用内存存储，避免依赖本地 Redis
     static SA_TOKEN_INIT: OnceLock<()> = OnceLock::new();
     SA_TOKEN_INIT.get_or_init(|| {
-        let config = SaTokenConf::default();
         let builder = SaTokenStateBuilder::default();
-        let _state = config.apply_to_builder(builder).build();
+        let _state = builder
+            .storage(std::sync::Arc::new(MemoryStorage::new()))
+            .build();
     });
 
     let plugin = common::create_db_plugin().await;
