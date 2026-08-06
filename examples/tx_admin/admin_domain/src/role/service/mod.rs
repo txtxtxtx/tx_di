@@ -65,6 +65,27 @@ impl RoleService {
         Ok(role)
     }
 
+    /// 构建新角色（检查编码唯一 + 聚合创建），**不落库**。
+    ///
+    /// 供应用层在事务中原子完成"建角色 + 绑菜单"时使用：
+    /// 先构建领域对象，再由 `RoleRepository::create_role_with_menus` 一次性提交。
+    ///
+    /// # 错误
+    /// - `DuplicateRoleCode` - 角色编码已被占用
+    pub async fn prepare_create(
+        &self,
+        name: String,
+        code: String,
+        sort: i32,
+        creator: Option<String>,
+    ) -> AppResult<Role> {
+        if self.role_repo.exists_by_code(&code).await? {
+            return Err(RepositoryError::DuplicateRoleCode)?;
+        }
+        let role_id = id::next_id();
+        Ok(Role::create(role_id, name, code, sort, creator))
+    }
+
     /// 更新角色信息
     ///
     /// # 参数

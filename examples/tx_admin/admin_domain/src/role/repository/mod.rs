@@ -22,6 +22,12 @@ pub trait RoleRepository: Any + Send + Sync {
     async fn update(&self, role: &Role) -> AppResult<()>;
     async fn soft_delete(&self, id: u64) -> AppResult<()>;
     async fn exists_by_code(&self, code: &str) -> AppResult<bool>;
+
+    /// 原子创建角色并绑定菜单（同一数据库事务）
+    ///
+    /// 用于"建角色 + 绑菜单"场景，任一步失败整体回滚，
+    /// 避免绑定失败时留下孤儿角色。
+    async fn create_role_with_menus(&self, role: &Role, menu_ids: &[u64]) -> AppResult<()>;
     async fn bind_menus(&self, role_id: u64, menu_ids: &[u64]) -> AppResult<()>;
     async fn get_menu_ids(&self, role_id: u64) -> AppResult<Vec<u64>>;
     async fn get_user_ids(&self, role_id: u64) -> AppResult<Vec<u64>>;

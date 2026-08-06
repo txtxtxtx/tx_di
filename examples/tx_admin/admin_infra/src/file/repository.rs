@@ -58,41 +58,36 @@ impl FileRepository for ToastyFileRepository {
     }
 
     async fn find_page(&self, query: &FileQuery, page: Page<File>) -> AppResult<Page<File>> {
-        let mut db = self.plugin.db().clone();
-        let all = SysFile::all()
-            .exec(&mut db)
-            .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseFile))?;
-
-        let filtered: Vec<&SysFile> = all
-            .iter()
-            .filter(|f| f.deleted == Deleted::No)
-            .filter(|f| {
+        // SQL 层过滤 + COUNT + LIMIT/OFFSET + ID 倒序
+        let (rows, total) = tx_di_toasty::toasty_page!(
+            self.plugin.db().clone(),
+            page,
+            {
+                let mut q = SysFile::all()
+                    .filter(SysFile::fields().deleted().eq(Deleted::No))
+                    .order_by(SysFile::fields().id().desc());
                 if let Some(ref name) = query.name {
-                    if !f.name.contains(name.as_str()) { return false; }
+                    q = q.filter(SysFile::fields().name().like_with_escape(
+                        format!("%{}%", tx_di_toasty::like_escape(name)),
+                        '\\',
+                    ));
                 }
                 if let Some(ref file_type) = query.file_type {
-                    if !f.file_type.contains(file_type.as_str()) { return false; }
+                    q = q.filter(SysFile::fields().file_type().like_with_escape(
+                        format!("%{}%", tx_di_toasty::like_escape(file_type)),
+                        '\\',
+                    ));
                 }
                 if let Some(config_id) = query.config_id {
-                    if f.config_id != config_id { return false; }
+                    q = q.filter(SysFile::fields().config_id().eq(config_id));
                 }
-                true
-            })
-            .collect();
+                q
+            },
+            |e| db_err(e, RepositoryError::DatabaseFile)
+        );
 
-        let total = filtered.len() as i64;
-        let offset = page.offset() as usize;
-        let size = page.size as usize;
-
-        let list: Vec<File> = filtered
-            .into_iter()
-            .skip(offset)
-            .take(size)
-            .map(Self::to_domain)
-            .collect();
-
-        Ok(Page::new(list, page.page, page.size, total))
+        let list: Vec<File> = rows.iter().map(Self::to_domain).collect();
+        Ok(page.fill(list, total))
     }
 
     async fn insert(&self, file: &File) -> AppResult<()> {

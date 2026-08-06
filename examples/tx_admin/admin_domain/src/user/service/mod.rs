@@ -106,6 +106,29 @@ impl UserService {
         Ok(user)
     }
 
+    /// 构建新用户（密码哈希 + 聚合创建），**不落库**。
+    ///
+    /// 供应用层在事务中原子完成"建用户 + 绑角色 + 绑部门"时使用：
+    /// 先构建领域对象，再由 `UserRepository::create_user_with_bindings` 一次性提交。
+    ///
+    /// # 错误
+    /// - `DuplicateUsername` - 用户名已被占用
+    /// - 密码哈希处理失败时返回错误
+    pub async fn prepare_create(
+        &self,
+        username: String,
+        password: String,
+        nickname: String,
+        creator: Option<String>,
+    ) -> AppResult<User> {
+        if self.user_repo.exists_by_username(&username).await? {
+            return Err(RepositoryError::DuplicateUsername)?;
+        }
+        let hashed_password = password::hash_password(&password)?;
+        let user_id = id::next_id();
+        Ok(User::create(user_id, username, hashed_password, nickname, creator))
+    }
+
     /// 更新用户基本信息
     ///
     /// # 参数

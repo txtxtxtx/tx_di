@@ -26,16 +26,23 @@ fn init(_this: &mut DbInitPlugin, _store: &Store) -> RIE<()> {
     Ok(())
 }
 
-/// `#[component(app_async_init)]` 回调：初始化种子数据
+/// `#[component(app_async_init)]` 回调：Schema 迁移 + 初始化种子数据
 async fn app_async_init(_comp: Arc<DbInitPlugin>, app: Arc<App>) -> RIE<()> {
-    // auto_schema = false 时跳过种子初始化（用户自行管理表结构）
     let toasty_config = app.inject::<ToastyConfig>();
+    let toasty_plugin = app.inject::<ToastyPlugin>();
+
+    // 生产迁移模式：受控 push_schema + 版本审计（`migrate_on_start=true`）
     if !toasty_config.auto_schema {
-        debug!("infra: auto_schema=false，跳过种子数据初始化");
-        return Ok(());
+        if toasty_config.migrate_on_start {
+            toasty_plugin.migrate().await?;
+            info!("infra: Schema 迁移完成 (migrate_on_start)");
+        } else {
+            debug!("infra: auto_schema=false 且 migrate_on_start=false，跳过 Schema 管理");
+            return Ok(());
+        }
     }
 
-    let toasty_plugin = app.inject::<ToastyPlugin>();
+    // 种子数据（内部检测空库，非空自动跳过）
     let db = toasty_plugin.db();
     crate::seed::seed_data(db).await?;
     info!("infra: 种子数据初始化完成");

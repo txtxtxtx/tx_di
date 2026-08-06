@@ -69,41 +69,35 @@ impl DictTypeRepository for ToastyDictTypeRepository {
     }
 
     async fn find_page(&self, query: &DictTypeQuery, page: Page<DictType>) -> AppResult<Page<DictType>> {
-        let mut db = self.plugin.db().clone();
-        let all = SysDictType::all()
-            .exec(&mut db)
-            .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseDict))?;
-
-        let filtered: Vec<&SysDictType> = all
-            .iter()
-            .filter(|d| d.deleted == Deleted::No)
-            .filter(|d| {
+        // SQL 层过滤 + COUNT + LIMIT/OFFSET
+        let (rows, total) = tx_di_toasty::toasty_page!(
+            self.plugin.db().clone(),
+            page,
+            {
+                let mut q =
+                    SysDictType::all().filter(SysDictType::fields().deleted().eq(Deleted::No));
                 if let Some(ref name) = query.name {
-                    if !d.name.contains(name.as_str()) { return false; }
+                    q = q.filter(SysDictType::fields().name().like_with_escape(
+                        format!("%{}%", tx_di_toasty::like_escape(name)),
+                        '\\',
+                    ));
                 }
                 if let Some(ref dict_type) = query.dict_type {
-                    if !d.dict_type.contains(dict_type.as_str()) { return false; }
+                    q = q.filter(SysDictType::fields().dict_type().like_with_escape(
+                        format!("%{}%", tx_di_toasty::like_escape(dict_type)),
+                        '\\',
+                    ));
                 }
                 if let Some(status) = query.status {
-                    if i32::from(d.status) != status { return false; }
+                    q = q.filter(SysDictType::fields().status().eq(Status::from(status)));
                 }
-                true
-            })
-            .collect();
+                q
+            },
+            |e| db_err(e, RepositoryError::DatabaseDict)
+        );
 
-        let total = filtered.len() as i64;
-        let offset = page.offset() as usize;
-        let size = page.size as usize;
-
-        let list: Vec<DictType> = filtered
-            .into_iter()
-            .skip(offset)
-            .take(size)
-            .map(Self::to_domain)
-            .collect();
-
-        Ok(Page::new(list, page.page, page.size, total))
+        let list: Vec<DictType> = rows.iter().map(Self::to_domain).collect();
+        Ok(page.fill(list, total))
     }
 
     async fn find_all(&self, query: &DictTypeQuery) -> AppResult<Vec<DictType>> {
@@ -267,41 +261,32 @@ impl DictDataRepository for ToastyDictDataRepository {
     }
 
     async fn find_page(&self, query: &DictDataQuery, page: Page<DictData>) -> AppResult<Page<DictData>> {
-        let mut db = self.plugin.db().clone();
-        let all = SysDictData::all()
-            .exec(&mut db)
-            .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseDict))?;
-
-        let filtered: Vec<&SysDictData> = all
-            .iter()
-            .filter(|d| d.deleted == Deleted::No)
-            .filter(|d| {
+        // SQL 层过滤 + COUNT + LIMIT/OFFSET
+        let (rows, total) = tx_di_toasty::toasty_page!(
+            self.plugin.db().clone(),
+            page,
+            {
+                let mut q =
+                    SysDictData::all().filter(SysDictData::fields().deleted().eq(Deleted::No));
                 if let Some(ref dict_type) = query.dict_type {
-                    if d.dict_type != *dict_type { return false; }
+                    q = q.filter(SysDictData::fields().dict_type().eq(dict_type));
                 }
                 if let Some(ref label) = query.label {
-                    if !d.label.contains(label.as_str()) { return false; }
+                    q = q.filter(SysDictData::fields().label().like_with_escape(
+                        format!("%{}%", tx_di_toasty::like_escape(label)),
+                        '\\',
+                    ));
                 }
                 if let Some(status) = query.status {
-                    if i32::from(d.status) != status { return false; }
+                    q = q.filter(SysDictData::fields().status().eq(Status::from(status)));
                 }
-                true
-            })
-            .collect();
+                q
+            },
+            |e| db_err(e, RepositoryError::DatabaseDict)
+        );
 
-        let total = filtered.len() as i64;
-        let offset = page.offset() as usize;
-        let size = page.size as usize;
-
-        let list: Vec<DictData> = filtered
-            .into_iter()
-            .skip(offset)
-            .take(size)
-            .map(Self::to_domain)
-            .collect();
-
-        Ok(Page::new(list, page.page, page.size, total))
+        let list: Vec<DictData> = rows.iter().map(Self::to_domain).collect();
+        Ok(page.fill(list, total))
     }
 
     async fn insert(&self, data: &DictData) -> AppResult<()> {

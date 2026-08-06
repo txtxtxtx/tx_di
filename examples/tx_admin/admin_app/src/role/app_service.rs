@@ -26,7 +26,7 @@ impl RoleAppService {
         Self { role_service, user_repo }
     }
 
-    /// 创建新角色
+    /// 创建新角色（建角色 + 绑菜单在同一事务中原子完成）
     pub async fn create_role(
         &self,
         req: CreateRoleRequest,
@@ -34,12 +34,16 @@ impl RoleAppService {
     ) -> AppResult<RoleResponse> {
         let mut role = self
             .role_service
-            .create_role(req.name, req.code, req.sort, creator)
+            .prepare_create(req.name, req.code, req.sort, creator)
             .await?;
 
-        if !req.menu_ids.is_empty() {
-            role = self.role_service.assign_menus(role.id, req.menu_ids).await?;
-        }
+        // 原子提交：建角色 + 绑菜单在同一个数据库事务中完成
+        let menu_ids = req.menu_ids.clone();
+        role.menu_ids = menu_ids.clone();
+        self.role_service
+            .role_repo()
+            .create_role_with_menus(&role, &menu_ids)
+            .await?;
 
         Ok(role_to_response(role))
     }

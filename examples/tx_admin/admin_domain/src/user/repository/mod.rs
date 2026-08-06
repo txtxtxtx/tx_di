@@ -57,6 +57,17 @@ pub trait UserRepository: Any + Send + Sync {
     /// Bind user to departments
     async fn bind_departments(&self, user_id: u64, dept_ids: &[u64]) -> AppResult<()>;
 
+    /// 原子创建用户并绑定角色与部门（同一数据库事务）
+    ///
+    /// 用于"建用户 + 绑角色 + 绑部门"的多步写场景，保证原子性：
+    /// 任一步失败则整体回滚，不会留下半成品用户或孤立关联。
+    async fn create_user_with_bindings(
+        &self,
+        user: &User,
+        role_ids: &[u64],
+        dept_ids: &[u64],
+    ) -> AppResult<()>;
+
     /// Get role IDs for user
     async fn get_role_ids(&self, user_id: u64) -> AppResult<Vec<u64>>;
 

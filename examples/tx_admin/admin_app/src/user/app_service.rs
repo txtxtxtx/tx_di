@@ -72,42 +72,33 @@ impl UserAppService {
             }
         }
 
+        // 构建领域对象（密码哈希等，不落库）
         let mut user = self
             .user_service
-            .create_user(req.username, req.password, req.nickname, creator.clone())
+            .prepare_create(req.username, req.password, req.nickname, creator.clone())
             .await?;
 
-        // Set optional fields and persist
+        // 设置可选字段（更新审计信息）
         if email.is_some() || mobile.is_some() || req.sex.is_some() || remark.is_some() {
-            user.email = email;
-            user.mobile = mobile;
-            user.sex = sex;
-            user.remark = remark;
-            user = self
-                .user_service
-                .update_user(
-                    user.id,
-                    user.nickname.clone(),
-                    user.email.clone(),
-                    user.mobile.clone(),
-                    user.sex,
-                    user.remark.clone(),
-                    creator.clone(),
-                )
-                .await?;
+            user.set_basic_info(
+                user.nickname.clone(),
+                email.clone(),
+                mobile.clone(),
+                sex,
+                remark.clone(),
+                creator.clone(),
+            );
         }
 
-        // Assign roles if provided
-        if !req.role_ids.is_empty() {
-            self.assign_roles(user.id, req.role_ids.clone()).await?;
-            user.role_ids = req.role_ids;
-        }
-
-        // Assign departments if provided
-        if !req.dept_ids.is_empty() {
-            self.assign_departments(user.id, req.dept_ids.clone()).await?;
-            user.dept_ids = req.dept_ids;
-        }
+        // 原子提交：建用户 + 绑角色 + 绑部门在同一个数据库事务中完成
+        let role_ids = req.role_ids.clone();
+        let dept_ids = req.dept_ids.clone();
+        self.user_service
+            .user_repo()
+            .create_user_with_bindings(&user, &role_ids, &dept_ids)
+            .await?;
+        user.role_ids = role_ids;
+        user.dept_ids = dept_ids;
 
         Ok(user_to_response(user))
     }

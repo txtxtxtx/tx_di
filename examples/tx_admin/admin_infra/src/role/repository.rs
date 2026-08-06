@@ -133,39 +133,38 @@ impl RoleRepository for ToastyRoleRepository {
     }
 
     async fn find_page(&self, query: &RoleQuery, page: Page<Role>) -> AppResult<Page<Role>> {
-        let mut db = self.plugin.db().clone();
-        let all = SysRole::all()
-            .exec(&mut db)
-            .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
-
-        let filtered: Vec<SysRole> = all
-            .into_iter()
-            .filter(|r| r.deleted == Deleted::No)
-            .filter(|r| {
+        // SQL 层过滤 + COUNT + LIMIT/OFFSET（避免全表加载到内存）
+        let (rows, total) = tx_di_toasty::toasty_page!(
+            self.plugin.db().clone(),
+            page,
+            {
+                let mut q = SysRole::all().filter(SysRole::fields().deleted().eq(Deleted::No));
                 if let Some(ref name) = query.name {
-                    if !r.name.contains(name.as_str()) { return false; }
+                    q = q.filter(SysRole::fields().name().like_with_escape(
+                        format!("%{}%", tx_di_toasty::like_escape(name)),
+                        '\\',
+                    ));
                 }
                 if let Some(ref code) = query.code {
-                    if !r.code.contains(code.as_str()) { return false; }
+                    q = q.filter(SysRole::fields().code().like_with_escape(
+                        format!("%{}%", tx_di_toasty::like_escape(code)),
+                        '\\',
+                    ));
                 }
                 if let Some(status) = query.status {
-                    if i32::from(r.status) != status { return false; }
+                    q = q.filter(SysRole::fields().status().eq(Status::from(status)));
                 }
-                true
-            })
-            .collect();
-
-        let total = filtered.len() as i64;
-        let offset = page.offset() as usize;
-        let size = page.size as usize;
+                q
+            },
+            |e| db_err(e, RepositoryError::DatabaseRole)
+        );
 
         let mut roles = Vec::new();
-        for r in filtered.into_iter().skip(offset).take(size) {
+        for r in rows {
             roles.push(self.to_full_domain(&r).await?);
         }
 
-        Ok(Page::new(roles, page.page, page.size, total))
+        Ok(page.fill(roles, total))
     }
 
     async fn find_all(&self, query: &RoleQuery) -> AppResult<Vec<Role>> {
@@ -189,6 +188,38 @@ impl RoleRepository for ToastyRoleRepository {
             roles.push(self.to_full_domain(&r).await?);
         }
         Ok(roles)
+    }
+
+    /// 原子创建角色并绑定菜单（单事务）
+    async fn create_role_with_menus(&self, role: &Role, menu_ids: &[u64]) -> AppResult<()> {
+        tx_di_toasty::toasty_transaction!(self.plugin.db().clone(), tx, {
+            SysRole::create()
+                .id(role.id)
+                .name(role.name.clone())
+                .code(role.code.clone())
+                .sort(role.sort)
+                .data_scope(role.data_scope)
+                .data_scope_dept_ids(role.data_scope_dept_ids.clone().unwrap_or_default())
+                .status(Status::from(role.status))
+                .remark(role.remark.clone().unwrap_or_default())
+                .tenant_id(role.tenant_id)
+                .creator(role.audit.creator.clone().unwrap_or_default())
+                .updater(role.audit.updater.clone().unwrap_or_default())
+                .deleted(Deleted::from(role.audit.deleted))
+                .exec(&mut *tx)
+                .await
+                .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+
+            for &menu_id in menu_ids {
+                SysRoleMenu::create()
+                    .role_id(role.id)
+                    .menu_id(menu_id)
+                    .exec(&mut *tx)
+                    .await
+                    .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+            }
+            Ok(())
+        })
     }
 
     async fn insert(&self, role: &Role) -> AppResult<()> {
@@ -273,28 +304,30 @@ impl RoleRepository for ToastyRoleRepository {
     }
 
     async fn bind_menus(&self, role_id: u64, menu_ids: &[u64]) -> AppResult<()> {
-        let mut db = self.plugin.db().clone();
-        let old = SysRoleMenu::filter_by_role_id(role_id)
-            .exec(&mut db)
-            .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
-
-        for rm in old {
-            rm.delete().exec(&mut db)
+        // 先删后插在同一个事务中完成，保证原子性
+        tx_di_toasty::toasty_transaction!(self.plugin.db().clone(), tx, {
+            let old = SysRoleMenu::filter_by_role_id(role_id)
+                .exec(&mut *tx)
                 .await
                 .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
-        }
 
-        for &menu_id in menu_ids {
-            SysRoleMenu::create()
-                .role_id(role_id)
-                .menu_id(menu_id)
-                .exec(&mut db)
-                .await
-                .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
-        }
+            for rm in old {
+                rm.delete().exec(&mut *tx)
+                    .await
+                    .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+            }
 
-        Ok(())
+            for &menu_id in menu_ids {
+                SysRoleMenu::create()
+                    .role_id(role_id)
+                    .menu_id(menu_id)
+                    .exec(&mut *tx)
+                    .await
+                    .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+            }
+
+            Ok(())
+        })
     }
 
     async fn get_menu_ids(&self, role_id: u64) -> AppResult<Vec<u64>> {
@@ -329,32 +362,36 @@ impl RoleRepository for ToastyRoleRepository {
     }
 
     async fn bind_users(&self, role_id: u64, user_ids: &[u64]) -> AppResult<()> {
-        let mut db = self.plugin.db().clone();
-        for &user_id in user_ids {
-            SysUserRole::create()
-                .user_id(user_id)
-                .role_id(role_id)
-                .exec(&mut db)
-                .await
-                .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
-        }
-        Ok(())
-    }
-
-    async fn unbind_users(&self, role_id: u64, user_ids: &[u64]) -> AppResult<()> {
-        let mut db = self.plugin.db().clone();
-        let user_roles = SysUserRole::filter_by_role_id(role_id)
-            .exec(&mut db)
-            .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
-
-        for ur in user_roles {
-            if user_ids.contains(&ur.user_id) {
-                ur.delete().exec(&mut db)
+        // 批量插入在同一个事务中完成（任一条失败整体回滚）
+        tx_di_toasty::toasty_transaction!(self.plugin.db().clone(), tx, {
+            for &user_id in user_ids {
+                SysUserRole::create()
+                    .user_id(user_id)
+                    .role_id(role_id)
+                    .exec(&mut *tx)
                     .await
                     .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
             }
-        }
-        Ok(())
+            Ok(())
+        })
+    }
+
+    async fn unbind_users(&self, role_id: u64, user_ids: &[u64]) -> AppResult<()> {
+        // 查询 + 删除在同一个事务中完成
+        tx_di_toasty::toasty_transaction!(self.plugin.db().clone(), tx, {
+            let user_roles = SysUserRole::filter_by_role_id(role_id)
+                .exec(&mut *tx)
+                .await
+                .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+
+            for ur in user_roles {
+                if user_ids.contains(&ur.user_id) {
+                    ur.delete().exec(&mut *tx)
+                        .await
+                        .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+                }
+            }
+            Ok(())
+        })
     }
 }

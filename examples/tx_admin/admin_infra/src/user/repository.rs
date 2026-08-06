@@ -81,6 +81,7 @@ impl ToastyUserRepository {
         let dept_ids = self.fetch_dept_ids(u.id).await?;
         Ok(Self::to_domain(u, role_ids, dept_ids))
     }
+
 }
 
 #[async_trait]
@@ -108,42 +109,45 @@ impl UserRepository for ToastyUserRepository {
     }
 
     async fn find_page(&self, query: &UserQuery, page: Page<User>) -> AppResult<Page<User>> {
-        let mut db = self.plugin.db().clone();
-        let all = SysUser::all()
-            .exec(&mut db)
-            .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
-
-        let filtered: Vec<SysUser> = all
-            .into_iter()
-            .filter(|u| u.deleted == Deleted::No)
-            .filter(|u| {
+        // SQL 层过滤 + COUNT + LIMIT/OFFSET（避免全表加载到内存）
+        let (rows, total) = tx_di_toasty::toasty_page!(
+            self.plugin.db().clone(),
+            page,
+            {
+                let mut q = SysUser::all().filter(SysUser::fields().deleted().eq(Deleted::No));
                 if let Some(ref username) = query.username {
-                    if !u.username.contains(username.as_str()) { return false; }
+                    q = q.filter(SysUser::fields().username().like_with_escape(
+                        format!("%{}%", tx_di_toasty::like_escape(username)),
+                        '\\',
+                    ));
                 }
                 if let Some(ref nickname) = query.nickname {
-                    if !u.nickname.contains(nickname.as_str()) { return false; }
+                    q = q.filter(SysUser::fields().nickname().like_with_escape(
+                        format!("%{}%", tx_di_toasty::like_escape(nickname)),
+                        '\\',
+                    ));
                 }
                 if let Some(ref mobile) = query.mobile {
-                    if !u.mobile.contains(mobile.as_str()) { return false; }
+                    q = q.filter(SysUser::fields().mobile().like_with_escape(
+                        format!("%{}%", tx_di_toasty::like_escape(mobile)),
+                        '\\',
+                    ));
                 }
                 if let Some(status) = query.status {
-                    if u.status != Status::from(status) { return false; }
+                    q = q.filter(SysUser::fields().status().eq(Status::from(status)));
                 }
-                true
-            })
-            .collect();
+                q
+            },
+            |e| db_err(e, RepositoryError::DatabaseUser)
+        );
 
-        let total = filtered.len() as i64;
-        let offset = page.offset() as usize;
-        let size = page.size as usize;
-
+        // 转 domain（角色/部门关联按需懒加载）
         let mut users = Vec::new();
-        for u in filtered.into_iter().skip(offset).take(size) {
+        for u in rows {
             users.push(self.to_full_domain(&u).await?);
         }
 
-        Ok(Page::new(users, page.page, page.size, total))
+        Ok(page.fill(users, total))
     }
 
     async fn find_all(&self, query: &UserQuery) -> AppResult<Vec<User>> {
@@ -356,58 +360,115 @@ impl UserRepository for ToastyUserRepository {
         Ok(users)
     }
 
+    /// 原子创建用户并绑定角色/部门（单事务）
+    async fn create_user_with_bindings(
+        &self,
+        user: &User,
+        role_ids: &[u64],
+        dept_ids: &[u64],
+    ) -> AppResult<()> {
+        // 便捷事务宏：建用户 + 绑角色 + 绑部门在同一个数据库事务中完成，
+        // 任一步失败则整体回滚（宏展开后 tx 未 commit，drop 自动回滚）。
+        tx_di_toasty::toasty_transaction!(self.plugin.db().clone(), tx, {
+            SysUser::create()
+                .id(user.id)
+                .username(user.username.clone())
+                .password_hash(user.password.clone())
+                .nickname(user.nickname.clone())
+                .remark(user.remark.clone().unwrap_or_default())
+                .email(user.email.clone().unwrap_or_default())
+                .mobile(user.mobile.clone().unwrap_or_default())
+                .sex(Sex::from(user.sex))
+                .avatar(user.avatar.clone().unwrap_or_default())
+                .status(Status::from(user.status))
+                .login_ip(user.login_ip.clone().unwrap_or_default())
+                .login_date(user.login_date.unwrap_or(jiff::Timestamp::UNIX_EPOCH))
+                .tenant_id(user.tenant_id.into_inner())
+                .creator(user.audit.creator.clone().unwrap_or_default())
+                .updater(user.audit.updater.clone().unwrap_or_default())
+                .deleted(Deleted::from(user.audit.deleted))
+                .exec(&mut *tx)
+                .await
+                .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+
+            // 绑定角色（同一事务）
+            for &role_id in role_ids {
+                SysUserRole::create()
+                    .user_id(user.id)
+                    .role_id(role_id)
+                    .exec(&mut *tx)
+                    .await
+                    .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            }
+
+            // 绑定部门（同一事务）
+            for &dept_id in dept_ids {
+                SysUserDept::create()
+                    .user_id(user.id)
+                    .dept_id(dept_id)
+                    .exec(&mut *tx)
+                    .await
+                    .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            }
+
+            Ok(())
+        })
+    }
+
     async fn bind_roles(&self, user_id: u64, role_ids: &[u64]) -> AppResult<()> {
-        let mut db = self.plugin.db().clone();
-        // 先删除旧的关联
-        let old = SysUserRole::filter_by_user_id(user_id)
-            .exec(&mut db)
-            .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
-
-        for ur in old {
-            ur.delete().exec(&mut db)
+        // 先删后插在同一个事务中完成，保证原子性
+        tx_di_toasty::toasty_transaction!(self.plugin.db().clone(), tx, {
+            let old = SysUserRole::filter_by_user_id(user_id)
+                .exec(&mut *tx)
                 .await
                 .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
-        }
 
-        // 插入新的关联
-        for &role_id in role_ids {
-            SysUserRole::create()
-                .user_id(user_id)
-                .role_id(role_id)
-                .exec(&mut db)
-                .await
-                .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
-        }
+            for ur in old {
+                ur.delete().exec(&mut *tx)
+                    .await
+                    .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            }
 
-        Ok(())
+            // 插入新的关联
+            for &role_id in role_ids {
+                SysUserRole::create()
+                    .user_id(user_id)
+                    .role_id(role_id)
+                    .exec(&mut *tx)
+                    .await
+                    .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            }
+
+            Ok(())
+        })
     }
 
     async fn bind_departments(&self, user_id: u64, dept_ids: &[u64]) -> AppResult<()> {
-        let mut db = self.plugin.db().clone();
-        // 先删除旧的关联
-        let old = SysUserDept::filter_by_user_id(user_id)
-            .exec(&mut db)
-            .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
-
-        for ud in old {
-            ud.delete().exec(&mut db)
+        // 先删后插在同一个事务中完成，保证原子性
+        tx_di_toasty::toasty_transaction!(self.plugin.db().clone(), tx, {
+            let old = SysUserDept::filter_by_user_id(user_id)
+                .exec(&mut *tx)
                 .await
                 .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
-        }
 
-        // 插入新的关联
-        for &dept_id in dept_ids {
-            SysUserDept::create()
-                .user_id(user_id)
-                .dept_id(dept_id)
-                .exec(&mut db)
-                .await
-                .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
-        }
+            for ud in old {
+                ud.delete().exec(&mut *tx)
+                    .await
+                    .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            }
 
-        Ok(())
+            // 插入新的关联
+            for &dept_id in dept_ids {
+                SysUserDept::create()
+                    .user_id(user_id)
+                    .dept_id(dept_id)
+                    .exec(&mut *tx)
+                    .await
+                    .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            }
+
+            Ok(())
+        })
     }
 
     async fn get_role_ids(&self, user_id: u64) -> AppResult<Vec<u64>> {

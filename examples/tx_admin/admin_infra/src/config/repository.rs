@@ -86,44 +86,37 @@ impl ConfigRepository for ToastyConfigRepository {
     }
 
     async fn find_page(&self, query: &ConfigQuery, page: Page<Config>) -> AppResult<Page<Config>> {
-        let mut db = self.plugin.db().clone();
-        let all = SysConfig::all()
-            .exec(&mut db)
-            .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseConfig))?;
-
-        let filtered: Vec<&SysConfig> = all
-            .iter()
-            .filter(|c| c.deleted == Deleted::No)
-            .filter(|c| {
+        // SQL 层过滤 + COUNT + LIMIT/OFFSET（避免全表加载到内存）
+        let (rows, total) = tx_di_toasty::toasty_page!(
+            self.plugin.db().clone(),
+            page,
+            {
+                let mut q = SysConfig::all().filter(SysConfig::fields().deleted().eq(Deleted::No));
                 if let Some(ref name) = query.name {
-                    if !c.name.contains(name.as_str()) { return false; }
+                    q = q.filter(SysConfig::fields().name().like_with_escape(
+                        format!("%{}%", tx_di_toasty::like_escape(name)),
+                        '\\',
+                    ));
                 }
                 if let Some(ref category) = query.category {
-                    if c.category != *category { return false; }
+                    q = q.filter(SysConfig::fields().category().eq(category));
                 }
                 if let Some(ref config_key) = query.config_key {
-                    if !c.config_key.contains(config_key.as_str()) { return false; }
+                    q = q.filter(SysConfig::fields().config_key().like_with_escape(
+                        format!("%{}%", tx_di_toasty::like_escape(config_key)),
+                        '\\',
+                    ));
                 }
                 if let Some(config_type) = query.config_type {
-                    if c.config_type != config_type { return false; }
+                    q = q.filter(SysConfig::fields().config_type().eq(config_type));
                 }
-                true
-            })
-            .collect();
+                q
+            },
+            |e| db_err(e, RepositoryError::DatabaseConfig)
+        );
 
-        let total = filtered.len() as i64;
-        let offset = page.offset() as usize;
-        let size = page.size as usize;
-
-        let list: Vec<Config> = filtered
-            .into_iter()
-            .skip(offset)
-            .take(size)
-            .map(Self::to_domain)
-            .collect();
-
-        Ok(Page::new(list, page.page, page.size, total))
+        let list: Vec<Config> = rows.iter().map(Self::to_domain).collect();
+        Ok(page.fill(list, total))
     }
 
     async fn find_all(&self, query: &ConfigQuery) -> AppResult<Vec<Config>> {

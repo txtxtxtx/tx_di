@@ -89,39 +89,13 @@ impl JobAppService {
         Ok(job_to_response(job))
     }
 
-    /// 分页查询定时任务列表
+    /// 分页查询定时任务列表（SQL 层过滤 + 分页）
     pub async fn get_job_page(&self, req: ListJobsRequest) -> AppResult<Page<JobResponse>> {
-        let all = self.repo().get_all_jobs().await?;
-
-        // 内存筛选
-        let filtered: Vec<InfrustJob> = all
-            .into_iter()
-            .filter(|j| {
-                if let Some(ref name) = req.name {
-                    if !j.name.contains(name.as_str()) {
-                        return false;
-                    }
-                }
-                if let Some(status) = req.status {
-                    if (j.status as i32) != status {
-                        return false;
-                    }
-                }
-                true
-            })
-            .collect();
-
-        let total = filtered.len() as i64;
-        let offset = ((req.page - 1) * req.page_size).max(0) as usize;
-        let size = req.page_size as usize;
-
-        let list: Vec<JobResponse> = filtered
-            .into_iter()
-            .skip(offset)
-            .take(size)
-            .map(job_to_response)
-            .collect();
-
+        let (rows, total) = self
+            .repo()
+            .find_job_page(req.name.as_deref(), req.status, req.page, req.page_size)
+            .await?;
+        let list: Vec<JobResponse> = rows.into_iter().map(job_to_response).collect();
         Ok(Page::new(list, req.page, req.page_size, total))
     }
 
@@ -146,34 +120,13 @@ impl JobAppService {
         Ok(job_to_response(updated))
     }
 
-    /// 分页查询任务执行日志
+    /// 分页查询任务执行日志（SQL 层过滤 + 分页）
     pub async fn get_job_log_page(&self, req: ListJobLogsRequest) -> AppResult<Page<JobLogResponse>> {
-        let all = self.repo().get_all_job_logs(req.job_id).await?;
-
-        // 内存筛选
-        let filtered: Vec<InfrustJobLog> = all
-            .into_iter()
-            .filter(|l| {
-                if let Some(status) = req.status {
-                    if (l.status as i32) != status {
-                        return false;
-                    }
-                }
-                true
-            })
-            .collect();
-
-        let total = filtered.len() as i64;
-        let offset = ((req.page - 1) * req.page_size).max(0) as usize;
-        let size = req.page_size as usize;
-
-        let list: Vec<JobLogResponse> = filtered
-            .into_iter()
-            .skip(offset)
-            .take(size)
-            .map(job_log_to_response)
-            .collect();
-
+        let (rows, total) = self
+            .repo()
+            .find_job_log_page(req.job_id, req.status, req.page, req.page_size)
+            .await?;
+        let list: Vec<JobLogResponse> = rows.into_iter().map(job_log_to_response).collect();
         Ok(Page::new(list, req.page, req.page_size, total))
     }
 

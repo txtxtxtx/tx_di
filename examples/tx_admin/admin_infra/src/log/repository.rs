@@ -66,47 +66,33 @@ impl OperateLogRepository for ToastyOperateLogRepository {
     }
 
     async fn find_page(&self, query: &OperateLogQuery, page: Page<OperateLog>) -> AppResult<Page<OperateLog>> {
-        let mut db = self.plugin.db().clone();
-        let all = SysOperateLog::all()
-            .exec(&mut db)
-            .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
-
-        let mut filtered: Vec<&SysOperateLog> = all
-            .iter()
-            .filter(|l| l.deleted == Deleted::No)
-            .filter(|l| {
+        // SQL 层过滤 + COUNT + LIMIT/OFFSET + ID 倒序
+        let (rows, total) = tx_di_toasty::toasty_page!(
+            self.plugin.db().clone(),
+            page,
+            {
+                let mut q = SysOperateLog::all()
+                    .filter(SysOperateLog::fields().deleted().eq(Deleted::No))
+                    .order_by(SysOperateLog::fields().id().desc());
                 if let Some(user_id) = query.user_id {
-                    if l.user_id != user_id { return false; }
+                    q = q.filter(SysOperateLog::fields().user_id().eq(user_id));
                 }
                 if let Some(ref log_type) = query.log_type {
-                    if l.log_type != *log_type { return false; }
+                    q = q.filter(SysOperateLog::fields().log_type().eq(log_type));
                 }
                 if let Some(ref sub_type) = query.sub_type {
-                    if l.sub_type != *sub_type { return false; }
+                    q = q.filter(SysOperateLog::fields().sub_type().eq(sub_type));
                 }
                 if let Some(success) = query.success {
-                    if l.success != success { return false; }
+                    q = q.filter(SysOperateLog::fields().success().eq(success));
                 }
-                true
-            })
-            .collect();
+                q
+            },
+            |e| db_err(e, RepositoryError::DatabaseLog)
+        );
 
-        // 按 ID 倒序
-        filtered.sort_by(|a, b| b.id.cmp(&a.id));
-
-        let total = filtered.len() as i64;
-        let offset = page.offset() as usize;
-        let size = page.size as usize;
-
-        let list: Vec<OperateLog> = filtered
-            .into_iter()
-            .skip(offset)
-            .take(size)
-            .map(Self::to_domain)
-            .collect();
-
-        Ok(Page::new(list, page.page, page.size, total))
+        let list: Vec<OperateLog> = rows.iter().map(Self::to_domain).collect();
+        Ok(page.fill(list, total))
     }
 
     async fn insert(&self, log: &OperateLog) -> AppResult<()> {
@@ -213,50 +199,42 @@ impl LoginLogRepository for ToastyLoginLogRepository {
     }
 
     async fn find_page(&self, query: &LoginLogQuery, page: Page<LoginLog>) -> AppResult<Page<LoginLog>> {
-        let mut db = self.plugin.db().clone();
-        let all = SysLoginLog::all()
-            .exec(&mut db)
-            .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
-
-        let mut filtered: Vec<&SysLoginLog> = all
-            .iter()
-            .filter(|l| l.deleted == Deleted::No)
-            .filter(|l| {
+        // SQL 层过滤 + COUNT + LIMIT/OFFSET + ID 倒序
+        let (rows, total) = tx_di_toasty::toasty_page!(
+            self.plugin.db().clone(),
+            page,
+            {
+                let mut q = SysLoginLog::all()
+                    .filter(SysLoginLog::fields().deleted().eq(Deleted::No))
+                    .order_by(SysLoginLog::fields().id().desc());
                 if let Some(user_id) = query.user_id {
-                    if l.user_id != user_id { return false; }
+                    q = q.filter(SysLoginLog::fields().user_id().eq(user_id));
                 }
                 if let Some(ref username) = query.username {
-                    if !l.username.contains(username.as_str()) { return false; }
+                    q = q.filter(SysLoginLog::fields().username().like_with_escape(
+                        format!("%{}%", tx_di_toasty::like_escape(username)),
+                        '\\',
+                    ));
                 }
                 if let Some(ref login_ip) = query.login_ip {
-                    if !l.login_ip.contains(login_ip.as_str()) { return false; }
+                    q = q.filter(SysLoginLog::fields().login_ip().like_with_escape(
+                        format!("%{}%", tx_di_toasty::like_escape(login_ip)),
+                        '\\',
+                    ));
                 }
                 if let Some(ref login_type) = query.login_type {
-                    if l.login_type != *login_type { return false; }
+                    q = q.filter(SysLoginLog::fields().login_type().eq(login_type));
                 }
                 if let Some(result) = query.result {
-                    if l.result != result { return false; }
+                    q = q.filter(SysLoginLog::fields().result().eq(result));
                 }
-                true
-            })
-            .collect();
+                q
+            },
+            |e| db_err(e, RepositoryError::DatabaseLog)
+        );
 
-        // 按 ID 倒序
-        filtered.sort_by(|a, b| b.id.cmp(&a.id));
-
-        let total = filtered.len() as i64;
-        let offset = page.offset() as usize;
-        let size = page.size as usize;
-
-        let list: Vec<LoginLog> = filtered
-            .into_iter()
-            .skip(offset)
-            .take(size)
-            .map(Self::to_domain)
-            .collect();
-
-        Ok(Page::new(list, page.page, page.size, total))
+        let list: Vec<LoginLog> = rows.iter().map(Self::to_domain).collect();
+        Ok(page.fill(list, total))
     }
 
     async fn insert(&self, log: &LoginLog) -> AppResult<()> {

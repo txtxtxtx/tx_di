@@ -1163,19 +1163,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 
 [[package]]
-name = "bcrypt"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b1866ecef4f2d06a0bb77880015fdf2b89e25a1c2e5addacb87e459c86dc67e"
-dependencies = [
- "base64 0.22.1",
- "blowfish",
- "getrandom 0.2.17",
- "subtle",
- "zeroize",
-]
-
-[[package]]
 name = "bigdecimal"
 version = "0.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1315,16 +1302,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdeb9d870516001442e364c5220d3574d2da8dc765554b4a617230d33fa58ef5"
 dependencies = [
  "objc2",
-]
-
-[[package]]
-name = "blowfish"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e412e2cd0f2b2d93e02543ceae7917b3c70331573df19ee046bcbc35e45e87d7"
-dependencies = [
- "byteorder",
- "cipher",
 ]
 
 [[package]]
@@ -3067,32 +3044,6 @@ dependencies = [
  "memchr",
  "pin-project-lite",
  "slab",
-]
-
-[[package]]
-name = "gb28181_admin"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum 0.8.9",
- "bcrypt",
- "chrono",
- "futures-core",
- "jiff",
- "serde",
- "serde_json",
- "toasty",
- "tokio",
- "tokio-stream",
- "tracing",
- "tx-di-core",
- "tx_di_axum",
- "tx_di_gb28181",
- "tx_di_log",
- "tx_di_sa_token",
- "tx_di_sip",
- "tx_di_toasty",
- "tx_gb28181",
 ]
 
 [[package]]
