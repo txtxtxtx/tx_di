@@ -167,8 +167,15 @@ impl Default for FileConfig {
     }
 }
 
-/// `#[component(init)]` 回调：配置加载后打印日志
+/// `#[component(init)]` 回调：解析相对路径并打印日志
 fn init(this: &mut FileConfig, _store: &Store) -> RIE<()> {
+    // 生产部署通过 APP_HOME 锚定上传目录，避免依赖进程工作目录
+    this.base_path = tx_di_core::resolve_data_path(&this.base_path);
+    for storage in &mut this.extra_storages {
+        if storage.backend == StorageBackend::Local {
+            storage.base_path = tx_di_core::resolve_data_path(&storage.base_path);
+        }
+    }
     tracing::info!(
         base_path = %this.base_path,
         max_file_size = this.max_file_size,
