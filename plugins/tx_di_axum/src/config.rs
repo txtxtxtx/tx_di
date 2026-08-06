@@ -109,8 +109,15 @@ impl Default for WebConfig {
     }
 }
 
-/// `#[component(init)]` 回调：配置超时和中间件注册
+/// `#[component(init)]` 回调：解析相对路径、配置超时和中间件注册
 fn init(this: &mut WebConfig, _store: &Store) -> RIE<()> {
+    // 生产部署通过 APP_HOME 锚定静态目录/SPA 前端目录，避免依赖进程工作目录
+    this.static_dir = tx_di_core::resolve_data_path(&this.static_dir);
+    if let Some(spa_apps) = &mut this.spa_apps {
+        for dist_dir in spa_apps.values_mut() {
+            *dist_dir = tx_di_core::resolve_data_path(dist_dir);
+        }
+    }
     // 设置超时时间
     crate::layers::set_timeout_secs(this.timeout_secs);
     // 注册配置的中间件
