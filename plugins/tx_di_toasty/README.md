@@ -23,7 +23,8 @@ TOML 节名为 `[toasty]`：
 ```toml
 [toasty]
 database_url = "sqlite://gb28181.db"
-auto_schema = true               # 启动时自动 push_schema 建表
+auto_schema = true               # 启动时自动 push_schema 建表（开发环境）
+migrate_on_start = false         # 生产迁移模式：受控 push_schema + 版本审计
 max_pool_size = 10
 table_name_prefix = "app_"
 pool_pre_ping = false
@@ -34,6 +35,7 @@ default_admin_password = "admin123"
 |------|------|--------|
 | `database_url` | `String` | `"sqlite://gb28181.db"` |
 | `auto_schema` | `bool` | `true` |
+| `migrate_on_start` | `bool` | `false` |
 | `max_pool_size` | `Option<usize>` | `None`（驱动默认） |
 | `table_name_prefix` | `Option<String>` | `None` |
 | `pool_wait_timeout_secs` | `Option<u64>` | `None` |
@@ -83,3 +85,4 @@ async fn main() -> tx_di_core::RIE<()> {
 4. **feature 是编译期开关**：启用哪个数据库 feature 只是开启驱动编译；真正选哪种库由运行时 `database_url` scheme 决定。未启用对应 feature 而用该 scheme 会编译/运行时错误。
 5. `default_admin_password` 当前**未被实际使用**（未实现空库自动建 admin 逻辑），不应依赖。
 6. `auto_schema=true` 即开发期自动 `push_schema()`，并非版本化迁移；生产建议设 `false` 自行管理。
+7. **生产迁移模式**：`auto_schema=false` + `migrate_on_start=true` 时，启动执行 `ToastyPlugin::migrate()`——创建版本审计表 `_schema_migrations` → `push_schema()`（toasty 对模型与库结构做 diff，仅执行增量 DDL，幂等可重复）→ 记录迁移时间。与 `auto_schema` 的区别是受控、可审计，且不回写配置文件。

@@ -33,7 +33,7 @@ use std::sync::{Arc, OnceLock, RwLock};
 use toasty::ModelSet;
 use tx_di_core::inject_from_store;
 use tx_di_core::{App, AppAllConfig};
-use tx_di_core::{Component, DepsTuple, RIE};
+use tx_di_core::{AppError, Component, DepsTuple, RIE};
 use crate::ToastyErr;
 
 /// Toasty 数据库实例的类型别名
@@ -134,6 +134,30 @@ impl ToastyPlugin {
     pub fn try_db(&self) -> Option<&ToastyDb> {
         self.db.get()
     }
+
+    /// 事务使用说明（toasty 官方内联模式）
+    ///
+    /// toasty 的 `Transaction` 借用 `&mut Db` 且实现 `Drop`（drop 自动回滚），
+    /// 因此**事务操作必须内联在同一个 async 函数中完成**，无法通过闭包借用传递。
+    /// 各 repository 中推荐的内联模式：
+    ///
+    /// ```rust,ignore
+    /// // 在 repository 方法内部：
+    /// let mut db = self.plugin.db().clone();
+    /// let mut tx = db.transaction().await.map_err(|e| {
+    ///     AppError::with_context(ToastyErr::TxBeginFailed, e.to_string())
+    /// })?;
+    ///
+    /// SysUser::create().username("a").exec(&mut tx).await?;   // 模型操作走 &mut tx
+    /// Role::create().name("r").exec(&mut tx).await?;
+    ///
+    /// tx.commit().await.map_err(|e| {
+    ///     AppError::with_context(ToastyErr::TxCommitFailed, e.to_string())
+    /// })?; // 任一步 Err 时 drop 自动回滚
+    /// ```
+    ///
+    /// `Transaction` 由 `lib.rs` re-export；`ToastyErr::TxBeginFailed/TxCommitFailed`
+    /// 提供标准错误码。
 
     /// 将配置文件的 `auto_schema = true` 改为 `false`（按行替换，保留注释与格式）
     fn change_auto_schema_closed(path: PathBuf) {
@@ -320,6 +344,68 @@ impl ToastyPlugin {
         }
 
         Ok(db)
+    }
+
+    /// 执行受控 Schema 迁移（生产环境推荐，配合 `ToastyConfig.migrate_on_start`）
+    ///
+    /// 行为：
+    /// 1. 创建版本审计表 `_schema_migrations`（幂等）
+    /// 2. 调用 `db.push_schema()` —— toasty 对模型 schema 与数据库实际结构做 diff，
+    ///    仅执行增量 DDL（建表 / 加列 / 加索引等），幂等可重复执行
+    /// 3. 记录迁移版本（`head` + 时间戳）
+    ///
+    /// 与 `auto_schema` 的区别：迁移受控、可审计，且不会自动改写配置文件。
+    ///
+    /// 跨库兼容：版本表使用标准 SQL（`DELETE` + `INSERT`），兼容 SQLite / PG / MySQL。
+    pub async fn migrate(&self) -> RIE<()> {
+        let mut db = self.db().clone();
+
+        // 1. 创建版本审计表（幂等）
+        toasty::sql::statement(
+            "CREATE TABLE IF NOT EXISTS _schema_migrations (\
+                 version TEXT PRIMARY KEY, \
+                 fingerprint TEXT NOT NULL, \
+                 applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP\
+             )",
+        )
+        .exec(&mut db)
+        .await
+        .map_err(|e| {
+            AppError::with_context(
+                ToastyErr::SchemaPushFailed,
+                format!("创建迁移版本表失败: {e}"),
+            )
+        })?;
+
+        // 2. 执行 schema diff 增量迁移
+        db.push_schema().await.map_err(|e| {
+            AppError::with_context(ToastyErr::SchemaPushFailed, format!("Schema 迁移失败: {e}"))
+        })?;
+
+        // 3. 记录迁移版本（先删后插，兼容各数据库方言）
+        toasty::sql::statement("DELETE FROM _schema_migrations WHERE version = 'head'")
+            .exec(&mut db)
+            .await
+            .map_err(|e| {
+                AppError::with_context(
+                    ToastyErr::SchemaPushFailed,
+                    format!("清理迁移版本失败: {e}"),
+                )
+            })?;
+        toasty::sql::statement(
+            "INSERT INTO _schema_migrations (version, fingerprint, applied_at) \
+             VALUES ('head', 'toasty-push-schema', CURRENT_TIMESTAMP)",
+        )
+        .exec(&mut db)
+        .await
+        .map_err(|e| {
+            AppError::with_context(
+                ToastyErr::SchemaPushFailed,
+                format!("记录迁移版本失败: {e}"),
+            )
+        })?;
+
+        Ok(())
     }
 
     /// 仅构建 Schema（不连接数据库）

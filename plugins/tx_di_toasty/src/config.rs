@@ -87,6 +87,17 @@ pub struct ToastyConfig {
     /// 登录后应立即修改。默认值 `"admin123"`。
     #[serde(default = "default_admin_password")]
     pub default_admin_password: String,
+
+    /// 启动时执行受控 Schema 迁移（生产环境推荐）
+    ///
+    /// `auto_schema=false` 时，若此项为 `true`，启动时调用 `ToastyPlugin::migrate()`：
+    /// 1. 创建版本审计表 `_schema_migrations`
+    /// 2. 执行 `db.push_schema()`（toasty 对模型与库结构做 diff，仅执行增量 DDL）
+    /// 3. 记录迁移时间
+    ///
+    /// 与 `auto_schema=true` 的区别：迁移受控、可审计，且不会自动改写配置文件。
+    #[serde(default)]
+    pub migrate_on_start: bool,
 }
 
 impl Default for ToastyConfig {
@@ -103,6 +114,7 @@ impl Default for ToastyConfig {
             pool_max_connection_idle_time_secs: None,
             pool_pre_ping: false,
             default_admin_password: default_admin_password(),
+            migrate_on_start: false,
         }
     }
 }

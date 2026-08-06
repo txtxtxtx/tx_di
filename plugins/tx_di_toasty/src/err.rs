@@ -20,4 +20,10 @@ pub enum ToastyErr {
     ModelRegistryError,
     #[err(-5, "数据库已经初始化了")]
     AlreadyInitialized,
+    /// 事务开启失败
+    #[err(-6, "事务开启失败")]
+    TxBeginFailed,
+    /// 事务提交失败
+    #[err(-7, "事务提交失败")]
+    TxCommitFailed,
 }
