@@ -57,7 +57,7 @@ pub type Transaction<'a> = toasty::db::Transaction<'a>;
 /// ```rust,ignore
 /// let (rows, total) = tx_di_toasty::toasty_page!(
 ///     self.plugin.db().clone(),      // 数据库句柄
-///     page,                          // Page<T> 引用（用于计算 offset/size）
+///     page,                          // Page<T> 请求对象（用于计算 offset/size）
 ///     {                              // 构建查询（含过滤/排序），返回 XxxQuery
 ///         let mut q = SysUser::all().filter(SysUser::fields().deleted().eq(Deleted::No));
 ///         if let Some(ref name) = query.name {
@@ -75,7 +75,8 @@ pub type Transaction<'a> = toasty::db::Transaction<'a>;
 /// // 或异步转换（关联表懒加载）：
 /// let mut list = Vec::new();
 /// for r in rows { list.push(self.to_full_domain(&r).await?); }
-/// Ok(Page::new(list, page.page, page.size, total))
+/// // 用 Page::fill 直接填充分页对象：
+/// Ok(page.fill(list, total))
 /// ```
 ///
 /// 要求：必须在返回 `AppResult`（或兼容 `?`）的 async 函数中调用；
