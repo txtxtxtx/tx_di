@@ -48,7 +48,7 @@ impl ConfigCenter for NacosConfigCenter {
             .await
         {
             Ok(resp) => Ok(Some(resp.content().clone())),
-            // 配置不存在 → None（与占位实现的语义一致）
+            // 配置不存在 → None（业务语义：配置缺失按空处理）
             Err(NacosError::ConfigNotFound(_)) => Ok(None),
             Err(e) => Err(AppError::from(format!("Nacos 获取配置失败: {e}"))),
         }

@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use tokio_util::sync::CancellationToken;
 use tx_di_core::DepsTuple;
-use tracing::{debug, info};
+use tracing::{info};
 use tx_di_core::{Component, App, RIE};
 
 use crate::config::RegistryConfig;
@@ -113,14 +113,14 @@ async fn app_async_init(comp: Arc<RegistryPlugin>, _app: Arc<App>) -> RIE<()> {
     Ok(())
 }
 
-/// `#[component(app_async_run)]` 回调：启动心跳和配置监听
+/// `#[component(app_async_run)]` 回调：启动配置监听（心跳由 nacos-sdk 双工连接自动保活）
 async fn app_async_run(comp: Arc<RegistryPlugin>, app: Arc<App>, token: CancellationToken) -> RIE<()> {
     let _ = app;
     if !comp.config.enabled {
         return Ok(());
     }
 
-    // 启动配置监听
+    // 启动配置监听（服务端变更 → ConfigWatcher 回调）
     if let Some(cc) = comp.config_center.get() {
         let mut watcher = ConfigWatcher::new(cc.clone());
         // 可在此添加默认订阅的配置
@@ -131,32 +131,8 @@ async fn app_async_run(comp: Arc<RegistryPlugin>, app: Arc<App>, token: Cancella
         tokio::spawn(watcher.run(token.clone()));
     }
 
-    // 启动心跳
-    if let Some(_reg) = comp.registry.get() {
-        let instance_id = comp
-            .instance_id
-            .get()
-            .cloned()
-            .unwrap_or_default();
-        let heartbeat_secs = comp.config.heartbeat_secs;
-        let tk = token.clone();
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(heartbeat_secs));
-            loop {
-                tokio::select! {
-                    _ = interval.tick() => {
-                        debug!("心跳: instance_id={}", instance_id);
-                    }
-                    _ = tk.cancelled() => {
-                        info!("心跳已停止");
-                        break;
-                    }
-                }
-            }
-        });
-    }
-
-    // 挂起直到取消
+    // 心跳保活由 nacos-sdk 的 gRPC 双工长连接自动完成（register 后 SDK 后台驱动），
+    // 无需插件侧额外心跳；此处仅挂起直到取消。
     token.cancelled().await;
     info!("RegistryPlugin: async_run 已结束");
     Ok(())
@@ -164,11 +140,28 @@ async fn app_async_run(comp: Arc<RegistryPlugin>, app: Arc<App>, token: Cancella
 
 /// 组件关闭时注销服务
 fn shutdown(this: &RegistryPlugin) {
-    if let Some(instance_id) = this.instance_id.get() {
-        if let Some(_reg) = this.registry.get() {
-            // 同步注销（block_on 在当前线程运行）
-            info!("正在注销服务实例: {}", instance_id);
-            // 实际注销需要 async，这里用 tokio::runtime::Handle 在关闭时处理
+    let Some(instance_id) = this.instance_id.get().cloned() else {
+        return;
+    };
+    let Some(reg) = this.registry.get().cloned() else {
+        return;
+    };
+
+    // 显式注销以加速释放（否则依赖服务端心跳超时剔除）
+    match tokio::runtime::Handle::try_current() {
+        Ok(handle) => {
+            handle.block_on(async move {
+                match reg.deregister(&instance_id).await {
+                    Ok(()) => info!("已注销服务实例: {}", instance_id),
+                    Err(e) => tracing::error!("注销服务实例失败: {}", e),
+                }
+            });
+        }
+        Err(_) => {
+            tracing::warn!(
+                "shutdown 时无 tokio runtime 上下文，跳过显式注销（将由心跳超时剔除）: {}",
+                instance_id
+            );
         }
     }
 }

@@ -1,15 +1,15 @@
 # tx_di_registry — 服务注册发现与配置中心插件使用文档
 
-提供统一的**服务注册/发现**（`ServiceRegistry` trait）与**配置中心**（`ConfigCenter` trait）抽象，默认后端为 Nacos。
+提供统一的**服务注册/发现**（`ServiceRegistry` trait）与**配置中心**（`ConfigCenter` trait）抽象，Nacos 后端基于**官方 `nacos-sdk`（nacos-group/nacos-sdk-rust 0.8）**实现。
 
 ## 用途
 
-- 服务实例注册、心跳保活、发现、订阅。
+- 服务实例注册、**自动心跳保活**（nacos-sdk gRPC 双工长连接，无需手写心跳）、发现、订阅。
 - 配置热更新监听（`listen_config`）。
 - HTTP/gRPC 双协议端点自动收集并注册到注册中心。
 - 内置 `DynamicConfig<T>` 通用配置容器（基于 `tokio::sync::watch` 热更新）。
 
-> ⚠️ **当前 Nacos 后端为 TODO 占位实现**：`NacosServiceRegistry` / `NacosConfigCenter` 的方法体仅打印日志，并未真正接入 `nacos_rust_client`。`discover` 恒返回空、`get_config` 恒返回 `None`、`listen_config` 内部 `pending()` 会永久阻塞订阅任务。生产接入前需补全实现。
+> ✅ **Nacos 后端已实现（官方 nacos-sdk 0.8）**：`NacosServiceRegistry`（`register`/`deregister`/`discover`/`subscribe`，注册后自动心跳）、`NacosConfigCenter`（`get_config`/`publish_config`/`remove_config`/`listen_config`）均已接入真实能力；`ConfigWatcher` 负责监听远端配置变更（变更回调反序列化→`DynamicConfig` 热更新链路的回调落点已预留）。
 
 ## 启用
 
@@ -102,9 +102,11 @@ register_endpoints(Arc::new(MyEndpoints));
 
 ## 注意事项
 
-1. **Nacos 后端为占位**：见上方用途警告，当前不要依赖其真实能力。
-2. `enabled = false` 时所有回调提前返回，`get_registry()`/`get_config_center()` 返回 `None`。
-3. `shutdown()` 仅打印日志，未实现真正的 `deregister`。
+1. `enabled = false` 时所有回调提前返回，`get_registry()`/`get_config_center()` 返回 `None`。
+2. `shutdown()` 已实现显式 `deregister`（`tokio::runtime::Handle::block_on` 异步注销；无 runtime 上下文时降级为心跳超时剔除）。
+3. 心跳保活由 nacos-sdk 的 gRPC 双工长连接自动完成，插件侧无额外心跳。
 4. 端点注册表为进程级全局静态（`ENDPOINT_PROVIDERS`），跨 App 实例共享。
 5. `init_sort` 顺序：`RegistryConfig = i32::MIN`（最早），`RegistryPlugin = i32::MAX - 50`（很晚，确保端点已注册才收集）。
-6. `DynamicConfig<T>` 是独立通用工具，目前与 Nacos 监听未接线，可单独使用其 `update`/`subscribe`。
+6. `DynamicConfig<T>` 可独立使用 `update`/`subscribe`；与 Nacos 监听的接线点在 `ConfigWatcher`（`listen_config` 回调目前打印日志，反序列化→`DynamicConfig.update` 待业务接入）。
+7. **nacos-sdk 写操作语义**：服务端不可用时 `register` 等会阻塞（SDK 正确行为），生产需配合快速失败 + 后台重试。
+8. **注册 IP**：容器/多网卡场景通过 `SERVICE_IP` 环境变量指定（默认 127.0.0.1 仅单机调试）。
