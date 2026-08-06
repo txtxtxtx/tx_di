@@ -38,6 +38,21 @@ impl <T> Page<T> {
         }
     }
 
+    /// 将 `(列表, 总数)` 填入当前分页请求对象，生成分页响应。
+    ///
+    /// 配合 `tx_di_toasty::toasty_page!` 宏使用：
+    /// ```rust,ignore
+    /// let (rows, total) = tx_di_toasty::toasty_page!(db, page, { ... }, |e| ...?);
+    /// // 行 → 领域对象转换（同步或异步）后：
+    /// Ok(page.fill(list, total))
+    /// ```
+    ///
+    /// 等价于 `Page::new(list, page, size, total)`，但复用已有 `page`/`size`，
+    /// 免去重复书写分页参数。
+    pub fn fill(self, list: Vec<T>, total: i64) -> Self {
+        Self::new(list, self.page, self.size, total)
+    }
+
     /// 计算 SQL OFFSET 值
     pub fn offset(&self) -> i64 {
         (self.page - 1) * self.size
