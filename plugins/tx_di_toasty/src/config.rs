@@ -107,8 +107,10 @@ impl Default for ToastyConfig {
     }
 }
 
-/// `#[component(init)]` 回调：配置加载后打印日志
+/// `#[component(init)]` 回调：解析相对路径并打印日志
 fn init(this: &mut ToastyConfig, _store: &Store) -> RIE<()> {
+    // 生产部署通过 APP_HOME 锚定 SQLite 相对路径，避免依赖进程工作目录
+    this.database_url = tx_di_core::resolve_sqlite_url(&this.database_url);
     tracing::debug!(
         url = %this.database_url,
         auto_schema = this.auto_schema,
