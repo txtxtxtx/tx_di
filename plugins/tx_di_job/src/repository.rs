@@ -216,35 +216,29 @@ impl JobRepository {
         page_num: i64,
         page_size: i64,
     ) -> AppResult<(Vec<InfrustJob>, i64)> {
-        let mut db = self.tp.db().clone();
-        let build = |name: Option<&str>, status: Option<i32>| {
-            let mut q = InfrustJob::all()
-                .filter(InfrustJob::fields().soft_delete().eq(SoftDelete::NORMAL));
-            if let Some(n) = name {
-                q = q.filter(InfrustJob::fields().name().like(format!("%{n}%")));
-            }
-            if let Some(st) = status {
-                let s = if st == 0 { JobStatus::Paused } else { JobStatus::Running };
-                q = q.filter(InfrustJob::fields().status().eq(s));
-            }
-            q
-        };
-
-        let total = build(name, status)
-            .count()
-            .exec(&mut db)
-            .await
-            .map_err(to_err)?;
-        let offset = ((page_num - 1) * page_size).max(0) as usize;
-        let size = page_size as usize;
-        let rows = build(name, status)
-            .order_by(InfrustJob::fields().id().desc())
-            .limit(size)
-            .offset(offset)
-            .exec(&mut db)
-            .await
-            .map_err(to_err)?;
-        Ok((rows, total as i64))
+        let pg = tx_common::page::Page::<InfrustJob>::request(page_num, page_size);
+        let (rows, total) = tx_di_toasty::toasty_page!(
+            self.tp.db().clone(),
+            pg,
+            {
+                let mut q = InfrustJob::all()
+                    .filter(InfrustJob::fields().soft_delete().eq(SoftDelete::NORMAL))
+                    .order_by(InfrustJob::fields().id().desc());
+                if let Some(n) = name {
+                    q = q.filter(InfrustJob::fields().name().like_with_escape(
+                        format!("%{}%", tx_di_toasty::like_escape(n)),
+                        '\\',
+                    ));
+                }
+                if let Some(st) = status {
+                    let s = if st == 0 { JobStatus::Paused } else { JobStatus::Running };
+                    q = q.filter(InfrustJob::fields().status().eq(s));
+                }
+                q
+            },
+            |e| to_err(e)
+        );
+        Ok((rows, total))
     }
 
     /// 查询所有未删除的任务（id 倒序）
@@ -319,35 +313,26 @@ impl JobRepository {
         page_num: i64,
         page_size: i64,
     ) -> AppResult<(Vec<InfrustJobLog>, i64)> {
-        let mut db = self.tp.db().clone();
-        let build = |job_id: Option<u64>, status: Option<i32>| {
-            let mut q = InfrustJobLog::all()
-                .filter(InfrustJobLog::fields().soft_delete().eq(SoftDelete::NORMAL));
-            if let Some(jid) = job_id {
-                q = q.filter(InfrustJobLog::fields().job_id().eq(jid));
-            }
-            if let Some(st) = status {
-                let s = if st == 0 { ExecutionStatus::Failed } else { ExecutionStatus::Success };
-                q = q.filter(InfrustJobLog::fields().status().eq(s));
-            }
-            q
-        };
-
-        let total = build(job_id, status)
-            .count()
-            .exec(&mut db)
-            .await
-            .map_err(to_err)?;
-        let offset = ((page_num - 1) * page_size).max(0) as usize;
-        let size = page_size as usize;
-        let rows = build(job_id, status)
-            .order_by(InfrustJobLog::fields().id().desc())
-            .limit(size)
-            .offset(offset)
-            .exec(&mut db)
-            .await
-            .map_err(to_err)?;
-        Ok((rows, total as i64))
+        let pg = tx_common::page::Page::<InfrustJobLog>::request(page_num, page_size);
+        let (rows, total) = tx_di_toasty::toasty_page!(
+            self.tp.db().clone(),
+            pg,
+            {
+                let mut q = InfrustJobLog::all()
+                    .filter(InfrustJobLog::fields().soft_delete().eq(SoftDelete::NORMAL))
+                    .order_by(InfrustJobLog::fields().id().desc());
+                if let Some(jid) = job_id {
+                    q = q.filter(InfrustJobLog::fields().job_id().eq(jid));
+                }
+                if let Some(st) = status {
+                    let s = if st == 0 { ExecutionStatus::Failed } else { ExecutionStatus::Success };
+                    q = q.filter(InfrustJobLog::fields().status().eq(s));
+                }
+                q
+            },
+            |e| to_err(e)
+        );
+        Ok((rows, total))
     }
 
     /// 查询所有未删除的执行日志（id 倒序），可选择性按 job_id 过滤
