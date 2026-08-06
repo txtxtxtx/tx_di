@@ -40,6 +40,17 @@ pub trait CacheService: Send + Sync + 'static {
     /// 为 key 设置超时时间
     async fn expire(&self, key: &str, ttl: Duration) -> AppResult<()>;
 
+    /// 原子设置：仅当 key 不存在时写入成功（SET NX），用于分布式锁。
+    ///
+    /// 返回 `true` 表示设置成功（成功获取锁）。
+    async fn set_nx(&self, key: &str, value: &[u8], ttl: Option<Duration>) -> AppResult<bool>;
+
+    /// 原子删除：仅当 key 当前值等于 `expected` 时删除（compare-and-del），
+    /// 用于安全释放分布式锁（避免误删其他持有者设置的锁）。
+    ///
+    /// 返回 `true` 表示删除成功。
+    async fn compare_and_del(&self, key: &str, expected: &[u8]) -> AppResult<bool>;
+
     // ── Hash 操作 ─────────────────────────────────────────────────────────
 
     /// 获取 hash 中 field 的值

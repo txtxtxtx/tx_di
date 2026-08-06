@@ -96,6 +96,40 @@ impl CacheService for RedisCache {
         Ok(())
     }
 
+    async fn set_nx(&self, key: &str, value: &[u8], ttl: Option<Duration>) -> AppResult<bool> {
+        let pk = self.prefixed(key);
+        let mut conn = self.get_mgr().await?.clone();
+        // SET key value NX EX seconds —— 原子地"不存在则设置"
+        let mut cmd = redis::cmd("SET");
+        cmd.arg(&pk).arg(value).arg("NX");
+        if let Some(ttl) = ttl {
+            cmd.arg("EX").arg(ttl.as_secs() as i64);
+        }
+        let result: Option<String> = cmd.query_async(&mut conn).await.map_err(Self::redis_err)?;
+        Ok(result.is_some())
+    }
+
+    async fn compare_and_del(&self, key: &str, expected: &[u8]) -> AppResult<bool> {
+        let pk = self.prefixed(key);
+        let mut conn = self.get_mgr().await?.clone();
+        // Lua 脚本保证"比较 + 删除"原子性，防止误删其他持有者的锁
+        const SCRIPT: &str = r#"
+            if redis.call("get", KEYS[1]) == ARGV[1] then
+                return redis.call("del", KEYS[1])
+            else
+                return 0
+            end
+        "#;
+        let script = redis::Script::new(SCRIPT);
+        let result: i64 = script
+            .key(&pk)
+            .arg(expected)
+            .invoke_async(&mut conn)
+            .await
+            .map_err(Self::redis_err)?;
+        Ok(result > 0)
+    }
+
     async fn exists(&self, key: &str) -> AppResult<bool> {
         let pk = self.prefixed(key);
         let mut conn = self.get_mgr().await?.clone();

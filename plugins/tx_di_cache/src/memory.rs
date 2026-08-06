@@ -187,6 +187,38 @@ impl CacheService for MemoryCache {
         Ok(())
     }
 
+    async fn set_nx(&self, key: &str, value: &[u8], ttl: Option<Duration>) -> AppResult<bool> {
+        let pk = self.prefixed(key);
+        self.check_expiry(&pk);
+        if self.is_full() && !self.store.contains_key(&pk) {
+            return Err(AppError::from_code(CacheErr::ResourceExhausted));
+        }
+        // Entry API 保证"检查 + 插入"原子性
+        match self.store.entry(pk) {
+            dashmap::mapref::entry::Entry::Occupied(_) => Ok(false),
+            dashmap::mapref::entry::Entry::Vacant(v) => {
+                v.insert(CacheValue::StringValue {
+                    data: value.to_vec(),
+                    expires_at: Self::expires_at(ttl),
+                });
+                Ok(true)
+            }
+        }
+    }
+
+    async fn compare_and_del(&self, key: &str, expected: &[u8]) -> AppResult<bool> {
+        let pk = self.prefixed(key);
+        self.check_expiry(&pk);
+        // remove_if 原子完成"比较 + 删除"
+        let removed = self.store.remove_if(&pk, |_, v| {
+            matches!(
+                v,
+                CacheValue::StringValue { data, .. } if data.as_slice() == expected
+            )
+        });
+        Ok(removed.is_some())
+    }
+
     async fn exists(&self, key: &str) -> AppResult<bool> {
         let pk = self.prefixed(key);
         self.check_expiry(&pk);
