@@ -9,7 +9,7 @@ repository.workspace = true
 
 [features]
 default = ["nacos"]
-nacos = ["dep:nacos_rust_client"]
+nacos = ["dep:nacos-sdk"]
 
 [dependencies]
 tx-di-core = { workspace = true }
@@ -25,5 +25,5 @@ thiserror = { workspace = true }
 futures = { workspace = true }
 chrono = { workspace = true }
 
-# Nacos 客户端（仅 feature="nacos" 时启用）
-nacos_rust_client = { version = "0.3", optional = true }
+# Nacos 客户端（仅 feature="nacos" 时启用）—— 官方 nacos-group/nacos-sdk-rust
+nacos-sdk = { version = "0.8", optional = true }

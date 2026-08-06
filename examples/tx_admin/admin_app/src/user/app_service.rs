@@ -11,6 +11,8 @@ use admin_domain::user::service::UserService;
 use admin_domain::role::repository::RoleRepository;
 use admin_domain::department::repository::DepartmentRepository;
 use admin_domain::menu::repository::MenuRepository;
+use admin_domain::shared::event_publisher::DomainEventPublisher;
+use admin_domain::shared::model::AggregateRoot;
 use admin_domain::shared::repository::RepositoryError;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
@@ -23,6 +25,8 @@ pub struct UserAppService {
     role_repo: Arc<dyn RoleRepository>,
     dept_repo: Arc<dyn DepartmentRepository>,
     menu_repo: Arc<dyn MenuRepository>,
+    /// 领域事件发布器（事务提交后发布聚合根事件；未注册时跳过）
+    event_publisher: Option<Arc<dyn DomainEventPublisher>>,
 }
 
 impl UserAppService {
@@ -39,7 +43,25 @@ impl UserAppService {
         dept_repo: Arc<dyn DepartmentRepository>,
         menu_repo: Arc<dyn MenuRepository>,
     ) -> Self {
-        Self { user_service, role_repo, dept_repo, menu_repo }
+        Self {
+            user_service,
+            role_repo,
+            dept_repo,
+            menu_repo,
+            event_publisher: None,
+        }
+    }
+
+    /// 发布聚合根待处理事件（事务提交后调用）
+    fn publish_events(&self, aggregate: &mut User) {
+        if self.event_publisher.is_none() {
+            return;
+        }
+        let events = aggregate.events().to_vec();
+        aggregate.clear_events();
+        if let Some(publisher) = &self.event_publisher {
+            publisher.publish(events);
+        }
     }
 
     /// 获取 UserService 引用（供 AuthAppService 等编排者使用）
@@ -99,6 +121,9 @@ impl UserAppService {
             .await?;
         user.role_ids = role_ids;
         user.dept_ids = dept_ids;
+
+        // 事务提交后发布领域事件（UserCreated 等）
+        self.publish_events(&mut user);
 
         Ok(user_to_response(user))
     }

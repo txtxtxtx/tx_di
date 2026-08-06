@@ -1,6 +1,7 @@
 mod plugin;
 mod operate_log;
 mod interfaces;
+mod nacos;
 pub mod error;
 pub mod auth;
 
@@ -20,6 +21,8 @@ use tx_di_job;
 use tx_di_log;
 #[allow(unused_imports)]
 use tx_di_sa_token;
+#[allow(unused_imports)]
+use tx_di_registry;
 #[allow(unused_imports)]
 use tx_di_toasty;
 /// 确保 infra 层插件被编译引入

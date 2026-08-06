@@ -63,15 +63,16 @@ async fn app_async_init(comp: Arc<RegistryPlugin>, _app: Arc<App>) -> RIE<()> {
         return Ok(());
     }
 
-    // 1. 初始化 Nacos 客户端
+    // 1. 初始化 Nacos 客户端（官方 nacos-sdk，gRPC 双工长连接）
     #[cfg(feature = "nacos")]
     {
-        let nacos_registry = crate::nacos::registry_impl::NacosServiceRegistry::new(&comp.config);
+        let nacos_registry = crate::nacos::registry_impl::NacosServiceRegistry::new(&comp.config)
+            .await?;
         comp.registry
             .set(Arc::new(nacos_registry) as Arc<dyn ServiceRegistry>)
             .map_err(|_| "registry 已初始化")?;
 
-        let nacos_config = crate::nacos::config_impl::NacosConfigCenter::new(&comp.config);
+        let nacos_config = crate::nacos::config_impl::NacosConfigCenter::new(&comp.config).await?;
         comp.config_center
             .set(Arc::new(nacos_config) as Arc<dyn ConfigCenter>)
             .map_err(|_| "config_center 已初始化")?;

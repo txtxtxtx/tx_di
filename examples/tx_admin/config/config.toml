@@ -42,6 +42,16 @@ migrate_on_start = true
 database_url = "sqlite:examples/tx_admin/data/tx_admin.db"
 max_pool_size = 10
 
+# 注册中心（Nacos）：enabled=true 时注册 HTTP/gRPC 端点并支持配置中心
+# 生产多实例部署开启；本地无 Nacos 时保持 false
+[registry_config]
+enabled = false
+nacos_addr = "http://127.0.0.1:8848"
+namespace = "public"
+group = "DEFAULT_GROUP"
+service_name = "tx-admin"
+auto_register = true
+
 [job_config]
 enabled = true
 poll_interval_secs = 1

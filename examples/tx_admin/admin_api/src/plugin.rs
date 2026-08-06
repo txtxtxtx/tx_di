@@ -98,6 +98,21 @@ async fn app_async_init(_comp: Arc<AdminPlugin>, app: Arc<App>) -> RIE<()> {
     });
     info!("操作日志 Layer 已注册 (sort=15)");
 
+    // ════════════════════ 领域事件订阅（示例：事件驱动扩展点）════════════════
+    // 领域事件由 AppService 在事务提交后发布（如 UserCreated）。
+    // 此处为验证机制的示例订阅；生产场景可在此接入缓存失效、审计、通知等。
+    {
+        let event_bus = app.inject::<admin_app::event_bus::EventBus>();
+        event_bus.subscribe(|event| {
+            if let admin_domain::shared::model::DomainEvent::UserCreated { user_id, username } =
+                event
+            {
+                tracing::info!("[domain-event] 用户创建: id={} username={}", user_id, username);
+            }
+        });
+        info!("领域事件总线订阅已注册");
+    }
+
     // 构建路由：公开接口与受保护接口
     let open = api::open_router();
     let protected = api::router(max_body_size);
@@ -118,6 +133,18 @@ async fn app_async_init(_comp: Arc<AdminPlugin>, app: Arc<App>) -> RIE<()> {
     let grpc_port = resolve_grpc_port(&app.inject::<AppAllConfig>());
     let grpc_addr: std::net::SocketAddr = format!("0.0.0.0:{}", grpc_port).parse()
         .map_err(|e: std::net::AddrParseError| anyhow::anyhow!("gRPC 地址解析失败: {}", e))?;
+
+    // ════════════════════ 注册中心端点注册（微服务化预留）════════════════
+    // 将 HTTP/gRPC 端点提供给 tx_di_registry，由 RegistryPlugin（init_sort=MAX-50，
+    // 晚于本组件 MAX-100）在启动时注册到 Nacos。生产通过 SERVICE_IP 环境变量指定注册 IP。
+    {
+        let http_port = web_config.port;
+        tx_di_registry::register_endpoints(std::sync::Arc::new(crate::nacos::AdminEndpoints::new(
+            http_port,
+            grpc_port,
+        )));
+        info!("已注册服务端点: HTTP={} gRPC={}", http_port, grpc_port);
+    }
 
     // 使用 tower middleware 实现认证
     let auth_layer = grpc::auth_interceptor::AuthLayer::new();
