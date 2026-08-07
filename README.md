@@ -316,7 +316,7 @@ async fn main() -> tx_di_core::RIE<()> {
 | **tx_di_file** | 文件存储：基于 `OpenDAL`，支持本地（`local`，默认）与 S3（`s3`）后端，统一文件操作接口。 | `opendal` |
 | **tx_di_job** | 定时任务：秒级 Cron 调度，支持内部函数 / Shell / Python 执行器，重试与超时，任务管理 API。依赖 `tx_di_toasty` 持久化。 | `cron`/`toasty` |
 | **tx_di_toasty** | ORM：封装 `toasty`，支持 `sqlite`（默认）/`postgresql`/`mysql`/`dynamodb`（feature），提供 `ToastyPlugin` 注册模型。 | `toasty` |
-| **tx_di_registry** | 服务注册与发现：默认 Nacos（`feature = "nacos"`），统一注册接口。 | `nacos_rust_client`（可选） |
+| **tx_di_nacos** | 配置中心 + 服务注册 + 应用启动循环（非组件 crate）：启动拉取远程配置与本地合并、监听配置变更优雅重启、注册 HTTP/gRPC 端点，`app_loop!` 宏一键接入。 | `nacos-sdk` |
 | **tx_di_sa_token** | 鉴权：封装 `sa-token-plugin-axum`，支持 `memory`（默认）/`redis`/`database`（feature）存储，与 `tx_di_axum` 配合做登录鉴权。 | `sa-token-plugin-axum` |
 | **tx_di_sip** | SIP 协议栈：基于 `rsipstack`，提供 SIP 传输与事务层，供 GB28181 插件复用。 | `rsipstack` |
 | **tx_di_gb28181** | GB28181 服务端（UAS/SIP 注册中心、设备目录、回放控制），基于 `rsipstack` + `tx_gb28181` + `tx_di_sip`。 | `tx_di_sip` |

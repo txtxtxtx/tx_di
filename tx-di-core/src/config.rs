@@ -22,6 +22,17 @@ pub struct AppAllConfig {
 }
 
 impl AppAllConfig {
+    /// 从内存 TOML 值创建配置（配置中心拉取 / 启动合并场景）
+    ///
+    /// 配合 `BuildContext::with_config` 使用：先拉取远程配置（如 Nacos），
+    /// 合并后从内存构建应用，使拉取到的配置参与组件初始化。
+    pub fn from_toml_value(value: toml::Value) -> RIE<Self> {
+        Ok(AppAllConfig {
+            toml_value: value,
+            config_path: PathBuf::new(),
+        })
+    }
+
     /// 从指定路径或默认路径加载配置
     pub fn new<P: Into<PathBuf>>(config_path: Option<P>) -> RIE<Self> {
         let final_config_path = if let Some(path) = config_path {

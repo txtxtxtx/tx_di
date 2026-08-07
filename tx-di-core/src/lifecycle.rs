@@ -68,6 +68,33 @@ impl BuildContext {
         Ok(ctx)
     }
 
+    /// 从内存配置创建 BuildContext（配置中心拉取场景）
+    ///
+    /// 典型用法（配合 `tx_di_nacos`，配置中心作为配置源，改配置 → 优雅重启 → 生效）：
+    ///
+    /// ```rust,ignore
+    /// // 1. 启动早期（BuildContext 之前）连接配置中心并拉取远程配置
+    /// let client = tx_di_nacos::NacosClient::connect(&bootstrap).await?;
+    /// let remote = client.pull_config("tx-admin.toml").await?;
+    /// // 2. 合并（远程覆盖本地 bootstrap）
+    /// let merged = client.merge_config(local_toml, remote)?;
+    /// // 3. 用合并后的配置构建应用（组件按新配置初始化）
+    /// let ctx = BuildContext::with_config(merged)?;
+    /// ```
+    pub fn with_config(toml_value: toml::Value) -> RIE<Self> {
+        let mut ctx = Self {
+            store: Store::new(),
+            metas: vec![],
+        };
+
+        let app_configs = AppAllConfig::from_toml_value(toml_value)?;
+        ctx.store.insert_cached(app_configs);
+
+        ctx.auto_register_all()?;
+
+        Ok(ctx)
+    }
+
     /// 自动注册所有通过 `#[derive(Component)]` 标记的组件
     fn auto_register_all(&mut self) -> RIE<()> {
         // 1. 填充 trait_impls（每个 Store 拥有独立的 trait 映射，无全局污染）
@@ -405,11 +432,19 @@ impl App {
         self.store.shutdown_prototypes();
     }
 
-    /// 等待退出信号并优雅关闭
+    /// 等待退出信号并优雅关闭（等价于 `wait_exit_signal().await` + `graceful_shutdown().await`）
     pub async fn waiting_exit(&self) {
-        App::wait_for_exit_signal().await;
+        App::wait_exit_signal().await;
+        let _ = self.graceful_shutdown().await;
+    }
+
+    /// 优雅关闭当前实例（**不退出进程**，可再次启动新 App）
+    ///
+    /// 用于配置中心「配置变更 → 优雅重启」场景：外层循环调用本方法关闭旧实例，
+    /// 然后用新配置重新构建并启动。幂等（shutdown 只执行一次）。
+    pub async fn graceful_shutdown(&self) -> RIE<()> {
         let start = Instant::now();
-        info!("正在等待退出...");
+        info!("正在优雅关闭...");
         self.shutdown_token.cancel();
 
         if let Some(handle) = self.task_handle.write().await.take() {
@@ -427,15 +462,16 @@ impl App {
             }
         }
 
-        // 优雅关闭所有组件
+        // 优雅关闭所有组件（幂等）
         self.shutdown().await;
 
-        info!("app 已退出，耗时: {:?}", start.elapsed());
+        info!("app 已关闭，耗时: {:?}", start.elapsed());
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        Ok(())
     }
 
-    /// 跨平台等待退出信号
-    async fn wait_for_exit_signal() {
+    /// 跨平台等待退出信号（Ctrl+C / SIGTERM / SIGHUP）
+    pub async fn wait_exit_signal() {
         #[cfg(unix)]
         {
             let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate())
