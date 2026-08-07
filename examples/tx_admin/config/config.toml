@@ -22,7 +22,7 @@ time_format = "local"
 
 [sa_token]
 # Redis 连接串（会话跨实例共享，水平扩容必需；本地无 Redis 时注释掉并改用内存 feature）
-redis_url = "redis://127.0.0.1:6379/0"
+# redis_url = "redis://127.0.0.1:6379/0"
 active_timeout = 1800
 auto_renew = true
 enable_refresh_token = true
@@ -45,12 +45,14 @@ max_pool_size = 10
 # 注册中心（Nacos）：enabled=true 时注册 HTTP/gRPC 端点并支持配置中心
 # 生产多实例部署开启；本地无 Nacos 时保持 false
 [registry_config]
-enabled = false
-nacos_addr = "http://127.0.0.1:8848"
-namespace = "public"
+enabled = true
+nacos_addr = "http://192.168.0.91:8848"
+namespace = "724add82-6b07-4bc6-aed5-b6d9425db423"
 group = "DEFAULT_GROUP"
-service_name = "tx-admin"
+service_name = "tx_admin"
 auto_register = true
+username = "nacos"
+password = "Yc@53672578."
 # 主配置 data_id（默认 "{service_name}.toml"）：启动拉取 + 合并本地，变更时优雅重启生效
 # config_data_id = "tx-admin.toml"
 

@@ -31,7 +31,7 @@ use tx_error::AppResult;
 #[tokio::main]
 async fn main() -> AppResult<()> {
     tx_di_nacos::app_loop! {
-        config = r"C:\a_me\proj\rust\tx_di\examples\tx_admin\config\config.toml",
+        config = r"examples/tx_admin/config/config.toml",
         startup = |app: std::sync::Arc<tx_di_core::App>| -> tx_di_core::RIE<()> {
             // 注册内置任务处理器
             use tx_di_job::{ExecutionStatus, JobPlugin, JobResult};

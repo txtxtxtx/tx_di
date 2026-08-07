@@ -8,7 +8,7 @@ use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::TcpListener as TokioTcpListener;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
-use tx_di_core::{ApiR, App, Component, DepsTuple, FormattedDateTime, RIE};
+use tx_di_core::{App, Component, DepsTuple, RIE};
 use crate::layers::LAYER_REGISTRY;
 
 /// 全局路由器注册表
@@ -169,8 +169,7 @@ impl WebPlugin {
     fn merge_routers() -> axum::Router {
         use aide::openapi::OpenApi;
 
-        let mut main_router = axum::Router::new()
-            .route("/health", get(health_check));
+        let mut main_router = axum::Router::new();
 
         let mut routers = ROUTER_REGISTRY.lock();
         if let Ok(ref mut routers) = routers {
@@ -234,8 +233,7 @@ impl WebPlugin {
     /// 合并所有已注册的路由器
     #[cfg(not(feature = "api-doc"))]
     fn merge_routers() -> axum::Router {
-        let mut main_router = axum::Router::new()
-            .route("/health", get(health_check));
+        let mut main_router = axum::Router::new();
 
         if let Ok(mut routers) = ROUTER_REGISTRY.lock() {
             let all = routers.drain(..).collect::<Vec<_>>();
@@ -335,13 +333,6 @@ fn create_tcp_listener(addr: SocketAddr) -> RIE<TokioTcpListener> {
     let tokio_listener = TokioTcpListener::from_std(listener)?;
 
     Ok(tokio_listener)
-}
-
-/// 健康检查端点
-///
-/// 返回简单的 OK 响应，用于负载均衡器或监控系统的健康检查
-async fn health_check() -> ApiR<FormattedDateTime> {
-    ApiR::success(FormattedDateTime::now())
 }
 
 /// 启动 web 服务器

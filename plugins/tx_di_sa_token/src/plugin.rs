@@ -1,9 +1,22 @@
 //! sa-token 核心插件组件
 
 use crate::config::SaTokenConf;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use tx_di_core::{App, Component, DepsTuple, RIE};
 use tracing::info;
+
+/// sa-token 全局状态（进程级单例）
+///
+/// sa-token-core 的 `StpUtil::init_manager` 内部使用 `OnceLock`，进程内只能调用一次。
+/// 而 tx-di 的 `app_loop!` 支持"配置变更 → 优雅重启（不退出进程）"，
+/// 重启会重新构建组件并再次走到 `SaTokenStateBuilder::build()` → 触发 panic
+/// （`StpUtil manager already initialized`）。
+///
+/// 因此这里将构建结果缓存到进程级静态变量：首次 build 后复用，后续重启不再 build。
+///
+/// > 注意：sa-token 配置（token_name / timeout / storage 等）属于**进程级初始化型配置**，
+/// > 变更后需完整重启进程生效（同 Nacos 配置中心"重启生效"语义）。
+static GLOBAL_SA_TOKEN_STATE: OnceLock<sa_token_plugin_axum::SaTokenState> = OnceLock::new();
 
 /// sa-token 插件
 ///
@@ -72,16 +85,28 @@ impl SaTokenPlugin {
 async fn app_async_init(comp: Arc<SaTokenPlugin>, _app: Arc<App>) -> RIE<()> {
     info!("SaTokenPlugin 初始化");
     let config = comp.config.clone();
-    info!("正在构建 SaToken 状态...");
-    // 使用 Builder 模式构建 SaTokenState
-    let builder = sa_token_plugin_axum::SaTokenStateBuilder::default();
-    let state = config.apply_to_builder(builder).await?.build();
-    // 写入 OnceLock
+
+    // 进程级复用：首次构建，重启复用（避免 StpUtil manager already initialized panic）
+    let state = match GLOBAL_SA_TOKEN_STATE.get() {
+        Some(s) => {
+            info!("复用已构建的 SaToken 状态（进程内优雅重启）");
+            s.clone()
+        }
+        None => {
+            info!("正在构建 SaToken 状态...");
+            // 使用 Builder 模式构建 SaTokenState
+            let builder = sa_token_plugin_axum::SaTokenStateBuilder::default();
+            let state = config.apply_to_builder(builder).await?.build();
+            // 首次构建成功后才写入全局（set 失败说明并发下已被其他任务构建，忽略）
+            let _ = GLOBAL_SA_TOKEN_STATE.set(state.clone());
+            state
+        }
+    };
+
+    // 写入组件字段 OnceLock
     if comp.state.set(state).is_err() {
         tracing::warn!("SaTokenPlugin: state concurrently initialized");
     }
-    // todo 注册权限拦截器
-    // tx_di_axum::add_layer(self.build_layer(),9999);
     info!(
             token_name = %config.token_name,
             timeout = config.timeout,
