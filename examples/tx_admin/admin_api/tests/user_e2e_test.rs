@@ -21,16 +21,26 @@ fn unique_username(tag: &str) -> String {
     format!("e2e_{tag}_{nanos}")
 }
 
+/// 生成唯一 11 位手机号（基于时间戳，避免唯一约束冲突）
+fn unique_mobile() -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("系统时钟应晚于 1970")
+        .as_nanos();
+    let tail = nanos % 10_000_000_000;
+    format!("1{tail:010}")
+}
+
 /// 创建用户并返回 `{id, username}`，失败时 panic（供各用例复用）
 async fn create_user(client: &reqwest::Client, base: &str, username: &str) -> (String, String) {
     let resp = client
-        .post(format!("{base}/api/v1/user/"))
+        .post(format!("{base}/api/v1/user"))
         .json(&json!({
             "username": username,
             "password": "Test@123456",
             "nickname": "E2E 测试用户",
             "email": format!("{username}@example.com"),
-            "mobile": "13800000000",
+            "mobile": unique_mobile(),
             "sex": 1,
             "remark": "created by e2e",
             "roleIds": [],
@@ -42,7 +52,11 @@ async fn create_user(client: &reqwest::Client, base: &str, username: &str) -> (S
     assert_eq!(resp.status(), 200, "创建用户应返回 HTTP 200: {resp:?}");
     let body: Value = resp.json().await.expect("创建用户响应 JSON 解析失败");
     assert_eq!(body["code"], 200, "创建用户业务码应为 200: {body}");
-    let id = body["data"]["id"].as_str().expect("缺少用户 id").to_string();
+    let id = body["data"]["id"]
+        .as_str()
+        .map(str::to_string)
+        .or_else(|| body["data"]["id"].as_u64().map(|v| v.to_string()))
+        .expect("缺少用户 id");
     (id, username.to_string())
 }
 
@@ -78,7 +92,7 @@ async fn create_user_duplicate_username_rejected() {
     let _ = create_user(&client, &srv.base_url, &username).await;
 
     let resp = client
-        .post(format!("{}/api/v1/user/", srv.base_url))
+        .post(format!("{}/api/v1/user", srv.base_url))
         .json(&json!({
             "username": username,
             "password": "Test@123456",
@@ -211,6 +225,21 @@ async fn change_status_ok() {
     assert_eq!(body["data"]["status"], 1, "禁用状态应持久化: {body}");
 }
 
+/// 查询用户状态码（0-正常, 1-禁用, 2-锁定），失败返回 -1
+async fn get_user_status(
+    client: &reqwest::Client,
+    base: &str,
+    user_id: &str,
+) -> i64 {
+    let resp = client
+        .get(format!("{base}/api/v1/user/{user_id}"))
+        .send()
+        .await
+        .expect("回查用户请求失败");
+    let body: Value = resp.json().await.expect("回查用户响应 JSON 解析失败");
+    body["data"]["status"].as_i64().unwrap_or(-1)
+}
+
 /// 状态快捷接口：disable/lock/unlock 依次生效
 #[tokio::test]
 async fn status_shortcuts_disable_lock_unlock() {
@@ -218,16 +247,6 @@ async fn status_shortcuts_disable_lock_unlock() {
     let client = authed_client(admin_token().await);
     let username = unique_username("scut");
     let (id, _) = create_user(&client, &srv.base_url, &username).await;
-
-    let get_status = |client: &reqwest::Client| async move {
-        let resp = client
-            .get(format!("{}/api/v1/user/{id}", srv.base_url))
-            .send()
-            .await
-            .expect("回查用户请求失败");
-        let body: Value = resp.json().await.expect("回查用户响应 JSON 解析失败");
-        body["data"]["status"].as_i64().unwrap_or(-1)
-    };
 
     // disable → 1
     let resp = client
@@ -237,7 +256,7 @@ async fn status_shortcuts_disable_lock_unlock() {
         .await
         .expect("disable 请求失败");
     assert_eq!(resp.status(), 200, "disable 应返回 HTTP 200: {resp:?}");
-    assert_eq!(get_status(&client).await, 1, "disable 后状态应为 1");
+    assert_eq!(get_user_status(&client, &srv.base_url, &id).await, 1, "disable 后状态应为 1");
 
     // lock → 2
     let resp = client
@@ -247,7 +266,7 @@ async fn status_shortcuts_disable_lock_unlock() {
         .await
         .expect("lock 请求失败");
     assert_eq!(resp.status(), 200, "lock 应返回 HTTP 200: {resp:?}");
-    assert_eq!(get_status(&client).await, 2, "lock 后状态应为 2");
+    assert_eq!(get_user_status(&client, &srv.base_url, &id).await, 2, "lock 后状态应为 2");
 
     // unlock → 0（unlock 置为 Active）
     let resp = client
@@ -257,7 +276,7 @@ async fn status_shortcuts_disable_lock_unlock() {
         .await
         .expect("unlock 请求失败");
     assert_eq!(resp.status(), 200, "unlock 应返回 HTTP 200: {resp:?}");
-    assert_eq!(get_status(&client).await, 0, "unlock 后状态应为 0");
+    assert_eq!(get_user_status(&client, &srv.base_url, &id).await, 0, "unlock 后状态应为 0");
 }
 
 /// 修改密码：成功返回 200

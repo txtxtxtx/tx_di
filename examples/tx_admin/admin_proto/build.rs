@@ -35,12 +35,15 @@ fn main() -> Result<()> {
 
     tonic_build::configure()
         .out_dir("src/pb")
-        // 顺序很重要：
-        // 1. serde derive 先引入，使下方 serde(rename_all) helper attribute 合法
-        // 2. serde_as 宏展开，注入 phantom 字段和 serde(with) 属性
+        // 顺序很重要（serde_with 硬性要求）：
+        // 1. `#[serde_with::serde_as]` 属性宏必须**先于** derive 出现，
+        //    它才能把字段上的 `#[serde_as(as = "...")]` 注解改写为
+        //    `#[serde(serialize_with = ..., deserialize_with = ...)]`。
+        //    若放在 derive 之后，宏不会改写字段注解，i64/u64 字符串序列化静默失效。
+        // 2. 之后才是 serde derive + rename_all helper attribute。
+        .type_attribute(".", "#[serde_with::serde_as]")
         .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
         .type_attribute(".", "#[serde(rename_all = \"camelCase\")]")
-        .type_attribute(".", "#[serde_with::serde_as]")
         .field_attribute("optional", "#[serde(skip_serializing_if = \"Option::is_none\")]")
         .compile_protos(&proto_paths, &[proto_dir])?;
 

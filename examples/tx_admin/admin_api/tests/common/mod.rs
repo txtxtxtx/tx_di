@@ -37,6 +37,13 @@ pub async fn server() -> &'static TestServer {
 }
 
 /// 启动完整 App：内存 SQLite + 关闭 Nacos + 随机 Web/gRPC 端口
+///
+/// **关键设计**：App 的 `async_run`（含 Web 服务器的 `axum::serve`）由
+/// `tokio::spawn` 启动，绑定在调用方 runtime 上。若在每个 `#[tokio::test]`
+/// 各自的 runtime 中启动，测试结束 runtime 销毁会连带杀掉后台 server，
+/// 导致后续用例连接被拒（ConnectionRefused）。
+/// 因此必须用**独立常驻 runtime** 执行 `ins_run`，该 runtime 与任何测试
+/// 的生命周期无关，跨测试持续存活。实现：后台线程 + 泄漏的 `Runtime`。
 async fn start_server() -> anyhow::Result<TestServer> {
     let web_port = pick_free_port().await?;
     let grpc_port = pick_free_port().await?;
@@ -54,10 +61,22 @@ async fn start_server() -> anyhow::Result<TestServer> {
         );
     }
 
-    let app = tx_di_core::BuildContext::with_config(cfg)?
-        .build()?
-        .ins_run()
-        .await?;
+    // 常驻 runtime：泄漏的 Runtime 保证其内部 async_run 任务（Web server）跨测试存活。
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("创建常驻 runtime 失败");
+    let runtime: &'static tokio::runtime::Runtime = Box::leak(Box::new(runtime));
+
+    let app = tokio::task::spawn_blocking(move || {
+        runtime.block_on(async move {
+            tx_di_core::BuildContext::with_config(cfg)?
+                .build()?
+                .ins_run()
+                .await
+        })
+    })
+    .await??;
 
     let base_url = format!("http://127.0.0.1:{web_port}");
     wait_for_ready(&base_url).await?;
@@ -165,11 +184,19 @@ pub async fn login(client: &reqwest::Client, base_url: &str) -> anyhow::Result<S
 
 static ADMIN_TOKEN: OnceCell<String> = OnceCell::const_new();
 
-/// 获取共享 admin token（进程内只登录一次）。
-///
-/// 登录接口有硬编码限流（`per_second(12)` + 桶容量 5），同一进程内多个用例
-/// 各自登录会耗尽配额触发 429，因此所有用例复用同一次登录的 token。
+/// 登录限流桶容量只有 5，`OnceCell::get_or_try_init` 在多个测试并行进入时会
+/// 并发执行多次登录请求（初始化不保证只跑一次），瞬间耗尽配额触发 429。
+/// 因此用互斥锁串行化初始化，保证进程内只真正发起一次登录。
+static ADMIN_TOKEN_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// 获取共享 admin token（进程内只真正登录一次，其余等待复用）。
 pub async fn admin_token() -> &'static str {
+    // 先快速路径：已初始化直接返回，避免锁竞争
+    if let Some(token) = ADMIN_TOKEN.get() {
+        return token.as_str();
+    }
+    let _guard = ADMIN_TOKEN_LOCK.lock().await;
+    // double-check：锁内可能已被其他任务初始化
     ADMIN_TOKEN
         .get_or_try_init(|| async {
             let srv = server().await;

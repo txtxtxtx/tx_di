@@ -69,6 +69,9 @@ async fn login_wrong_password_rejected() {
 }
 
 /// 未登录访问受保护接口 → HTTP 401
+///
+/// 注意：sa-token 拦截器直接返回 HTTP 401（空 body），并非 ApiR JSON，
+/// 因此只断言状态码，不解析响应体。
 #[tokio::test]
 async fn user_info_requires_auth() {
     let srv = server().await;
@@ -80,9 +83,6 @@ async fn user_info_requires_auth() {
         .await
         .expect("请求失败");
     assert_eq!(resp.status(), 401, "未登录应返回 401");
-
-    let body: Value = resp.json().await.expect("401 响应 JSON 解析失败");
-    assert_eq!(body["code"], 401, "401 业务码应为 401: {body}");
 }
 
 /// 带 token 访问 user_info → 成功且返回 admin 用户信息
