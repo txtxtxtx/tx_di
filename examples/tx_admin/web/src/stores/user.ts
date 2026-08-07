@@ -6,14 +6,18 @@ import { resetDynamicRoutes } from '@/router'
 import type { LoginRequest, UserInfoResponse } from '@/types'
 
 export const useUserStore = defineStore('user', () => {
-  const token = ref(localStorage.getItem('token') || '')
+  // 阶段 E-2：token 由后端写入 HttpOnly Cookie（前端不可读、防 XSS 窃取），
+  // 此处仅缓存 userInfo 判断登录态，不再存储 token。
+  const token = ref('')
   const userInfo = ref<UserInfoResponse | null>(null)
   const permissions = ref<string[]>([])
 
   async function login(req: LoginRequest) {
     const res = await loginApi(req)
-    token.value = res.data.token
-    localStorage.setItem('token', res.data.token)
+    // token 在 HttpOnly Cookie 中，前端不保存
+    token.value = ''
+    userInfo.value = res.data
+    permissions.value = res.data.permissions || []
     return res
   }
 
@@ -29,7 +33,6 @@ export const useUserStore = defineStore('user', () => {
     token.value = ''
     userInfo.value = null
     permissions.value = []
-    localStorage.removeItem('token')
     const menuStore = useMenuStore()
     menuStore.clearMenus()
     resetDynamicRoutes()

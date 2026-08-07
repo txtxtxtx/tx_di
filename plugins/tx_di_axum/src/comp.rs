@@ -79,6 +79,11 @@ async fn app_async_init(comp: Arc<WebPlugin>, app: Arc<App>) -> RIE<()> {
     // API 文档端点（/docs, /api-docs/openapi.json）
     outer_router = WebPlugin::setup_doc_routes(outer_router);
 
+    // 可观测性：/metrics Prometheus 指标端点（阶段 E-3）
+    crate::metrics::ensure_initialized();
+    outer_router = outer_router.merge(crate::metrics::metrics_router());
+    info!("已注册 /metrics 指标端点");
+
     // 合并：中间件外的路由优先匹配
     let router = outer_router.merge(api_router);
 
@@ -353,12 +358,17 @@ async fn start_server(config: Arc<WebConfig>, router: axum::Router, token: Cance
     info!("静态文件夹路径:{}",config.static_dir);
     info!("Web 服务器正在监听: {}", addr);
     let listener = create_tcp_listener(addr)?;
-    axum::serve(listener, router)
-        .with_graceful_shutdown(async move {
-            token.cancelled().await;
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!("Web 服务器运行失败: {}", e))?;
+    // into_make_service_with_connect_info 注入客户端 SocketAddr（ConnectInfo），
+    // 供限流中间件（tower-governor 的 PeerIpKeyExtractor / SmartIpKeyExtractor）提取客户端 IP。
+    axum::serve(
+        listener,
+        router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(async move {
+        token.cancelled().await;
+    })
+    .await
+    .map_err(|e| anyhow::anyhow!("Web 服务器运行失败: {}", e))?;
 
     Ok(())
 }

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::info;
-use tx_di_axum::{WebPlugin, WebConfig, add_layer};
+use tx_di_axum::{WebPlugin, WebConfig, add_layer, MetricsLayer};
 use tx_di_core::{App, AppAllConfig, Component, DepsTuple, RIE};
 use tx_di_sa_token::{SaTokenPlugin, SaTokenLayer, SaCheckLoginLayer};
 use admin_app::log::app_service::OperateLogAppService;
@@ -63,6 +63,10 @@ async fn app_async_init(_comp: Arc<AdminPlugin>, app: Arc<App>) -> RIE<()> {
     // 获取 WebConfig 的 max_body_size，用于文件上传 Content-Length 提前拦截
     let web_config = app.inject::<WebConfig>();
     let max_body_size = web_config.max_body_size as u64;
+
+    // 可观测性指标 Layer（阶段 E-3）：采集 HTTP 请求计数与耗时
+    add_layer(MetricsLayer, 5); // sort=5: 在 api_log(10) 之前（指标应覆盖所有请求）
+    info!("Prometheus 指标 Layer 已注册 (sort=5)");
 
     // 注册操作日志 Layer：每次 HTTP 请求自动写入 sys_operate_log 表
     let op_log_svc: Arc<OperateLogAppService> = app.inject();

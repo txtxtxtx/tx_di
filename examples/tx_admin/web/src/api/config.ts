@@ -1,8 +1,8 @@
-import request from './request'
+﻿import request from './request'
 import type { ApiRes, PageData, ConfigResponse, CreateConfigRequest, UpdateConfigRequest, ListConfigsRequest } from '@/types'
 
 export function createConfig(data: CreateConfigRequest) {
-  return request.post<ApiRes<ConfigResponse>>('/api/config', data).then(r => r.data)
+  return request.post<ApiRes<ConfigResponse>>('/api/v1/config', data).then(r => r.data)
 }
 
 export function getConfig(configId: string) {
@@ -18,7 +18,7 @@ export function deleteConfig(configId: string) {
 }
 
 export function listConfigs(data: ListConfigsRequest) {
-  return request.post<ApiRes<PageData<ConfigResponse>>>('/api/config/list', data).then(r => r.data)
+  return request.post<ApiRes<PageData<ConfigResponse>>>('/api/v1/config/list', data).then(r => r.data)
 }
 
 export function getConfigByKey(key: string) {

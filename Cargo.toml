@@ -154,6 +154,19 @@ sa-token-plugin-axum = { version = "0.1.18", default-features = false, features 
 aide = { version = "0.14", features = ["axum", "axum-json", "redoc"] }
 schemars = "0.8"
 
+# 登录限流（阶段 E-1：基于 IP 的速率限制）
+tower_governor = { version = "0.8", default-features = false, features = ["axum"] }
+
+# 可观测性（阶段 E-3：OpenTelemetry 链路 + Prometheus 指标）
+# 版本对齐：tracing-opentelemetry 0.30 依赖 opentelemetry 0.29 系列，故统一用 0.29。
+# otlp 使用 http-proto + reqwest-blocking-client：exporter 在同步 init 回调中构建，
+# 后台线程批量导出，无需 async runtime；grpc-tonic 会与项目 tonic 0.12 冲突，故关闭默认 features。
+opentelemetry = "0.29"
+opentelemetry_sdk = { version = "0.29", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.29", default-features = false, features = ["trace", "http-proto", "reqwest-blocking-client"] }
+tracing-opentelemetry = "0.30"
+prometheus = "0.14"
+
 livekit-api = { version = "0.4", default-features = false }
 livekit = { version = "0.7.42", default-features = false }
 toasty = { version = "0.9", default-features = false, features = ["serde"] }

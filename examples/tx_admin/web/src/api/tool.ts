@@ -1,6 +1,6 @@
-import request from './request'
+﻿import request from './request'
 import type { ApiRes, CacheStatsResponse } from '@/types'
 
 export function getCacheStats() {
-  return request.get<ApiRes<CacheStatsResponse>>('/api/tool/cache/stats').then(r => r.data)
+  return request.get<ApiRes<CacheStatsResponse>>('/api/v1/tool/cache/stats').then(r => r.data)
 }

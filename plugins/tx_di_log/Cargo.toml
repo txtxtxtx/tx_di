@@ -16,3 +16,9 @@ tracing-subscriber.workspace = true
 tracing-appender.workspace = true
 anyhow.workspace = true
 time = {workspace = true,features = ["formatting"]}
+
+# 可观测性（阶段 E-3：OpenTelemetry 链路导出，otlp_endpoint 配置后启用）
+opentelemetry.workspace = true
+opentelemetry_sdk.workspace = true
+opentelemetry-otlp.workspace = true
+tracing-opentelemetry.workspace = true

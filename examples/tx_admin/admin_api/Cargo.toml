@@ -32,6 +32,8 @@ prost  = { workspace = true }
 # HTTP
 axum   = { workspace = true, features = ["macros", "multipart"] }
 tower  = { workspace = true, features = ["full"] }
+# 登录限流（阶段 E-1：基于 IP 的速率限制）
+tower_governor = { workspace = true }
 
 # 序列化
 serde       = { workspace = true }

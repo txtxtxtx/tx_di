@@ -122,6 +122,48 @@ fn init(this: &mut LogPlugins, _store: &Store) -> RIE<()> {
         filter
     };
     // 注册全局订阅者（使用 try_init 避免重复初始化 panic）
+    // 阶段 E-3：配置 otlp_endpoint 时挂载 OTel 链路追踪 layer。
+    // OTel layer 需放在最内层（Registry 之上），console layer 最外层。
+    let otel_enabled = this
+        .config
+        .otlp_endpoint
+        .as_ref()
+        .is_some_and(|_| !crate::otel::is_initialized());
+
+    if otel_enabled {
+        let endpoint = this.config.otlp_endpoint.clone().unwrap_or_default();
+        let service_name = this
+            .config
+            .service_name
+            .clone()
+            .unwrap_or_else(|| this.config.prefix.clone());
+        match crate::otel::init_tracer(&endpoint, &service_name) {
+            Ok(tracer) => {
+                // OTel layer 必须放在 Layer 链最外层（官方示例 opentelemetry-otlp.rs），
+                // 其 S 泛型由调用点推断为整个 Layered 链。
+                if this.config.console_output {
+                    let _ = tracing_subscriber::registry()
+                        .with(env_filter)
+                        .with(file_layer)
+                        .with(console_layer)
+                        .with(tracing_opentelemetry::OpenTelemetryLayer::new(tracer))
+                        .try_init();
+                } else {
+                    let _ = tracing_subscriber::registry()
+                        .with(env_filter)
+                        .with(file_layer)
+                        .with(tracing_opentelemetry::OpenTelemetryLayer::new(tracer))
+                        .try_init();
+                }
+                debug!("日志初始化完成（含 OTel）");
+                return Ok(());
+            }
+            Err(e) => {
+                error!("OTel 初始化失败（降级为纯日志模式）: {e}");
+            }
+        }
+    }
+
     let subscriber = tracing_subscriber::registry()
         .with(env_filter)
         .with(file_layer);

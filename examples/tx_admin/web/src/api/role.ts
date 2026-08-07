@@ -1,8 +1,8 @@
-import request from './request'
+﻿import request from './request'
 import type { ApiRes, PageData, RoleResponse, CreateRoleRequest, UpdateRoleRequest, ListRolesRequest, AssignMenusRequest, UserResponse } from '@/types'
 
 export function createRole(data: CreateRoleRequest) {
-  return request.post<ApiRes<RoleResponse>>('/api/role', data).then(r => r.data)
+  return request.post<ApiRes<RoleResponse>>('/api/v1/role', data).then(r => r.data)
 }
 
 export function getRole(roleId: string) {
@@ -18,15 +18,15 @@ export function deleteRole(roleId: string) {
 }
 
 export function listRoles(data: ListRolesRequest) {
-  return request.post<ApiRes<PageData<RoleResponse>>>('/api/role/list', data).then(r => r.data)
+  return request.post<ApiRes<PageData<RoleResponse>>>('/api/v1/role/list', data).then(r => r.data)
 }
 
 export function assignMenus(data: AssignMenusRequest) {
-  return request.post<ApiRes<null>>('/api/role/assign_menus', data).then(r => r.data)
+  return request.post<ApiRes<null>>('/api/v1/role/assign_menus', data).then(r => r.data)
 }
 
 export function getAllRoles() {
-  return request.get<ApiRes<RoleResponse[]>>('/api/role/all').then(r => r.data)
+  return request.get<ApiRes<RoleResponse[]>>('/api/v1/role/all').then(r => r.data)
 }
 
 export function getRoleUsers(roleId: string) {

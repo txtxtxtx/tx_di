@@ -55,6 +55,17 @@ pub struct LogConfig {
 
     #[serde(default = "time_format_str")]
     pub time_format_str: String,
+
+    /// OpenTelemetry OTLP 导出端点（阶段 E-3）
+    ///
+    /// 配置后（如 `http://127.0.0.1:4318`）启用链路追踪导出（W3C TraceContext），
+    /// 与 Jaeger / OTel Collector / 云厂商可观测平台对接。为空则禁用 OTel。
+    #[serde(default)]
+    pub otlp_endpoint: Option<String>,
+
+    /// OTel 服务名（上报到可观测平台的服务标识，默认取 prefix）
+    #[serde(default)]
+    pub service_name: Option<String>,
 }
 
 fn time_format_str() -> String {

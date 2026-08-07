@@ -127,16 +127,30 @@ export function resetDynamicRoutes() {
 const whiteList = ['/login']
 
 router.beforeEach(async (to, _from, next) => {
-  const token = localStorage.getItem('token')
+  // 阶段 E-2：token 在 HttpOnly Cookie（前端不可读），登录态通过 userInfo 判断。
+  // 首次进入时尝试 fetchUserInfo（自动携带 Cookie），服务端校验失败则视为未登录。
+  const { useUserStore } = await import('@/stores/user')
+  const userStore = useUserStore()
 
-  if (!token) {
-    // 未登录：白名单放行，否则跳登录
-    if (whiteList.includes(to.path)) {
-      next()
-    } else {
-      next('/login')
+  if (!userStore.userInfo) {
+    // 未确认登录态：先尝试用 Cookie 换取用户信息
+    let authed = false
+    try {
+      await userStore.fetchUserInfo()
+      authed = true
+    } catch {
+      authed = false
     }
-    return
+
+    if (!authed) {
+      // 未登录：白名单放行，否则跳登录
+      if (whiteList.includes(to.path)) {
+        next()
+      } else {
+        next('/login')
+      }
+      return
+    }
   }
 
   // 已登录访问登录页 → 跳首页

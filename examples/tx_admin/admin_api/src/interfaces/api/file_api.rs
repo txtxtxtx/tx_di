@@ -79,9 +79,9 @@ pub fn router(max_body_size: u64) -> Router {
 /// 公开路由：无需鉴权（URL 含 UUID，不可猜测）
 ///
 /// 当前包含：
-/// - `GET /api/file/pre/serve/{*path}` 本地文件静态服务
+/// - `GET /api/v1/file/pre/serve/{*path}` 本地文件静态服务
 pub fn open_router() -> Router {
-    Router::new().route("/api/file/pre/serve/{*path}", get(serve_local_file))
+    Router::new().route("/api/v1/file/pre/serve/{*path}", get(serve_local_file))
 }
 
 // ============================================================================

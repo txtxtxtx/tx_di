@@ -19,6 +19,10 @@ dir = "./logs"
 prefix = "tx_admin"
 retention_days = 7
 time_format = "local"
+# 阶段 E-3：OpenTelemetry 链路导出（OTLP HTTP，对接 Jaeger/OTel Collector）。
+# 配置后自动启用；为空则不启用。示例：otlp_endpoint = "http://127.0.0.1:4318"
+# otlp_endpoint = ""
+# service_name = "tx-admin"
 
 [sa_token]
 # Redis 连接串（会话跨实例共享，水平扩容必需；本地无 Redis 时注释掉并改用内存 feature）

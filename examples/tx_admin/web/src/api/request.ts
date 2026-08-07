@@ -11,19 +11,10 @@ let isRedirectingToLogin = false
 const request = axios.create({
   baseURL: '',
   timeout: 30000,
+  // 阶段 E-2：token 存储加固——登录后 token 写入 HttpOnly Cookie，
+  // 浏览器自动携带 Cookie 认证，无需前端管理 token
+  withCredentials: true,
 })
-
-// 请求拦截器：注入 token
-request.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers['Authorization'] = token
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
 
 // 响应拦截器：统一错误处理
 request.interceptors.response.use(

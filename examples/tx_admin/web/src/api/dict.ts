@@ -1,9 +1,9 @@
-import request from './request'
+﻿import request from './request'
 import type { ApiRes, PageData, DictTypeResponse, DictDataResponse, CreateDictTypeRequest, UpdateDictTypeRequest, ListDictTypesRequest, CreateDictDataRequest, UpdateDictDataRequest, ListDictDataRequest } from '@/types'
 
 // 字典类型
 export function createDictType(data: CreateDictTypeRequest) {
-  return request.post<ApiRes<DictTypeResponse>>('/api/dict/type', data).then(r => r.data)
+  return request.post<ApiRes<DictTypeResponse>>('/api/v1/dict/type', data).then(r => r.data)
 }
 
 export function getDictType(id: string) {
@@ -19,12 +19,12 @@ export function deleteDictType(id: string) {
 }
 
 export function listDictTypes(data: ListDictTypesRequest) {
-  return request.post<ApiRes<PageData<DictTypeResponse>>>('/api/dict/type/list', data).then(r => r.data)
+  return request.post<ApiRes<PageData<DictTypeResponse>>>('/api/v1/dict/type/list', data).then(r => r.data)
 }
 
 // 字典数据
 export function createDictData(data: CreateDictDataRequest) {
-  return request.post<ApiRes<DictDataResponse>>('/api/dict/data', data).then(r => r.data)
+  return request.post<ApiRes<DictDataResponse>>('/api/v1/dict/data', data).then(r => r.data)
 }
 
 export function getDictData(id: string) {
@@ -40,7 +40,7 @@ export function deleteDictData(id: string) {
 }
 
 export function listDictData(data: ListDictDataRequest) {
-  return request.post<ApiRes<PageData<DictDataResponse>>>('/api/dict/data/list', data).then(r => r.data)
+  return request.post<ApiRes<PageData<DictDataResponse>>>('/api/v1/dict/data/list', data).then(r => r.data)
 }
 
 export function getDictDataByType(dictType: string) {
@@ -48,7 +48,7 @@ export function getDictDataByType(dictType: string) {
 }
 
 export function getDictDataByTypes(dictTypes: string[]) {
-  return request.get<ApiRes<Record<string, DictDataResponse[]>>>('/api/dict/data/batch', {
+  return request.get<ApiRes<Record<string, DictDataResponse[]>>>('/api/v1/dict/data/batch', {
     params: { types: dictTypes.join(',') },
   }).then(r => r.data)
 }

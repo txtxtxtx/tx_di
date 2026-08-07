@@ -31,3 +31,6 @@ tokio-util.workspace = true
 tx_common = { workspace = true, features = ["axum"] }
 aide = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
+
+# 可观测性指标（阶段 E-3：/metrics Prometheus 端点）
+prometheus.workspace = true

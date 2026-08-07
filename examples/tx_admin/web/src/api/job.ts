@@ -1,4 +1,4 @@
-import request from './request'
+﻿import request from './request'
 import type {
   JobResponse, JobLogResponse,
   CreateJobRequest, UpdateJobRequest,
@@ -10,7 +10,7 @@ import type {
 
 /** 任务列表 */
 export function listJobs(data: ListJobsRequest) {
-  return request.post<ApiRes<PageData<JobResponse>>>('/api/job/list', data).then(r => r.data)
+  return request.post<ApiRes<PageData<JobResponse>>>('/api/v1/job/list', data).then(r => r.data)
 }
 
 /** 任务详情 */
@@ -20,7 +20,7 @@ export function getJob(id: string) {
 
 /** 新增任务 */
 export function createJob(data: CreateJobRequest) {
-  return request.post<ApiRes<JobResponse>>('/api/job', data).then(r => r.data)
+  return request.post<ApiRes<JobResponse>>('/api/v1/job', data).then(r => r.data)
 }
 
 /** 修改任务 */
@@ -47,7 +47,7 @@ export function runJob(id: string) {
 
 /** 日志列表 */
 export function listJobLogs(data: ListJobLogsRequest) {
-  return request.post<ApiRes<PageData<JobLogResponse>>>('/api/job/log/list', data).then(r => r.data)
+  return request.post<ApiRes<PageData<JobLogResponse>>>('/api/v1/job/log/list', data).then(r => r.data)
 }
 
 /** 日志详情 */
@@ -57,5 +57,5 @@ export function getJobLog(id: string) {
 
 /** 清空日志 */
 export function cleanJobLogs(jobId?: string) {
-  return request.delete<ApiRes<null>>('/api/job/log/clean', { data: { jobId: jobId || null } }).then(r => r.data)
+  return request.delete<ApiRes<null>>('/api/v1/job/log/clean', { data: { jobId: jobId || null } }).then(r => r.data)
 }

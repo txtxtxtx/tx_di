@@ -1,9 +1,9 @@
-import request from './request'
+﻿import request from './request'
 import type { FileConfigResponse, CreateFileConfigRequest, UpdateFileConfigRequest, ApiRes } from '@/types'
 
 /** 获取文件配置列表 */
 export function listFileConfigs() {
-  return request.get<ApiRes<FileConfigResponse[]>>('/api/file/config/list').then(r => r.data)
+  return request.get<ApiRes<FileConfigResponse[]>>('/api/v1/file/config/list').then(r => r.data)
 }
 
 /** 获取文件配置详情 */
@@ -13,7 +13,7 @@ export function getFileConfig(id: number) {
 
 /** 新增文件配置 */
 export function createFileConfig(data: CreateFileConfigRequest) {
-  return request.post<ApiRes<FileConfigResponse>>('/api/file/config', data).then(r => r.data)
+  return request.post<ApiRes<FileConfigResponse>>('/api/v1/file/config', data).then(r => r.data)
 }
 
 /** 修改文件配置 */
