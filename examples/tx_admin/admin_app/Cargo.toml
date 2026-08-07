@@ -28,7 +28,6 @@ dashmap = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true, features = ["io"] }
-schemars = { workspace = true }
 uuid = { version = "1", features = ["v4", "v7"] }
 
 [dev-dependencies]

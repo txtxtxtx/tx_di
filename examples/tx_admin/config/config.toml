@@ -73,7 +73,6 @@ thread_pool_size = 4
 port = 50051
 
 [web_config]
-enable_api_doc = true
 enable_cors = true
 host = "::"
 layers = [[5, "timeout"], [10, "api_log"], [100, "compression"], [10000, "cors"]]

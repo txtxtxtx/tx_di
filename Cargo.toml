@@ -102,7 +102,7 @@ env_logger = "0.11"
 serde = { version = "1.0", features = ["derive", "serde_derive"] }
 serde_json = "1.0"
 serde_repr = "0.1"
-serde_with = { version = "3.21.0", features = ["macros", "alloc", "schemars_0_8"] }
+serde_with = { version = "3.21.0", features = ["macros", "alloc"] }
 
 rsipstack = { version = "0.5", features = ["default"] }
 tokio-util = { version = "0.7", features = ["rt"] }
@@ -149,10 +149,6 @@ prost-types = "0.13"
 tonic-build = "0.12"
 
 sa-token-plugin-axum = { version = "0.1.18", default-features = false, features = ["axum-08", "memory"] }
-
-# API 文档
-aide = { version = "0.14", features = ["axum", "axum-json", "redoc"] }
-schemars = "0.8"
 
 # 登录限流（阶段 E-1：基于 IP 的速率限制）
 tower_governor = { version = "0.8", default-features = false, features = ["axum"] }

@@ -3,7 +3,6 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "api-doc", derive(schemars::JsonSchema))]
 pub struct Page<T>{
     #[serde(default)]
     pub list: Vec<T>,

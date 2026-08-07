@@ -36,11 +36,9 @@ fn main() -> Result<()> {
     tonic_build::configure()
         .out_dir("src/pb")
         // 顺序很重要：
-        // 1. schemars 先展开，看到原始 struct（无 phantom 字段）
-        // 2. serde(rename_all) 同时被 schemars 和 serde 读取
-        // 3. serde_as 展开，注入 phantom 字段和 serde(with) 属性
-        // 4. Serialize/Deserialize derive 展开，看到 DisplayFromStr 生效
-        .type_attribute(".", "#[derive(schemars::JsonSchema)]")
+        // 1. serde(rename_all) 被 serde 读取
+        // 2. serde_as 展开，注入 phantom 字段和 serde(with) 属性
+        // 3. Serialize/Deserialize derive 展开，看到 DisplayFromStr 生效
         .type_attribute(".", "#[serde(rename_all = \"camelCase\")]")
         .type_attribute(".", "#[serde_with::serde_as]")
         .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")

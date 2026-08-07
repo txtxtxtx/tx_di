@@ -59,7 +59,6 @@ dependencies = [
  "mockall",
  "pretty_assertions",
  "rstest",
- "schemars 0.8.22",
  "serde",
  "serde_json",
  "tempfile",
@@ -91,7 +90,6 @@ dependencies = [
  "pretty_assertions",
  "rand 0.9.5",
  "rstest",
- "schemars 0.8.22",
  "serde",
  "serde_json",
  "serde_repr",
@@ -138,7 +136,6 @@ dependencies = [
  "prost 0.13.5",
  "prost-types 0.13.5",
  "protoc-bin-vendored",
- "schemars 0.8.22",
  "serde",
  "serde_json",
  "serde_with",
@@ -198,27 +195,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddd31a130427c27518df266943a5308ed92d4b226cc639f5a8f1002816174301"
 dependencies = [
  "memchr",
-]
-
-[[package]]
-name = "aide"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2477554ebf38aea815a9c4729100cfc32f766876c45b9c9c38ef221b9d1a703"
-dependencies = [
- "axum 0.8.9",
- "bytes",
- "cfg-if",
- "http 1.4.2",
- "indexmap 2.14.0",
- "schemars 0.8.22",
- "serde",
- "serde_json",
- "serde_qs",
- "thiserror 2.0.19",
- "tower-layer",
- "tower-service",
- "tracing",
 ]
 
 [[package]]
@@ -7564,7 +7540,6 @@ checksum = "3fbf2ae1b8bc8e02df939598064d22402220cd5bbcca1c76f7d6a310974d5615"
 dependencies = [
  "dyn-clone",
  "indexmap 1.9.3",
- "indexmap 2.14.0",
  "schemars_derive",
  "serde",
  "serde_json",
@@ -7781,19 +7756,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_qs"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b417bedc008acbdf6d6b4bc482d29859924114bbe2650b7921fb68a261d0aa6"
-dependencies = [
- "axum 0.8.9",
- "futures",
- "percent-encoding",
- "serde",
- "thiserror 2.0.19",
-]
-
-[[package]]
 name = "serde_repr"
 version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7846,7 +7808,6 @@ dependencies = [
  "hex",
  "indexmap 1.9.3",
  "indexmap 2.14.0",
- "schemars 0.8.22",
  "schemars 0.9.0",
  "schemars 1.2.1",
  "serde_core",
@@ -10001,7 +9962,6 @@ version = "0.1.0"
 dependencies = [
  "axum 0.8.9",
  "chrono",
- "schemars 0.8.22",
  "serde",
  "tx_error",
 ]
@@ -10010,13 +9970,11 @@ dependencies = [
 name = "tx_di_axum"
 version = "0.1.0"
 dependencies = [
- "aide",
  "anyhow",
  "axum 0.8.9",
  "http 1.4.2",
  "linkme",
  "prometheus",
- "schemars 0.8.22",
  "serde",
  "serde_json",
  "socket2 0.6.5",

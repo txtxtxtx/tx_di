@@ -21,7 +21,7 @@ pub struct MenuQuery {
 /// 该结构体实现了 Debug、Clone、Serialize 和 Deserialize 特性，
 /// 支持调试输出、克隆、序列化和反序列化操作
 #[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MenuTreeNode {
     /// 菜单节点的唯一标识符

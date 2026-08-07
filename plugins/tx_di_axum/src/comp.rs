@@ -2,7 +2,6 @@ use std::net::{SocketAddr, TcpListener};
 use crate::bound::AppStatus;
 use crate::{WebConfig};
 use axum::http::Request;
-use axum::routing::get;
 use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::TcpListener as TokioTcpListener;
@@ -13,13 +12,9 @@ use crate::layers::LAYER_REGISTRY;
 
 /// 全局路由器注册表
 ///
-/// 使用 `Mutex<Vec>` 存储，合并时 drain 取出（`ApiRouter` 不实现 `Clone`）
+/// 使用 `Mutex<Vec>` 存储，合并时 drain 取出
 static ROUTER_REGISTRY: LazyLock<Mutex<Vec<crate::Router>>> =
     LazyLock::new(|| Mutex::new(Vec::new()));
-
-/// 生成的 OpenAPI spec（JSON Value），供文档端点使用
-#[cfg(feature = "api-doc")]
-static OPENAPI_SPEC: OnceLock<serde_json::Value> = OnceLock::new();
 
 /// Web 服务器插件组件
 ///
@@ -76,9 +71,6 @@ async fn app_async_init(comp: Arc<WebPlugin>, app: Arc<App>) -> RIE<()> {
     // SPA 应用
     outer_router = WebPlugin::setup_spa_apps(outer_router, &config);
 
-    // API 文档端点（/docs, /api-docs/openapi.json）
-    outer_router = WebPlugin::setup_doc_routes(outer_router);
-
     // 可观测性：/metrics Prometheus 指标端点（阶段 E-3）
     crate::metrics::ensure_initialized();
     outer_router = outer_router.merge(crate::metrics::metrics_router());
@@ -130,9 +122,7 @@ impl WebPlugin {
 
     /// 添加路由器
     ///
-    /// 使用 [`crate::Router`] 注册路由，该类型根据 `api-doc` feature 自动切换：
-    /// - `api-doc` 启用时：`Router` = `ApiRouter`，自动生成 OpenAPI 文档
-    /// - `api-doc` 禁用时：`Router` = `axum::Router`
+    /// 使用 [`crate::Router`]（即 `axum::Router`）注册路由。
     ///
     /// ## **必须在上下文创建前添加路由器，否则路由无效**
     ///
@@ -148,95 +138,14 @@ impl WebPlugin {
         }
     }
 
-    /// 添加原始 axum 路由器（不参与 OpenAPI 文档生成）
-    ///
-    /// 当 `api-doc` 启用时，接受 `axum::Router` 并包装为 `ApiRouter`。
-    /// 适用于不需要文档的路由（如内部管理接口、第三方库提供的路由）。
+    /// 添加 axum 路由器（与 `add_router` 等价，类型均为 `axum::Router`）
     ///
     /// ## **必须在上下文创建前添加路由器，否则路由无效**
     pub fn add_axum_router(router: axum::Router) {
-        #[cfg(feature = "api-doc")]
-        {
-            use aide::axum::ApiRouter;
-            let api_router = ApiRouter::new().merge(router);
-            Self::add_router(api_router);
-        }
-        #[cfg(not(feature = "api-doc"))]
-        {
-            Self::add_router(router);
-        }
+        Self::add_router(router);
     }
 
     /// 合并所有已注册的路由器
-    ///
-    /// 返回 `(Router, Option<OpenApi>)`，OpenAPI spec 用于后续注册文档端点
-    #[cfg(feature = "api-doc")]
-    fn merge_routers() -> axum::Router {
-        use aide::openapi::OpenApi;
-
-        let mut main_router = axum::Router::new();
-
-        let mut routers = ROUTER_REGISTRY.lock();
-        if let Ok(ref mut routers) = routers {
-            if !routers.is_empty() {
-                let all = routers.drain(..).collect::<Vec<_>>();
-                let count = all.len();
-                let api_router = all.into_iter()
-                    .reduce(|acc, r| acc.merge(r))
-                    .unwrap();
-
-                let mut api = OpenApi::default();
-                let api_routes = api_router.finish_api(&mut api);
-                main_router = main_router.merge(api_routes);
-
-                // 存储 OpenAPI spec，供 setup_doc_routes 使用
-                match serde_json::to_value(&api) {
-                    Ok(spec) => { let _ = OPENAPI_SPEC.set(spec); }
-                    Err(e) => error!("序列化 OpenAPI spec 失败: {}", e),
-                }
-
-                info!("已合并 {} 个路由器", count);
-            } else {
-                debug!("未注册任何路由器");
-            }
-        } else {
-            error!("无法获取路由器注册表的锁");
-        }
-
-        main_router
-    }
-
-    /// 注册文档路由（在中间件之外）
-    ///
-    /// 包括 `/docs`（Redoc）和 `/api-docs/openapi.json`
-    #[cfg(feature = "api-doc")]
-    fn setup_doc_routes(router: axum::Router) -> axum::Router {
-        use aide::redoc::Redoc;
-
-        let spec = match OPENAPI_SPEC.get() {
-            Some(s) => s.clone(),
-            None => return router,
-        };
-
-        let router = router.route(
-            "/api-docs/openapi.json",
-            get(move || async { axum::response::Json(spec) }),
-        );
-
-        let redoc_html: &'static str = Box::leak(
-            Redoc::new("/api-docs/openapi.json")
-                .with_title("API Documentation")
-                .html()
-                .into_boxed_str()
-        );
-        router.route("/docs", get(move || async move { axum::response::Html(redoc_html) }))
-    }
-
-    #[cfg(not(feature = "api-doc"))]
-    fn setup_doc_routes(router: axum::Router) -> axum::Router { router }
-
-    /// 合并所有已注册的路由器
-    #[cfg(not(feature = "api-doc"))]
     fn merge_routers() -> axum::Router {
         let mut main_router = axum::Router::new();
 

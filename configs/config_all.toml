@@ -216,13 +216,6 @@ timeout_secs = 30
 # [web_config.layers]
 # layers = [[100, "cors"], [200, "compression"]]
 
-# 是否启用 API 文档端点（需启用 api-doc feature，默认开启）
-# /swagger-ui — 接口文档页面
-# /api-docs/openapi.json — OpenAPI 规范 JSON
-# 默认: true
-enable_api_doc = true
-
-
 # ╔══════════════════════════════════════════════════════════════════════════════
 # ║ 6. tx_di_sa_token — 认证鉴权插件
 # ║ TOML key: [sa_token]     init_sort: i32::MIN + 1
