@@ -135,11 +135,11 @@ async fn app_async_init(_comp: Arc<AdminPlugin>, app: Arc<App>) -> RIE<()> {
         .map_err(|e: std::net::AddrParseError| anyhow::anyhow!("gRPC 地址解析失败: {}", e))?;
 
     // ════════════════════ 注册中心端点注册（微服务化预留）════════════════
-    // 将 HTTP/gRPC 端点提供给 tx_di_registry，由 RegistryPlugin（init_sort=MAX-50，
-    // 晚于本组件 MAX-100）在启动时注册到 Nacos。生产通过 SERVICE_IP 环境变量指定注册 IP。
+    // 将 HTTP/gRPC 端点声明到端点注册表，由 tx_di_nacos 的 app_loop! 在启动后
+    // 统一收集（take_endpoints）并注册到 Nacos。生产通过 SERVICE_IP 环境变量指定注册 IP。
     {
         let http_port = web_config.port;
-        tx_di_registry::register_endpoints(std::sync::Arc::new(crate::nacos::AdminEndpoints::new(
+        tx_di_nacos::register_endpoints(std::sync::Arc::new(crate::nacos::AdminEndpoints::new(
             http_port,
             grpc_port,
         )));

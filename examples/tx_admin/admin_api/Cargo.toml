@@ -53,5 +53,5 @@ ringbuf = "0.5.0"
 # 定时任务调度（使用 tx_di_job 插件）
 tx_di_job = { path = "../../../plugins/tx_di_job" }
 
-# 注册中心（Nacos 服务注册/发现 + 配置中心，微服务化预留）
-tx_di_registry = { path = "../../../plugins/tx_di_registry" }
+# Nacos 配置中心 + 服务注册 + 应用启动循环（非组件 crate）
+tx_di_nacos = { path = "../../../plugins/tx_di_nacos" }

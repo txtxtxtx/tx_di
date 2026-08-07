@@ -51,6 +51,8 @@ namespace = "public"
 group = "DEFAULT_GROUP"
 service_name = "tx-admin"
 auto_register = true
+# 主配置 data_id（默认 "{service_name}.toml"）：启动拉取 + 合并本地，变更时优雅重启生效
+# config_data_id = "tx-admin.toml"
 
 [job_config]
 enabled = true

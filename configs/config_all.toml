@@ -337,9 +337,8 @@ internal_timeout_secs = 300
 
 
 # ╔══════════════════════════════════════════════════════════════════════════════
-# ║ 8. tx_di_registry — 服务注册发现插件
-# ║ TOML key: [registry_config]     init_sort: i32::MIN（配置）/ i32::MAX - 50（运行）
-# ║ feature: nacos（默认）
+# ║ 8. tx_di_nacos — 配置中心 + 服务注册 + 应用启动循环（非组件 crate）
+# ║ TOML key: [registry_config]     由 tx_di_nacos::app_loop! 读取（bootstrap）
 # ╚══════════════════════════════════════════════════════════════════════════════
 [registry_config]
 # 主开关：是否启用注册中心
@@ -369,6 +368,10 @@ auto_register = true
 # 心跳间隔（秒）
 # 默认: 5
 heartbeat_secs = 5
+
+# 主配置 data_id（整份 TOML，远程覆盖本地；启动时拉取 + 变更时优雅重启生效）
+# 默认: null（使用 "{service_name}.toml"）
+# config_data_id = "tx-admin.toml"
 
 
 # ╔══════════════════════════════════════════════════════════════════════════════
