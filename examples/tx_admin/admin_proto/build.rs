@@ -36,12 +36,11 @@ fn main() -> Result<()> {
     tonic_build::configure()
         .out_dir("src/pb")
         // 顺序很重要：
-        // 1. serde(rename_all) 被 serde 读取
-        // 2. serde_as 展开，注入 phantom 字段和 serde(with) 属性
-        // 3. Serialize/Deserialize derive 展开，看到 DisplayFromStr 生效
+        // 1. serde derive 先引入，使下方 serde(rename_all) helper attribute 合法
+        // 2. serde_as 宏展开，注入 phantom 字段和 serde(with) 属性
+        .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
         .type_attribute(".", "#[serde(rename_all = \"camelCase\")]")
         .type_attribute(".", "#[serde_with::serde_as]")
-        .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
         .field_attribute("optional", "#[serde(skip_serializing_if = \"Option::is_none\")]")
         .compile_protos(&proto_paths, &[proto_dir])?;
 
