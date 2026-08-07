@@ -65,6 +65,7 @@ mod user_service_tests {
         async fn find_by_dept_id(&self, _: u64) -> AppResult<Vec<User>> { Ok(vec![]) }
         async fn bind_roles(&self, _: u64, _: &[u64]) -> AppResult<()> { Ok(()) }
         async fn bind_departments(&self, _: u64, _: &[u64]) -> AppResult<()> { Ok(()) }
+        async fn create_user_with_bindings(&self, _: &User, _: &[u64], _: &[u64]) -> AppResult<()> { Ok(()) }
         async fn get_role_ids(&self, uid: u64) -> AppResult<Vec<u64>> { (self.get_role_ids_fn)(uid) }
         async fn get_dept_ids(&self, uid: u64) -> AppResult<Vec<u64>> { (self.get_dept_ids_fn)(uid) }
     }

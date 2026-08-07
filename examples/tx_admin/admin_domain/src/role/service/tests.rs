@@ -61,6 +61,7 @@ mod role_service_tests {
         async fn find_by_id(&self, id: u64) -> AppResult<Option<Role>> { (self.find_by_id_fn)(id) }
         async fn find_by_code(&self, code: &str) -> AppResult<Option<Role>> { (self.find_by_code_fn)(code) }
         async fn find_by_ids(&self, ids: &[u64]) -> AppResult<Vec<Role>> { (self.find_by_ids_fn)(ids) }
+        async fn create_role_with_menus(&self, _: &Role, _: &[u64]) -> AppResult<()> { Ok(()) }
         async fn find_page(&self, query: &RoleQuery, page: Page<Role>) -> AppResult<Page<Role>> { (self.find_page_fn)(query, page) }
         async fn find_all(&self, query: &RoleQuery) -> AppResult<Vec<Role>> { (self.find_all_fn)(query) }
         async fn insert(&self, role: &Role) -> AppResult<()> { (self.insert_fn)(role) }
