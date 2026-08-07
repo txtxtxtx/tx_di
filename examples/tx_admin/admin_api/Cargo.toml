@@ -7,6 +7,11 @@ license.workspace = true
 readme.workspace = true
 repository.workspace = true
 
+# lib target：bin 与集成测试共享模块（组件 linkme 注册点）
+[lib]
+name = "admin_api"
+path = "src/lib.rs"
+
 [dependencies]
 # 项目内依赖
 admin_proto  = { path = "../admin_proto" }
@@ -58,3 +63,8 @@ tx_di_job = { path = "../../../plugins/tx_di_job" }
 
 # Nacos 配置中心 + 服务注册 + 应用启动循环（非组件 crate）
 tx_di_nacos = { path = "../../../plugins/tx_di_nacos" }
+
+[dev-dependencies]
+# E2E 回归测试（批次 1）：HTTP 客户端 + 内存配置构建
+reqwest = { workspace = true }
+toml    = { workspace = true }
