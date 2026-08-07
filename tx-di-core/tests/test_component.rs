@@ -639,8 +639,8 @@ fn test_interceptor_after_modify_result() {
     let mut chain = InterceptorChain::new();
     chain.push(ErrEnricher);
     let ctx = CallContext::new("test");
-    let mut result = CallResult::Err("fail".into());
-    chain.after_all(&ctx, &mut result);
+    // `around` 语义：包裹业务 body 调用（经 `around_all`），而非 `after_all`（只调 after 钩子）
+    let result = chain.around_all(&ctx, Box::new(|| CallResult::Err("fail".into())));
     match &result {
         CallResult::Err(msg) => assert_eq!(msg, "enriched: fail"),
         _ => panic!("expected Err"),

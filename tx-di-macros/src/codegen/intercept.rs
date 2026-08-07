@@ -69,12 +69,9 @@ pub fn gen_init_override(ctx: &CodeGenContext) -> TokenStream2 {
             let comp: ::std::sync::Arc<Self> = ::tx_di_core::inject_from_store(&app.store);
             let mut chain = ::tx_di_core::aop::InterceptorChain::new();
             #(#push_code)*
-            __INTERCEPTOR_CHAIN
-                .set(::std::sync::Arc::new(chain))
-                .map_err(|_| ::tx_di_core::AppError::with_context(
-                    ::tx_di_core::DiErr::InjectError,
-                    "拦截器链重复初始化（init 被多次调用）",
-                ))?;
+            // 幂等初始化：链已存在（多 App / 多次 init，如测试场景）时复用既有链，
+            // 不再报错。生产环境单 App 仅 init 一次，行为不变。
+            let _ = __INTERCEPTOR_CHAIN.set(::std::sync::Arc::new(chain));
             #user_init
             Ok(())
         }
