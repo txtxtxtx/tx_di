@@ -8,13 +8,11 @@ readme = "README.md"
 repository.workspace = true
 
 [features]
-default = ["memory"]
+# 无默认 feature：内存存储始终可用（sa-token-storage-memory 直接依赖）
+default = []
 
-# 存储后端特性（互斥，只能选择一个）
-## 内存存储（默认，适用于开发和测试）
-memory = ["sa-token-plugin-axum/memory"]
-
-## Redis 存储（适用于生产环境，支持分布式部署）
+# Redis 存储（可选增强，适用于生产环境/水平扩容场景）
+# 未启用时回退内存存储；启用后仍可配置使用内存（见 config.rs create_storage）
 redis = ["sa-token-plugin-axum/redis"]
 
 [dependencies]

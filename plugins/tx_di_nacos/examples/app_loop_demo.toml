@@ -1,0 +1,16 @@
+# app_loop_demo 本地配置文件（bootstrap 层）
+# 仅需 [registry_config]；业务配置从 Nacos 的 tx_admin_app_loop.toml 拉取合并
+
+[registry_config]
+enabled = true
+nacos_addr = "http://192.168.0.91:8848"
+namespace = "yc_dev"
+group = "DEFAULT_GROUP"
+service_name = "tx_admin_app_loop"
+auto_register = false
+username = "nacos"
+password = "Yc@53672578."
+config_data_id = "tx_admin_app_loop.toml"
+
+[demo]
+message = "hello-local"

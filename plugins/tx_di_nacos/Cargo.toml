@@ -24,3 +24,6 @@ chrono = { workspace = true }
 
 # Nacos 客户端（官方 nacos-group/nacos-sdk-rust）
 nacos-sdk = { version = "0.8" }
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true }

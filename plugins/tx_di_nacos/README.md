@@ -35,12 +35,14 @@ async fn main() -> AppResult<()> {
 
 ```toml
 [registry_config]
-enabled = false                # 主开关：true 启用配置中心 + 服务注册
+enabled = true                 # 主开关：true 启用配置中心 + 服务注册
 nacos_addr = "http://127.0.0.1:8848"
 namespace = "public"
 group = "DEFAULT_GROUP"
 service_name = "tx-admin"
 auto_register = true
+username = "nacos"             # Nacos 登录账号（服务端开启鉴权时必填）
+password = "******"            # Nacos 登录密码
 config_data_id = "tx-admin.toml"   # 主配置 data_id（默认 "{service_name}.toml"）
 ```
 
@@ -54,6 +56,11 @@ config_data_id = "tx-admin.toml"   # 主配置 data_id（默认 "{service_name}.
 | `auto_register` | `bool` | `true` |
 | `heartbeat_secs` | `u64` | `5` |
 | `config_data_id` | `Option<String>` | `None`（用 `{service_name}.toml`） |
+| `username` | `Option<String>` | `None` |
+| `password` | `Option<String>` | `None` |
+
+> **鉴权**：Nacos 服务端开启鉴权后（`nacos.core.auth.enabled=true`）必须配置 `username`/`password`，
+> 否则配置发布/拉取会被静默拒绝（返回成功但无数据）。
 
 ## 公共 API
 

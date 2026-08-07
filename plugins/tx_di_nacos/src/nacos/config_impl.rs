@@ -26,11 +26,17 @@ pub struct NacosConfigCenter {
 impl NacosConfigCenter {
     /// 构建 Nacos 配置中心客户端
     pub async fn new(config: &RegistryConfig) -> AppResult<Self> {
-        let props = ClientProps::new()
+        let mut props = ClientProps::new()
             .server_addr(normalize_addr(&config.nacos_addr))
             .namespace(config.namespace.clone())
             .app_name("tx_di_nacos")
             .load_cache_at_start(true);
+        if let Some(u) = &config.username {
+            props = props.auth_username(u.clone());
+        }
+        if let Some(p) = &config.password {
+            props = props.auth_password(p.clone());
+        }
         let client = ConfigServiceBuilder::new(props)
             .build()
             .await

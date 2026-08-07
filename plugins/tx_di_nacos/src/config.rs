@@ -49,6 +49,14 @@ pub struct RegistryConfig {
     /// 主配置 data_id（整份 TOML，远程覆盖本地；默认 `"{service_name}.toml"`）
     #[serde(default)]
     pub config_data_id: Option<String>,
+
+    /// Nacos 登录用户名（服务端开启鉴权时必填）
+    #[serde(default)]
+    pub username: Option<String>,
+
+    /// Nacos 登录密码（服务端开启鉴权时必填）
+    #[serde(default)]
+    pub password: Option<String>,
 }
 
 impl Default for RegistryConfig {
@@ -62,6 +70,8 @@ impl Default for RegistryConfig {
             auto_register: default_true(),
             heartbeat_secs: default_heartbeat_secs(),
             config_data_id: None,
+            username: None,
+            password: None,
         }
     }
 }

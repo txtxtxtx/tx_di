@@ -38,11 +38,17 @@ pub struct NacosServiceRegistry {
 impl NacosServiceRegistry {
     /// 构建 Nacos 服务注册客户端（gRPC 双工长连接，自动重连）
     pub async fn new(config: &RegistryConfig) -> AppResult<Self> {
-        let props = ClientProps::new()
+        let mut props = ClientProps::new()
             .server_addr(normalize_addr(&config.nacos_addr))
             .namespace(config.namespace.clone())
             .app_name("tx_di_nacos")
             .load_cache_at_start(true);
+        if let Some(u) = &config.username {
+            props = props.auth_username(u.clone());
+        }
+        if let Some(p) = &config.password {
+            props = props.auth_password(p.clone());
+        }
         let client = NamingServiceBuilder::new(props)
             .build()
             .await
