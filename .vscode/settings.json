@@ -1,13 +1,12 @@
 {
-  // vscode-proto3 扩展：proto 文件 include 路径
-  // 必须与 admin_proto/build.rs 的 compile_protos(..., &[proto_dir]) 一致
+  // vscode-proto3 扩展配置
+  // protoc 路径：使用 protoc-bin-vendored 内嵌的 protoc（与 build.rs 一致）
+  // 注意：cargo registry 哈希（rsproxy.cn-e3de039b2554c837）与本机环境绑定，
+  //       换机器/换镜像源后需重新查找 protoc.exe 更新此路径
   "protoc": {
+    "path": "C:\\Users\\tx_home\\.cargo\\registry\\src\\rsproxy.cn-e3de039b2554c837\\protoc-bin-vendored-win32-3.2.0\\bin\\protoc.exe",
     "options": [
-      "--proto_path=${workspaceFolder}/examples/tx_admin/admin_proto/protos"
+      "--proto_path=examples/tx_admin/admin_proto/protos"
     ]
-  },
-  // clangd 分析 proto（若使用 C/C++ 扩展）
-  "clangd.arguments": [
-    "--background-index"
-  ]
+  }
 }
