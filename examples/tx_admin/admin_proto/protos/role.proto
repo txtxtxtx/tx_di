@@ -10,85 +10,106 @@ import "user.proto";
 // ============================================================
 
 service RoleService {
+  /// 新增角色
   rpc CreateRole(CreateRoleRequest) returns (RoleResponse);
+  /// 更新角色
   rpc UpdateRole(UpdateRoleRequest) returns (RoleResponse);
+  /// 删除角色
   rpc DeleteRole(DeleteRoleRequest) returns (admin.common.Empty);
+  /// 按 ID 查询角色
   rpc GetRole(GetRoleRequest) returns (RoleResponse);
+  /// 分页查询角色列表
   rpc ListRoles(ListRolesRequest) returns (ListRolesResponse);
+  /// 为角色分配菜单权限
   rpc AssignMenus(AssignMenusRequest) returns (admin.common.Empty);
+  /// 查询角色下的用户
   rpc GetRoleUsers(GetRoleUsersRequest) returns (GetRoleUsersResponse);
+  /// 向角色添加用户
   rpc AddUsersToRole(AddUsersToRoleRequest) returns (admin.common.Empty);
+  /// 从角色移除用户
   rpc RemoveUsersFromRole(RemoveUsersFromRoleRequest) returns (admin.common.Empty);
 }
 
+// 新增角色请求
 message CreateRoleRequest {
-  string name = 1;
-  string code = 2;
-  int32 sort = 3;
-  optional string remark = 4;
-  repeated uint64 menu_ids = 5;
+  string name = 1;              // 角色名称
+  string code = 2;              // 角色编码（全局唯一，如 "admin"）
+  int32 sort = 3;               // 排序号（越小越靠前）
+  optional string remark = 4;   // 备注说明
+  repeated uint64 menu_ids = 5; // 初始分配的菜单 ID 列表
 }
 
+// 更新角色请求
 message UpdateRoleRequest {
-  uint64 role_id = 1;
-  string name = 2;
-  string code = 3;
-  int32 sort = 4;
-  int32 data_scope = 5;
-  optional string remark = 6;
+  uint64 role_id = 1;       // 角色 ID
+  string name = 2;          // 角色名称
+  string code = 3;          // 角色编码
+  int32 sort = 4;           // 排序号
+  int32 data_scope = 5;     // 数据权限范围：0=全部, 1=本部门, 2=本部门及以下, 3=仅本人
+  optional string remark = 6; // 备注说明
 }
 
+// 删除角色请求
 message DeleteRoleRequest {
-  uint64 role_id = 1;
+  uint64 role_id = 1;  // 角色 ID
 }
 
+// 按 ID 查询角色请求
 message GetRoleRequest {
-  uint64 role_id = 1;
+  uint64 role_id = 1;  // 角色 ID
 }
 
+// 分页查询角色请求
 message ListRolesRequest {
-  optional string name = 1;
-  optional string code = 2;
-  optional int32 status = 3;
-  int64 page = 4;
-  int64 page_size = 5;
+  optional string name = 1;   // 按名称模糊过滤
+  optional string code = 2;   // 按编码模糊过滤
+  optional int32 status = 3;  // 按状态过滤：0=停用, 1=正常
+  int64 page = 4;             // 页码
+  int64 page_size = 5;        // 每页条数
 }
 
+// 为角色分配菜单请求
 message AssignMenusRequest {
-  uint64 role_id = 1;
-  repeated uint64 menu_ids = 2;
+  uint64 role_id = 1;              // 角色 ID
+  repeated uint64 menu_ids = 2;    // 分配的菜单 ID 列表（全量覆盖）
 }
 
+// 角色信息响应
 message RoleResponse {
-  uint64 id = 1;
-  string name = 2;
-  string code = 3;
-  int32 sort = 4;
-  int32 data_scope = 5;
-  int32 status = 6;
-  optional string remark = 7;
-  repeated uint64 menu_ids = 8;
+  uint64 id = 1;                // 角色 ID
+  string name = 2;              // 角色名称
+  string code = 3;              // 角色编码
+  int32 sort = 4;               // 排序号
+  int32 data_scope = 5;         // 数据权限范围
+  int32 status = 6;             // 状态：0=停用, 1=正常
+  optional string remark = 7;   // 备注说明
+  repeated uint64 menu_ids = 8; // 已分配的菜单 ID 列表
 }
 
+// 分页查询角色响应
 message ListRolesResponse {
-  repeated RoleResponse items = 1;
-  admin.common.PageResponse page_info = 2;
+  repeated RoleResponse items = 1;  // 角色列表
+  admin.common.PageResponse page_info = 2; // 分页信息
 }
 
+// 查询角色用户请求
 message GetRoleUsersRequest {
-  uint64 role_id = 1;
+  uint64 role_id = 1;  // 角色 ID
 }
 
+// 查询角色用户响应
 message GetRoleUsersResponse {
-  repeated admin.user.UserResponse users = 1;
+  repeated admin.user.UserResponse users = 1;  // 该角色下的用户列表
 }
 
+// 向角色添加用户请求
 message AddUsersToRoleRequest {
-  uint64 role_id = 1;
-  repeated uint64 user_ids = 2;
+  uint64 role_id = 1;              // 角色 ID
+  repeated uint64 user_ids = 2;    // 用户 ID 列表
 }
 
+// 从角色移除用户请求
 message RemoveUsersFromRoleRequest {
-  uint64 role_id = 1;
-  repeated uint64 user_ids = 2;
+  uint64 role_id = 1;              // 角色 ID
+  repeated uint64 user_ids = 2;    // 用户 ID 列表
 }

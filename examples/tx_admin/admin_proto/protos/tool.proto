@@ -4,20 +4,23 @@ package admin.tool;
 
 import "google/protobuf/empty.proto";
 
+// 缓存条目信息
 message CacheInfo {
-  string key = 1;
-  string value = 2;
-  uint64 ttl = 3;  // 剩余过期时间（秒）
+  string key = 1;    // 缓存键
+  string value = 2;  // 缓存值
+  uint64 ttl = 3;    // 剩余过期时间（秒）
 }
 
+// 缓存统计响应
 message CacheStatsResponse {
-  uint64 total_keys = 1;
-  uint64 used_memory = 2;  // 字节
-  uint64 hit_count = 3;
-  uint64 miss_count = 4;
-  double hit_rate = 5;     // 百分比
+  uint64 total_keys = 1;   // 缓存键总数
+  uint64 used_memory = 2;  // 已用内存（字节）
+  uint64 hit_count = 3;    // 命中次数
+  uint64 miss_count = 4;   // 未命中次数
+  double hit_rate = 5;     // 命中率（百分比，0~100）
 }
 
 service ToolService {
+  /// 获取缓存统计信息（键数/内存/命中率）
   rpc GetCacheStats(google.protobuf.Empty) returns (CacheStatsResponse);
 }

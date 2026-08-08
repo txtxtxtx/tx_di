@@ -9,61 +9,74 @@ import "common.proto";
 // ============================================================
 
 service FileService {
+  /// 上传文件（记录元数据到配置的存储后端）
   rpc UploadFile(UploadFileRequest) returns (FileResponse);
+  /// 删除文件
   rpc DeleteFile(DeleteFileRequest) returns (admin.common.Empty);
+  /// 按 ID 查询文件信息
   rpc GetFile(GetFileRequest) returns (FileResponse);
+  /// 分页查询文件列表
   rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
+  /// 获取文件下载地址
   rpc DownloadFile(DownloadFileRequest) returns (DownloadFileResponse);
 }
 
+// 上传文件请求
 message UploadFileRequest {
-  string name = 1;
-  string path = 2;
-  string url = 3;
-  optional string file_type = 4;
-  int32 size = 5;
-  optional uint64 config_id = 6;
+  string name = 1;               // 文件原始名称（含扩展名）
+  string path = 2;               // 存储路径（相对 base_path）
+  string url = 3;                // 访问 URL
+  optional string file_type = 4; // 文件类型（MIME，如 "image/png"）
+  int32 size = 5;                // 文件大小（字节）
+  optional uint64 config_id = 6; // 存储配置 ID（指定用哪个存储后端）
 }
 
+// 删除文件请求
 message DeleteFileRequest {
-  uint64 file_id = 1;
+  uint64 file_id = 1;  // 文件 ID
 }
 
+// 按 ID 查询文件请求
 message GetFileRequest {
-  uint64 file_id = 1;
+  uint64 file_id = 1;  // 文件 ID
 }
 
+// 分页查询文件请求
 message ListFilesRequest {
-  optional string name = 1;
-  optional string file_type = 2;
-  optional uint64 config_id = 3;
-  int64 page = 4;
-  int64 page_size = 5;
+  optional string name = 1;       // 按文件名模糊过滤
+  optional string file_type = 2;  // 按文件类型过滤
+  optional uint64 config_id = 3;  // 按存储配置过滤
+  int64 page = 4;                 // 页码
+  int64 page_size = 5;            // 每页条数
 }
 
+// 文件信息响应
 message FileResponse {
-  uint64 id = 1;
-  optional uint64 config_id = 2;
-  string name = 3;
-  string path = 4;
-  string url = 5;
-  optional string file_type = 6;
-  int32 size = 7;
+  uint64 id = 1;                // 文件 ID
+  optional uint64 config_id = 2; // 存储配置 ID
+  string name = 3;              // 文件原始名称
+  string path = 4;              // 存储路径
+  string url = 5;               // 访问 URL
+  optional string file_type = 6; // 文件类型（MIME）
+  int32 size = 7;               // 文件大小（字节）
 }
 
+// 分页查询文件响应
 message ListFilesResponse {
-  repeated FileResponse items = 1;
-  admin.common.PageResponse page_info = 2;
+  repeated FileResponse items = 1;  // 文件列表
+  admin.common.PageResponse page_info = 2; // 分页信息
 }
 
+// 下载文件请求
 message DownloadFileRequest {
-  uint64 file_id = 1;
+  uint64 file_id = 1;  // 文件 ID
 }
 
+// 下载文件响应
 message DownloadFileResponse {
   string url = 1;          // 下载链接
   string filename = 2;     // 文件名
-  uint64 size = 3;         // 文件大小
+  uint64 size = 3;         // 文件大小（字节）
   string content_type = 4; // MIME 类型
 }
 
@@ -72,50 +85,63 @@ message DownloadFileResponse {
 // ============================================================
 
 service FileConfigService {
+  /// 查询所有存储配置
   rpc ListFileConfigs(admin.common.Empty) returns (ListFileConfigsResponse);
+  /// 按 ID 查询存储配置
   rpc GetFileConfig(GetFileConfigRequest) returns (FileConfigResponse);
+  /// 新增存储配置
   rpc CreateFileConfig(CreateFileConfigRequest) returns (FileConfigResponse);
+  /// 更新存储配置
   rpc UpdateFileConfig(UpdateFileConfigRequest) returns (FileConfigResponse);
+  /// 删除存储配置
   rpc DeleteFileConfig(DeleteFileConfigRequest) returns (admin.common.Empty);
+  /// 设置默认（主）存储配置
   rpc SetMasterFileConfig(SetMasterFileConfigRequest) returns (FileConfigResponse);
 }
 
+// 存储配置响应
 message FileConfigResponse {
-  uint64 id = 1;
-  string name = 2;
-  int32 storage = 3;         // 0=本地, 1=S3, 2=数据库
-  optional string remark = 4;
-  int32 master = 5;          // 0=普通, 1=主配置
-  string config = 6;         // JSON 配置
+  uint64 id = 1;                // 配置 ID
+  string name = 2;              // 配置名称
+  int32 storage = 3;            // 存储类型：0=本地, 1=S3, 2=数据库
+  optional string remark = 4;   // 备注说明
+  int32 master = 5;             // 是否主配置：0=普通, 1=主配置（默认使用）
+  string config = 6;            // JSON 配置（后端特定参数）
 }
 
+// 查询所有存储配置响应
 message ListFileConfigsResponse {
-  repeated FileConfigResponse items = 1;
+  repeated FileConfigResponse items = 1;  // 存储配置列表
 }
 
+// 按 ID 查询存储配置请求
 message GetFileConfigRequest {
-  uint64 id = 1;
+  uint64 id = 1;  // 配置 ID
 }
 
+// 新增存储配置请求
 message CreateFileConfigRequest {
-  string name = 1;
-  int32 storage = 2;
-  optional string remark = 3;
-  string config = 4;
+  string name = 1;            // 配置名称
+  int32 storage = 2;          // 存储类型：0=本地, 1=S3, 2=数据库
+  optional string remark = 3; // 备注说明
+  string config = 4;          // JSON 配置
 }
 
+// 更新存储配置请求
 message UpdateFileConfigRequest {
-  uint64 id = 1;
-  string name = 2;
-  int32 storage = 3;
-  optional string remark = 4;
-  string config = 5;
+  uint64 id = 1;              // 配置 ID
+  string name = 2;            // 配置名称
+  int32 storage = 3;          // 存储类型
+  optional string remark = 4; // 备注说明
+  string config = 5;          // JSON 配置
 }
 
+// 删除存储配置请求
 message DeleteFileConfigRequest {
-  uint64 id = 1;
+  uint64 id = 1;  // 配置 ID
 }
 
+// 设置主存储配置请求
 message SetMasterFileConfigRequest {
-  uint64 id = 1;
+  uint64 id = 1;  // 要设为主配置的配置 ID
 }

@@ -9,105 +9,129 @@ import "common.proto";
 // ============================================================
 
 service UserService {
+  /// 新增用户
   rpc CreateUser(CreateUserRequest) returns (UserResponse);
+  /// 部分更新用户信息（仅传需要修改的字段）
   rpc UpdateUser(UpdateUserRequest) returns (UserResponse);
+  /// 修改用户状态（禁用/启用/锁定）
   rpc ChangeUserStatus(ChangeUserStatusRequest) returns (admin.common.Empty);
+  /// 删除用户
   rpc DeleteUser(DeleteUserRequest) returns (admin.common.Empty);
+  /// 按 ID 查询用户
   rpc GetUser(GetUserRequest) returns (UserResponse);
+  /// 分页查询用户列表
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  /// 修改用户密码
   rpc ChangePassword(ChangePasswordRequest) returns (admin.common.Empty);
+  /// 为用户分配角色（全量覆盖）
   rpc AssignRoles(AssignRolesRequest) returns (admin.common.Empty);
+  /// 为用户分配部门（全量覆盖）
   rpc AssignDepts(AssignDeptsRequest) returns (admin.common.Empty);
+  /// 启用用户
   rpc EnableUser(UserIdRequest) returns (admin.common.Empty);
+  /// 禁用用户
   rpc DisableUser(UserIdRequest) returns (admin.common.Empty);
+  /// 锁定用户
   rpc LockUser(UserIdRequest) returns (admin.common.Empty);
+  /// 解锁用户
   rpc UnlockUser(UserIdRequest) returns (admin.common.Empty);
 }
 
+// 新增用户请求
 message CreateUserRequest {
-  string username = 1;      // 必填
-  string password = 2;      // 必填
-  string nickname = 3;      // 必填
-  optional string email = 4;
-  optional string mobile = 5;
-  optional int32 sex = 6;   // 0-未知, 1-男, 2-女
-  optional string remark = 7;
-  repeated uint64 role_ids = 8;
-  repeated uint64 dept_ids = 9;
+  string username = 1;      // 登录用户名（必填，全局唯一）
+  string password = 2;      // 初始密码（必填）
+  string nickname = 3;      // 昵称/显示名（必填）
+  optional string email = 4; // 邮箱
+  optional string mobile = 5; // 手机号
+  optional int32 sex = 6;   // 性别：0-未知, 1-男, 2-女
+  optional string remark = 7; // 备注说明
+  repeated uint64 role_ids = 8; // 初始角色 ID 列表
+  repeated uint64 dept_ids = 9; // 初始部门 ID 列表
 }
 
 // 部分更新：仅传需要修改的字段
 message UpdateUserRequest {
-  uint64 user_id = 1;           // 必填
-  optional string nickname = 2;
-  optional string email = 3;
-  optional string mobile = 4;
-  optional int32 sex = 5;       // 0-未知, 1-男, 2-女
-  optional string remark = 6;
-  optional int32 status = 7;    // 0-正常, 1-禁用, 2-锁定
+  uint64 user_id = 1;           // 用户 ID（必填）
+  optional string nickname = 2; // 昵称
+  optional string email = 3;    // 邮箱
+  optional string mobile = 4;   // 手机号
+  optional int32 sex = 5;       // 性别：0-未知, 1-男, 2-女
+  optional string remark = 6;   // 备注说明
+  optional int32 status = 7;    // 状态：0-正常, 1-禁用, 2-锁定
 }
 
+// 修改用户状态请求
 message ChangeUserStatusRequest {
-  uint64 user_id = 1;
-  int32 status = 2;             // 0-正常, 1-禁用, 2-锁定
+  uint64 user_id = 1;   // 用户 ID
+  int32 status = 2;     // 目标状态：0-正常, 1-禁用, 2-锁定
 }
 
+// 删除用户请求
 message DeleteUserRequest {
-  uint64 user_id = 1;
+  uint64 user_id = 1;  // 用户 ID
 }
 
+// 按 ID 查询用户请求
 message GetUserRequest {
-  uint64 user_id = 1;
+  uint64 user_id = 1;  // 用户 ID
 }
 
+// 分页查询用户请求
 message ListUsersRequest {
-  optional string username = 1;
-  optional string nickname = 2;
-  optional string mobile = 3;
-  optional int32 status = 4;
-  optional uint64 dept_id = 5;
-  admin.common.PageRequest page_info = 6;
+  optional string username = 1; // 按用户名模糊过滤
+  optional string nickname = 2; // 按昵称模糊过滤
+  optional string mobile = 3;   // 按手机号模糊过滤
+  optional int32 status = 4;    // 按状态过滤：0-正常, 1-禁用, 2-锁定
+  optional uint64 dept_id = 5;  // 按部门过滤
+  admin.common.PageRequest page_info = 6; // 分页信息
 }
 
+// 修改密码请求
 message ChangePasswordRequest {
-  uint64 user_id = 1;
-  string new_password = 2;
+  uint64 user_id = 1;    // 用户 ID
+  string new_password = 2; // 新密码（明文）
 }
 
+// 分配角色请求
 message AssignRolesRequest {
-  uint64 user_id = 1;
-  repeated uint64 role_ids = 2;
+  uint64 user_id = 1;              // 用户 ID
+  repeated uint64 role_ids = 2;    // 角色 ID 列表（全量覆盖）
 }
 
+// 分配部门请求
 message AssignDeptsRequest {
-  uint64 user_id = 1;
-  repeated uint64 dept_ids = 2;
+  uint64 user_id = 1;              // 用户 ID
+  repeated uint64 dept_ids = 2;    // 部门 ID 列表（全量覆盖）
 }
 
+// 用户信息响应
 message UserResponse {
-  uint64 id = 1;
-  string username = 2;
-  string nickname = 3;
-  optional string email = 4;
-  optional string mobile = 5;
-  int32 sex = 6;                // 0-未知, 1-男, 2-女
-  int32 status = 7;             // 0-正常, 1-禁用, 2-锁定
-  optional string remark = 8;
-  repeated uint64 role_ids = 9;
-  repeated uint64 dept_ids = 10;
-  optional string avatar = 11;
-  optional string login_ip = 12;
-  int64 login_date = 13;        // Unix 时间戳（毫秒），0 表示未登录
-  uint64 tenant_id = 14;
-  int64 create_time = 15;       // Unix 时间戳（毫秒）
-  int64 update_time = 16;       // Unix 时间戳（毫秒）
+  uint64 id = 1;                // 用户 ID
+  string username = 2;          // 用户名
+  string nickname = 3;          // 昵称
+  optional string email = 4;    // 邮箱
+  optional string mobile = 5;   // 手机号
+  int32 sex = 6;                // 性别：0-未知, 1-男, 2-女
+  int32 status = 7;             // 状态：0-正常, 1-禁用, 2-锁定
+  optional string remark = 8;   // 备注说明
+  repeated uint64 role_ids = 9; // 角色 ID 列表
+  repeated uint64 dept_ids = 10; // 部门 ID 列表
+  optional string avatar = 11;  // 头像 URL
+  optional string login_ip = 12; // 最近登录 IP
+  int64 login_date = 13;        // 最近登录时间（Unix 时间戳，毫秒），0 表示未登录
+  uint64 tenant_id = 14;        // 租户 ID
+  int64 create_time = 15;       // 创建时间（Unix 时间戳，毫秒）
+  int64 update_time = 16;       // 更新时间（Unix 时间戳，毫秒）
 }
 
+// 分页查询用户响应
 message ListUsersResponse {
-  repeated UserResponse items = 1;
-  admin.common.PageResponse page_info = 2;
+  repeated UserResponse items = 1;  // 用户列表
+  admin.common.PageResponse page_info = 2; // 分页信息
 }
 
+// 通用用户 ID 请求（启用/禁用/锁定/解锁共用）
 message UserIdRequest {
-  uint64 user_id = 1;
+  uint64 user_id = 1;  // 用户 ID
 }

@@ -4,16 +4,16 @@ package admin.common;
 
 /// 通用分页请求（page >= 1, size >= 1 且建议 <= 200）
 message PageRequest {
-  int64 page = 1;
-  int64 size = 2;
+  int64 page = 1;  // 页码，从 1 开始
+  int64 size = 2;  // 每页条数，建议 1~200
 }
 
-/// 空响应
+/// 空响应：用于仅表示操作成功、无需返回数据的接口
 message Empty {}
 
-/// 分页响应
+/// 分页响应：统一的分页信息结构
 message PageResponse {
-  int64 total = 1;
-  int64 page = 2;
-  int64 size = 3;
+  int64 total = 1;  // 总记录数
+  int64 page = 2;   // 当前页码
+  int64 size = 3;   // 当前页实际返回的条数（或请求的每页条数）
 }

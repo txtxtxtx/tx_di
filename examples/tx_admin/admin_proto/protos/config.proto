@@ -9,71 +9,86 @@ import "common.proto";
 // ============================================================
 
 service ConfigService {
+  /// 新增配置项
   rpc CreateConfig(CreateConfigRequest) returns (ConfigResponse);
+  /// 更新配置项（含可见性状态）
   rpc UpdateConfig(UpdateConfigRequest) returns (ConfigResponse);
+  /// 删除配置项
   rpc DeleteConfig(DeleteConfigRequest) returns (admin.common.Empty);
+  /// 按 ID 查询单个配置项
   rpc GetConfig(GetConfigRequest) returns (ConfigResponse);
+  /// 分页查询配置项列表（支持按名称/分类/key/类型过滤）
   rpc ListConfigs(ListConfigsRequest) returns (ListConfigsResponse);
+  /// 按多个 key 批量查询配置值
   rpc GetByKeys(GetByKeysRequest) returns (GetByKeysResponse);
 }
 
+// 新增配置请求
 message CreateConfigRequest {
-  string category = 1;
-  int32 config_type = 2;
-  string name = 3;
-  string config_key = 4;
-  string value = 5;
-  optional string remark = 6;
+  string category = 1;     // 配置分类（如 "system"、"email"）
+  int32 config_type = 2;   // 配置类型：0=字符串, 1=数字, 2=布尔, 3=JSON
+  string name = 3;         // 配置显示名称
+  string config_key = 4;   // 配置键名（全局唯一，读取时使用）
+  string value = 5;        // 配置值（按类型以字符串形式存储）
+  optional string remark = 6; // 备注说明
 }
 
+// 更新配置请求
 message UpdateConfigRequest {
-  uint64 config_id = 1;
-  string category = 2;
-  int32 config_type = 3;
-  string name = 4;
-  string config_key = 5;
-  string value = 6;
-  int32 visible = 7;
-  optional string remark = 8;
+  uint64 config_id = 1;      // 配置 ID
+  string category = 2;       // 配置分类
+  int32 config_type = 3;     // 配置类型
+  string name = 4;           // 配置显示名称
+  string config_key = 5;     // 配置键名
+  string value = 6;          // 配置值
+  int32 visible = 7;         // 是否可见：0=隐藏, 1=可见
+  optional string remark = 8; // 备注说明
 }
 
+// 删除配置请求
 message DeleteConfigRequest {
-  uint64 config_id = 1;
+  uint64 config_id = 1;  // 配置 ID
 }
 
+// 按 ID 查询配置请求
 message GetConfigRequest {
-  uint64 config_id = 1;
+  uint64 config_id = 1;  // 配置 ID
 }
 
+// 分页查询配置请求
 message ListConfigsRequest {
-  optional string name = 1;
-  optional string category = 2;
-  optional string config_key = 3;
-  optional int32 config_type = 4;
-  int64 page = 5;
-  int64 page_size = 6;
+  optional string name = 1;        // 按名称模糊过滤
+  optional string category = 2;    // 按分类精确过滤
+  optional string config_key = 3;  // 按键名模糊过滤
+  optional int32 config_type = 4;  // 按配置类型过滤
+  int64 page = 5;                  // 页码，从 1 开始
+  int64 page_size = 6;             // 每页条数
 }
 
+// 配置项响应
 message ConfigResponse {
-  uint64 id = 1;
-  string category = 2;
-  int32 config_type = 3;
-  string name = 4;
-  string config_key = 5;
-  string value = 6;
-  int32 visible = 7;
-  optional string remark = 8;
+  uint64 id = 1;              // 配置 ID
+  string category = 2;        // 配置分类
+  int32 config_type = 3;      // 配置类型
+  string name = 4;            // 配置显示名称
+  string config_key = 5;      // 配置键名
+  string value = 6;           // 配置值
+  int32 visible = 7;          // 是否可见：0=隐藏, 1=可见
+  optional string remark = 8; // 备注说明
 }
 
+// 分页查询配置响应
 message ListConfigsResponse {
-  repeated ConfigResponse items = 1;
-  admin.common.PageResponse page_info = 2;
+  repeated ConfigResponse items = 1;  // 配置项列表
+  admin.common.PageResponse page_info = 2; // 分页信息
 }
 
+// 按 keys 批量查询请求
 message GetByKeysRequest {
-  repeated string keys = 1;
+  repeated string keys = 1;  // 需要查询的配置键名列表
 }
 
+// 按 keys 批量查询响应
 message GetByKeysResponse {
-  map<string, string> configs = 1;
+  map<string, string> configs = 1;  // 键名 → 配置值
 }

@@ -9,70 +9,82 @@ import "common.proto";
 // ============================================================
 
 service MenuService {
+  /// 新增菜单
   rpc CreateMenu(CreateMenuRequest) returns (MenuResponse);
+  /// 更新菜单
   rpc UpdateMenu(UpdateMenuRequest) returns (MenuResponse);
+  /// 删除菜单
   rpc DeleteMenu(DeleteMenuRequest) returns (admin.common.Empty);
+  /// 按 ID 查询菜单
   rpc GetMenu(GetMenuRequest) returns (MenuResponse);
+  /// 查询菜单列表（支持名称/状态/类型过滤）
   rpc ListMenus(ListMenusRequest) returns (ListMenusResponse);
 }
 
+// 新增菜单请求
 message CreateMenuRequest {
-  string name = 1;
-  string permission = 2;
-  int32 types = 3;
-  int32 sort = 4;
-  uint64 parent_id = 5;
-  optional string path = 6;
-  optional string icon = 7;
-  optional string component = 8;
-  optional string component_name = 9;
+  string name = 1;                  // 菜单名称
+  string permission = 2;            // 权限标识（如 "system:user:list"）
+  int32 types = 3;                  // 菜单类型：0=目录, 1=菜单, 2=按钮
+  int32 sort = 4;                   // 排序号（越小越靠前）
+  uint64 parent_id = 5;             // 上级菜单 ID，0 表示顶级
+  optional string path = 6;         // 路由路径（如 "/user"）
+  optional string icon = 7;         // 图标名称
+  optional string component = 8;    // 前端组件路径（如 "system/user/index"）
+  optional string component_name = 9; // 组件名称（keep-alive 用）
 }
 
+// 更新菜单请求
 message UpdateMenuRequest {
-  uint64 menu_id = 1;
-  string name = 2;
-  string permission = 3;
-  int32 types = 4;
-  int32 sort = 5;
-  uint64 parent_id = 6;
-  optional string path = 7;
-  optional string icon = 8;
-  optional string component = 9;
-  optional string component_name = 10;
-  int32 visible = 11;
-  int32 keep_alive = 12;
+  uint64 menu_id = 1;               // 菜单 ID
+  string name = 2;                  // 菜单名称
+  string permission = 3;            // 权限标识
+  int32 types = 4;                  // 菜单类型
+  int32 sort = 5;                   // 排序号
+  uint64 parent_id = 6;             // 上级菜单 ID
+  optional string path = 7;         // 路由路径
+  optional string icon = 8;         // 图标名称
+  optional string component = 9;    // 前端组件路径
+  optional string component_name = 10; // 组件名称
+  int32 visible = 11;               // 是否显示：0=隐藏, 1=显示
+  int32 keep_alive = 12;            // 是否缓存组件：0=否, 1=是
 }
 
+// 删除菜单请求
 message DeleteMenuRequest {
-  uint64 menu_id = 1;
+  uint64 menu_id = 1;  // 菜单 ID
 }
 
+// 按 ID 查询菜单请求
 message GetMenuRequest {
-  uint64 menu_id = 1;
+  uint64 menu_id = 1;  // 菜单 ID
 }
 
+// 查询菜单列表请求
 message ListMenusRequest {
-  optional string name = 1;
-  optional int32 status = 2;
-  optional int32 types = 3;
+  optional string name = 1;   // 按名称模糊过滤
+  optional int32 status = 2;  // 按状态过滤：0=停用, 1=正常
+  optional int32 types = 3;   // 按类型过滤：0=目录, 1=菜单, 2=按钮
 }
 
+// 菜单信息响应
 message MenuResponse {
-  uint64 id = 1;
-  string name = 2;
-  string permission = 3;
-  int32 types = 4;
-  int32 sort = 5;
-  uint64 parent_id = 6;
-  optional string path = 7;
-  optional string icon = 8;
-  optional string component = 9;
-  optional string component_name = 10;
-  int32 status = 11;
-  int32 visible = 12;
-  int32 keep_alive = 13;
+  uint64 id = 1;                // 菜单 ID
+  string name = 2;              // 菜单名称
+  string permission = 3;        // 权限标识
+  int32 types = 4;              // 菜单类型
+  int32 sort = 5;               // 排序号
+  uint64 parent_id = 6;         // 上级菜单 ID
+  optional string path = 7;     // 路由路径
+  optional string icon = 8;     // 图标名称
+  optional string component = 9; // 前端组件路径
+  optional string component_name = 10; // 组件名称
+  int32 status = 11;            // 状态：0=停用, 1=正常
+  int32 visible = 12;           // 是否显示：0=隐藏, 1=显示
+  int32 keep_alive = 13;        // 是否缓存组件：0=否, 1=是
 }
 
+// 查询菜单列表响应
 message ListMenusResponse {
-  repeated MenuResponse items = 1;
+  repeated MenuResponse items = 1;  // 菜单列表（前端按 parent_id 组树）
 }

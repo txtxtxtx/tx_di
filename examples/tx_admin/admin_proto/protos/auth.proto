@@ -9,48 +9,53 @@ import "common.proto";
 // ============================================================
 
 service AuthService {
-  /// 用户登录
+  /// 用户登录：校验用户名/密码，返回 Token 及用户基础信息
   rpc Login(LoginRequest) returns (LoginResponse);
-  /// 获取当前用户信息
+  /// 获取当前用户详细信息（含角色、权限）
   rpc GetUserInfo(GetUserInfoRequest) returns (UserInfoResponse);
-  /// 用户登出
+  /// 用户登出：使当前 Token 失效
   rpc Logout(LogoutRequest) returns (admin.common.Empty);
 }
 
+// 登录请求
 message LoginRequest {
-  string username = 1;
-  string password = 2;
-  string login_ip = 3;
+  string username = 1;  // 登录用户名
+  string password = 2;  // 登录密码（明文，传输层应使用 HTTPS）
+  string login_ip = 3;  // 登录来源 IP（用于日志审计）
 }
 
+// 登录响应
 message LoginResponse {
-  uint64 user_id = 1;
-  string username = 2;
-  string nickname = 3;
-  uint64 tenant_id = 4;
-  repeated uint64 role_ids = 5;
-  repeated string permissions = 6;
-  repeated uint64 dept_ids = 7;
-  string token = 8;
-  repeated string role_codes = 9;
+  uint64 user_id = 1;          // 用户 ID
+  string username = 2;         // 用户名
+  string nickname = 3;         // 用户昵称/显示名
+  uint64 tenant_id = 4;        // 租户 ID（多租户场景）
+  repeated uint64 role_ids = 5;   // 角色 ID 列表
+  repeated string permissions = 6; // 权限标识列表（如 "system:user:add"）
+  repeated uint64 dept_ids = 7;   // 所属部门 ID 列表
+  string token = 8;            // 登录令牌（后续请求头携带）
+  repeated string role_codes = 9; // 角色编码列表（如 "admin"）
 }
 
+// 获取当前用户信息请求
 message GetUserInfoRequest {
-  uint64 user_id = 1;
+  uint64 user_id = 1;  // 用户 ID
 }
 
+// 当前用户详细信息响应
 message UserInfoResponse {
-  uint64 user_id = 1;
-  string username = 2;
-  string nickname = 3;
-  optional string email = 4;
-  optional string mobile = 5;
-  optional string avatar = 6;
-  repeated string roles = 7;
-  repeated string permissions = 8;
-  uint64 tenant_id = 9;
+  uint64 user_id = 1;            // 用户 ID
+  string username = 2;           // 用户名
+  string nickname = 3;           // 昵称
+  optional string email = 4;     // 邮箱
+  optional string mobile = 5;    // 手机号
+  optional string avatar = 6;    // 头像 URL
+  repeated string roles = 7;     // 角色名称列表
+  repeated string permissions = 8; // 权限标识列表
+  uint64 tenant_id = 9;          // 租户 ID
 }
 
+// 登出请求
 message LogoutRequest {
-  uint64 user_id = 1;
+  uint64 user_id = 1;  // 用户 ID
 }

@@ -9,104 +9,117 @@ import "common.proto";
 // ============================================================
 
 service LogService {
-  // 操作日志
+  // ---- 操作日志 ----
+  /// 写入一条操作日志
   rpc CreateOperateLog(CreateOperateLogRequest) returns (admin.common.Empty);
+  /// 分页查询操作日志
   rpc ListOperateLogs(ListOperateLogsRequest) returns (ListOperateLogsResponse);
 
-  // 登录日志
+  // ---- 登录日志 ----
+  /// 写入一条登录日志
   rpc CreateLoginLog(CreateLoginLogRequest) returns (admin.common.Empty);
+  /// 分页查询登录日志
   rpc ListLoginLogs(ListLoginLogsRequest) returns (ListLoginLogsResponse);
 }
 
 // ---- 操作日志 ----
 
+// 写入操作日志请求
 message CreateOperateLogRequest {
-  string trace_id = 1;
-  uint64 user_id = 2;
-  int32 user_type = 3;
-  string log_type = 4;
-  string sub_type = 5;
-  uint64 biz_id = 6;
-  string action = 7;
-  int32 success = 8;
-  string extra = 9;
+  string trace_id = 1;   // 链路追踪 ID
+  uint64 user_id = 2;    // 操作用户 ID
+  int32 user_type = 3;   // 用户类型：0=系统用户, 1=管理员, 2=普通用户
+  string log_type = 4;   // 日志类型（如 "business"、"error"）
+  string sub_type = 5;   // 子类型（如 "add"、"update"、"delete"）
+  uint64 biz_id = 6;     // 业务对象 ID
+  string action = 7;     // 操作描述（如 "删除用户"）
+  int32 success = 8;     // 是否成功：0=失败, 1=成功
+  string extra = 9;      // 扩展信息（JSON 字符串）
 }
 
+// 分页查询操作日志请求
 message ListOperateLogsRequest {
-  optional uint64 user_id = 1;
-  optional string log_type = 2;
-  optional string sub_type = 3;
-  optional int32 success = 4;
-  optional string begin_time = 5;
-  optional string end_time = 6;
-  int64 page = 7;
-  int64 page_size = 8;
+  optional uint64 user_id = 1;     // 按用户过滤
+  optional string log_type = 2;    // 按日志类型过滤
+  optional string sub_type = 3;    // 按子类型过滤
+  optional int32 success = 4;      // 按结果过滤：0=失败, 1=成功
+  optional string begin_time = 5;  // 起始时间（含）
+  optional string end_time = 6;    // 结束时间（含）
+  int64 page = 7;                  // 页码
+  int64 page_size = 8;             // 每页条数
 }
 
+// 操作日志响应
 message OperateLogResponse {
-  uint64 id = 1;
-  string trace_id = 2;
-  uint64 user_id = 3;
-  int32 user_type = 4;
-  string log_type = 5;
-  string sub_type = 6;
-  uint64 biz_id = 7;
-  string action = 8;
-  int32 success = 9;
-  string extra = 10;
-  optional string request_method = 11;
-  optional string request_url = 12;
-  optional string user_ip = 13;
-  optional string created_at = 14;
+  uint64 id = 1;                 // 日志 ID
+  string trace_id = 2;           // 链路追踪 ID
+  uint64 user_id = 3;            // 操作用户 ID
+  int32 user_type = 4;           // 用户类型
+  string log_type = 5;           // 日志类型
+  string sub_type = 6;           // 子类型
+  uint64 biz_id = 7;             // 业务对象 ID
+  string action = 8;             // 操作描述
+  int32 success = 9;             // 是否成功
+  string extra = 10;             // 扩展信息
+  optional string request_method = 11; // 请求方法（GET/POST/...）
+  optional string request_url = 12;    // 请求 URL
+  optional string user_ip = 13;        // 来源 IP
+  optional string created_at = 14;     // 记录时间（ISO8601 字符串）
 }
 
+// 分页查询操作日志响应
 message ListOperateLogsResponse {
-  repeated OperateLogResponse items = 1;
-  admin.common.PageResponse page_info = 2;
+  repeated OperateLogResponse items = 1;  // 操作日志列表
+  admin.common.PageResponse page_info = 2; // 分页信息
 }
 
 // ---- 登录日志 ----
 
+// 写入登录日志请求
 message CreateLoginLogRequest {
-  uint64 user_id = 1;
-  int32 user_type = 2;
-  string username = 3;
-  string login_ip = 4;
-  string login_type = 5;
-  int32 result = 6;
+  uint64 user_id = 1;    // 登录用户 ID
+  int32 user_type = 2;   // 用户类型
+  string username = 3;   // 登录用户名
+  string login_ip = 4;   // 登录 IP
+  string login_type = 5; // 登录方式（如 "password"、"token"、"sso"）
+  int32 result = 6;      // 登录结果：0=失败, 1=成功
 }
 
+// 分页查询登录日志请求
 message ListLoginLogsRequest {
-  optional uint64 user_id = 1;
-  optional string username = 2;
-  optional string login_ip = 3;
-  optional string login_type = 4;
-  optional int32 result = 5;
-  optional string begin_time = 6;
-  optional string end_time = 7;
-  int64 page = 8;
-  int64 page_size = 9;
+  optional uint64 user_id = 1;     // 按用户过滤
+  optional string username = 2;    // 按用户名模糊过滤
+  optional string login_ip = 3;    // 按 IP 过滤
+  optional string login_type = 4;  // 按登录方式过滤
+  optional int32 result = 5;       // 按结果过滤：0=失败, 1=成功
+  optional string begin_time = 6;  // 起始时间（含）
+  optional string end_time = 7;    // 结束时间（含）
+  int64 page = 8;                  // 页码
+  int64 page_size = 9;             // 每页条数
 }
 
+// 登录日志响应
 message LoginLogResponse {
-  uint64 id = 1;
-  uint64 user_id = 2;
-  int32 user_type = 3;
-  string username = 4;
-  string login_ip = 5;
-  string login_type = 6;
-  int32 result = 7;
-  optional string msg = 8;
-  optional string login_time = 9;
+  uint64 id = 1;                // 日志 ID
+  uint64 user_id = 2;           // 登录用户 ID
+  int32 user_type = 3;          // 用户类型
+  string username = 4;          // 登录用户名
+  string login_ip = 5;          // 登录 IP
+  string login_type = 6;        // 登录方式
+  int32 result = 7;             // 登录结果：0=失败, 1=成功
+  optional string msg = 8;      // 失败原因/备注
+  optional string login_time = 9; // 登录时间（ISO8601 字符串）
 }
 
+// 分页查询登录日志响应
 message ListLoginLogsResponse {
-  repeated LoginLogResponse items = 1;
-  admin.common.PageResponse page_info = 2;
+  repeated LoginLogResponse items = 1;  // 登录日志列表
+  admin.common.PageResponse page_info = 2; // 分页信息
 }
 
 // ---- 通用删除请求 ----
 
+// 批量删除日志请求（操作日志与登录日志通用）
 message DeleteLogsRequest {
-  repeated uint64 ids = 1;
+  repeated uint64 ids = 1;  // 日志 ID 列表
 }
