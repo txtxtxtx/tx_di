@@ -1,0 +1,13 @@
+{
+  // vscode-proto3 扩展：proto 文件 include 路径
+  // 必须与 admin_proto/build.rs 的 compile_protos(..., &[proto_dir]) 一致
+  "protoc": {
+    "options": [
+      "--proto_path=${workspaceFolder}/examples/tx_admin/admin_proto/protos"
+    ]
+  },
+  // clangd 分析 proto（若使用 C/C++ 扩展）
+  "clangd.arguments": [
+    "--background-index"
+  ]
+}
