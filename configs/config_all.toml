@@ -135,8 +135,8 @@ auto_schema = true
 pool_pre_ping = false
 
 # 数据库为空时自动创建的 admin 账号默认密码
-# 默认: "admin123"
-default_admin_password = "admin123"
+# 默认: "admin123"（生产环境请通过环境变量注入）
+default_admin_password = "${ADMIN_DEFAULT_PASSWORD}"
 
 
 # ╔══════════════════════════════════════════════════════════════════════════════
@@ -440,8 +440,8 @@ registrar = "sip:192.168.1.1:5060"
 username = "34020000001320000001"
 
 # 注册密码
-# 默认: ""
-password = "12345678"
+# 默认: ""（生产环境请通过环境变量注入）
+password = "${GB28181_REGISTER_PASSWORD}"
 
 # 认证域（realm），null 表示接受任意挑战
 # 默认: null
@@ -491,8 +491,8 @@ register_ttl = 3600
 enable_auth = false
 
 # 全局认证密码（所有设备共用）
-# 默认: "12345678"
-auth_password = "12345678"
+# 默认: "12345678"（生产环境请通过环境变量注入）
+auth_password = "${GB28181_AUTH_PASSWORD}"
 
 # 按设备 ID 配置独立密码（优先级高于 auth_password）
 # [gb28181_server_config.device_passwords]

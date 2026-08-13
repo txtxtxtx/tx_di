@@ -20,7 +20,7 @@ realm                  = "3402000000"
 sip_ip                 = "192.168.0.200"
 heartbeat_timeout_secs = 120
 enable_auth            = true
-auth_password          = "tx123456"
+auth_password          = "${GB28181_AUTH_PASSWORD}"
 
 [gb28181_server_config.media]
 local_ip       = "127.0.0.1"
@@ -29,7 +29,7 @@ rtp_port_end   = 40000
 
 [gb28181_server_config.zlm]
 base_url = "http://127.0.0.1:8080"
-secret   = "035c73f7-bb6b-4889-a715-d9eb2d1925cc"
+secret   = "${ZLM_API_SECRET}"
 
 [sip_config]
 host  = "0.0.0.0"
@@ -47,7 +47,7 @@ prefix = "tx_gb28181"
 database_url = "sqlite:./gb28181.db"
 auto_schema = false
 max_pool_size = 3
-default_admin_password = "admin123"
+default_admin_password = "${ADMIN_DEFAULT_PASSWORD}"
 
 # 认证配置（sa-token）
 [sa_token_config]
