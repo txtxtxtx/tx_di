@@ -11,6 +11,12 @@
 
 pub mod flexible_serde;
 
+/// gRPC 服务反射所需的文件描述符集合（由 build.rs 生成）。
+///
+/// `tonic_reflection` 依赖此字节集向客户端暴露服务与方法定义，
+/// 供 `grpcurl` / `grpcui` 等工具动态发现接口。
+pub const FILE_DESCRIPTOR_SET: &[u8] = include_bytes!("pb/admin_descriptor.bin");
+
 pub mod admin {
     /// 通用类型（PageRequest, Empty, PageResponse 等）
     pub mod common {

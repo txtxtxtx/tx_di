@@ -11,7 +11,7 @@ pub use comp::*;
 pub use bound::DiComp;
 pub use e::WebErr;
 pub use err::WebErrCode;
-pub use layers::{add_arc_layer, add_layer, body_limit::BodySizeLimitLayer};
+pub use layers::{add_arc_layer, add_layer, body_limit::BodySizeLimitLayer, security::SecurityHeadersLayer};
 pub use metrics::{MetricsLayer, metrics_router, register_collector};
 
 /// 统一路由器类型

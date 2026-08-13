@@ -1,0 +1,87 @@
+# ============================================================
+# tx_admin 生产配置示例（PostgreSQL + Redis，多实例水平扩容）
+# ============================================================
+# 用法：
+#   docker compose -f examples/tx_admin/docker-compose.yml up
+#   # 或本地运行：
+#   CONFIG_PATH=examples/tx_admin/config/config.production.toml cargo run -p admin_api
+#
+# 与 config.toml（SQLite 开发版）的区别：
+#   - 数据库改用 PostgreSQL（多实例共享）
+#   - sa-token 会话 + Job 分布式锁改 Redis（多实例共享）
+# ============================================================
+
+[file_config]
+backend = "local"
+base_path = "./uploads"
+base_url = "http://localhost:8888/files"
+max_file_size = 10485760
+
+[file_config.s3]
+access_key = ""
+bucket = ""
+endpoint = ""
+force_path_style = false
+region = "ap-southeast-1"
+secret_key = ""
+
+[log_config]
+console_output = true
+dir = "./logs"
+prefix = "tx_admin"
+retention_days = 7
+time_format = "local"
+
+[sa_token]
+redis_url = "redis://127.0.0.1:6379/0"
+active_timeout = 1800
+auto_renew = true
+enable_refresh_token = true
+is_concurrent = true
+is_read_cookie = true
+is_read_header = true
+is_share = true
+refresh_token_timeout = 604800
+timeout = 86400
+token_name = "Authorization"
+token_style = "simple-uuid"
+
+[toasty_config]
+auto_schema = false
+migrate_on_start = true
+database_url = "postgres://tx_admin:tx_admin_pwd_change_me@127.0.0.1:5432/tx_admin"
+max_pool_size = 10
+
+# 注册中心（Nacos）：生产多实例部署开启；本地无 Nacos 时保持 false
+[registry_config]
+enabled = false
+nacos_addr = "http://127.0.0.1:8848"
+namespace = "public"
+group = "DEFAULT_GROUP"
+service_name = "tx_admin"
+auto_register = true
+
+[job_config]
+enabled = true
+poll_interval_secs = 1
+shell_timeout_secs = 300
+python_timeout_secs = 300
+python_path = "/usr/bin/python3"
+thread_pool_size = 4
+# 多实例部署必须开启，避免同一 cron 任务被重复执行
+distributed_lock = true
+lock_timeout_secs = 300
+
+[grpc_config]
+port = 50051
+
+[web_config]
+enable_cors = true
+host = "::"
+layers = [[5, "timeout"], [5, "security"], [10, "api_log"], [100, "compression"], [10000, "cors"]]
+max_body_size = 104857600
+port = 8888
+timeout_secs = 30
+
+[web_config.spa_apps]
+"/web" = "examples/tx_admin/web/dist"

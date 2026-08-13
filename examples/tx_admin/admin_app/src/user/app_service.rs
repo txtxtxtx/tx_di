@@ -195,6 +195,10 @@ impl UserAppService {
 
         // 校验每个角色存在且为启用状态（status == 0 即 Enabled）
         let roles = self.role_repo.find_by_ids(&role_ids).await?;
+        // 数据完整性校验：输入 ID 与命中记录数必须一致，防止悬空引用
+        if roles.len() != role_ids.len() {
+            return Err(RepositoryError::NotFoundRole)?;
+        }
         for r in &roles {
             if r.status != 0 {
                 return Err(RepositoryError::ValidationUserStatus)?;
@@ -219,6 +223,10 @@ impl UserAppService {
 
         // 校验每个部门存在且为启用状态
         let depts = self.dept_repo.find_by_ids(&dept_ids).await?;
+        // 数据完整性校验：输入 ID 与命中记录数必须一致，防止悬空引用
+        if depts.len() != dept_ids.len() {
+            return Err(RepositoryError::NotFoundDept)?;
+        }
         for d in &depts {
             if d.status != 0 {
                 return Err(RepositoryError::ValidationDeptDisabled)?;

@@ -30,7 +30,7 @@ npm run build
 npm run preview
 ```
 
-开发模式下，`/api` 请求自动代理到 `http://localhost:8000`（后端服务）。
+开发模式下，`/api` 请求自动代理到 `http://127.0.0.1:8888`（后端服务）。
 
 ## 项目结构
 
@@ -117,7 +117,7 @@ src/
 
 ## 对接后端
 
-后端服务位于 `examples/tx_admin/admin_api`，默认端口 8000。API 响应格式：
+后端服务位于 `examples/tx_admin/admin_api`，默认端口 8888。API 响应格式：
 
 ```json
 // 成功

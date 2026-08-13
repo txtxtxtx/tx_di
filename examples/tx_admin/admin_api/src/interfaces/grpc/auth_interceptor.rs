@@ -24,7 +24,14 @@ pub struct GrpcToken(pub TokenValue);
 
 /// 不需要认证的 gRPC 方法全名列表
 const OPEN_METHODS: &[&str] = &[
+    // 登录
     "/admin.auth.AuthService/Login",
+    // gRPC 健康检查（K8s 探针 / grpc_health_probe，不带 token）
+    "/grpc.health.v1.Health/Check",
+    "/grpc.health.v1.Health/Watch",
+    // gRPC 服务反射（grpcurl / grpcui 调试工具）
+    "/grpc.reflection.v1.ServerReflection/ServerReflectionInfo",
+    "/grpc.reflection.v1alpha.ServerReflection/ServerReflectionInfo",
 ];
 
 // ============================================================

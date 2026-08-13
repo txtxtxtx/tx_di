@@ -18,7 +18,7 @@ admin_proto  = { path = "../admin_proto" }
 admin_app    = { path = "../admin_app" }
 admin_domain = { path = "../admin_domain" }
 admin_infra  = { path = "../admin_infra" }
-tx_di_toasty = { path = "../../../plugins/tx_di_toasty" }
+tx_di_toasty = { path = "../../../plugins/tx_di_toasty", features = ["sqlite", "postgresql"] }
 toasty = { workspace = true, features = ["serde"] }
 tx_error    = { path = "../../../common/tx_error", features = ["axum"] }
 tx_common    = { path = "../../../common/crates/tx_common", features = ["axum"] }
@@ -27,12 +27,16 @@ tx_di_file  = { path = "../../../plugins/tx_di_file" }
 tx_di_log   = { path = "../../../plugins/tx_di_log" }
 tx_di_axum  = { path = "../../../plugins/tx_di_axum" }
 # 认证授权：内存存储始终兜底；水平扩容时启用 redis feature + 配置 redis_url
-tx_di_sa_token = { path = "../../../plugins/tx_di_sa_token" }
+# 生产默认启用 redis（会话跨实例共享）；未配置 redis_url 时自动回退内存。
+tx_di_sa_token = { path = "../../../plugins/tx_di_sa_token", features = ["redis"] }
 sa-token-core = "0.1"
 
 # gRPC
 tonic  = { workspace = true }
 prost  = { workspace = true }
+# gRPC 生产可观测性：健康检查 + 服务反射（客户端调试 / 工具发现接口）
+tonic-health       = "0.12"
+tonic-reflection   = "0.12"
 
 # HTTP
 axum   = { workspace = true, features = ["macros", "multipart"] }
