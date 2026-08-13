@@ -1,14 +1,124 @@
-# 这里是一个示例 .cnb.yml
-  
-  # 匹配main分支
-  main:
-    # 触发事件为 push 事件
-    push:
-      # 这里是阶段任务示例，可配置任意多个阶段，这里以一个阶段为例
-      - name: "your first CNB building"
-        stages:
-          # 使用流水线输出你的构建配置数据
-          - name: echo your build data
-            script: echo ${CNB_BUILD_USER} 通过 ${CNB_BRANCH} 分支触发了 ${CNB_EVENT} 事件
-  
-  # 更多资料见 https://docs.cnb.cool/build/quick-start.html
+# ============================================================
+# tx_di / tx_admin CI/CD 流水线
+# ------------------------------------------------------------
+# 一、push 到 main —— 回归测试
+# 二、PR —— 回归测试 + 代码质量门禁（fmt / clippy / 覆盖率）
+# 三、tag_push（发版）—— 回归测试 → 构建并推送 Docker 镜像
+#    到 CNB 制品库 → git:release 自动发布 Release
+#
+# 回归测试范围（详见 examples/tx_admin/docs/10-测试说明书.md）：
+#   - 框架层 tx-di-core（须串行，避免全局状态竞态）
+#   - admin_domain（单元）  / admin_app（集成，串行）
+#   - admin_api（E2E，含 gRPC 自动化回归）/ admin_proto（DTO 序列化）
+# ============================================================
+
+# ── 公共锚点：回归测试阶段（test / fmt / clippy）─────────────
+.rust-env: &rust-env
+  runner:
+    cpus: 8
+  docker:
+    image: rust:1.97-slim
+    volumes:
+      - cargo-registry:/usr/local/cargo/registry:rw
+      - target-cache:/workspace/target:rw
+
+.regression-stages: &regression-stages
+  stages:
+    - name: fmt
+      script: cargo fmt --check
+    - name: clippy
+      script: cargo clippy -p tx-di-core -p tx-di-macros -p admin_domain -p admin_app -p admin_api -- -D warnings
+    - name: test-core
+      # 框架层核心测试（串行，避免全局状态竞态）
+      script: cargo test -p tx-di-core -- --test-threads=1
+    - name: test-domain
+      script: cargo test -p admin_domain
+    - name: test-app
+      # 集成测试串行（共享全局状态）
+      script: cargo test -p admin_app -- --test-threads=1
+    - name: test-api
+      # 接口层 E2E（含 gRPC 自动化回归 + admin_proto DTO 序列化）
+      script: cargo test -p admin_api
+  failStages:
+    - name: notify-fail
+      script: |
+        echo "❌ 回归测试失败"
+        echo "流水线: $CNB_PIPELINE_NAME  构建: $CNB_BUILD_ID  分支: $CNB_BRANCH"
+        echo "错误: $CNB_BUILD_FAILED_MSG"
+
+# ============================================================
+# 一、push 到 main —— 自动回归测试
+# ============================================================
+main:
+  push:
+    - name: regression-test
+      <<: *rust-env
+      ifModify:
+        - "tx-di-core/**"
+        - "tx-di-macros/**"
+        - "common/**"
+        - "plugins/**"
+        - "examples/tx_admin/**"
+        - "Cargo.toml"
+        - "Cargo.lock"
+      <<: *regression-stages
+
+# ============================================================
+# 二、PR —— 回归测试 + 代码质量门禁
+# ============================================================
+"$":
+  pull_request:
+    - name: pr-regression-gate
+      <<: *rust-env
+      ifModify:
+        - "tx-di-core/**"
+        - "tx-di-macros/**"
+        - "common/**"
+        - "plugins/**"
+        - "examples/tx_admin/**"
+        - "Cargo.toml"
+        - "Cargo.lock"
+      <<: *regression-stages
+      endStages:
+        - name: notify-success
+          script: echo "✅ PR 回归测试全部通过"
+
+# ============================================================
+# 三、tag_push —— 回归测试 → 构建镜像 → 发布
+# ============================================================
+  tag_push:
+    - name: release
+      <<: *rust-env
+      services:
+        - docker
+      stages:
+        - name: fmt
+          script: cargo fmt --check
+        - name: clippy
+          script: cargo clippy -p tx-di-core -p tx-di-macros -p admin_domain -p admin_app -p admin_api -- -D warnings
+        - name: test-core
+          script: cargo test -p tx-di-core -- --test-threads=1
+        - name: test-domain
+          script: cargo test -p admin_domain
+        - name: test-app
+          script: cargo test -p admin_app -- --test-threads=1
+        - name: test-api
+          script: cargo test -p admin_api
+        - name: build-image
+          # 构建并推送 tx_admin Docker 镜像到 CNB 制品库（Tag 版本）
+          # services: docker 已内置对 CNB 制品库的认证，无需显式 docker login
+          script: |
+            docker build -f examples/tx_admin/Dockerfile \
+              -t "$CNB_DOCKER_REGISTRY/$CNB_REPO_SLUG_LOWERCASE:${CNB_BRANCH}" .
+            docker push "$CNB_DOCKER_REGISTRY/$CNB_REPO_SLUG_LOWERCASE:${CNB_BRANCH}"
+        - name: create-release
+          type: git:release
+          options:
+            tag: "$CNB_BRANCH"
+            description: "tx_admin v${CNB_BRANCH} 发布：自动回归测试通过，镜像已推送至制品库。"
+      failStages:
+        - name: notify-fail
+          script: |
+            echo "❌ 发版失败"
+            echo "Tag: $CNB_BRANCH  构建: $CNB_BUILD_ID"
+            echo "错误: $CNB_BUILD_FAILED_MSG"
