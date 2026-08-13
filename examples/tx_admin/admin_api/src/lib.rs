@@ -20,5 +20,5 @@ pub mod auth;
 #[allow(unused_imports)]
 use {
     admin_app, admin_infra, tx_di_axum, tx_di_file, tx_di_job, tx_di_log,
-    tx_di_sa_token, tx_di_toasty,
+    tx_di_sa_token, tx_di_toasty, tx_di_nacos,
 };

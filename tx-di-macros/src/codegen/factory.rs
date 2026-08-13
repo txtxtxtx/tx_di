@@ -47,6 +47,11 @@ pub fn gen_factory_fn(ctx: &CodeGenContext) -> TokenStream2 {
                             )
                         })
                 };
+                // 配置组件同样需要执行 inner_init（#[component(init)] 回调），
+                // 例如 WebConfig 在 init 中注册配置驱动的中间件层（timeout/cors/压缩等）。
+                if let Err(e) = <#struct_name as ::tx_di_core::Component>::inner_init(&mut config, store) {
+                    panic!("[di] 配置组件 '{}' inner_init 失败: {}", stringify!(#struct_name), e);
+                }
                 ::tx_di_core::tracing::debug!("{} build 成功", stringify!(#struct_name));
                 Box::new(config) as Box<dyn std::any::Any + Send + Sync>
             }

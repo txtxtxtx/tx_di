@@ -13,7 +13,7 @@ use tx_error::AppResult;
 #[tokio::main]
 async fn main() -> AppResult<()> {
     tx_di_nacos::app_loop! {
-        config = r"examples/tx_admin/config/config.toml",
+        config = resolve_config_path(),
         startup = |app: std::sync::Arc<tx_di_core::App>| -> tx_di_core::RIE<()> {
             // 注册内置任务处理器
             use tx_di_job::{ExecutionStatus, JobPlugin, JobResult};
@@ -31,4 +31,21 @@ async fn main() -> AppResult<()> {
             Ok(())
         },
     }
+}
+
+/// 解析本地配置文件路径。
+///
+/// 优先级：环境变量 `CONFIG_PATH` > 当前目录 `config/config.toml` >
+/// 仓库约定路径 `examples/tx_admin/config/config.toml`（向后兼容开发习惯）。
+/// 生产部署推荐显式设置 `CONFIG_PATH`（绝对路径），避免依赖进程工作目录。
+fn resolve_config_path() -> &'static str {
+    if let Ok(p) = std::env::var("CONFIG_PATH") {
+        if !p.trim().is_empty() {
+            return Box::leak(p.into_boxed_str());
+        }
+    }
+    if std::path::Path::new("config/config.toml").exists() {
+        return "config/config.toml";
+    }
+    "examples/tx_admin/config/config.toml"
 }

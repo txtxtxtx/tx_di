@@ -1,0 +1,72 @@
+# ============================================================
+# tx_admin 生产编排示例（单服务多实例 + 共享基础设施）
+# ============================================================
+# 使用：
+#   docker compose -f examples/tx_admin/docker-compose.yml up --build
+#   docker compose -f examples/tx_admin/docker-compose.yml up --scale tx_admin=3
+#
+# 说明：
+#   - PostgreSQL 存业务数据、Redis 存会话/分布式锁
+#   - tx_admin 无状态化后可水平扩容（多实例共享 PG/Redis）
+#   - 生产请务必修改 ADMIN_INIT_PASSWORD / 数据库口令
+# ============================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: tx_admin
+      POSTGRES_USER: tx_admin
+      POSTGRES_PASSWORD: tx_admin_pwd_change_me
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tx_admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  tx_admin:
+    build:
+      context: ../..
+      dockerfile: examples/tx_admin/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      CONFIG_PATH: /app/config/config.toml
+      APP_HOME: /app/data
+      SERVICE_IP: tx_admin
+      GRPC_PORT: "50051"
+      REDIS_URL: redis://redis:6379/0
+      ADMIN_INIT_PASSWORD: change_me_on_first_login
+      # 数据库连接：覆盖默认 SQLite，指向 PostgreSQL（ToastyConfig 支持 DATABASE_URL 环境变量覆盖）
+      DATABASE_URL: postgres://tx_admin:tx_admin_pwd_change_me@postgres:5432/tx_admin
+    ports:
+      - "8888:8888"
+      - "50051:50051"
+    volumes:
+      - tx_admin_uploads:/app/data/uploads
+      - tx_admin_logs:/app/logs
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+  redis_data:
+  tx_admin_uploads:
+  tx_admin_logs:

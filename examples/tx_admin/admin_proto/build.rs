@@ -45,6 +45,8 @@ fn main() -> Result<()> {
         .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
         .type_attribute(".", "#[serde(rename_all = \"camelCase\")]")
         .field_attribute("optional", "#[serde(skip_serializing_if = \"Option::is_none\")]")
+        // 生成文件描述符集合（供 gRPC 服务反射使用）
+        .file_descriptor_set_path("src/pb/admin_descriptor.bin")
         .compile_protos(&proto_paths, &[proto_dir])?;
 
     // 后处理：为 i64/u64 字段添加 serde_as 属性

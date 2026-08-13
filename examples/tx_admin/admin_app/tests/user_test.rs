@@ -515,6 +515,36 @@ async fn assign_roles_empty_should_clear() {
     assert!(found.role_ids.is_empty());
 }
 
+#[tokio::test]
+async fn assign_roles_with_nonexistent_id_should_fail() {
+    let (user_app, _, _, _) = common::create_user_app_with_shared().await;
+    let user = user_app
+        .create_user(
+            CreateUserRequest {
+                username: "bad_role_ref".into(),
+                password: "pwd".into(),
+                nickname: "悬空角色引用".into(),
+                email: None,
+                mobile: None,
+                sex: None,
+                remark: None,
+                role_ids: vec![],
+                dept_ids: vec![],
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
+
+    // 绑定不存在的角色 ID，应返回错误而非静默绑定悬空引用
+    let result = user_app.assign_roles(user.id, vec![9_999_999]).await;
+    assert!(result.is_err(), "绑定不存在的角色 ID 应返回错误");
+
+    // 回查确认未产生任何悬空绑定
+    let found = user_app.get_user(user.id).await.unwrap();
+    assert!(found.role_ids.is_empty());
+}
+
 // ── 1.5 部门分配 ───────────────────────────────────────────────────────────
 
 #[tokio::test]
@@ -588,6 +618,36 @@ async fn assign_departments_empty_should_clear() {
     user_app.assign_departments(user.id, vec![]).await.unwrap();
 
     // 回查验证部门已清空
+    let found = user_app.get_user(user.id).await.unwrap();
+    assert!(found.dept_ids.is_empty());
+}
+
+#[tokio::test]
+async fn assign_departments_with_nonexistent_id_should_fail() {
+    let (user_app, _, _, _) = common::create_user_app_with_shared().await;
+    let user = user_app
+        .create_user(
+            CreateUserRequest {
+                username: "bad_dept_ref".into(),
+                password: "pwd".into(),
+                nickname: "悬空部门引用".into(),
+                email: None,
+                mobile: None,
+                sex: None,
+                remark: None,
+                role_ids: vec![],
+                dept_ids: vec![],
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
+
+    // 绑定不存在的部门 ID，应返回错误而非静默绑定悬空引用
+    let result = user_app.assign_departments(user.id, vec![9_999_999]).await;
+    assert!(result.is_err(), "绑定不存在的部门 ID 应返回错误");
+
+    // 回查确认未产生任何悬空绑定
     let found = user_app.get_user(user.id).await.unwrap();
     assert!(found.dept_ids.is_empty());
 }

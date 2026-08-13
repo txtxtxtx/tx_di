@@ -14,8 +14,19 @@ use tx_di_toasty::ToastyDb;
 use tx_error::AppResult;
 use tracing::info;
 
-/// 默认管理员密码（明文，由调用方负责哈希）
+/// 默认管理员密码（明文，由调用方负责哈希）。
+///
+/// 生产环境务必通过环境变量 `ADMIN_INIT_PASSWORD` 覆盖默认值；
+/// 首次登录后应立即修改密码。
 pub const DEFAULT_ADMIN_PASSWORD: &str = "admin123";
+
+/// 初始化管理员密码解析：环境变量 `ADMIN_INIT_PASSWORD` > 默认值 `admin123`。
+pub fn resolve_admin_password() -> String {
+    std::env::var("ADMIN_INIT_PASSWORD")
+        .ok()
+        .filter(|p| !p.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_ADMIN_PASSWORD.to_string())
+}
 
 /// 字典种子数据：(dict_type, type_name, data_items)
 /// data_items: (sort, label, value, color_type)
@@ -200,8 +211,9 @@ const MENU_SEEDS: &[(u64, &str, &str, i32, i32, u64, &str, &str, &str, &str, i32
 pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
     let mut db = db.clone();
 
-    // 1. 创建默认管理员用户（密码由调用方哈希后传入）
-    let password_hash = admin_domain::password::hash_password(DEFAULT_ADMIN_PASSWORD)?;
+    // 1. 创建默认管理员用户（密码由环境变量或默认值解析，再哈希后入库）
+    let init_password = resolve_admin_password();
+    let password_hash = admin_domain::password::hash_password(&init_password)?;
     SysUser::create()
         .id(1)
         .username("admin".to_string())
@@ -219,7 +231,7 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
         .exec(&mut db)
         .await
         .map_err(|e| anyhow::anyhow!("创建管理员用户失败: {}", e))?;
-    info!("已创建默认管理员 admin/admin123");
+    info!("已创建默认管理员 admin（密码来自 ADMIN_INIT_PASSWORD 或默认值）");
 
     // 2. 创建角色
     SysRole::create()

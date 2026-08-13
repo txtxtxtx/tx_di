@@ -153,9 +153,25 @@ async fn app_async_init(_comp: Arc<AdminPlugin>, app: Arc<App>) -> RIE<()> {
     // 使用 tower middleware 实现认证
     let auth_layer = grpc::auth_interceptor::AuthLayer::new();
 
+    // 生产可观测性：gRPC 健康检查（tonic-health）与服务反射（tonic-reflection）。
+    // - health：供 K8s gRPC 探针 / grpc_health_probe / 注册中心探活。
+    // - reflection：供 grpcurl / grpcui 等工具动态发现服务与方法。
+    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
+    // 空服务名（""）表示整体健康状态，tonic-health 默认即为 Serving；
+    // 这里显式再标记一次以保证语义清晰（grpc_health_probe 默认检查空服务名）。
+    health_reporter
+        .set_service_status("", tonic_health::ServingStatus::Serving)
+        .await;
+    let reflection_service = tonic_reflection::server::Builder::configure()
+        .register_encoded_file_descriptor_set(admin_proto::FILE_DESCRIPTOR_SET)
+        .build_v1()
+        .map_err(|e| anyhow::anyhow!("gRPC 反射服务构建失败: {e}"))?;
+
     // 构建 tonic Router，注册所有 gRPC 服务
     let grpc_router = tonic::transport::Server::builder()
         .layer(auth_layer)
+        .add_service(health_service)
+        .add_service(reflection_service)
         .add_service(AuthServiceServer::new(AuthGrpcService { app: app.clone() }))
         .add_service(UserServiceServer::new(UserGrpcService { app: app.clone() }))
         .add_service(RoleServiceServer::new(RoleGrpcService { app: app.clone() }))

@@ -26,6 +26,7 @@ use tracing::{debug, error, Level};
 
 pub mod api_log;
 pub mod body_limit;
+pub mod security;
 
 /// 超时配置（秒）
 static TIMEOUT_SECS: LazyLock<Arc<RwLock<u64>>> =
@@ -125,6 +126,9 @@ fn get_layer_by_name(name: impl Into<String>) -> Option<Arc<dyn DynMiddleware>> 
     match name.as_str() {
         "api_log" => {
             Some(Arc::new(api_log::ApiLogLayer))
+        }
+        "security" => {
+            Some(Arc::new(security::SecurityHeadersLayer))
         }
         "cors" => {
             Some(Arc::new(tower_http::cors::CorsLayer::permissive()))
