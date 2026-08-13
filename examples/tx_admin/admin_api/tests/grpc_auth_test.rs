@@ -1,13 +1,26 @@
-//! gRPC AuthService 集成测试
+//! gRPC AuthService 回归测试
 //!
-//! 测试登录和获取用户信息接口
+//! 复用 `common::server()` E2E 基座自动启动完整 App（含 gRPC 服务 + 随机端口），
+//! 无需再手动 `cargo run` 起服务。覆盖登录成功/失败、获取用户信息、登出、鉴权拦截。
+//!
+//! ## 改造说明
+//! 此前版本连接固定 `127.0.0.1:50051`，依赖外部手动启动服务，无法随 `cargo test`
+//! 自动通过（属测试说明书缺口 G-2）。本次改为复用基座注入的随机 `grpc_url`，
+//! 使其成为可自动运行的回归测试。
+
+mod common;
 
 use admin_proto::admin::auth::auth_service_client::AuthServiceClient;
 use admin_proto::admin::auth::{GetUserInfoRequest, LoginRequest, LogoutRequest};
+use admin_proto::admin::common::PageRequest;
+use admin_proto::admin::user::user_service_client::UserServiceClient;
+use admin_proto::admin::user::ListUsersRequest;
 use tonic::Request;
 
-/// 测试服务器地址（需要先启动服务）
-const SERVER_URL: &str = "http://127.0.0.1:50051";
+/// 获取共享测试服务器（自动启动完整 App + gRPC 服务）
+async fn server_grpc() -> &'static common::TestServer {
+    common::server().await
+}
 
 /// 测试登录接口
 ///
@@ -17,7 +30,8 @@ const SERVER_URL: &str = "http://127.0.0.1:50051";
 /// 3. 返回的 user_id 大于 0
 #[tokio::test]
 async fn test_login_success() {
-    let mut client = AuthServiceClient::connect(SERVER_URL)
+    let srv = server_grpc().await;
+    let mut client = AuthServiceClient::connect(srv.grpc_url.clone())
         .await
         .expect("无法连接到 gRPC 服务器");
 
@@ -37,16 +51,15 @@ async fn test_login_success() {
     assert!(response.user_id > 0, "user_id 应该大于 0");
     assert!(!response.token.is_empty(), "token 不应为空");
     assert_eq!(response.username, "admin", "用户名应为 admin");
-
-    println!("✅ 登录成功: user_id={}, token={}", response.user_id, response.token);
 }
 
 /// 测试登录失败 - 错误密码
 ///
-/// 验证：使用错误密码登录时返回错误
+/// 验证：使用错误密码登录时返回 Unauthenticated
 #[tokio::test]
 async fn test_login_wrong_password() {
-    let mut client = AuthServiceClient::connect(SERVER_URL)
+    let srv = server_grpc().await;
+    let mut client = AuthServiceClient::connect(srv.grpc_url.clone())
         .await
         .expect("无法连接到 gRPC 服务器");
 
@@ -58,17 +71,14 @@ async fn test_login_wrong_password() {
 
     let result = client.login(request).await;
 
-    // 验证登录失败
     assert!(result.is_err(), "错误密码应该返回错误");
-
     let status = result.unwrap_err();
     assert_eq!(
         status.code(),
         tonic::Code::Unauthenticated,
-        "错误码应为 Unauthenticated,{}", status.message()
+        "错误码应为 Unauthenticated,{}",
+        status.message()
     );
-
-    println!("✅ 登录失败测试通过: {}", status.message());
 }
 
 /// 测试获取用户信息接口
@@ -79,7 +89,8 @@ async fn test_login_wrong_password() {
 /// 3. 返回的用户信息字段完整
 #[tokio::test]
 async fn test_get_user_info() {
-    let mut client = AuthServiceClient::connect(SERVER_URL)
+    let srv = server_grpc().await;
+    let mut client = AuthServiceClient::connect(srv.grpc_url.clone())
         .await
         .expect("无法连接到 gRPC 服务器");
 
@@ -115,10 +126,31 @@ async fn test_get_user_info() {
     assert_eq!(user_info.user_id, login_response.user_id, "user_id 应一致");
     assert!(!user_info.username.is_empty(), "用户名不应为空");
     assert!(!user_info.nickname.is_empty(), "昵称不应为空");
+}
 
-    println!(
-        "✅ 获取用户信息成功: username={}, nickname={}, roles={:?}",
-        user_info.username, user_info.nickname, user_info.roles
+/// 测试未携带 token 访问受保护接口被拦截
+///
+/// 验证：gRPC 鉴权拦截器（AuthLayer）对无 token 请求返回 Unauthenticated
+#[tokio::test]
+async fn test_get_user_info_without_token_rejected() {
+    let srv = server_grpc().await;
+    let mut client = UserServiceClient::connect(srv.grpc_url.clone())
+        .await
+        .expect("无法连接到 gRPC 服务器");
+
+    let request = Request::new(ListUsersRequest {
+        page_info: Some(PageRequest { page: 1, size: 10 }),
+        ..Default::default()
+    });
+
+    let result = client.list_users(request).await;
+    assert!(result.is_err(), "未携带 token 应被拦截");
+    let status = result.unwrap_err();
+    assert_eq!(
+        status.code(),
+        tonic::Code::Unauthenticated,
+        "无 token 应返回 Unauthenticated,{}",
+        status.message()
     );
 }
 
@@ -130,7 +162,8 @@ async fn test_get_user_info() {
 /// 3. 返回成功
 #[tokio::test]
 async fn test_logout() {
-    let mut client = AuthServiceClient::connect(SERVER_URL)
+    let srv = server_grpc().await;
+    let mut client = AuthServiceClient::connect(srv.grpc_url.clone())
         .await
         .expect("无法连接到 gRPC 服务器");
 
@@ -147,8 +180,6 @@ async fn test_logout() {
         .expect("登录失败")
         .into_inner();
 
-
-
     // 登出
     let mut logout_request = Request::new(LogoutRequest {
         user_id: login_response.user_id,
@@ -157,13 +188,8 @@ async fn test_logout() {
         "authorization",
         format!("Bearer {}", login_response.token).parse().unwrap(),
     );
-    let response = client
-        .logout(logout_request)
-        .await
-        .expect("登出失败");
+    let response = client.logout(logout_request).await.expect("登出失败");
 
     // 验证返回成功
     assert_eq!(response.into_inner(), admin_proto::Empty {});
-
-    println!("✅ 登出成功");
 }

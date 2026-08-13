@@ -159,3 +159,99 @@ pub use admin::job::{
 pub use admin::monitor::{ServerInfo, DiskInfo, NetworkInfo, OnlineUser, OnlineUserListResponse};
 // --- Tool ---
 pub use admin::tool::{CacheInfo, CacheStatsResponse};
+
+#[cfg(test)]
+mod tests {
+    //! DTO 序列化契约回归测试（G-6）
+    //!
+    //! 验证 HTTP/JSON 与 gRPC 共享 DTO 的关键序列化契约，防止 DTO 变更
+    //! 破坏协议一致性（前端 JS 数值精度、camelCase 字段名、数字/字符串兼容）。
+
+    use super::*;
+
+    #[test]
+    fn login_response_u64_serialized_as_string() {
+        // u64 字段（user_id/tenant_id）必须序列化为字符串，避免 JS 精度丢失
+        let resp = admin::auth::LoginResponse {
+            user_id: 9007199254740993, // 超过 2^53，若按数字输出将丢失精度
+            username: "admin".into(),
+            nickname: "管理员".into(),
+            tenant_id: 1,
+            role_ids: vec![1, 2],
+            permissions: vec!["system:user:list".into()],
+            dept_ids: vec![3],
+            token: "tok-123".into(),
+            role_codes: vec!["admin".into()],
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(
+            json.contains("\"userId\":\"9007199254740993\""),
+            "userId 应序列化为字符串，实际: {json}"
+        );
+        assert!(json.contains("\"roleIds\":[\"1\",\"2\"]"), "roleIds 应序列化为字符串数组: {json}");
+        assert!(json.contains("\"tenantId\":\"1\""), "tenantId 应为字符串: {json}");
+    }
+
+    #[test]
+    fn login_response_field_names_camel_case() {
+        // 字段名必须是 camelCase（前端契约）
+        let resp = admin::auth::LoginResponse {
+            user_id: 1,
+            username: "admin".into(),
+            nickname: "管理员".into(),
+            tenant_id: 1,
+            role_ids: vec![],
+            permissions: vec![],
+            dept_ids: vec![],
+            token: "t".into(),
+            role_codes: vec![],
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        for key in ["userId", "tenantId", "roleIds", "deptIds", "roleCodes"] {
+            assert!(json.contains(&format!("\"{key}\"")), "缺少 camelCase 字段 {key}: {json}");
+        }
+        assert!(!json.contains("user_id"), "不应出现 snake_case 字段: {json}");
+    }
+
+    #[test]
+    fn page_request_accepts_number_or_string() {
+        // 反序列化契约：page/size 同时接受数字与字符串
+        let from_number: admin::common::PageRequest =
+            serde_json::from_str(r#"{"page":1,"size":10}"#).unwrap();
+        let from_string: admin::common::PageRequest =
+            serde_json::from_str(r#"{"page":"2","size":"20"}"#).unwrap();
+        assert_eq!(from_number.page, 1);
+        assert_eq!(from_number.size, 10);
+        assert_eq!(from_string.page, 2);
+        assert_eq!(from_string.size, 20);
+
+        // 序列化契约：始终输出字符串
+        let json = serde_json::to_string(&from_number).unwrap();
+        assert!(json.contains("\"page\":\"1\""), "page 应序列化为字符串: {json}");
+    }
+
+    #[test]
+    fn create_config_request_roundtrip() {
+        // 配置请求：创建后序列化再反序列化，字段保持完整
+        let req = admin::config::CreateConfigRequest {
+            category: "system".into(),
+            config_type: 0,
+            name: "系统名称".into(),
+            config_key: "sys.name".into(),
+            value: "Admin".into(),
+            remark: Some("备注".into()),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let back: admin::config::CreateConfigRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.config_key, "sys.name");
+        assert_eq!(back.value, "Admin");
+        assert_eq!(back.remark.as_deref(), Some("备注"));
+    }
+
+    #[test]
+    fn empty_message_serializes_to_empty_object() {
+        // Empty 消息序列化后应为空对象（gRPC/HTTP 通用）
+        let json = serde_json::to_string(&admin::common::Empty {}).unwrap();
+        assert_eq!(json, "{}");
+    }
+}
