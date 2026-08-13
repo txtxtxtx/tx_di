@@ -9,7 +9,7 @@ group = "DEFAULT_GROUP"
 service_name = "tx_admin_app_loop"
 auto_register = false
 username = "nacos"
-password = "Yc@53672578."
+password = "${NACOS_PASSWORD}"
 config_data_id = "tx_admin_app_loop.toml"
 
 [demo]

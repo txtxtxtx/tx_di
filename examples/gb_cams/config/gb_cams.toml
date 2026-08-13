@@ -41,7 +41,7 @@ platform_uri = "sip:41010500002000000001@192.168.0.66:8116"
 # 本设备 ID（注册用户名，20 位）
 device_id    = "41010500001320000001"
 username     = "41010500001320000001"
-password     = "123456"
+password     = "${GB28181_DEVICE_PASSWORD}"
 realm        = "4101050000"
 register_ttl = 3600
 heartbeat_secs = 60

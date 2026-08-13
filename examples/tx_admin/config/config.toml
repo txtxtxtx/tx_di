@@ -56,7 +56,7 @@ group = "DEFAULT_GROUP"
 service_name = "tx_admin"
 auto_register = true
 username = "nacos"
-password = "Yc@53672578."
+password = "${NACOS_PASSWORD}"
 # 主配置 data_id（默认 "{service_name}.toml"）：启动拉取 + 合并本地，变更时优雅重启生效
 # config_data_id = "tx-admin.toml"
 
