@@ -22,6 +22,8 @@ use admin_api;
 pub struct TestServer {
     /// HTTP 基地址（如 `http://127.0.0.1:53271`）
     pub base_url: String,
+    /// gRPC 基地址（如 `http://127.0.0.1:53272`），供 gRPC 客户端连接
+    pub grpc_url: String,
     /// 已启动的 App（init + async_init 已完成，async_run 后台运行）
     pub app: Arc<App>,
 }
@@ -79,8 +81,9 @@ async fn start_server() -> anyhow::Result<TestServer> {
     .await??;
 
     let base_url = format!("http://127.0.0.1:{web_port}");
+    let grpc_url = format!("http://127.0.0.1:{grpc_port}");
     wait_for_ready(&base_url).await?;
-    Ok(TestServer { base_url, app })
+    Ok(TestServer { base_url, grpc_url, app })
 }
 
 /// 测试配置模板（port 由运行时注入）
