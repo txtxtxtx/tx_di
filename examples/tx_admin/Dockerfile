@@ -44,10 +44,15 @@ WORKDIR /app
 COPY --from=builder /src/target/release/admin_api /app/admin_api
 # 本地配置文件（可被挂载覆盖）
 COPY examples/tx_admin/config/config.toml /app/config/config.toml
-# 前端构建产物
-COPY --from=web-builder /src/web/dist /app/web/dist
+# 前端构建产物：路径必须与 config.toml spa_apps 在 APP_HOME 锚定后的结果一致。
+# config.toml 中 spa_apps["/web"] = "examples/tx_admin/web/dist"，
+# APP_HOME=/app/data 时 resolve_data_path 解析为 /app/data/examples/tx_admin/web/dist，
+# 因此前端必须 COPY 到该目录，否则 /web 前端不可访问。
+COPY --from=web-builder /src/web/dist /app/data/examples/tx_admin/web/dist
 
-RUN mkdir -p /app/data /app/logs /app/uploads \
+# SQLite 默认库路径（config.toml database_url 锚定后）对应的父目录：
+# sqlite:examples/tx_admin/data/tx_admin.db → /app/data/examples/tx_admin/data/tx_admin.db
+RUN mkdir -p /app/data/examples/tx_admin/data /app/logs /app/uploads \
     && chown -R appuser:appuser /app
 
 USER appuser
