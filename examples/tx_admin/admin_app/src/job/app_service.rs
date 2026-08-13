@@ -19,6 +19,11 @@ pub struct JobAppService {
 }
 
 impl JobAppService {
+    /// 创建定时任务应用服务实例（供集成测试手动构造）
+    pub fn new(tp: Arc<ToastyPlugin>, job_plugin: Arc<JobPlugin>) -> Self {
+        Self { tp, job_plugin }
+    }
+
     fn repo(&self) -> JobRepository {
         JobRepository::new(self.tp.clone())
     }

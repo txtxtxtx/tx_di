@@ -81,12 +81,19 @@ async fn query_operate_logs_by_sub_type() {
 #[tokio::test]
 async fn delete_operate_logs() {
     let (app, _, _) = common::create_operate_log_app().await;
-    app.create_log(CreateOperateLogRequest {
+    let log = app.create_log(CreateOperateLogRequest {
         trace_id: "t".into(), user_id: 1, user_type: 1,
         log_type: "m".into(), sub_type: "m".into(),
         biz_id: 1, action: "op".into(), success: 1, extra: "".into(),
     }).await.unwrap();
-    app.delete_logs(&[1]).await.unwrap();
+    // 用创建日志返回的真实雪花 ID 删除（而非固定 ID=1）
+    app.delete_logs(&[log.id]).await.unwrap();
+    // 验证删除后确实查不到
+    let page = app.get_log_page(ListOperateLogsRequest {
+        user_id: None, log_type: None, sub_type: None, success: None,
+        begin_time: None, end_time: None, page: 1, page_size: 10,
+    }).await.unwrap();
+    assert_eq!(page.total, 0);
 }
 
 #[tokio::test]
@@ -172,11 +179,18 @@ async fn query_login_logs_by_result() {
 #[tokio::test]
 async fn delete_login_logs() {
     let (app, _, _) = common::create_login_log_app().await;
-    app.create_log(CreateLoginLogRequest {
+    let log = app.create_log(CreateLoginLogRequest {
         user_id: 1, user_type: 1, username: "u1".into(),
         login_ip: "127.0.0.1".into(), login_type: "password".into(), result: 1,
     }).await.unwrap();
-    app.delete_logs(&[1]).await.unwrap();
+    // 用创建日志返回的真实雪花 ID 删除（而非固定 ID=1）
+    app.delete_logs(&[log.id]).await.unwrap();
+    // 验证删除后确实查不到
+    let page = app.get_log_page(ListLoginLogsRequest {
+        user_id: None, username: None, login_ip: None, login_type: None,
+        result: None, begin_time: None, end_time: None, page: 1, page_size: 10,
+    }).await.unwrap();
+    assert_eq!(page.total, 0);
 }
 
 #[tokio::test]

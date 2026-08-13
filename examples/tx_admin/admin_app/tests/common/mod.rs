@@ -261,3 +261,76 @@ pub async fn create_login_log_app() -> (LoginLogAppService, Arc<LoginLogService>
     let app = LoginLogAppService::new(svc.clone());
     (app, svc, repo)
 }
+
+// ── Shared DB helpers (跨聚合关联测试) ──────────────────────────────────────
+
+/// 创建共享同一 DB 的 User/Role/Dept/Menu AppService 集合
+/// 用于测试跨聚合关联（用户绑角色/部门、角色绑菜单），避免使用不存在的假 ID
+pub async fn create_user_app_with_shared() -> (
+    UserAppService,
+    RoleAppService,
+    DepartmentAppService,
+    MenuAppService,
+) {
+    let plugin = create_db_plugin().await;
+    let user_repo = Arc::new(ToastyUserRepository::new(plugin.clone()));
+    let role_repo = Arc::new(ToastyRoleRepository::new(plugin.clone()));
+    let dept_repo = Arc::new(ToastyDepartmentRepository::new(plugin.clone()));
+    let menu_repo = Arc::new(ToastyMenuRepository::new(plugin));
+
+    let user_svc = Arc::new(UserService::new(user_repo.clone()));
+    let role_svc = Arc::new(RoleService::new(role_repo.clone()));
+    let dept_svc = Arc::new(DepartmentService::new(dept_repo.clone()));
+    let menu_svc = Arc::new(MenuService::new(menu_repo.clone()));
+
+    let user_app = UserAppService::new(user_svc, role_repo, dept_repo, menu_repo);
+    let role_app = RoleAppService::new(role_svc, user_repo);
+    let dept_app = DepartmentAppService::new(dept_svc);
+    let menu_app = MenuAppService::new(menu_svc);
+
+    (user_app, role_app, dept_app, menu_app)
+}
+
+// ── Job helpers ─────────────────────────────────────────────────────────────
+
+use std::path::PathBuf;
+use std::time::Duration;
+use tokio::sync::Semaphore;
+use tx_di_job::{
+    JobConfig, InternalJobExecutor, JobPlugin, JobRepository, PythonJobExecutor,
+    ShellJobExecutor, InfrustJob, InfrustJobLog,
+};
+use admin_app::job::app_service::JobAppService;
+
+/// 创建定时任务测试用 DB 插件（含 Job 模型）
+pub async fn create_job_db_plugin() -> Arc<ToastyPlugin> {
+    let mut builder = toasty::Db::builder();
+    builder.models(toasty::models!(
+        InfrustJob, InfrustJobLog
+    ));
+    let db = builder.connect("sqlite::memory:").await.unwrap();
+    db.push_schema().await.unwrap();
+    Arc::new(ToastyPlugin {
+        config: Arc::new(tx_di_toasty::ToastyConfig::default()),
+        db: OnceLock::from(db),
+        models: Arc::new(RwLock::new(ModelSet::new())),
+    })
+}
+
+/// 创建 JobAppService（含手动初始化的 JobPlugin，不启动调度器）
+pub async fn create_job_app() -> (JobAppService, Arc<JobPlugin>) {
+    let tp = create_job_db_plugin().await;
+    let job_plugin = Arc::new(JobPlugin {
+        config: Arc::new(JobConfig::default()),
+        repository: OnceLock::from(Arc::new(JobRepository::new(tp.clone()))),
+        internal_executor: OnceLock::from(Arc::new(InternalJobExecutor::new(Duration::from_secs(60)))),
+        shell_executor: OnceLock::from(Arc::new(ShellJobExecutor::new(Duration::from_secs(60)))),
+        python_executor: OnceLock::from(Arc::new(PythonJobExecutor::new(
+            PathBuf::from("python3"), Duration::from_secs(60),
+        ))),
+        semaphore: OnceLock::from(Arc::new(Semaphore::new(4))),
+        cache: None,
+    });
+    let app = JobAppService::new(tp, job_plugin.clone());
+    (app, job_plugin)
+}
