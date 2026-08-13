@@ -1,0 +1,3387 @@
+openapi: 3.0.3
+info:
+  title: TX Admin API
+  version: 1.0.0
+  description: |
+    管理后台 HTTP API（tx_admin）OpenAPI 3 规范。
+
+    全局约定：
+    - 业务路由统一前缀 /api/v1，健康检查 /health 无前缀。
+    - 统一响应包装 ApiR<T> = { code, msg, data }，HTTP 状态码恒为 200。
+    - 认证基于 sa-token：登录成功后令牌写入 HttpOnly Cookie（默认键名 satoken，
+      实际键名由 SaTokenConf.token_name 决定），请求需携带该 Cookie。
+servers:
+  - url: http://localhost:8080
+    description: 本地开发环境
+security:
+  - saToken: []
+tags:
+  - name: Auth
+    description: 认证与当前用户信息
+  - name: User
+    description: 用户管理
+  - name: Role
+    description: 角色管理
+  - name: Menu
+    description: 菜单管理
+  - name: Dept
+    description: 部门管理
+  - name: Config
+    description: 系统配置
+  - name: Dict
+    description: 数据字典
+  - name: Log
+    description: 操作/登录日志
+  - name: File
+    description: 文件存储
+  - name: Monitor
+    description: 服务监控
+  - name: Job
+    description: 定时任务
+  - name: Tool
+    description: 开发工具
+  - name: Health
+    description: 健康检查
+paths:
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: 用户登录
+      description: 校验用户名/密码，返回令牌与用户基础信息；令牌写入 HttpOnly Cookie。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LoginResponse'
+  /api/v1/auth/user_info:
+    get:
+      tags: [Auth]
+      summary: 获取当前用户详细信息（含角色、权限）
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserInfoResponse'
+  /api/v1/auth/menus:
+    get:
+      tags: [Auth]
+      summary: 获取当前用户菜单树
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MenuTreeNode'
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: 用户登出
+      description: 销毁 sa-token 会话并清除 HttpOnly Cookie。
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/user/:
+    post:
+      tags: [User]
+      summary: 新增用户
+      description: 所需权限 user:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserResponse'
+  /api/v1/user/{user_id}:
+    get:
+      tags: [User]
+      summary: 按 ID 查询用户
+      description: 所需权限 user:view
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 用户 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserResponse'
+    put:
+      tags: [User]
+      summary: 部分更新用户信息
+      description: 所需权限 user:update（修改本人信息除外）
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 用户 ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserResponse'
+    delete:
+      tags: [User]
+      summary: 删除用户
+      description: 所需权限 user:delete
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 用户 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/user/list:
+    post:
+      tags: [User]
+      summary: 分页查询用户列表
+      description: 所需权限 user:view
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListUsersRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageUser'
+  /api/v1/user/change_password:
+    post:
+      tags: [User]
+      summary: 修改密码
+      description: 所需权限 user:password（修改他人密码时）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/user/assign_roles:
+    post:
+      tags: [User]
+      summary: 分配角色（全量覆盖）
+      description: 所需权限 user:assign_role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignRolesRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/user/assign_depts:
+    post:
+      tags: [User]
+      summary: 分配部门（全量覆盖）
+      description: 所需权限 user:assign_dept
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignDeptsRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/user/change_status:
+    post:
+      tags: [User]
+      summary: 修改用户状态（禁用/启用/锁定）
+      description: 所需权限 user:status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeUserStatusRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserResponse'
+  /api/v1/user/enable:
+    post:
+      tags: [User]
+      summary: 启用用户
+      description: 所需权限 user:status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserIdRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/user/disable:
+    post:
+      tags: [User]
+      summary: 禁用用户
+      description: 所需权限 user:status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserIdRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/user/lock:
+    post:
+      tags: [User]
+      summary: 锁定用户
+      description: 所需权限 user:status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserIdRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/user/unlock:
+    post:
+      tags: [User]
+      summary: 解锁用户
+      description: 所需权限 user:status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserIdRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/role/:
+    post:
+      tags: [Role]
+      summary: 新增角色
+      description: 所需权限 role:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoleRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RoleResponse'
+  /api/v1/role/{role_id}:
+    get:
+      tags: [Role]
+      summary: 按 ID 查询角色
+      description: 所需权限 role:view
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 角色 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RoleResponse'
+    put:
+      tags: [Role]
+      summary: 更新角色
+      description: 所需权限 role:update
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 角色 ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRoleRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RoleResponse'
+    delete:
+      tags: [Role]
+      summary: 删除角色
+      description: 所需权限 role:delete
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 角色 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/role/list:
+    post:
+      tags: [Role]
+      summary: 分页查询角色列表
+      description: 所需权限 role:view
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListRolesRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageRole'
+  /api/v1/role/assign_menus:
+    post:
+      tags: [Role]
+      summary: 为角色分配菜单权限（全量覆盖）
+      description: 所需权限 role:assign_menu
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignMenusRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/role/all:
+    get:
+      tags: [Role]
+      summary: 查询全部角色
+      description: 所需权限 role:view
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/RoleResponse'
+  /api/v1/role/{role_id}/users:
+    get:
+      tags: [Role]
+      summary: 查询角色下的用户
+      description: 所需权限 role:view
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 角色 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/UserResponse'
+    post:
+      tags: [Role]
+      summary: 向角色添加用户
+      description: 所需权限 role:assign_menu
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 角色 ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: integer
+                format: int64
+              description: 用户 ID 列表
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+    delete:
+      tags: [Role]
+      summary: 从角色移除用户
+      description: 所需权限 role:assign_menu
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 角色 ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: integer
+                format: int64
+              description: 用户 ID 列表
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/menu/:
+    post:
+      tags: [Menu]
+      summary: 新增菜单
+      description: 所需权限 menu:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMenuRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MenuResponse'
+  /api/v1/menu/{menu_id}:
+    get:
+      tags: [Menu]
+      summary: 按 ID 查询菜单
+      description: 所需权限 menu:view
+      parameters:
+        - name: menu_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 菜单 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MenuResponse'
+    put:
+      tags: [Menu]
+      summary: 更新菜单
+      description: 所需权限 menu:update
+      parameters:
+        - name: menu_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 菜单 ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMenuRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MenuResponse'
+    delete:
+      tags: [Menu]
+      summary: 删除菜单
+      description: 所需权限 menu:delete
+      parameters:
+        - name: menu_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 菜单 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/menu/list:
+    post:
+      tags: [Menu]
+      summary: 查询菜单树
+      description: 所需权限 menu:view，返回树形结构（MenuTreeNode）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListMenusRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MenuTreeNode'
+  /api/v1/dept/:
+    post:
+      tags: [Dept]
+      summary: 新增部门
+      description: 所需权限 dept:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeptRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DeptResponse'
+  /api/v1/dept/{dept_id}:
+    get:
+      tags: [Dept]
+      summary: 按 ID 查询部门
+      description: 所需权限 dept:view
+      parameters:
+        - name: dept_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 部门 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DeptResponse'
+    put:
+      tags: [Dept]
+      summary: 更新部门
+      description: 所需权限 dept:update
+      parameters:
+        - name: dept_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 部门 ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDeptRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DeptResponse'
+    delete:
+      tags: [Dept]
+      summary: 删除部门
+      description: 所需权限 dept:delete
+      parameters:
+        - name: dept_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 部门 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/dept/list:
+    post:
+      tags: [Dept]
+      summary: 查询部门树
+      description: 所需权限 dept:view，返回树形结构（DeptTreeNode）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListDeptsRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DeptTreeNode'
+  /api/v1/config/:
+    post:
+      tags: [Config]
+      summary: 新增配置项
+      description: 所需权限 config:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConfigRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ConfigResponse'
+  /api/v1/config/{config_id}:
+    get:
+      tags: [Config]
+      summary: 按 ID 查询配置项
+      description: 所需权限 config:view
+      parameters:
+        - name: config_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 配置 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ConfigResponse'
+    put:
+      tags: [Config]
+      summary: 更新配置项
+      description: 所需权限 config:update
+      parameters:
+        - name: config_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 配置 ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateConfigRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ConfigResponse'
+    delete:
+      tags: [Config]
+      summary: 删除配置项
+      description: 所需权限 config:delete
+      parameters:
+        - name: config_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 配置 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/config/list:
+    post:
+      tags: [Config]
+      summary: 分页查询配置项列表
+      description: 所需权限 config:view
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListConfigsRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageConfig'
+  /api/v1/config/key/{key}:
+    get:
+      tags: [Config]
+      summary: 按配置键名查询配置项
+      description: 所需权限 config:view
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 配置键名
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ConfigResponse'
+  /api/v1/dict/type:
+    post:
+      tags: [Dict]
+      summary: 新增字典类型
+      description: 所需权限 dict:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDictTypeRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DictTypeResponse'
+  /api/v1/dict/type/{id}:
+    get:
+      tags: [Dict]
+      summary: 按 ID 查询字典类型
+      description: 所需权限 dict:view
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 字典类型 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DictTypeResponse'
+    put:
+      tags: [Dict]
+      summary: 更新字典类型
+      description: 所需权限 dict:update
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 字典类型 ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDictTypeRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DictTypeResponse'
+    delete:
+      tags: [Dict]
+      summary: 删除字典类型（级联删除其下数据）
+      description: 所需权限 dict:delete
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 字典类型 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/dict/type/list:
+    post:
+      tags: [Dict]
+      summary: 分页查询字典类型列表
+      description: 所需权限 dict:view
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListDictTypesRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageDictType'
+  /api/v1/dict/data:
+    post:
+      tags: [Dict]
+      summary: 新增字典数据项
+      description: 所需权限 dict:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDictDataRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DictDataResponse'
+  /api/v1/dict/data/{id}:
+    get:
+      tags: [Dict]
+      summary: 按 ID 查询字典数据项
+      description: 所需权限 dict:view
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 字典数据 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DictDataResponse'
+    put:
+      tags: [Dict]
+      summary: 更新字典数据项
+      description: 所需权限 dict:update
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 字典数据 ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDictDataRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DictDataResponse'
+    delete:
+      tags: [Dict]
+      summary: 删除字典数据项
+      description: 所需权限 dict:delete
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 字典数据 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/dict/data/list:
+    post:
+      tags: [Dict]
+      summary: 分页查询字典数据列表
+      description: 所需权限 dict:view
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListDictDataRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageDictData'
+  /api/v1/dict/data/type/{dict_type}:
+    get:
+      tags: [Dict]
+      summary: 按字典类型标识查询数据项列表
+      description: 所需权限 dict:view
+      parameters:
+        - name: dict_type
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 字典类型标识
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DictDataResponse'
+  /api/v1/dict/data/code/{dict_code}:
+    get:
+      tags: [Dict]
+      summary: 按字典编码查询数据项列表
+      description: 所需权限 dict:view
+      parameters:
+        - name: dict_code
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 字典编码
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DictDataResponse'
+  /api/v1/dict/data/batch:
+    get:
+      tags: [Dict]
+      summary: 按多个字典类型批量查询（下拉框常用）
+      description: 所需权限 dict:view，query 参数 types 为逗号分隔的类型编码
+      parameters:
+        - name: types
+          in: query
+          required: true
+          schema:
+            type: string
+          description: 逗号分隔的字典类型编码，如 sys_status,sys_sex
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        additionalProperties:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/DictDataResponse'
+  /api/v1/log/operate:
+    post:
+      tags: [Log]
+      summary: 写入操作日志
+      description: 所需权限 log:view
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOperateLogRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/log/operate/list:
+    post:
+      tags: [Log]
+      summary: 分页查询操作日志
+      description: 所需权限 log:view
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListOperateLogsRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageOperateLog'
+  /api/v1/log/login:
+    post:
+      tags: [Log]
+      summary: 写入登录日志
+      description: 所需权限 log:view
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLoginLogRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/log/login/list:
+    post:
+      tags: [Log]
+      summary: 分页查询登录日志
+      description: 所需权限 log:view
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListLoginLogsRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageLoginLog'
+  /api/v1/log/operate/delete:
+    post:
+      tags: [Log]
+      summary: 批量删除操作日志
+      description: 所需权限 log:delete
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteLogsRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/log/operate/clean:
+    delete:
+      tags: [Log]
+      summary: 清空操作日志
+      description: 所需权限 log:clean
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/log/login/delete:
+    post:
+      tags: [Log]
+      summary: 批量删除登录日志
+      description: 所需权限 log:delete
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteLogsRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/log/login/clean:
+    delete:
+      tags: [Log]
+      summary: 清空登录日志
+      description: 所需权限 log:clean
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/file/upload:
+    post:
+      tags: [File]
+      summary: 流式多文件上传
+      description: 所需权限 file:upload；multipart/form-data，字段 config_id（可选）+ file（可多文件）
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                config_id:
+                  type: integer
+                  format: int64
+                  description: 存储配置 ID（缺省用主配置）
+                file:
+                  type: string
+                  format: binary
+                  description: 文件（可同时上传多个）
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/FileResponse'
+  /api/v1/file/{file_id}:
+    get:
+      tags: [File]
+      summary: 获取文件元数据
+      description: 所需权限 file:view
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 文件 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FileResponse'
+    delete:
+      tags: [File]
+      summary: 删除文件（物理 + 软删除）
+      description: 所需权限 file:delete
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 文件 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/file/{file_id}/download:
+    get:
+      tags: [File]
+      summary: 流式下载文件
+      description: 所需权限 file:download；直接返回二进制流（非 ApiR 包装）
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 文件 ID
+      responses:
+        '200':
+          description: 文件二进制流（application/octet-stream，带 Content-Disposition）
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /api/v1/file/list:
+    post:
+      tags: [File]
+      summary: 分页查询文件列表
+      description: 所需权限 file:view
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListFilesRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageFile'
+  /api/v1/file/pre/url/{file_id}:
+    get:
+      tags: [File]
+      summary: 获取文件预览 URL
+      description: 所需权限 file:download
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 文件 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PreviewUrlResponse'
+  /api/v1/file/pre/serve/{path}:
+    get:
+      tags: [File]
+      summary: 本地文件静态服务（供预览 URL 使用）
+      description: 公开路由（UUID 路径不可猜测）；直接返回文件二进制流（非 ApiR 包装）
+      security: []
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 文件相对路径
+      responses:
+        '200':
+          description: 文件二进制流
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /api/v1/file/config/list:
+    get:
+      tags: [File]
+      summary: 查询全部存储配置
+      description: 所需权限 file:view
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/FileConfigResponse'
+  /api/v1/file/config/{id}:
+    get:
+      tags: [File]
+      summary: 按 ID 查询存储配置
+      description: 所需权限 file:view
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 配置 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FileConfigResponse'
+    put:
+      tags: [File]
+      summary: 更新存储配置
+      description: 所需权限 file:upload
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 配置 ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFileConfigRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FileConfigResponse'
+    delete:
+      tags: [File]
+      summary: 删除存储配置
+      description: 所需权限 file:delete
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 配置 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/file/config/:
+    post:
+      tags: [File]
+      summary: 新增存储配置
+      description: 所需权限 file:upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFileConfigRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FileConfigResponse'
+  /api/v1/file/config/{id}/master:
+    put:
+      tags: [File]
+      summary: 设为默认（主）存储配置
+      description: 所需权限 file:upload
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 配置 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FileConfigResponse'
+  /api/v1/monitor/server:
+    get:
+      tags: [Monitor]
+      summary: 获取服务器运行信息
+      description: 所需权限 system:view；all=true 返回最近 5 条缓存，否则仅返回最新一条
+      parameters:
+        - name: all
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: "true 返回 { list: [ServerInfo] }，缺省/ false 返回单条 ServerInfo"
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        oneOf:
+                          - $ref: '#/components/schemas/ServerInfo'
+                          - type: object
+                            properties:
+                              list:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/ServerInfo'
+  /api/v1/monitor/online:
+    get:
+      tags: [Monitor]
+      summary: 获取在线用户列表
+      description: 所需权限 system:view；遍历活跃 sa-token 会话，提取登录 IP 与时间
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OnlineUserListResponse'
+  /api/v1/job/list:
+    post:
+      tags: [Job]
+      summary: 分页查询定时任务列表
+      description: 所需权限 job:view
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListJobsRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageJob'
+  /api/v1/job/{id}:
+    get:
+      tags: [Job]
+      summary: 按 ID 查询定时任务
+      description: 所需权限 job:view
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 任务 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/JobResponse'
+    put:
+      tags: [Job]
+      summary: 更新定时任务
+      description: 所需权限 job:update
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 任务 ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateJobRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/JobResponse'
+    delete:
+      tags: [Job]
+      summary: 删除定时任务
+      description: 所需权限 job:delete
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 任务 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/job/:
+    post:
+      tags: [Job]
+      summary: 新增定时任务
+      description: 所需权限 job:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateJobRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/JobResponse'
+  /api/v1/job/{id}/status:
+    put:
+      tags: [Job]
+      summary: 暂停/恢复定时任务
+      description: 所需权限 job:status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 任务 ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeJobStatusRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/JobResponse'
+  /api/v1/job/{id}/run:
+    post:
+      tags: [Job]
+      summary: 手动立即执行一次任务
+      description: 所需权限 job:execute
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 任务 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/job/log/list:
+    post:
+      tags: [Job]
+      summary: 分页查询任务执行日志
+      description: 所需权限 job:view
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListJobLogsRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PageJobLog'
+  /api/v1/job/log/{id}:
+    get:
+      tags: [Job]
+      summary: 按 ID 查询任务执行日志详情
+      description: 所需权限 job:view
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: 日志 ID
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/JobLogResponse'
+    delete:
+      tags: [Job]
+      summary: 清空任务执行日志
+      description: 所需权限 job:delete
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CleanJobLogsRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Empty'
+  /api/v1/tool/cache/stats:
+    get:
+      tags: [Tool]
+      summary: 获取缓存统计
+      description: 所需权限 system:view；当前为示例 mock 数据，待接入真实缓存组件
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiR'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CacheStatsResponse'
+  /health:
+    get:
+      tags: [Health]
+      summary: 综合健康信息
+      description: "公开路由（无需认证）；返回 {status, db, version} 等裸 JSON（非 ApiR 包装）"
+      security: []
+      responses:
+        '200':
+          description: 综合健康信息（status=ok/degraded）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /health/live:
+    get:
+      tags: [Health]
+      summary: 存活探针
+      description: 公开路由（无需认证）；进程存活即返回 200
+      security: []
+      responses:
+        '200':
+          description: 存活
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: {type: string, example: alive}
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: 就绪探针
+      description: 公开路由（无需认证）；校验数据库连通，异常返回 503
+      security: []
+      responses:
+        '200':
+          description: 就绪（数据库正常）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: {type: string, example: ready}
+                  db: {type: string, example: ok}
+        '503':
+          description: 未就绪（数据库异常）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: {type: string, example: unavailable}
+                  db: {type: string, example: error}
+components:
+  securitySchemes:
+    saToken:
+      type: apiKey
+      in: cookie
+      name: satoken
+      description: sa-token 会话令牌（HttpOnly Cookie）
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          description: 登录用户名
+        password:
+          type: string
+          description: 登录密码（明文，传输层使用 HTTPS）
+        login_ip:
+          type: string
+          description: 登录来源 IP（用于日志审计）
+    LoginResponse:
+      type: object
+      properties:
+        user_id:
+          type: integer
+          format: int64
+          description: 用户 ID
+        username:
+          type: string
+        nickname:
+          type: string
+          description: 昵称/显示名
+        tenant_id:
+          type: integer
+          format: int64
+          description: 租户 ID
+        role_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: 角色 ID 列表
+        permissions:
+          type: array
+          items:
+            type: string
+          description: 权限标识列表，如 system:user:add
+        dept_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: 所属部门 ID 列表
+        token:
+          type: string
+          description: 登录令牌
+        role_codes:
+          type: array
+          items:
+            type: string
+          description: 角色编码列表，如 admin
+    UserInfoResponse:
+      type: object
+      properties:
+        user_id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        nickname:
+          type: string
+        email:
+          type: string
+          nullable: true
+          description: 邮箱
+        mobile:
+          type: string
+          nullable: true
+          description: 手机号
+        avatar:
+          type: string
+          nullable: true
+          description: 头像 URL
+        roles:
+          type: array
+          items:
+            type: string
+          description: 角色名称列表
+        permissions:
+          type: array
+          items:
+            type: string
+          description: 权限标识列表
+        tenant_id:
+          type: integer
+          format: int64
+    LogoutRequest:
+      type: object
+      properties:
+        user_id:
+          type: integer
+          format: int64
+          description: 用户 ID
+
+    CreateUserRequest:
+      type: object
+      required: [username, password, nickname]
+      properties:
+        username:
+          type: string
+          description: 登录用户名（全局唯一）
+        password:
+          type: string
+          description: 初始密码
+        nickname:
+          type: string
+          description: 昵称/显示名
+        email:
+          type: string
+          nullable: true
+        mobile:
+          type: string
+          nullable: true
+        sex:
+          type: integer
+          format: int32
+          nullable: true
+          description: 性别 0-未知 1-男 2-女
+        remark:
+          type: string
+          nullable: true
+        role_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: 初始角色 ID 列表
+        dept_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: 初始部门 ID 列表
+    UpdateUserRequest:
+      type: object
+      required: [user_id]
+      properties:
+        user_id:
+          type: integer
+          format: int64
+        nickname:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        mobile:
+          type: string
+          nullable: true
+        sex:
+          type: integer
+          format: int32
+          nullable: true
+        remark:
+          type: string
+          nullable: true
+        status:
+          type: integer
+          format: int32
+          nullable: true
+          description: 状态 0-正常 1-禁用 2-锁定
+    ChangeUserStatusRequest:
+      type: object
+      required: [user_id, status]
+      properties:
+        user_id:
+          type: integer
+          format: int64
+        status:
+          type: integer
+          format: int32
+          description: 目标状态 0-正常 1-禁用 2-锁定
+    ChangePasswordRequest:
+      type: object
+      required: [user_id, new_password]
+      properties:
+        user_id:
+          type: integer
+          format: int64
+        new_password:
+          type: string
+          description: 新密码（明文）
+    AssignRolesRequest:
+      type: object
+      required: [user_id, role_ids]
+      properties:
+        user_id:
+          type: integer
+          format: int64
+        role_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: 角色 ID 列表（全量覆盖）
+    AssignDeptsRequest:
+      type: object
+      required: [user_id, dept_ids]
+      properties:
+        user_id:
+          type: integer
+          format: int64
+        dept_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: 部门 ID 列表（全量覆盖）
+    ListUsersRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          nullable: true
+          description: 按用户名模糊过滤
+        nickname:
+          type: string
+          nullable: true
+          description: 按昵称模糊过滤
+        mobile:
+          type: string
+          nullable: true
+          description: 按手机号模糊过滤
+        status:
+          type: integer
+          format: int32
+          nullable: true
+          description: 按状态过滤 0-正常 1-禁用 2-锁定
+        dept_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: 按部门过滤
+        page_info:
+          $ref: '#/components/schemas/PageRequest'
+    UserIdRequest:
+      type: object
+      required: [user_id]
+      properties:
+        user_id:
+          type: integer
+          format: int64
+          description: 用户 ID
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        nickname:
+          type: string
+        email:
+          type: string
+          nullable: true
+        mobile:
+          type: string
+          nullable: true
+        sex:
+          type: integer
+          format: int32
+          description: 性别 0-未知 1-男 2-女
+        status:
+          type: integer
+          format: int32
+          description: 状态 0-正常 1-禁用 2-锁定
+        remark:
+          type: string
+          nullable: true
+        role_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+        dept_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+        avatar:
+          type: string
+          nullable: true
+        login_ip:
+          type: string
+          nullable: true
+        login_date:
+          type: integer
+          format: int64
+          description: 最近登录时间（Unix 毫秒），0 表示未登录
+        tenant_id:
+          type: integer
+          format: int64
+        create_time:
+          type: integer
+          format: int64
+          description: 创建时间（Unix 毫秒）
+        update_time:
+          type: integer
+          format: int64
+          description: 更新时间（Unix 毫秒）
+    PageUser:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            list:
+              type: array
+              items:
+                $ref: '#/components/schemas/UserResponse'
+
+    CreateRoleRequest:
+      type: object
+      required: [name, code]
+      properties:
+        name:
+          type: string
+          description: 角色名称
+        code:
+          type: string
+          description: 角色编码（全局唯一，如 admin）
+        sort:
+          type: integer
+          format: int32
+          description: 排序号（越小越靠前）
+        remark:
+          type: string
+          nullable: true
+        menu_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: 初始分配的菜单 ID 列表
+    UpdateRoleRequest:
+      type: object
+      required: [role_id]
+      properties:
+        role_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        code:
+          type: string
+        sort:
+          type: integer
+          format: int32
+        data_scope:
+          type: integer
+          format: int32
+          description: 数据权限范围 0-全部 1-本部门 2-本部门及以下 3-仅本人
+        remark:
+          type: string
+          nullable: true
+    AssignMenusRequest:
+      type: object
+      required: [role_id, menu_ids]
+      properties:
+        role_id:
+          type: integer
+          format: int64
+        menu_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: 分配的菜单 ID 列表（全量覆盖）
+    RoleResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        code:
+          type: string
+        sort:
+          type: integer
+          format: int32
+        data_scope:
+          type: integer
+          format: int32
+          description: 数据权限范围
+        status:
+          type: integer
+          format: int32
+          description: 状态 0-停用 1-正常
+        remark:
+          type: string
+          nullable: true
+        menu_ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: 已分配的菜单 ID 列表
+    ListRolesRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+          description: 按名称模糊过滤
+        code:
+          type: string
+          nullable: true
+          description: 按编码模糊过滤
+        status:
+          type: integer
+          format: int32
+          nullable: true
+          description: 按状态过滤 0-停用 1-正常
+        page:
+          type: integer
+          format: int64
+          description: 页码
+        page_size:
+          type: integer
+          format: int64
+          description: 每页条数
+    PageRole:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            list:
+              type: array
+              items:
+                $ref: '#/components/schemas/RoleResponse'
+
+    CreateMenuRequest:
+      type: object
+      required: [name, permission, types]
+      properties:
+        name: {type: string, description: 菜单名称}
+        permission: {type: string, description: 权限标识，如 system:user:list}
+        types: {type: integer, format: int32, description: 菜单类型 0-目录 1-菜单 2-按钮}
+        sort: {type: integer, format: int32, description: 排序号}
+        parent_id: {type: integer, format: int64, description: 上级菜单 ID，0 表示顶级}
+        path: {type: string, nullable: true, description: 路由路径}
+        icon: {type: string, nullable: true, description: 图标名称}
+        component: {type: string, nullable: true, description: 前端组件路径}
+        component_name: {type: string, nullable: true, description: 组件名称}
+    UpdateMenuRequest:
+      type: object
+      required: [menu_id]
+      properties:
+        menu_id: {type: integer, format: int64}
+        name: {type: string}
+        permission: {type: string}
+        types: {type: integer, format: int32}
+        sort: {type: integer, format: int32}
+        parent_id: {type: integer, format: int64}
+        path: {type: string, nullable: true}
+        icon: {type: string, nullable: true}
+        component: {type: string, nullable: true}
+        component_name: {type: string, nullable: true}
+        visible: {type: integer, format: int32, description: 是否显示 0-隐藏 1-显示}
+        keep_alive: {type: integer, format: int32, description: 是否缓存 0-否 1-是}
+    MenuResponse:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        name: {type: string}
+        permission: {type: string}
+        types: {type: integer, format: int32, description: 菜单类型 0-目录 1-菜单 2-按钮}
+        sort: {type: integer, format: int32}
+        parent_id: {type: integer, format: int64}
+        path: {type: string, nullable: true}
+        icon: {type: string, nullable: true}
+        component: {type: string, nullable: true}
+        component_name: {type: string, nullable: true}
+        status: {type: integer, format: int32, description: 状态 0-停用 1-正常}
+        visible: {type: integer, format: int32}
+        keep_alive: {type: integer, format: int32}
+    MenuTreeNode:
+      type: object
+      description: 菜单树节点（children 递归）
+      properties:
+        id: {type: string, description: 菜单节点 ID（字符串形式）}
+        name: {type: string}
+        permission: {type: string}
+        types: {type: integer, format: int32}
+        sort: {type: integer, format: int32}
+        parentId: {type: string, description: 父级菜单 ID}
+        path: {type: string, nullable: true}
+        icon: {type: string, nullable: true}
+        component: {type: string, nullable: true}
+        componentName: {type: string, nullable: true}
+        status: {type: integer, format: int32}
+        visible: {type: integer, format: int32}
+        keepAlive: {type: integer, format: int32}
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/MenuTreeNode'
+    ListMenusRequest:
+      type: object
+      properties:
+        name: {type: string, nullable: true, description: 按名称模糊过滤}
+        status: {type: integer, format: int32, nullable: true, description: 按状态过滤 0-停用 1-正常}
+        types: {type: integer, format: int32, nullable: true, description: 按类型过滤 0-目录 1-菜单 2-按钮}
+
+    CreateDeptRequest:
+      type: object
+      required: [name, parent_id]
+      properties:
+        name: {type: string, description: 部门名称}
+        parent_id: {type: integer, format: int64, description: 上级部门 ID，0 表示顶级}
+        sort: {type: integer, format: int32, description: 排序号}
+        leader_user_id: {type: integer, format: int64, nullable: true, description: 负责人用户 ID}
+        phone: {type: string, nullable: true, description: 联系电话}
+        email: {type: string, nullable: true, description: 联系邮箱}
+    UpdateDeptRequest:
+      type: object
+      required: [dept_id]
+      properties:
+        dept_id: {type: integer, format: int64}
+        name: {type: string}
+        parent_id: {type: integer, format: int64}
+        sort: {type: integer, format: int32}
+        leader_user_id: {type: integer, format: int64, nullable: true}
+        phone: {type: string, nullable: true}
+        email: {type: string, nullable: true}
+    DeptResponse:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        name: {type: string}
+        parent_id: {type: integer, format: int64}
+        sort: {type: integer, format: int32}
+        leader_user_id: {type: integer, format: int64, nullable: true}
+        phone: {type: string, nullable: true}
+        email: {type: string, nullable: true}
+        status: {type: integer, format: int32, description: 状态 0-停用 1-正常}
+    DeptTreeNode:
+      type: object
+      description: 部门树节点（children 递归）
+      properties:
+        id: {type: integer, format: int64}
+        name: {type: string}
+        parent_id: {type: integer, format: int64}
+        sort: {type: integer, format: int32}
+        leader_user_id: {type: integer, format: int64, nullable: true}
+        status: {type: integer, format: int32}
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeptTreeNode'
+    ListDeptsRequest:
+      type: object
+      properties:
+        name: {type: string, nullable: true, description: 按名称模糊过滤}
+        status: {type: integer, format: int32, nullable: true, description: 按状态过滤 0-停用 1-正常}
+
+    CreateConfigRequest:
+      type: object
+      required: [category, config_type, name, config_key, value]
+      properties:
+        category: {type: string, description: 配置分类，如 system、email}
+        config_type: {type: integer, format: int32, description: 配置类型 0-字符串 1-数字 2-布尔 3-JSON}
+        name: {type: string, description: 配置显示名称}
+        config_key: {type: string, description: 配置键名（全局唯一）}
+        value: {type: string, description: 配置值（按类型以字符串存储）}
+        remark: {type: string, nullable: true}
+    UpdateConfigRequest:
+      type: object
+      required: [config_id]
+      properties:
+        config_id: {type: integer, format: int64}
+        category: {type: string}
+        config_type: {type: integer, format: int32}
+        name: {type: string}
+        config_key: {type: string}
+        value: {type: string}
+        visible: {type: integer, format: int32, description: 是否可见 0-隐藏 1-可见}
+        remark: {type: string, nullable: true}
+    ConfigResponse:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        category: {type: string}
+        config_type: {type: integer, format: int32}
+        name: {type: string}
+        config_key: {type: string}
+        value: {type: string}
+        visible: {type: integer, format: int32}
+        remark: {type: string, nullable: true}
+    ListConfigsRequest:
+      type: object
+      properties:
+        name: {type: string, nullable: true, description: 按名称模糊过滤}
+        category: {type: string, nullable: true, description: 按分类精确过滤}
+        config_key: {type: string, nullable: true, description: 按键名模糊过滤}
+        config_type: {type: integer, format: int32, nullable: true, description: 按配置类型过滤}
+        page: {type: integer, format: int64, description: 页码}
+        page_size: {type: integer, format: int64, description: 每页条数}
+    PageConfig:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            list:
+              type: array
+              items:
+                $ref: '#/components/schemas/ConfigResponse'
+
+    CreateDictTypeRequest:
+      type: object
+      required: [name, dict_type]
+      properties:
+        name: {type: string, description: 字典类型显示名称}
+        dict_type: {type: string, description: 字典类型标识（全局唯一）}
+        remark: {type: string, nullable: true}
+    UpdateDictTypeRequest:
+      type: object
+      required: [id]
+      properties:
+        id: {type: integer, format: int64}
+        name: {type: string}
+        dict_type: {type: string}
+        remark: {type: string, nullable: true}
+    DictTypeResponse:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        name: {type: string}
+        dict_type: {type: string}
+        status: {type: integer, format: int32, description: 状态 0-停用 1-正常}
+        remark: {type: string, nullable: true}
+    ListDictTypesRequest:
+      type: object
+      properties:
+        name: {type: string, nullable: true, description: 按名称模糊过滤}
+        dict_type: {type: string, nullable: true, description: 按类型标识模糊过滤}
+        status: {type: integer, format: int32, nullable: true, description: 按状态过滤 0-停用 1-正常}
+        page: {type: integer, format: int64, description: 页码}
+        page_size: {type: integer, format: int64, description: 每页条数}
+    PageDictType:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            list:
+              type: array
+              items:
+                $ref: '#/components/schemas/DictTypeResponse'
+    CreateDictDataRequest:
+      type: object
+      required: [sort, label, value, dict_type]
+      properties:
+        sort: {type: integer, format: int32, description: 排序号}
+        label: {type: string, description: 展示文本}
+        value: {type: string, description: 存储值}
+        dict_type: {type: string, description: 所属字典类型标识}
+        color_type: {type: string, nullable: true, description: 标签颜色}
+        css_class: {type: string, nullable: true, description: 自定义 CSS 类名}
+        remark: {type: string, nullable: true}
+    UpdateDictDataRequest:
+      type: object
+      required: [id]
+      properties:
+        id: {type: integer, format: int64}
+        sort: {type: integer, format: int32}
+        label: {type: string}
+        value: {type: string}
+        dict_type: {type: string}
+        color_type: {type: string, nullable: true}
+        css_class: {type: string, nullable: true}
+        remark: {type: string, nullable: true}
+    DictDataResponse:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        sort: {type: integer, format: int32}
+        label: {type: string}
+        value: {type: string}
+        dict_type: {type: string}
+        status: {type: integer, format: int32, description: 状态 0-停用 1-正常}
+        color_type: {type: string, nullable: true}
+        css_class: {type: string, nullable: true}
+        remark: {type: string, nullable: true}
+    ListDictDataRequest:
+      type: object
+      properties:
+        dict_type: {type: string, nullable: true, description: 按字典类型精确过滤}
+        label: {type: string, nullable: true, description: 按展示文本模糊过滤}
+        status: {type: integer, format: int32, nullable: true, description: 按状态过滤 0-停用 1-正常}
+        page: {type: integer, format: int64, description: 页码}
+        page_size: {type: integer, format: int64, description: 每页条数}
+    PageDictData:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            list:
+              type: array
+              items:
+                $ref: '#/components/schemas/DictDataResponse'
+
+    CreateOperateLogRequest:
+      type: object
+      required: [user_id, action]
+      properties:
+        trace_id: {type: string, description: 链路追踪 ID}
+        user_id: {type: integer, format: int64}
+        user_type: {type: integer, format: int32, description: 用户类型 0=系统 1=管理员 2=普通}
+        log_type: {type: string, description: 日志类型，如 business/error}
+        sub_type: {type: string, description: 子类型，如 add/update/delete}
+        biz_id: {type: integer, format: int64}
+        action: {type: string, description: 操作描述}
+        success: {type: integer, format: int32, description: 是否成功 0=失败 1=成功}
+        extra: {type: string, description: 扩展信息（JSON 字符串）}
+    ListOperateLogsRequest:
+      type: object
+      properties:
+        user_id: {type: integer, format: int64, nullable: true}
+        log_type: {type: string, nullable: true}
+        sub_type: {type: string, nullable: true}
+        success: {type: integer, format: int32, nullable: true}
+        begin_time: {type: string, nullable: true, description: 起始时间（含）}
+        end_time: {type: string, nullable: true, description: 结束时间（含）}
+        page: {type: integer, format: int64}
+        page_size: {type: integer, format: int64}
+    OperateLogResponse:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        trace_id: {type: string}
+        user_id: {type: integer, format: int64}
+        user_type: {type: integer, format: int32}
+        log_type: {type: string}
+        sub_type: {type: string}
+        biz_id: {type: integer, format: int64}
+        action: {type: string}
+        success: {type: integer, format: int32}
+        extra: {type: string}
+        request_method: {type: string, nullable: true}
+        request_url: {type: string, nullable: true}
+        user_ip: {type: string, nullable: true}
+        created_at: {type: string, nullable: true}
+    PageOperateLog:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            list:
+              type: array
+              items:
+                $ref: '#/components/schemas/OperateLogResponse'
+    CreateLoginLogRequest:
+      type: object
+      required: [user_id, username]
+      properties:
+        user_id: {type: integer, format: int64}
+        user_type: {type: integer, format: int32}
+        username: {type: string}
+        login_ip: {type: string}
+        login_type: {type: string, description: 登录方式 password/token/sso}
+        result: {type: integer, format: int32, description: 结果 0=失败 1=成功}
+    ListLoginLogsRequest:
+      type: object
+      properties:
+        user_id: {type: integer, format: int64, nullable: true}
+        username: {type: string, nullable: true}
+        login_ip: {type: string, nullable: true}
+        login_type: {type: string, nullable: true}
+        result: {type: integer, format: int32, nullable: true}
+        begin_time: {type: string, nullable: true}
+        end_time: {type: string, nullable: true}
+        page: {type: integer, format: int64}
+        page_size: {type: integer, format: int64}
+    LoginLogResponse:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        user_id: {type: integer, format: int64}
+        user_type: {type: integer, format: int32}
+        username: {type: string}
+        login_ip: {type: string}
+        login_type: {type: string}
+        result: {type: integer, format: int32}
+        msg: {type: string, nullable: true}
+        login_time: {type: string, nullable: true}
+    PageLoginLog:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            list:
+              type: array
+              items:
+                $ref: '#/components/schemas/LoginLogResponse'
+    DeleteLogsRequest:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: 日志 ID 列表
+
+    ListFilesRequest:
+      type: object
+      properties:
+        name: {type: string, nullable: true, description: 按文件名模糊过滤}
+        file_type: {type: string, nullable: true, description: 按 MIME 类型过滤}
+        config_id: {type: integer, format: int64, nullable: true}
+        page: {type: integer, format: int64}
+        page_size: {type: integer, format: int64}
+    FileResponse:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        config_id: {type: integer, format: int64, nullable: true}
+        name: {type: string}
+        path: {type: string}
+        url: {type: string}
+        file_type: {type: string, nullable: true, description: MIME 类型}
+        size: {type: integer, format: int32, description: 文件大小（字节）}
+    PageFile:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            list:
+              type: array
+              items:
+                $ref: '#/components/schemas/FileResponse'
+    PreviewUrlResponse:
+      type: object
+      properties:
+        url: {type: string, description: 资源访问地址}
+        type: {type: string, description: permanent | temporary}
+        expires_at: {type: string, nullable: true, description: 过期时间（ISO8601），permanent 时为 null}
+    CreateFileConfigRequest:
+      type: object
+      required: [name, storage, config]
+      properties:
+        name: {type: string, description: 配置名称}
+        storage: {type: integer, format: int32, description: 存储类型 0=本地 1=S3 2=数据库}
+        remark: {type: string, nullable: true}
+        config: {type: string, description: JSON 配置串}
+    UpdateFileConfigRequest:
+      type: object
+      required: [id]
+      properties:
+        id: {type: integer, format: int64}
+        name: {type: string}
+        storage: {type: integer, format: int32}
+        remark: {type: string, nullable: true}
+        config: {type: string}
+    FileConfigResponse:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        name: {type: string}
+        storage: {type: integer, format: int32}
+        remark: {type: string, nullable: true}
+        master: {type: integer, format: int32, description: 是否主配置 0=普通 1=主配置}
+        config: {type: string, description: JSON 配置串}
+
+    ServerInfo:
+      type: object
+      properties:
+        os_name: {type: string}
+        os_version: {type: string}
+        hostname: {type: string}
+        cpu_cores: {type: integer, format: int32}
+        cpu_usage: {type: number, format: double, description: CPU 使用率（%）}
+        total_memory: {type: integer, format: int64, description: 总内存（字节）}
+        used_memory: {type: integer, format: int64}
+        memory_usage: {type: number, format: double, description: 内存使用率（%）}
+        total_disk: {type: integer, format: int64, description: 磁盘总空间（字节）}
+        used_disk: {type: integer, format: int64}
+        disk_usage: {type: number, format: double, description: 磁盘使用率（%）}
+        disks:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiskInfo'
+        networks:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetworkInfo'
+    DiskInfo:
+      type: object
+      properties:
+        name: {type: string, description: 名称/挂载点/文件系统}
+        total_space: {type: integer, format: int64}
+        available_space: {type: integer, format: int64}
+        usage: {type: number, format: double, description: 使用率（%）}
+    NetworkInfo:
+      type: object
+      properties:
+        name: {type: string}
+        mac_address: {type: string}
+        ip_addresses:
+          type: array
+          items: {type: string}
+        received_bytes: {type: integer, format: int64}
+        transmitted_bytes: {type: integer, format: int64}
+        received_packets: {type: integer, format: int64}
+        transmitted_packets: {type: integer, format: int64}
+    OnlineUser:
+      type: object
+      properties:
+        user_id: {type: integer, format: int64}
+        username: {type: string}
+        login_ip: {type: string}
+        login_time: {type: string, description: 登录时间}
+    OnlineUserListResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/OnlineUser'
+        total: {type: integer, format: int64, description: 在线用户总数}
+
+    CreateJobRequest:
+      type: object
+      required: [name, handler_name, cron_expression]
+      properties:
+        name: {type: string, description: 任务名称}
+        handler_name: {type: string, description: 执行器名称}
+        handler_param: {type: string, nullable: true, description: 执行器参数（JSON）}
+        cron_expression: {type: string, description: 6 段 Cron 表达式（秒级）}
+        retry_count: {type: integer, format: int32, description: 失败重试次数}
+        retry_interval: {type: integer, format: int32, description: 重试间隔（秒）}
+        monitor_timeout: {type: integer, format: int32, description: 执行超时（秒）}
+    UpdateJobRequest:
+      type: object
+      required: [id]
+      properties:
+        id: {type: integer, format: int64}
+        name: {type: string}
+        handler_name: {type: string}
+        handler_param: {type: string, nullable: true}
+        cron_expression: {type: string}
+        retry_count: {type: integer, format: int32}
+        retry_interval: {type: integer, format: int32}
+        monitor_timeout: {type: integer, format: int32}
+    ChangeJobStatusRequest:
+      type: object
+      required: [id, status]
+      properties:
+        id: {type: integer, format: int64}
+        status: {type: integer, format: int32, description: 目标状态 0=暂停 1=运行}
+    JobResponse:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        name: {type: string}
+        status: {type: integer, format: int32, description: 0=暂停 1=运行}
+        handler_name: {type: string}
+        handler_param: {type: string, nullable: true}
+        cron_expression: {type: string}
+        retry_count: {type: integer, format: int32}
+        retry_interval: {type: integer, format: int32}
+        monitor_timeout: {type: integer, format: int32}
+    ListJobsRequest:
+      type: object
+      properties:
+        name: {type: string, nullable: true}
+        status: {type: integer, format: int32, nullable: true, description: 0=暂停 1=运行}
+        page: {type: integer, format: int64}
+        page_size: {type: integer, format: int64}
+    PageJob:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            list:
+              type: array
+              items:
+                $ref: '#/components/schemas/JobResponse'
+    JobLogResponse:
+      type: object
+      properties:
+        id: {type: integer, format: int64}
+        job_id: {type: integer, format: int64}
+        handler_name: {type: string}
+        handler_param: {type: string, nullable: true}
+        execute_index: {type: integer, format: int32, description: 执行序号（重试计数）}
+        begin_time: {type: string, description: 开始时间（ISO8601）}
+        end_time: {type: string, nullable: true}
+        duration: {type: integer, format: int32, nullable: true, description: 耗时（毫秒）}
+        status: {type: integer, format: int32, description: 0=执行中 1=成功 2=失败}
+        result: {type: string, nullable: true, description: 执行结果/输出}
+    ListJobLogsRequest:
+      type: object
+      properties:
+        job_id: {type: integer, format: int64, nullable: true}
+        status: {type: integer, format: int32, nullable: true, description: 0=执行中 1=成功 2=失败}
+        page: {type: integer, format: int64}
+        page_size: {type: integer, format: int64}
+    PageJobLog:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            list:
+              type: array
+              items:
+                $ref: '#/components/schemas/JobLogResponse'
+    CleanJobLogsRequest:
+      type: object
+      properties:
+        job_id: {type: integer, format: int64, nullable: true, description: 为空则清空所有任务日志}
+
+    CacheStatsResponse:
+      type: object
+      properties:
+        total_keys: {type: integer, format: int64, description: 缓存键总数}
+        used_memory: {type: integer, format: int64, description: 已用内存（字节）}
+        hit_count: {type: integer, format: int64, description: 命中次数}
+        miss_count: {type: integer, format: int64, description: 未命中次数}
+        hit_rate: {type: number, format: double, description: 命中率（%）}
+
+    HealthResponse:
+      type: object
+      properties:
+        status: {type: string, description: ok | degraded}
+        db: {type: string, description: ok | error}
+        version: {type: string, description: 服务版本（CARGO_PKG_VERSION）}
+
+    ApiR:
+      type: object
+      required: [code, msg]
+      properties:
+        code:
+          type: integer
+          format: int32
+          example: 200
+          description: 业务状态码，200 表示成功
+        msg:
+          type: string
+          example: success
+          description: 提示信息
+        data:
+          nullable: true
+          description: 业务数据负载
+    Page:
+      type: object
+      description: 分页结果（list 元素类型由具体响应决定）
+      properties:
+        list:
+          type: array
+          items: {}
+        page:
+          type: integer
+          format: int64
+          description: 当前页码
+        size:
+          type: integer
+          format: int64
+          description: 每页条数
+        total:
+          type: integer
+          format: int64
+          description: 总记录数
+    Empty:
+      type: object
+      description: 空消息（无字段）
+    PageRequest:
+      type: object
+      description: 分页请求（page 从 1 开始，size 建议 1~200）
+      properties:
+        page:
+          type: integer
+          format: int64
+          description: 页码
+        size:
+          type: integer
+          format: int64
+          description: 每页条数
+    PageResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int64

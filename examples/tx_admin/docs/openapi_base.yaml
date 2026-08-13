@@ -1,0 +1,115 @@
+openapi: 3.0.3
+info:
+  title: TX Admin API
+  version: 1.0.0
+  description: |
+    管理后台 HTTP API（tx_admin）OpenAPI 3 规范。
+
+    全局约定：
+    - 业务路由统一前缀 /api/v1，健康检查 /health 无前缀。
+    - 统一响应包装 ApiR<T> = { code, msg, data }，HTTP 状态码恒为 200。
+    - 认证基于 sa-token：登录成功后令牌写入 HttpOnly Cookie（默认键名 satoken，
+      实际键名由 SaTokenConf.token_name 决定），请求需携带该 Cookie。
+servers:
+  - url: http://localhost:8080
+    description: 本地开发环境
+security:
+  - saToken: []
+tags:
+  - name: Auth
+    description: 认证与当前用户信息
+  - name: User
+    description: 用户管理
+  - name: Role
+    description: 角色管理
+  - name: Menu
+    description: 菜单管理
+  - name: Dept
+    description: 部门管理
+  - name: Config
+    description: 系统配置
+  - name: Dict
+    description: 数据字典
+  - name: Log
+    description: 操作/登录日志
+  - name: File
+    description: 文件存储
+  - name: Monitor
+    description: 服务监控
+  - name: Job
+    description: 定时任务
+  - name: Tool
+    description: 开发工具
+  - name: Health
+    description: 健康检查
+paths:
+components:
+  securitySchemes:
+    saToken:
+      type: apiKey
+      in: cookie
+      name: satoken
+      description: sa-token 会话令牌（HttpOnly Cookie）
+  schemas:
+    ApiR:
+      type: object
+      required: [code, msg]
+      properties:
+        code:
+          type: integer
+          format: int32
+          example: 200
+          description: 业务状态码，200 表示成功
+        msg:
+          type: string
+          example: success
+          description: 提示信息
+        data:
+          nullable: true
+          description: 业务数据负载
+    Page:
+      type: object
+      description: 分页结果（list 元素类型由具体响应决定）
+      properties:
+        list:
+          type: array
+          items: {}
+        page:
+          type: integer
+          format: int64
+          description: 当前页码
+        size:
+          type: integer
+          format: int64
+          description: 每页条数
+        total:
+          type: integer
+          format: int64
+          description: 总记录数
+    Empty:
+      type: object
+      description: 空消息（无字段）
+    PageRequest:
+      type: object
+      description: 分页请求（page 从 1 开始，size 建议 1~200）
+      properties:
+        page:
+          type: integer
+          format: int64
+          description: 页码
+        size:
+          type: integer
+          format: int64
+          description: 每页条数
+    PageResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int64
