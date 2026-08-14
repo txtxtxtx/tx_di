@@ -16,7 +16,9 @@ export const useUserStore = defineStore('user', () => {
     const res = await loginApi(req)
     // token 在 HttpOnly Cookie 中，前端不保存
     token.value = ''
-    userInfo.value = res.data
+    // 登录接口返回的是 LoginResponse，字段与 UserInfoResponse 不完全一致，
+    // 且登录后路由守卫会通过 fetchUserInfo()（携带 Cookie）拉取完整的用户信息，
+    // 故此处不直接赋给 userInfo，仅取 permissions 供即时使用。
     permissions.value = res.data.permissions || []
     return res
   }
