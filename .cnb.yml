@@ -19,8 +19,8 @@
   docker:
     image: rust:1.97-slim
     volumes:
-      - cargo-registry:/usr/local/cargo/registry:rw
-      - target-cache:/workspace/target:rw
+      - cargo-registry:/usr/local/cargo/registry:copy-on-write
+      - target-cache:/workspace/target:copy-on-write
 
 .regression-stages: &regression-stages
   stages:
