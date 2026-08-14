@@ -101,6 +101,10 @@ time_format = "local"
 token_name = "Authorization"
 timeout = 86400
 is_concurrent = true
+# is_share=true 时同一账号(admin)的所有登录共享同一个 token，
+# 并行运行下 logout 用例会连带失效 admin_token() 的共享 token，
+# 导致 user_info_with_token_ok 偶发 401。测试中关闭共享，
+# 使各用例独立 token 互不干扰（与设计文档示例 is_share:false 一致）。
 is_share = false
 token_style = "simple-uuid"
 is_read_header = true

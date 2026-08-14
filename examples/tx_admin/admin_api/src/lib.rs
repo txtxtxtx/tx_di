@@ -18,8 +18,7 @@ pub mod operate_log;
 pub mod plugin;
 
 // 显式引用各插件 crate，触发 linkme 编译期注册（组件注册点）
-#[allow(unused_imports)]
-#[allow(clippy::single_component_path_imports)]
+#[allow(unused_imports, clippy::single_component_path_imports)]
 use {
     admin_app, admin_infra, tx_di_axum, tx_di_file, tx_di_job, tx_di_log, tx_di_nacos,
     tx_di_sa_token, tx_di_toasty,

@@ -7,8 +7,7 @@
 
 // 引用 lib：触发 `AdminPlugin` 等组件 linkme 注册（见 src/lib.rs）
 // 依赖 linkme 的链接副作用，不能删除；clippy 无法识别，需显式抑制该 lint。
-#[allow(unused_imports)]
-#[allow(clippy::single_component_path_imports)]
+#[allow(unused_imports, clippy::single_component_path_imports)]
 use admin_api;
 use tx_error::AppResult;
 
