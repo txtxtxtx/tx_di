@@ -19,3 +19,6 @@ examples/tx_admin/data/dist
 /pkgs/
 examples\tx_di_can\app\node_modules
 examples/tx_di_can/app/dist
+
+# 本地 Cargo registry 缓存
+.cargo-home/
