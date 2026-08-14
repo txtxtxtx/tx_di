@@ -24,9 +24,7 @@ pub type Router = axum::Router;
 mod tests {
     use tx_di_core::BuildContext;
     #[allow(unused)]
-    use tx_di_log;
     // use super::*;
-
     #[tokio::test]
     async fn it_works() {
         // D:\proj\tx_di\configs\di-config.toml

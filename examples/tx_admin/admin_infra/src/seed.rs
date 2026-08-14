@@ -30,6 +30,7 @@ pub fn resolve_admin_password() -> String {
 
 /// 字典种子数据：(dict_type, type_name, data_items)
 /// data_items: (sort, label, value, color_type)
+#[allow(clippy::type_complexity)]
 const DICT_SEEDS: &[(&str, &str, &[(i32, &str, &str, &str)])] = &[
     (
         "sys_status",
@@ -131,6 +132,7 @@ const DICT_SEEDS: &[(&str, &str, &[(i32, &str, &str, &str)])] = &[
 /// types: 0=目录, 1=菜单, 2=按钮/权限
 /// visible: 0=显示, 1=隐藏
 /// keep_alive: 0=不缓存, 1=缓存
+#[allow(clippy::type_complexity)]
 const MENU_SEEDS: &[(
     u64,
     &str,

@@ -94,15 +94,15 @@ impl DepartmentRepository for ToastyDepartmentRepository {
             .iter()
             .filter(|d| d.deleted == Deleted::No)
             .filter(|d| {
-                if let Some(ref name) = query.name {
-                    if !d.name.contains(name.as_str()) {
-                        return false;
-                    }
+                if let Some(ref name) = query.name
+                    && !d.name.contains(name.as_str())
+                {
+                    return false;
                 }
-                if let Some(status) = query.status {
-                    if i32::from(d.status) != status {
-                        return false;
-                    }
+                if let Some(status) = query.status
+                    && i32::from(d.status) != status
+                {
+                    return false;
                 }
                 true
             })

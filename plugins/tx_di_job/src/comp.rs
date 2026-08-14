@@ -118,7 +118,7 @@ impl JobPlugin {
         handler_name: &str,
         handler_param: Option<&str>,
     ) -> JobResult {
-        let executor_type = ExecutorType::from_handler_name(&handler_name);
+        let executor_type = ExecutorType::from_handler_name(handler_name);
         match executor_type {
             ExecutorType::Internal => {
                 self.internal_exec()
@@ -558,8 +558,8 @@ impl JobPlugin {
                                 );
                             }
                             // 执行完成释放分布式锁（仅释放自己持有的锁）
-                            if let Some((cache, lock_key, token)) = &release_lock {
-                                if let Err(e) = cache
+                            if let Some((cache, lock_key, token)) = &release_lock
+                                && let Err(e) = cache
                                     .compare_and_del(lock_key, token.as_bytes())
                                     .await
                                 {
@@ -569,7 +569,6 @@ impl JobPlugin {
                                         "释放分布式锁失败（将由 TTL 兜底）"
                                     );
                                 }
-                            }
                         });
 
                         last_trigger.insert(job_id, slot);
@@ -614,6 +613,63 @@ fn parse_cron_schedule(expr: &str) -> Result<cron::Schedule, cron::error::Error>
         // 仍失败则返回原始错误
         expr.parse()
     }
+}
+async fn app_async_init(comp: Arc<JobPlugin>, app: Arc<App>) -> RIE<()> {
+    info!("JobPlugin: 异步初始化开始");
+    // 获取数据库实例
+    let toasty_plugin = app.inject::<ToastyPlugin>();
+
+    // 创建数据访问层（内部构造，非 DI 注入）
+    let repository = Arc::new(JobRepository::new(toasty_plugin));
+
+    // 创建执行器（内部构造，非 DI 注入）
+    let internal_executor = Arc::new(InternalJobExecutor::new(comp.config.internal_timeout()));
+    let shell_executor = Arc::new(ShellJobExecutor::new(comp.config.shell_timeout()));
+    let python_executor = Arc::new(PythonJobExecutor::new(
+        comp.config.python_path.clone(),
+        comp.config.python_timeout(),
+    ));
+
+    // 创建并发控制信号量
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(comp.config.thread_pool_size));
+
+    // 设置到 JobPlugin 的 OnceLock 字段
+    comp.repository
+        .set(repository)
+        .map_err(|_| JobErr::RepositoryAlreadyInit)?;
+    comp.internal_executor
+        .set(internal_executor)
+        .map_err(|_| JobErr::InternalExecutorAlreadyInit)?;
+    comp.shell_executor
+        .set(shell_executor)
+        .map_err(|_| JobErr::ShellExecutorAlreadyInit)?;
+    comp.python_executor
+        .set(python_executor)
+        .map_err(|_| JobErr::PythonExecutorAlreadyInit)?;
+    comp.semaphore
+        .set(semaphore)
+        .map_err(|_| JobErr::SemaphoreAlreadyInit)?;
+
+    info!("JobPlugin: 异步初始化完成");
+    Ok(())
+}
+
+/// `#[component(app_async_run)]` 回调：启动调度器主循环
+async fn app_async_run(comp: Arc<JobPlugin>, _app: Arc<App>, token: CancellationToken) -> RIE<()> {
+    if !comp.config.enabled {
+        info!("JobPlugin: 调度器未启用，跳过启动");
+        return Ok(());
+    }
+
+    info!("JobPlugin: 启动调度器");
+
+    // 框架已将 async_run 放入 tokio::spawn，此处直接占用当前任务执行调度循环
+    if let Err(e) = comp.scheduler_loop(token).await {
+        error!(error = %e, "调度器主循环异常退出");
+    }
+
+    info!("JobPlugin: 调度器已停止");
+    Ok(())
 }
 
 #[cfg(test)]
@@ -863,61 +919,4 @@ mod tests {
         // 释放后应可再次获取
         let _p = sem.try_acquire().unwrap();
     }
-}
-async fn app_async_init(comp: Arc<JobPlugin>, app: Arc<App>) -> RIE<()> {
-    info!("JobPlugin: 异步初始化开始");
-    // 获取数据库实例
-    let toasty_plugin = app.inject::<ToastyPlugin>();
-
-    // 创建数据访问层（内部构造，非 DI 注入）
-    let repository = Arc::new(JobRepository::new(toasty_plugin));
-
-    // 创建执行器（内部构造，非 DI 注入）
-    let internal_executor = Arc::new(InternalJobExecutor::new(comp.config.internal_timeout()));
-    let shell_executor = Arc::new(ShellJobExecutor::new(comp.config.shell_timeout()));
-    let python_executor = Arc::new(PythonJobExecutor::new(
-        comp.config.python_path.clone(),
-        comp.config.python_timeout(),
-    ));
-
-    // 创建并发控制信号量
-    let semaphore = Arc::new(tokio::sync::Semaphore::new(comp.config.thread_pool_size));
-
-    // 设置到 JobPlugin 的 OnceLock 字段
-    comp.repository
-        .set(repository)
-        .map_err(|_| JobErr::RepositoryAlreadyInit)?;
-    comp.internal_executor
-        .set(internal_executor)
-        .map_err(|_| JobErr::InternalExecutorAlreadyInit)?;
-    comp.shell_executor
-        .set(shell_executor)
-        .map_err(|_| JobErr::ShellExecutorAlreadyInit)?;
-    comp.python_executor
-        .set(python_executor)
-        .map_err(|_| JobErr::PythonExecutorAlreadyInit)?;
-    comp.semaphore
-        .set(semaphore)
-        .map_err(|_| JobErr::SemaphoreAlreadyInit)?;
-
-    info!("JobPlugin: 异步初始化完成");
-    Ok(())
-}
-
-/// `#[component(app_async_run)]` 回调：启动调度器主循环
-async fn app_async_run(comp: Arc<JobPlugin>, _app: Arc<App>, token: CancellationToken) -> RIE<()> {
-    if !comp.config.enabled {
-        info!("JobPlugin: 调度器未启用，跳过启动");
-        return Ok(());
-    }
-
-    info!("JobPlugin: 启动调度器");
-
-    // 框架已将 async_run 放入 tokio::spawn，此处直接占用当前任务执行调度循环
-    if let Err(e) = comp.scheduler_loop(token).await {
-        error!(error = %e, "调度器主循环异常退出");
-    }
-
-    info!("JobPlugin: 调度器已停止");
-    Ok(())
 }

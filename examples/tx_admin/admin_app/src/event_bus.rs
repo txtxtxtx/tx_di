@@ -13,12 +13,15 @@ use admin_domain::shared::event_publisher::DomainEventPublisher;
 use admin_domain::shared::model::DomainEvent;
 use tx_di_core::{Component, DepsTuple};
 
+/// 领域事件订阅者回调类型
+pub type Subscriber = Arc<dyn Fn(DomainEvent) + Send + Sync>;
+
 /// 进程内领域事件总线
 #[derive(Component)]
 #[component(as_trait = dyn DomainEventPublisher)]
 pub struct EventBus {
     #[tx_cst(RwLock::new(Vec::new()))]
-    subscribers: RwLock<Vec<Arc<dyn Fn(DomainEvent) + Send + Sync>>>,
+    subscribers: RwLock<Vec<Subscriber>>,
 }
 
 impl EventBus {

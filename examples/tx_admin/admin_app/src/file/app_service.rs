@@ -108,12 +108,12 @@ impl FileAppService {
             }
 
             // 从 DB 配置 JSON 创建存储后端并注册到插件缓存
-            if let Ok(storage_cfg) = serde_json::from_str::<StorageConfig>(&cfg.config) {
-                if let Ok(storage) = OpendalStorage::from_storage_config(&storage_cfg) {
-                    let storage = Arc::new(storage) as Arc<dyn FileStorage>;
-                    self.file_plugin.add_storage(cache_key, storage.clone());
-                    return Ok(storage);
-                }
+            if let Ok(storage_cfg) = serde_json::from_str::<StorageConfig>(&cfg.config)
+                && let Ok(storage) = OpendalStorage::from_storage_config(&storage_cfg)
+            {
+                let storage = Arc::new(storage) as Arc<dyn FileStorage>;
+                self.file_plugin.add_storage(cache_key, storage.clone());
+                return Ok(storage);
             }
         }
 
@@ -128,12 +128,11 @@ impl FileAppService {
         } else {
             self.file_config_repo.find_master().await.ok().flatten()
         };
-        if let Some(cfg) = db_config {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&cfg.config) {
-                if let Some(base) = json.get("base_path").and_then(|v| v.as_str()) {
-                    return Some(base.to_string());
-                }
-            }
+        if let Some(cfg) = db_config
+            && let Ok(json) = serde_json::from_str::<serde_json::Value>(&cfg.config)
+            && let Some(base) = json.get("base_path").and_then(|v| v.as_str())
+        {
+            return Some(base.to_string());
         }
         // 回退到插件配置
         Some(self.file_plugin.config.base_path.clone())

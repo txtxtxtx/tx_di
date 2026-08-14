@@ -24,6 +24,7 @@ impl MenuService {
         Self { menu_repo }
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// 创建新菜单
     ///
     /// # 参数
@@ -73,6 +74,7 @@ impl MenuService {
         Ok(menu)
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// 更新菜单信息
     ///
     /// # 参数

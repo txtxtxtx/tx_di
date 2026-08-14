@@ -61,7 +61,7 @@ fn init(this: &mut LogPlugins, _store: &Store) -> RIE<()> {
         .filename_suffix("log")
         .max_log_files(this.config.retention_days)
         .build(&this.config.dir)
-        .map_err(|e| anyhow::Error::new(e))?;
+        .map_err(anyhow::Error::new)?;
 
     let (non_blocking_appender, guard) = NonBlocking::new(file_appender);
 
@@ -103,11 +103,11 @@ fn init(this: &mut LogPlugins, _store: &Store) -> RIE<()> {
     let env_filter = if this.config.modules.is_empty() {
         // 如果没有模块级别的配置，使用全局级别
         EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| EnvFilter::new(&this.config.level.as_str().to_lowercase()))
+            .unwrap_or_else(|_| EnvFilter::new(this.config.level.as_str().to_lowercase()))
     } else {
         // 从全局级别开始
         let mut filter = EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| EnvFilter::new(&this.config.level.as_str().to_lowercase()));
+            .unwrap_or_else(|_| EnvFilter::new(this.config.level.as_str().to_lowercase()));
 
         // 添加模块级别的覆盖配置
         for (module, level) in &this.config.modules {

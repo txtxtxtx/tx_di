@@ -16,7 +16,6 @@ use tx_di_core::App;
 
 // 空导入：触发 admin_api lib 链接（AdminPlugin 等组件 linkme 注册）
 #[allow(unused_imports)]
-use admin_api;
 
 /// 测试服务器句柄
 pub struct TestServer {
@@ -33,7 +32,7 @@ static SERVER: OnceCell<TestServer> = OnceCell::const_new();
 /// 获取共享测试服务器实例（进程内全局唯一，只启动一次）
 pub async fn server() -> &'static TestServer {
     SERVER
-        .get_or_try_init(|| start_server())
+        .get_or_try_init(start_server)
         .await
         .expect("E2E 测试服务器启动失败")
 }

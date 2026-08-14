@@ -183,23 +183,21 @@ impl FileStorage for OpendalStorage {
         }
 
         // 本地文件系统需先确保父目录存在
-        if self.backend == StorageBackend::Local {
-            if let Some(parent) = std::path::Path::new(path).parent() {
-                if let Some(parent_str) = parent.to_str() {
-                    if !parent_str.is_empty() {
-                        // OpenDAL Fs 服务要求 create_dir 路径以 `/` 结尾
-                        let dir_path = if parent_str.ends_with('/') {
-                            parent_str.to_string()
-                        } else {
-                            format!("{}/", parent_str)
-                        };
-                        self.operator
-                            .create_dir(&dir_path)
-                            .await
-                            .map_err(|e| map_opendal_error(e, path))?;
-                    }
-                }
-            }
+        if self.backend == StorageBackend::Local
+            && let Some(parent) = std::path::Path::new(path).parent()
+            && let Some(parent_str) = parent.to_str()
+            && !parent_str.is_empty()
+        {
+            // OpenDAL Fs 服务要求 create_dir 路径以 `/` 结尾
+            let dir_path = if parent_str.ends_with('/') {
+                parent_str.to_string()
+            } else {
+                format!("{}/", parent_str)
+            };
+            self.operator
+                .create_dir(&dir_path)
+                .await
+                .map_err(|e| map_opendal_error(e, path))?;
         }
 
         // 流式写入：通过 OpenDAL Writer 分块传输，不缓冲全文件
@@ -263,8 +261,7 @@ impl FileStorage for OpendalStorage {
             .await
             .map_err(|e| map_opendal_error(e, path))?;
 
-        let io_stream = bytes_stream
-            .map(|r| r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string())));
+        let io_stream = bytes_stream.map(|r| r.map_err(|e| std::io::Error::other(e.to_string())));
 
         Ok(Box::pin(StreamReader::new(io_stream)))
     }

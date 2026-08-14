@@ -73,6 +73,7 @@ impl ConfigService {
         Ok(config)
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// 更新已有配置项的信息
     ///
     /// # 参数

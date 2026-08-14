@@ -147,15 +147,15 @@ impl ConfigRepository for ToastyConfigRepository {
             .iter()
             .filter(|c| c.deleted == Deleted::No)
             .filter(|c| {
-                if let Some(ref category) = query.category {
-                    if c.category != *category {
-                        return false;
-                    }
+                if let Some(ref category) = query.category
+                    && c.category != *category
+                {
+                    return false;
                 }
-                if let Some(ref name) = query.name {
-                    if !c.name.contains(name.as_str()) {
-                        return false;
-                    }
+                if let Some(ref name) = query.name
+                    && !c.name.contains(name.as_str())
+                {
+                    return false;
                 }
                 true
             })

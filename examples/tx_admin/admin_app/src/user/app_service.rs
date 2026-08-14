@@ -78,17 +78,17 @@ impl UserAppService {
         let sex = req.sex.map(Sex::from).unwrap_or_default();
 
         // Check email uniqueness
-        if let Some(ref e) = email {
-            if self.user_service.exists_by_email(e).await? {
-                return Err(RepositoryError::DuplicateEmail)?;
-            }
+        if let Some(ref e) = email
+            && self.user_service.exists_by_email(e).await?
+        {
+            Err(RepositoryError::DuplicateEmail)?;
         }
 
         // Check mobile uniqueness
-        if let Some(ref m) = mobile {
-            if self.user_service.exists_by_mobile(m).await? {
-                return Err(RepositoryError::DuplicateMobile)?;
-            }
+        if let Some(ref m) = mobile
+            && self.user_service.exists_by_mobile(m).await?
+        {
+            Err(RepositoryError::DuplicateMobile)?;
         }
 
         // 构建领域对象（密码哈希等，不落库）
@@ -183,18 +183,18 @@ impl UserAppService {
 
         // 用户必须为 Active 状态
         if user.status != UserStatus::Active {
-            return Err(RepositoryError::ValidationUserStatus)?;
+            Err(RepositoryError::ValidationUserStatus)?;
         }
 
         // 校验每个角色存在且为启用状态（status == 0 即 Enabled）
         let roles = self.role_repo.find_by_ids(&role_ids).await?;
         // 数据完整性校验：输入 ID 与命中记录数必须一致，防止悬空引用
         if roles.len() != role_ids.len() {
-            return Err(RepositoryError::NotFoundRole)?;
+            Err(RepositoryError::NotFoundRole)?;
         }
         for r in &roles {
             if r.status != 0 {
-                return Err(RepositoryError::ValidationUserStatus)?;
+                Err(RepositoryError::ValidationUserStatus)?;
             }
         }
 
@@ -211,18 +211,18 @@ impl UserAppService {
 
         // 用户必须为 Active 状态
         if user.status != UserStatus::Active {
-            return Err(RepositoryError::ValidationUserStatus)?;
+            Err(RepositoryError::ValidationUserStatus)?;
         }
 
         // 校验每个部门存在且为启用状态
         let depts = self.dept_repo.find_by_ids(&dept_ids).await?;
         // 数据完整性校验：输入 ID 与命中记录数必须一致，防止悬空引用
         if depts.len() != dept_ids.len() {
-            return Err(RepositoryError::NotFoundDept)?;
+            Err(RepositoryError::NotFoundDept)?;
         }
         for d in &depts {
             if d.status != 0 {
-                return Err(RepositoryError::ValidationDeptDisabled)?;
+                Err(RepositoryError::ValidationDeptDisabled)?;
             }
         }
 

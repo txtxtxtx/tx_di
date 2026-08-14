@@ -6,19 +6,15 @@ use tx_di_core::{Component, RIE, Store};
 /// 存储后端类型
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum StorageBackend {
     /// 本地文件系统
+    #[default]
     Local,
     /// AWS S3（或兼容 S3 协议的对象存储，如 MinIO）
     S3,
     /// 数据库存储（文件内容存入 infrust_file_content 表）
     Database,
-}
-
-impl Default for StorageBackend {
-    fn default() -> Self {
-        Self::Local
-    }
 }
 
 impl TryFrom<i32> for StorageBackend {

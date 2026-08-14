@@ -135,6 +135,7 @@ impl UserService {
         ))
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// 更新用户基本信息
     ///
     /// # 参数

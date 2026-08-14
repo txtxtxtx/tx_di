@@ -248,7 +248,7 @@ impl JobRepository {
                 }
                 q
             },
-            |e| to_err(e)
+            to_err
         );
         Ok((rows, total))
     }
@@ -346,7 +346,7 @@ impl JobRepository {
                 }
                 q
             },
-            |e| to_err(e)
+            to_err
         );
         Ok((rows, total))
     }

@@ -114,6 +114,12 @@ where
 #[derive(Clone)]
 pub struct AuthLayer;
 
+impl Default for AuthLayer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AuthLayer {
     pub fn new() -> Self {
         Self
@@ -153,6 +159,7 @@ fn extract_bearer_token<B>(req: &Request<B>) -> Result<TokenValue, String> {
 /// 从 request extensions 获取 login_id
 ///
 /// 在 gRPC service 方法中调用，获取当前已认证用户的 login_id。
+#[allow(clippy::result_large_err)]
 pub fn get_login_id(req: &tonic::Request<impl std::any::Any>) -> Result<String, tonic::Status> {
     req.extensions()
         .get::<GrpcLoginId>()
