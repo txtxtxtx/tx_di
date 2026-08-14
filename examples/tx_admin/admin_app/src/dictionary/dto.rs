@@ -1,5 +1,5 @@
-use admin_domain::dictionary::model::aggregate::{DictType, DictData};
-use admin_proto::{DictTypeResponse, DictDataResponse};
+use admin_domain::dictionary::model::aggregate::{DictData, DictType};
+use admin_proto::{DictDataResponse, DictTypeResponse};
 
 /// Convert a domain DictType aggregate into a proto DictTypeResponse
 pub fn dict_type_to_response(dt: DictType) -> DictTypeResponse {

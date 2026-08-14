@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::dictionary::dto::{dict_type_to_response, dict_data_to_response};
+use crate::dictionary::dto::{dict_data_to_response, dict_type_to_response};
 use admin_domain::dictionary::model::value_object::{DictDataQuery, DictTypeQuery};
 use admin_domain::dictionary::service::{DictDataService, DictTypeService};
 use admin_proto::{
-    CreateDictTypeRequest, UpdateDictTypeRequest, ListDictTypesRequest, DictTypeResponse,
-    CreateDictDataRequest, UpdateDictDataRequest, ListDictDataRequest, DictDataResponse,
+    CreateDictDataRequest, CreateDictTypeRequest, DictDataResponse, DictTypeResponse,
+    ListDictDataRequest, ListDictTypesRequest, UpdateDictDataRequest, UpdateDictTypeRequest,
 };
+use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
-use tx_common::page::Page;
 
 #[derive(Component)]
 pub struct DictTypeAppService {
@@ -65,7 +65,10 @@ impl DictTypeAppService {
             status: req.status,
         };
         let page = Page::request(req.page, req.page_size);
-        let result = self.dict_type_service.get_dict_type_page(&query, page).await?;
+        let result = self
+            .dict_type_service
+            .get_dict_type_page(&query, page)
+            .await?;
 
         Ok(Page::new(
             result.list.into_iter().map(dict_type_to_response).collect(),
@@ -77,7 +80,10 @@ impl DictTypeAppService {
 
     /// 获取所有字典类型列表
     pub async fn get_all_dict_types(&self) -> AppResult<Vec<DictTypeResponse>> {
-        let dts = self.dict_type_service.get_all_dict_types(&DictTypeQuery::default()).await?;
+        let dts = self
+            .dict_type_service
+            .get_all_dict_types(&DictTypeQuery::default())
+            .await?;
         Ok(dts.into_iter().map(dict_type_to_response).collect())
     }
 }
@@ -145,7 +151,10 @@ impl DictDataAppService {
             status: req.status,
         };
         let page = Page::request(req.page, req.page_size);
-        let result = self.dict_data_service.get_dict_data_page(&query, page).await?;
+        let result = self
+            .dict_data_service
+            .get_dict_data_page(&query, page)
+            .await?;
 
         Ok(Page::new(
             result.list.into_iter().map(dict_data_to_response).collect(),
@@ -162,9 +171,16 @@ impl DictDataAppService {
     }
 
     /// 批量根据字典类型编码获取字典数据
-    pub async fn get_by_dict_types(&self, dict_types: Vec<String>) -> AppResult<HashMap<String, Vec<DictDataResponse>>> {
-        let map = self.dict_data_service.get_by_dict_types(&dict_types).await?;
-        Ok(map.into_iter()
+    pub async fn get_by_dict_types(
+        &self,
+        dict_types: Vec<String>,
+    ) -> AppResult<HashMap<String, Vec<DictDataResponse>>> {
+        let map = self
+            .dict_data_service
+            .get_by_dict_types(&dict_types)
+            .await?;
+        Ok(map
+            .into_iter()
             .map(|(k, v)| (k, v.into_iter().map(dict_data_to_response).collect()))
             .collect())
     }

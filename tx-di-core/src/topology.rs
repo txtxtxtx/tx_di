@@ -4,15 +4,15 @@
 //! 确保构建时依赖项已就绪。检测到循环依赖时 panic。
 
 use std::any::TypeId;
-use std::collections::{BinaryHeap, HashMap};
 use std::cmp::Reverse;
+use std::collections::{BinaryHeap, HashMap};
 
 use tracing::debug;
 
 use crate::RIE;
-use crate::registry::{ComponentMeta, COMPONENT_REGISTRY};
-use crate::store::TraitImplMap;
 use crate::error::{AppError, DiErr};
+use crate::registry::{COMPONENT_REGISTRY, ComponentMeta};
+use crate::store::TraitImplMap;
 
 /// 对组件元数据进行拓扑排序，返回排序后的 TypeId 列表
 ///

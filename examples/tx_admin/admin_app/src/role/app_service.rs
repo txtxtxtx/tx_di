@@ -4,12 +4,12 @@ use crate::role::dto::*;
 use crate::user::dto::user_to_response;
 use admin_domain::role::model::value_object::RoleQuery;
 use admin_domain::role::service::RoleService;
-use admin_domain::user::repository::UserRepository;
-use admin_domain::user::model::value_object::UserStatus;
 use admin_domain::shared::repository::RepositoryError;
+use admin_domain::user::model::value_object::UserStatus;
+use admin_domain::user::repository::UserRepository;
+use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
-use tx_common::page::Page;
 
 /// Role application service - 编排领域操作 + 跨聚合校验
 #[derive(Component)]
@@ -19,11 +19,11 @@ pub struct RoleAppService {
 }
 
 impl RoleAppService {
-    pub fn new(
-        role_service: Arc<RoleService>,
-        user_repo: Arc<dyn UserRepository>,
-    ) -> Self {
-        Self { role_service, user_repo }
+    pub fn new(role_service: Arc<RoleService>, user_repo: Arc<dyn UserRepository>) -> Self {
+        Self {
+            role_service,
+            user_repo,
+        }
     }
 
     /// 创建新角色（建角色 + 绑菜单在同一事务中原子完成）
@@ -56,7 +56,15 @@ impl RoleAppService {
     ) -> AppResult<RoleResponse> {
         let role = self
             .role_service
-            .update_role(req.role_id, req.name, req.code, req.sort, req.data_scope, req.remark, updater)
+            .update_role(
+                req.role_id,
+                req.name,
+                req.code,
+                req.sort,
+                req.data_scope,
+                req.remark,
+                updater,
+            )
             .await?;
         Ok(role_to_response(role))
     }
@@ -73,7 +81,10 @@ impl RoleAppService {
         status: i32,
         updater: Option<String>,
     ) -> AppResult<RoleResponse> {
-        let role = self.role_service.change_status(role_id, status, updater).await?;
+        let role = self
+            .role_service
+            .change_status(role_id, status, updater)
+            .await?;
         Ok(role_to_response(role))
     }
 
@@ -90,10 +101,7 @@ impl RoleAppService {
     }
 
     /// 分页查询角色列表
-    pub async fn get_role_page(
-        &self,
-        request: ListRolesRequest,
-    ) -> AppResult<Page<RoleResponse>> {
+    pub async fn get_role_page(&self, request: ListRolesRequest) -> AppResult<Page<RoleResponse>> {
         let query = RoleQuery {
             name: request.name,
             code: request.code,
@@ -112,12 +120,18 @@ impl RoleAppService {
 
     /// 获取所有角色列表
     pub async fn get_all_roles(&self) -> AppResult<Vec<RoleResponse>> {
-        let roles = self.role_service.get_all_roles(&RoleQuery::default()).await?;
+        let roles = self
+            .role_service
+            .get_all_roles(&RoleQuery::default())
+            .await?;
         Ok(roles.into_iter().map(role_to_response).collect())
     }
 
     /// 获取角色关联的用户列表
-    pub async fn get_role_users(&self, role_id: u64) -> AppResult<Vec<crate::user::dto::UserResponse>> {
+    pub async fn get_role_users(
+        &self,
+        role_id: u64,
+    ) -> AppResult<Vec<crate::user::dto::UserResponse>> {
         let users = self.role_service.get_role_users(role_id).await?;
         Ok(users.into_iter().map(user_to_response).collect())
     }
@@ -130,7 +144,9 @@ impl RoleAppService {
     pub async fn add_users_to_role(&self, role_id: u64, user_ids: Vec<u64>) -> AppResult<()> {
         // 跨聚合校验：每个用户必须存在且为 Active 状态
         for &uid in &user_ids {
-            let user = self.user_repo.find_by_id(uid)
+            let user = self
+                .user_repo
+                .find_by_id(uid)
                 .await?
                 .ok_or(RepositoryError::NotFoundUser)?;
             if user.status != UserStatus::Active {
@@ -143,6 +159,8 @@ impl RoleAppService {
 
     /// 从角色中移除用户
     pub async fn remove_users_from_role(&self, role_id: u64, user_ids: Vec<u64>) -> AppResult<()> {
-        self.role_service.remove_users_from_role(role_id, user_ids).await
+        self.role_service
+            .remove_users_from_role(role_id, user_ids)
+            .await
     }
 }

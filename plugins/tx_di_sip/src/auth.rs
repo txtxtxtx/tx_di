@@ -27,9 +27,9 @@ const K: [u32; 64] = [
     0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
 ];
 const S: [u32; 64] = [
-    7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14,
-    20, 5, 9, 14, 20, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 6, 10, 15, 21, 6,
-    10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+    7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9,
+    14, 20, 5, 9, 14, 20, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 6, 10, 15,
+    21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
 ];
 /// ── MD5 实现（RFC 1321）
 ///
@@ -100,12 +100,12 @@ pub fn md5_hex(hash: [u8; 16]) -> String {
 /// `response = MD5(MD5(A1):nonce:MD5(A2))`
 /// 其中 A1 = `username:realm:password`，A2 = `method:uri`
 pub fn verify_digest_auth(
-    auth_header: &str, // Authorization 头内容
-    method: &str,      // HTTP/SIP 方法（如 REGISTER）
-    uri: &str,         // 请求 URI
+    auth_header: &str,       // Authorization 头内容
+    method: &str,            // HTTP/SIP 方法（如 REGISTER）
+    uri: &str,               // 请求 URI
     expected_password: &str, // 期望的密码
-    realm: &str,       // 认证域
-    nonce: &str,       // 服务器生成的随机数
+    realm: &str,             // 认证域
+    nonce: &str,             // 服务器生成的随机数
 ) -> bool {
     // 从 Authorization 头提取各字段
     let get_field = |name: &str| -> Option<String> {
@@ -170,7 +170,9 @@ pub fn build_digest_authorization(
     uri: &str,
     nonce: &str,
 ) -> String {
-    let ha1 = md5_hex(md5_digest(format!("{}:{}:{}", username, realm, password).as_bytes()));
+    let ha1 = md5_hex(md5_digest(
+        format!("{}:{}:{}", username, realm, password).as_bytes(),
+    ));
     let ha2 = md5_hex(md5_digest(format!("{}:{}", method, uri).as_bytes()));
     let response = md5_hex(md5_digest(format!("{}:{}:{}", ha1, nonce, ha2).as_bytes()));
 
@@ -219,7 +221,10 @@ mod tests {
 
     #[test]
     fn md5_abc() {
-        assert_eq!(md5_hex(md5_digest(b"abc")), "900150983cd24fb0d6963f7d28e17f72");
+        assert_eq!(
+            md5_hex(md5_digest(b"abc")),
+            "900150983cd24fb0d6963f7d28e17f72"
+        );
     }
 
     #[test]

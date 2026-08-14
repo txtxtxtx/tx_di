@@ -41,15 +41,10 @@ pub use plugin::SaTokenPlugin;
 
 // 重导出 sa-token 核心 API
 pub use sa_token_plugin_axum::{
-    SaTokenLayer, SaCheckLoginLayer, SaCheckPermissionLayer,
-    SaTokenExtractor, OptionalSaTokenExtractor, LoginIdExtractor,
-    SaTokenState, SaTokenStateBuilder,
-    StpUtil,
-    sa_check_login, sa_check_permission, sa_check_role,
-    sa_check_permissions_and, sa_check_permissions_or,
-    sa_check_roles_and, sa_check_roles_or,
-    sa_ignore,
-    SaStorage,
+    LoginIdExtractor, OptionalSaTokenExtractor, SaCheckLoginLayer, SaCheckPermissionLayer,
+    SaStorage, SaTokenExtractor, SaTokenLayer, SaTokenState, SaTokenStateBuilder, StpUtil,
+    sa_check_login, sa_check_permission, sa_check_permissions_and, sa_check_permissions_or,
+    sa_check_role, sa_check_roles_and, sa_check_roles_or, sa_ignore,
 };
 // MemoryStorage 从独立 crate 导出（与 sa-token-plugin-axum 的 feature 解耦，始终可用）
 pub use sa_token_storage_memory::MemoryStorage;

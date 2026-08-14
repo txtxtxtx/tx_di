@@ -1,21 +1,20 @@
 //! 用户管理 HTTP API
 
-use axum::Json;
-use tx_di_sa_token::LoginIdExtractor;
-use tx_di_axum::Router;
-use axum::routing::{get, post, put, delete};
-use tx_di_axum::bound::DiComp;
-use admin_app::user::app_service::UserAppService;
 use crate::auth::ensure_permission;
+use admin_app::user::app_service::UserAppService;
+use axum::Json;
+use axum::routing::{delete, get, post, put};
+use tx_di_axum::Router;
+use tx_di_axum::bound::DiComp;
+use tx_di_sa_token::LoginIdExtractor;
 
-use admin_proto::{
-    CreateUserRequest, UpdateUserRequest, ChangePasswordRequest,
-    AssignRolesRequest, AssignDeptsRequest, ListUsersRequest,
-    ChangeUserStatusRequest, UserResponse, Empty, UserIdRequest,
-};
-use admin_domain::user::model::value_object::UserStatus;
-use tx_common::{ApiR, ApiRes, Page};
 use crate::error::ApiErr;
+use admin_domain::user::model::value_object::UserStatus;
+use admin_proto::{
+    AssignDeptsRequest, AssignRolesRequest, ChangePasswordRequest, ChangeUserStatusRequest,
+    CreateUserRequest, Empty, ListUsersRequest, UpdateUserRequest, UserIdRequest, UserResponse,
+};
+use tx_common::{ApiR, ApiRes, Page};
 
 pub fn router() -> Router {
     Router::new()
@@ -121,7 +120,9 @@ async fn assign_depts(
     Json(req): Json<AssignDeptsRequest>,
 ) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("user:assign_dept").await?;
-    user_svc.assign_departments(req.user_id, req.dept_ids).await?;
+    user_svc
+        .assign_departments(req.user_id, req.dept_ids)
+        .await?;
     Ok(ApiRes::ok().into_typed())
 }
 
@@ -132,9 +133,11 @@ async fn change_user_status(
     Json(req): Json<ChangeUserStatusRequest>,
 ) -> Result<ApiR<UserResponse>, ApiErr> {
     ensure_permission("user:status").await?;
-    let status = UserStatus::try_from_i32(req.status)
-        .map_err(|_| anyhow::anyhow!("invalid status"))?;
-    let r = user_svc.change_status(req.user_id, status, Some(login_id)).await?;
+    let status =
+        UserStatus::try_from_i32(req.status).map_err(|_| anyhow::anyhow!("invalid status"))?;
+    let r = user_svc
+        .change_status(req.user_id, status, Some(login_id))
+        .await?;
     Ok(ApiR::success(r))
 }
 
@@ -145,7 +148,9 @@ async fn enable_user(
     Json(req): Json<UserIdRequest>,
 ) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("user:status").await?;
-    user_svc.change_status(req.user_id, UserStatus::Active, Some(login_id)).await?;
+    user_svc
+        .change_status(req.user_id, UserStatus::Active, Some(login_id))
+        .await?;
     Ok(ApiRes::ok().into_typed())
 }
 
@@ -156,7 +161,9 @@ async fn disable_user(
     Json(req): Json<UserIdRequest>,
 ) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("user:status").await?;
-    user_svc.change_status(req.user_id, UserStatus::Disabled, Some(login_id)).await?;
+    user_svc
+        .change_status(req.user_id, UserStatus::Disabled, Some(login_id))
+        .await?;
     Ok(ApiRes::ok().into_typed())
 }
 
@@ -167,7 +174,9 @@ async fn lock_user(
     Json(req): Json<UserIdRequest>,
 ) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("user:status").await?;
-    user_svc.change_status(req.user_id, UserStatus::Locked, Some(login_id)).await?;
+    user_svc
+        .change_status(req.user_id, UserStatus::Locked, Some(login_id))
+        .await?;
     Ok(ApiRes::ok().into_typed())
 }
 
@@ -178,6 +187,8 @@ async fn unlock_user(
     Json(req): Json<UserIdRequest>,
 ) -> Result<ApiR<Empty>, ApiErr> {
     ensure_permission("user:status").await?;
-    user_svc.change_status(req.user_id, UserStatus::Active, Some(login_id)).await?;
+    user_svc
+        .change_status(req.user_id, UserStatus::Active, Some(login_id))
+        .await?;
     Ok(ApiRes::ok().into_typed())
 }

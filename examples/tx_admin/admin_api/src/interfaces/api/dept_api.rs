@@ -1,16 +1,16 @@
 //! 部门管理 HTTP API
 
+use crate::auth::ensure_permission;
+use crate::error::ApiErr;
 use admin_app::department::app_service::DepartmentAppService;
+use admin_app::empty_string::opt_filter;
 use admin_domain::department::model::value_object::DeptTreeNode;
 use admin_proto::{CreateDeptRequest, DeptResponse, Empty, ListDeptsRequest, UpdateDeptRequest};
 use axum::Json;
-use admin_app::empty_string::opt_filter;
-use tx_common::{ApiR, ApiRes};
 use axum::routing::{delete, get, post, put};
-use tx_di_axum::bound::DiComp;
+use tx_common::{ApiR, ApiRes};
 use tx_di_axum::Router;
-use crate::auth::ensure_permission;
-use crate::error::ApiErr;
+use tx_di_axum::bound::DiComp;
 use tx_di_sa_token::StpUtil;
 
 pub fn router() -> Router {

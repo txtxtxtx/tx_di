@@ -21,7 +21,8 @@ async fn main() {
 
     let cfg = tx_di_nacos::RegistryConfig {
         enabled: true,
-        nacos_addr: std::env::var("NACOS_ADDR").unwrap_or_else(|_| "http://192.168.0.91:8848".into()),
+        nacos_addr: std::env::var("NACOS_ADDR")
+            .unwrap_or_else(|_| "http://192.168.0.91:8848".into()),
         namespace: std::env::var("NACOS_NS").unwrap_or_else(|_| "yc_dev".into()),
         group: std::env::var("NACOS_GROUP").unwrap_or_else(|_| "DEFAULT_GROUP".into()),
         service_name: "tx_admin_publish".into(),

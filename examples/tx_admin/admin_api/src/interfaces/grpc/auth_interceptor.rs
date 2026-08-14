@@ -224,18 +224,13 @@ mod tests {
     #[test]
     fn test_extract_bearer_token_invalid_format() {
         let mut req = Request::new(());
-        req.headers_mut().insert(
-            "authorization",
-            HeaderValue::from_static("Basic abc123"),
-        );
+        req.headers_mut()
+            .insert("authorization", HeaderValue::from_static("Basic abc123"));
 
         let result = extract_bearer_token(&req);
         assert!(result.is_err(), "格式错误应返回错误");
 
         let error = result.unwrap_err();
-        assert!(
-            error.contains("Bearer"),
-            "错误信息应提示需要 Bearer 格式"
-        );
+        assert!(error.contains("Bearer"), "错误信息应提示需要 Bearer 格式");
     }
 }

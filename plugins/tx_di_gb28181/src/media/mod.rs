@@ -63,10 +63,10 @@ pub mod null;
 pub mod zlm;
 
 use crate::err::GbErr;
-use tx_di_core::AppError as IE;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::sync::Arc;
+use tx_di_core::AppError as IE;
 
 // 子模块再导出
 pub use mediamtx::MediaMtxBackend;
@@ -165,7 +165,7 @@ pub struct RtpServerHandle {
 ///
 /// 包含明文和加密（TLS/HTTPS）两种版本的地址。
 /// 当后端未配置 TLS 时，对应的 `_tls` 字段为空字符串。
-#[derive(Debug, Clone, Default,Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct PlayUrls {
     /// 流标识
     pub stream_id: String,

@@ -4,16 +4,16 @@
 //! 使用 toasty ORM 连接数据库（SQLite/PostgreSQL/MySQL）。
 
 pub mod common;
-pub mod user;
-pub mod role;
-pub mod menu;
-pub mod department;
-pub mod file;
 pub mod config;
+pub mod department;
 pub mod dictionary;
+pub mod file;
 pub mod log;
+pub mod menu;
 pub mod plugin;
+pub mod role;
 pub mod seed;
+pub mod user;
 
 /// 注册所有 toasty 数据库模型
 ///

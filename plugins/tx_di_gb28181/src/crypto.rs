@@ -8,7 +8,6 @@
 // ── SIP Digest Auth 验证（已下沉到 L0 纯净层 tx_di_sip::auth）─────────────
 pub use tx_di_sip::auth::{generate_nonce, md5_digest, md5_hex, verify_digest_auth};
 
-
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 单元测试
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -79,9 +78,7 @@ mod tests {
         let a2 = "REGISTER:sip:target@1.2.3.4:5060";
         let ha1 = md5_hex(md5_digest(a1.as_bytes()));
         let ha2 = md5_hex(md5_digest(a2.as_bytes()));
-        let response = md5_hex(md5_digest(
-            format!("{}:nonce:{}", ha1, ha2).as_bytes(),
-        ));
+        let response = md5_hex(md5_digest(format!("{}:nonce:{}", ha1, ha2).as_bytes()));
 
         let auth = format!(
             "Digest username=\"user\", realm=\"realm\", nonce=\"nonce\", response=\"{}\"",

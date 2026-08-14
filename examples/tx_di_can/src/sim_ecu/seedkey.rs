@@ -42,5 +42,7 @@ pub fn compute_key(seed: &[u8], level: u8) -> Vec<u8> {
 /// 生成随机种子（仿真用，固定可复现长度的种子）
 pub fn generate_seed(len: usize, level: u8) -> Vec<u8> {
     // 使用确定性序列便于测试；真实 ECU 应使用真随机
-    (0..len).map(|i| ((i as u8).wrapping_mul(0x11)).wrapping_add(level)).collect()
+    (0..len)
+        .map(|i| ((i as u8).wrapping_mul(0x11)).wrapping_add(level))
+        .collect()
 }

@@ -2,9 +2,9 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{
+    Attribute, Data, DeriveInput, Ident, Lit, LitInt, LitStr, Result as SynResult, Token,
     parse::{Parse, ParseStream},
     parse_macro_input,
-    Attribute, Data, DeriveInput, Ident, Lit, LitInt, LitStr, Result as SynResult, Token,
 };
 
 /// 通用错误码，当只传 `#[err("msg")]` 时作为默认值
@@ -26,7 +26,10 @@ impl Parse for ErrVariantAttr {
         // 情况1: 纯字符串 → `#[err("msg")]`
         if input.peek(LitStr) {
             let s: LitStr = input.parse()?;
-            return Ok(ErrVariantAttr { code: DEFAULT_ERROR_CODE, msg: s.value() });
+            return Ok(ErrVariantAttr {
+                code: DEFAULT_ERROR_CODE,
+                msg: s.value(),
+            });
         }
 
         // 情况2: 整数 → `#[err(N, "msg")]`
@@ -35,7 +38,10 @@ impl Parse for ErrVariantAttr {
             let code: i32 = int_lit.base10_parse()?;
             let _comma: Token![,] = input.parse()?;
             let s: LitStr = input.parse()?;
-            return Ok(ErrVariantAttr { code, msg: s.value() });
+            return Ok(ErrVariantAttr {
+                code,
+                msg: s.value(),
+            });
         }
 
         // 情况3: 命名参数 → `#[err(code = N, msg = "...")]`

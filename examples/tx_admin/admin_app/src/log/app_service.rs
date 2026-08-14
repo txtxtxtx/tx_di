@@ -1,14 +1,16 @@
 use std::sync::Arc;
 
-use admin_proto::{CreateOperateLogRequest, ListOperateLogsRequest, OperateLogResponse,
-                  CreateLoginLogRequest, ListLoginLogsRequest, LoginLogResponse};
 use admin_domain::log::model::value_object::{LoginLogQuery, OperateLogQuery};
 use admin_domain::log::service::{LoginLogService, OperateLogService};
+use admin_proto::{
+    CreateLoginLogRequest, CreateOperateLogRequest, ListLoginLogsRequest, ListOperateLogsRequest,
+    LoginLogResponse, OperateLogResponse,
+};
+use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
-use tx_common::page::Page;
 
-use crate::log::dto::{operate_log_to_response, login_log_to_response};
+use crate::log::dto::{login_log_to_response, operate_log_to_response};
 
 #[derive(Component)]
 pub struct OperateLogAppService {
@@ -21,10 +23,7 @@ impl OperateLogAppService {
     }
 
     /// 创建操作日志记录
-    pub async fn create_log(
-        &self,
-        req: CreateOperateLogRequest,
-    ) -> AppResult<OperateLogResponse> {
+    pub async fn create_log(&self, req: CreateOperateLogRequest) -> AppResult<OperateLogResponse> {
         let log = self
             .log_service
             .create_log(
@@ -59,7 +58,11 @@ impl OperateLogAppService {
         let result = self.log_service.get_log_page(&query, page).await?;
 
         Ok(Page::new(
-            result.list.into_iter().map(operate_log_to_response).collect(),
+            result
+                .list
+                .into_iter()
+                .map(operate_log_to_response)
+                .collect(),
             result.page,
             result.size,
             result.total,
@@ -88,10 +91,7 @@ impl LoginLogAppService {
     }
 
     /// 创建登录日志记录
-    pub async fn create_log(
-        &self,
-        req: CreateLoginLogRequest,
-    ) -> AppResult<LoginLogResponse> {
+    pub async fn create_log(&self, req: CreateLoginLogRequest) -> AppResult<LoginLogResponse> {
         let log = self
             .log_service
             .create_log(

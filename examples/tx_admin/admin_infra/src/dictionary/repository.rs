@@ -1,11 +1,11 @@
-use std::sync::Arc;
 use async_trait::async_trait;
+use std::sync::Arc;
 
 use admin_domain::dictionary::model::aggregate::{DictData, DictType};
 use admin_domain::dictionary::model::value_object::{DictDataQuery, DictTypeQuery};
 use admin_domain::dictionary::repository::{DictDataRepository, DictTypeRepository};
-use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::model::AuditFields;
+use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::repository::{RepositoryError, db_err};
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
@@ -13,7 +13,7 @@ use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
 use super::model::{SysDictData, SysDictType};
-use crate::common::{Status, Deleted};
+use crate::common::{Deleted, Status};
 
 /// Toasty 实现的 DictTypeRepository
 #[derive(Component)]
@@ -33,13 +33,29 @@ impl ToastyDictTypeRepository {
             d.name.clone(),
             d.dict_type.clone(),
             i32::from(d.status),
-            if d.remark.is_empty() { None } else { Some(d.remark.clone()) },
+            if d.remark.is_empty() {
+                None
+            } else {
+                Some(d.remark.clone())
+            },
             AuditFields {
-                creator: if d.creator.is_empty() { None } else { Some(d.creator.clone()) },
+                creator: if d.creator.is_empty() {
+                    None
+                } else {
+                    Some(d.creator.clone())
+                },
                 create_time: d.created_at,
-                updater: if d.updater.is_empty() { None } else { Some(d.updater.clone()) },
+                updater: if d.updater.is_empty() {
+                    None
+                } else {
+                    Some(d.updater.clone())
+                },
                 update_time: d.updated_at,
-                deleted: if d.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if d.deleted == Deleted::Yes {
+                    DeletedStatus::Deleted
+                } else {
+                    DeletedStatus::Normal
+                },
             },
         )
     }
@@ -68,7 +84,11 @@ impl DictTypeRepository for ToastyDictTypeRepository {
         }
     }
 
-    async fn find_page(&self, query: &DictTypeQuery, page: Page<DictType>) -> AppResult<Page<DictType>> {
+    async fn find_page(
+        &self,
+        query: &DictTypeQuery,
+        page: Page<DictType>,
+    ) -> AppResult<Page<DictType>> {
         // SQL 层过滤 + COUNT + LIMIT/OFFSET
         let (rows, total) = tx_di_toasty::toasty_page!(
             self.plugin.db().clone(),
@@ -77,10 +97,11 @@ impl DictTypeRepository for ToastyDictTypeRepository {
                 let mut q =
                     SysDictType::all().filter(SysDictType::fields().deleted().eq(Deleted::No));
                 if let Some(ref name) = query.name {
-                    q = q.filter(SysDictType::fields().name().like_with_escape(
-                        format!("%{}%", tx_di_toasty::like_escape(name)),
-                        '\\',
-                    ));
+                    q =
+                        q.filter(SysDictType::fields().name().like_with_escape(
+                            format!("%{}%", tx_di_toasty::like_escape(name)),
+                            '\\',
+                        ));
                 }
                 if let Some(ref dict_type) = query.dict_type {
                     q = q.filter(SysDictType::fields().dict_type().like_with_escape(
@@ -112,13 +133,19 @@ impl DictTypeRepository for ToastyDictTypeRepository {
             .filter(|d| d.deleted == Deleted::No)
             .filter(|d| {
                 if let Some(ref name) = query.name {
-                    if !d.name.contains(name.as_str()) { return false; }
+                    if !d.name.contains(name.as_str()) {
+                        return false;
+                    }
                 }
                 if let Some(ref dict_type) = query.dict_type {
-                    if !d.dict_type.contains(dict_type.as_str()) { return false; }
+                    if !d.dict_type.contains(dict_type.as_str()) {
+                        return false;
+                    }
                 }
                 if let Some(status) = query.status {
-                    if i32::from(d.status) != status { return false; }
+                    if i32::from(d.status) != status {
+                        return false;
+                    }
                 }
                 true
             })
@@ -169,7 +196,8 @@ impl DictTypeRepository for ToastyDictTypeRepository {
             .await
             .map_err(|_| RepositoryError::NotFoundDict)?;
 
-        dict_type.update()
+        dict_type
+            .update()
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
@@ -208,15 +236,39 @@ impl ToastyDictDataRepository {
             d.value.clone(),
             d.dict_type.clone(),
             i32::from(d.status),
-            if d.color_type.is_empty() { None } else { Some(d.color_type.clone()) },
-            if d.css_class.is_empty() { None } else { Some(d.css_class.clone()) },
-            if d.remark.is_empty() { None } else { Some(d.remark.clone()) },
+            if d.color_type.is_empty() {
+                None
+            } else {
+                Some(d.color_type.clone())
+            },
+            if d.css_class.is_empty() {
+                None
+            } else {
+                Some(d.css_class.clone())
+            },
+            if d.remark.is_empty() {
+                None
+            } else {
+                Some(d.remark.clone())
+            },
             AuditFields {
-                creator: if d.creator.is_empty() { None } else { Some(d.creator.clone()) },
+                creator: if d.creator.is_empty() {
+                    None
+                } else {
+                    Some(d.creator.clone())
+                },
                 create_time: d.created_at,
-                updater: if d.updater.is_empty() { None } else { Some(d.updater.clone()) },
+                updater: if d.updater.is_empty() {
+                    None
+                } else {
+                    Some(d.updater.clone())
+                },
                 update_time: d.updated_at,
-                deleted: if d.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if d.deleted == Deleted::Yes {
+                    DeletedStatus::Deleted
+                } else {
+                    DeletedStatus::Normal
+                },
             },
         )
     }
@@ -260,7 +312,11 @@ impl DictDataRepository for ToastyDictDataRepository {
             .collect())
     }
 
-    async fn find_page(&self, query: &DictDataQuery, page: Page<DictData>) -> AppResult<Page<DictData>> {
+    async fn find_page(
+        &self,
+        query: &DictDataQuery,
+        page: Page<DictData>,
+    ) -> AppResult<Page<DictData>> {
         // SQL 层过滤 + COUNT + LIMIT/OFFSET
         let (rows, total) = tx_di_toasty::toasty_page!(
             self.plugin.db().clone(),
@@ -272,10 +328,11 @@ impl DictDataRepository for ToastyDictDataRepository {
                     q = q.filter(SysDictData::fields().dict_type().eq(dict_type));
                 }
                 if let Some(ref label) = query.label {
-                    q = q.filter(SysDictData::fields().label().like_with_escape(
-                        format!("%{}%", tx_di_toasty::like_escape(label)),
-                        '\\',
-                    ));
+                    q =
+                        q.filter(SysDictData::fields().label().like_with_escape(
+                            format!("%{}%", tx_di_toasty::like_escape(label)),
+                            '\\',
+                        ));
                 }
                 if let Some(status) = query.status {
                     q = q.filter(SysDictData::fields().status().eq(Status::from(status)));

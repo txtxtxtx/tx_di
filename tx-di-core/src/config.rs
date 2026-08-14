@@ -9,10 +9,10 @@ use std::path::{Path, PathBuf};
 use serde::de::DeserializeOwned;
 use toml::Value::Table;
 
+use crate::RIE;
 use crate::component::Component;
 use crate::error::{AppError, DiErr};
 use crate::scope::Scope;
-use crate::RIE;
 
 /// 全局配置文件
 pub struct AppAllConfig {
@@ -130,7 +130,9 @@ impl Component for AppAllConfig {
     type Deps = ();
 
     fn build(_deps: Self::Deps, _store: &crate::Store) -> Self {
-        panic!("[di] AppAllConfig 只在 BuildContext::new() 内部构建，不应通过 Component::build() 调用")
+        panic!(
+            "[di] AppAllConfig 只在 BuildContext::new() 内部构建，不应通过 Component::build() 调用"
+        )
     }
 
     const SCOPE: Scope = Scope::Singleton;

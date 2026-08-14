@@ -23,10 +23,10 @@
 
 use crate::adapter::CanAdapter;
 use crate::frame::{CanFdFrame, CanFrame, FrameId, FrameKind};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 
 /// CAN-FD 单帧（非 escape）最大数据长度
 const FD_SF_MAX: usize = 62;
@@ -117,7 +117,14 @@ impl IsoTpChannel {
 
     /// 发送单帧 SF（Classical）
     async fn send_classical_single(&self, data: &[u8]) -> Result<()> {
-        let mut buf = vec![0u8; if self.config.enable_padding { 8 } else { data.len() + 1 }];
+        let mut buf = vec![
+            0u8;
+            if self.config.enable_padding {
+                8
+            } else {
+                data.len() + 1
+            }
+        ];
         buf[0] = data.len() as u8; // PCI: SF, DL
         buf[1..=data.len()].copy_from_slice(data);
         if self.config.enable_padding {
@@ -152,7 +159,11 @@ impl IsoTpChannel {
             let fs = fc[0] & 0x0F;
             let bs = fc[1];
             let st_ms = fc[2];
-            let st_delay = if st_ms > 0 { st_ms as u64 } else { self.config.st_min_ms as u64 };
+            let st_delay = if st_ms > 0 {
+                st_ms as u64
+            } else {
+                self.config.st_min_ms as u64
+            };
 
             match fs {
                 0x00 => { /* CTS：继续 */ }
@@ -230,8 +241,7 @@ impl IsoTpChannel {
                 }
                 // 首帧
                 0x1 => {
-                    let total = (((frame.data[0] & 0x0F) as usize) << 8)
-                        | frame.data[1] as usize;
+                    let total = (((frame.data[0] & 0x0F) as usize) << 8) | frame.data[1] as usize;
                     let mut buf = Vec::with_capacity(total);
                     buf.extend_from_slice(&frame.data[2..8.min(frame.data.len())]);
 
@@ -248,7 +258,11 @@ impl IsoTpChannel {
                         }
                         let sn = cf.data[0] & 0x0F;
                         if sn != (expected_sn & 0x0F) {
-                            return Err(anyhow!("ISO-TP: SN 不连续，期望 {}, 收到 {}", expected_sn & 0x0F, sn));
+                            return Err(anyhow!(
+                                "ISO-TP: SN 不连续，期望 {}, 收到 {}",
+                                expected_sn & 0x0F,
+                                sn
+                            ));
                         }
                         let remaining = total - buf.len();
                         let take = 7usize.min(remaining);
@@ -301,10 +315,7 @@ impl IsoTpChannel {
             buf[2..].copy_from_slice(data);
             self.adapter.send_fd(&self.make_fd_frame(buf)).await
         } else {
-            Err(anyhow!(
-                "ISO-TP FD: 单帧数据过长 ({}B)，应走多帧路径",
-                len
-            ))
+            Err(anyhow!("ISO-TP FD: 单帧数据过长 ({}B)，应走多帧路径", len))
         }
     }
 
@@ -352,7 +363,11 @@ impl IsoTpChannel {
             let fs = fc[0] & 0x0F;
             let bs = fc[1];
             let st_ms = fc[2];
-            let st_delay = if st_ms > 0 { st_ms as u64 } else { self.config.st_min_ms as u64 };
+            let st_delay = if st_ms > 0 {
+                st_ms as u64
+            } else {
+                self.config.st_min_ms as u64
+            };
 
             match fs {
                 0x00 => { /* CTS */ }
@@ -408,10 +423,7 @@ impl IsoTpChannel {
         .map_err(|_| anyhow!("ISO-TP FD: 接收超时 ({}ms)", timeout_ms))?
     }
 
-    async fn recv_fd_inner(
-        &self,
-        rx: &mut broadcast::Receiver<CanFdFrame>,
-    ) -> Result<Vec<u8>> {
+    async fn recv_fd_inner(&self, rx: &mut broadcast::Receiver<CanFdFrame>) -> Result<Vec<u8>> {
         let rx_id = self.config.rx_id;
         loop {
             let frame = self.next_fd_frame(rx, rx_id).await?;
@@ -434,8 +446,7 @@ impl IsoTpChannel {
                             if data.len() < 4 {
                                 return Err(anyhow!("ISO-TP FD: SF escape 长度截断"));
                             }
-                            let len =
-                                ((data[2] as usize) << 8) | (data[3] as usize);
+                            let len = ((data[2] as usize) << 8) | (data[3] as usize);
                             let start = 4;
                             if data.len() < start + len {
                                 return Err(anyhow!("ISO-TP FD: SF escape 数据不足"));
@@ -466,12 +477,11 @@ impl IsoTpChannel {
                         if data.len() < 6 {
                             return Err(anyhow!("ISO-TP FD: FF escape 截断"));
                         }
-                        let total = u32::from_be_bytes([data[2], data[3], data[4], data[5]])
-                            as usize;
+                        let total =
+                            u32::from_be_bytes([data[2], data[3], data[4], data[5]]) as usize;
                         (total, 6usize)
                     } else {
-                        let total =
-                            (((data[0] & 0x0F) as usize) << 8) | (data[1] as usize);
+                        let total = (((data[0] & 0x0F) as usize) << 8) | (data[1] as usize);
                         if total < 1 {
                             return Err(anyhow!("ISO-TP FD: FF_DL 过小 ({})", total));
                         }
@@ -542,14 +552,14 @@ impl IsoTpChannel {
         self.adapter.send(&self.make_classical_frame(buf)).await
     }
 
-    async fn recv_classical_fc(
-        &self,
-        rx: &mut broadcast::Receiver<CanFrame>,
-    ) -> Result<Vec<u8>> {
+    async fn recv_classical_fc(&self, rx: &mut broadcast::Receiver<CanFrame>) -> Result<Vec<u8>> {
         let rx_id = self.config.rx_id;
-        let frame = timeout(Duration::from_millis(1000), self.next_classical_frame(rx, rx_id))
-            .await
-            .map_err(|_| anyhow!("ISO-TP: 等待 FC 超时"))??;
+        let frame = timeout(
+            Duration::from_millis(1000),
+            self.next_classical_frame(rx, rx_id),
+        )
+        .await
+        .map_err(|_| anyhow!("ISO-TP: 等待 FC 超时"))??;
         Ok(frame.data)
     }
 
@@ -597,10 +607,7 @@ impl IsoTpChannel {
         self.adapter.send_fd(&self.make_fd_frame(buf)).await
     }
 
-    async fn recv_fd_fc(
-        &self,
-        rx: &mut broadcast::Receiver<CanFdFrame>,
-    ) -> Result<Vec<u8>> {
+    async fn recv_fd_fc(&self, rx: &mut broadcast::Receiver<CanFdFrame>) -> Result<Vec<u8>> {
         let rx_id = self.config.rx_id;
         let frame = timeout(Duration::from_millis(1000), self.next_fd_frame(rx, rx_id))
             .await
@@ -616,7 +623,9 @@ impl IsoTpChannel {
         loop {
             match rx.recv().await {
                 Ok(f) => {
-                    if f.id.raw() == filter_id { return Ok(f); }
+                    if f.id.raw() == filter_id {
+                        return Ok(f);
+                    }
                 }
                 Err(broadcast::error::RecvError::Lagged(n)) => {
                     tracing::warn!("[isotp] FD 接收滞后丢弃 {} 帧", n);
@@ -644,9 +653,12 @@ mod tests {
             mut rx: broadcast::Receiver<CanFrame>,
             timeout_ms: u64,
         ) -> Result<Vec<u8>> {
-            timeout(Duration::from_millis(timeout_ms), self.recv_classical_inner(&mut rx))
-                .await
-                .map_err(|_| anyhow!("ISO-TP: 接收超时 ({}ms)", timeout_ms))?
+            timeout(
+                Duration::from_millis(timeout_ms),
+                self.recv_classical_inner(&mut rx),
+            )
+            .await
+            .map_err(|_| anyhow!("ISO-TP: 接收超时 ({}ms)", timeout_ms))?
         }
 
         async fn recv_on_fd(
@@ -654,9 +666,12 @@ mod tests {
             mut rx: broadcast::Receiver<CanFdFrame>,
             timeout_ms: u64,
         ) -> Result<Vec<u8>> {
-            timeout(Duration::from_millis(timeout_ms), self.recv_fd_inner(&mut rx))
-                .await
-                .map_err(|_| anyhow!("ISO-TP FD: 接收超时 ({}ms)", timeout_ms))?
+            timeout(
+                Duration::from_millis(timeout_ms),
+                self.recv_fd_inner(&mut rx),
+            )
+            .await
+            .map_err(|_| anyhow!("ISO-TP FD: 接收超时 ({}ms)", timeout_ms))?
         }
     }
 
@@ -666,11 +681,19 @@ mod tests {
         let adapter = Arc::new(SimBusAdapter::new("t", 128));
         let tester = IsoTpChannel::new(
             adapter.clone(),
-            IsoTpConfig { tx_id: 0x7E0, rx_id: 0x7E8, ..Default::default() },
+            IsoTpConfig {
+                tx_id: 0x7E0,
+                rx_id: 0x7E8,
+                ..Default::default()
+            },
         );
         let ecu = IsoTpChannel::new(
             adapter.clone(),
-            IsoTpConfig { tx_id: 0x7E8, rx_id: 0x7E0, ..Default::default() },
+            IsoTpConfig {
+                tx_id: 0x7E8,
+                rx_id: 0x7E0,
+                ..Default::default()
+            },
         );
 
         // 先订阅 ECU 接收通道，确保不丢首帧
@@ -694,11 +717,21 @@ mod tests {
         let adapter = Arc::new(SimBusAdapter::new("t", 512));
         let tester = IsoTpChannel::new(
             adapter.clone(),
-            IsoTpConfig { tx_id: 0x7E0, rx_id: 0x7E8, is_fd, ..Default::default() },
+            IsoTpConfig {
+                tx_id: 0x7E0,
+                rx_id: 0x7E8,
+                is_fd,
+                ..Default::default()
+            },
         );
         let ecu = IsoTpChannel::new(
             adapter.clone(),
-            IsoTpConfig { tx_id: 0x7E8, rx_id: 0x7E0, is_fd, ..Default::default() },
+            IsoTpConfig {
+                tx_id: 0x7E8,
+                rx_id: 0x7E0,
+                is_fd,
+                ..Default::default()
+            },
         );
 
         // 先订阅 ECU 接收通道（classical / FD），确保不丢首帧

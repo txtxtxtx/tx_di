@@ -99,7 +99,7 @@ impl DeviceRegistry {
             .map(|r| r.clone())
             .collect()
     }
-    
+
     /// 获取所有在线设备列表, 包含子设备
     pub fn online_devices_with_sub(&self) -> Vec<GbDevice> {
         self.inner
@@ -122,12 +122,12 @@ impl DeviceRegistry {
     pub fn all_devices_with_sub(&self) -> Vec<GbDevice> {
         self.inner.iter().map(|r| r.clone()).collect()
     }
-    
+
     /// 获取所有设备数量
     pub fn all_devices_count(&self) -> usize {
         self.inner.iter().filter(|r| r.is_parent()).count()
     }
-    
+
     /// 获取所有设备数量，包含子设备
     pub fn total_count_with_sub(&self) -> usize {
         self.inner.len()
@@ -147,11 +147,13 @@ impl DeviceRegistry {
 
     /// 列出所有设备 ID
     pub fn list_device_ids(&self) -> Vec<String> {
-        self.inner.iter()
+        self.inner
+            .iter()
             .filter(|r| r.is_parent())
-            .map(|r| r.device_id.clone()).collect()
+            .map(|r| r.device_id.clone())
+            .collect()
     }
-    
+
     /// 列出所有设备 ID, 包含子设备
     pub fn device_ids_with_sub(&self) -> Vec<String> {
         self.inner.iter().map(|r| r.device_id.clone()).collect()
@@ -201,11 +203,7 @@ impl DeviceRegistry {
 
         // 更新每个父设备的 channel 字段为实际子设备数量
         for parent_id in &parent_ids {
-            let sub_count = self
-                .inner
-                .iter()
-                .filter(|r| r.is_son(parent_id))
-                .count() as u32;
+            let sub_count = self.inner.iter().filter(|r| r.is_son(parent_id)).count() as u32;
             if let Some(mut parent) = self.inner.get_mut(parent_id) {
                 parent.channel = sub_count;
             }

@@ -5,13 +5,13 @@
 
 use super::{FileInfo, FileStorage, guess_mime_type};
 use crate::config::{FileConfig, S3Config, StorageBackend, StorageConfig};
-use crate::error::{map_opendal_error, FilePluginErr};
+use crate::error::{FilePluginErr, map_opendal_error};
 use async_trait::async_trait;
 use futures::{Stream, StreamExt};
 use opendal::Operator;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tx_error::{AppError, AppResult};
 
@@ -65,11 +65,9 @@ impl OpendalStorage {
                     .finish()
             }
             #[cfg(feature = "s3")]
-            StorageBackend::S3 => Self::build_s3_operator(&cfg.s3)?
-                .ok_or_else(|| AppError::with_context(
-                    FilePluginErr::StorageInitFailed,
-                    "S3 配置不完整",
-                ))?,
+            StorageBackend::S3 => Self::build_s3_operator(&cfg.s3)?.ok_or_else(|| {
+                AppError::with_context(FilePluginErr::StorageInitFailed, "S3 配置不完整")
+            })?,
             #[cfg(not(feature = "s3"))]
             StorageBackend::S3 => {
                 return Err(AppError::with_context(
@@ -164,11 +162,7 @@ impl OpendalStorage {
     /// 获取文件的公开访问 URL
     fn file_url(&self, path: &str) -> String {
         let safe_path = path.trim_start_matches('/');
-        format!(
-            "{}/{}",
-            self.base_url.trim_end_matches('/'),
-            safe_path
-        )
+        format!("{}/{}", self.base_url.trim_end_matches('/'), safe_path)
     }
 }
 
@@ -234,10 +228,7 @@ impl FileStorage for OpendalStorage {
                 ));
             }
 
-            let n = reader
-                .read(&mut buf)
-                .await
-                .map_err(AppError::from)?;
+            let n = reader.read(&mut buf).await.map_err(AppError::from)?;
             if n == 0 {
                 break;
             }
@@ -257,12 +248,9 @@ impl FileStorage for OpendalStorage {
         Ok(path_str)
     }
 
-    async fn read_stream(
-        &self,
-        path: &str,
-    ) -> AppResult<Pin<Box<dyn AsyncRead + Send + Unpin>>> {
-        use tokio_util::io::StreamReader;
+    async fn read_stream(&self, path: &str) -> AppResult<Pin<Box<dyn AsyncRead + Send + Unpin>>> {
         use futures::StreamExt;
+        use tokio_util::io::StreamReader;
 
         let reader = self
             .operator
@@ -275,9 +263,8 @@ impl FileStorage for OpendalStorage {
             .await
             .map_err(|e| map_opendal_error(e, path))?;
 
-        let io_stream = bytes_stream.map(|r| {
-            r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
-        });
+        let io_stream = bytes_stream
+            .map(|r| r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string())));
 
         Ok(Box::pin(StreamReader::new(io_stream)))
     }
@@ -357,11 +344,7 @@ impl FileStorage for OpendalStorage {
         Ok(Box::pin(stream))
     }
 
-    async fn presigned_url(
-        &self,
-        path: &str,
-        expire_secs: u64,
-    ) -> AppResult<String> {
+    async fn presigned_url(&self, path: &str, expire_secs: u64) -> AppResult<String> {
         // OpenDAL 的 presign 支持大部分后端（S3/GCS/Azure 等）
         // 本地文件系统则回退到 file_url
         match self

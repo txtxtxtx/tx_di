@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use async_trait::async_trait;
+use std::sync::Arc;
 
 use admin_domain::log::model::aggregate::{LoginLog, OperateLog};
 use admin_domain::log::model::value_object::{LoginLogQuery, OperateLogQuery};
@@ -39,17 +39,45 @@ impl ToastyOperateLogRepository {
             l.action.clone(),
             l.success,
             l.extra.clone(),
-            if l.request_method.is_empty() { None } else { Some(l.request_method.clone()) },
-            if l.request_url.is_empty() { None } else { Some(l.request_url.clone()) },
-            if l.user_ip.is_empty() { None } else { Some(l.user_ip.clone()) },
-            if l.user_agent.is_empty() { None } else { Some(l.user_agent.clone()) },
+            if l.request_method.is_empty() {
+                None
+            } else {
+                Some(l.request_method.clone())
+            },
+            if l.request_url.is_empty() {
+                None
+            } else {
+                Some(l.request_url.clone())
+            },
+            if l.user_ip.is_empty() {
+                None
+            } else {
+                Some(l.user_ip.clone())
+            },
+            if l.user_agent.is_empty() {
+                None
+            } else {
+                Some(l.user_agent.clone())
+            },
             l.tenant_id,
             AuditFields {
-                creator: if l.creator.is_empty() { None } else { Some(l.creator.clone()) },
+                creator: if l.creator.is_empty() {
+                    None
+                } else {
+                    Some(l.creator.clone())
+                },
                 create_time: l.created_at,
-                updater: if l.updater.is_empty() { None } else { Some(l.updater.clone()) },
+                updater: if l.updater.is_empty() {
+                    None
+                } else {
+                    Some(l.updater.clone())
+                },
                 update_time: l.updated_at,
-                deleted: if l.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if l.deleted == Deleted::Yes {
+                    DeletedStatus::Deleted
+                } else {
+                    DeletedStatus::Normal
+                },
             },
         )
     }
@@ -65,7 +93,11 @@ impl OperateLogRepository for ToastyOperateLogRepository {
         }
     }
 
-    async fn find_page(&self, query: &OperateLogQuery, page: Page<OperateLog>) -> AppResult<Page<OperateLog>> {
+    async fn find_page(
+        &self,
+        query: &OperateLogQuery,
+        page: Page<OperateLog>,
+    ) -> AppResult<Page<OperateLog>> {
         // SQL 层过滤 + COUNT + LIMIT/OFFSET + ID 倒序
         let (rows, total) = tx_di_toasty::toasty_page!(
             self.plugin.db().clone(),
@@ -126,7 +158,8 @@ impl OperateLogRepository for ToastyOperateLogRepository {
         let mut db = self.plugin.db().clone();
         for &id in ids {
             if let Ok(log) = SysOperateLog::get_by_id(&mut db, id).await {
-                log.delete().exec(&mut db)
+                log.delete()
+                    .exec(&mut db)
                     .await
                     .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
             }
@@ -142,7 +175,8 @@ impl OperateLogRepository for ToastyOperateLogRepository {
             .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
 
         for log in all {
-            log.delete().exec(&mut db)
+            log.delete()
+                .exec(&mut db)
                 .await
                 .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
         }
@@ -169,20 +203,48 @@ impl ToastyLoginLogRepository {
             l.user_type,
             l.username.clone(),
             l.login_ip.clone(),
-            if l.login_location.is_empty() { None } else { Some(l.login_location.clone()) },
-            if l.browser.is_empty() { None } else { Some(l.browser.clone()) },
-            if l.os.is_empty() { None } else { Some(l.os.clone()) },
+            if l.login_location.is_empty() {
+                None
+            } else {
+                Some(l.login_location.clone())
+            },
+            if l.browser.is_empty() {
+                None
+            } else {
+                Some(l.browser.clone())
+            },
+            if l.os.is_empty() {
+                None
+            } else {
+                Some(l.os.clone())
+            },
             l.login_type.clone(),
             l.result,
-            if l.msg.is_empty() { None } else { Some(l.msg.clone()) },
+            if l.msg.is_empty() {
+                None
+            } else {
+                Some(l.msg.clone())
+            },
             l.login_time,
             l.tenant_id,
             AuditFields {
-                creator: if l.creator.is_empty() { None } else { Some(l.creator.clone()) },
+                creator: if l.creator.is_empty() {
+                    None
+                } else {
+                    Some(l.creator.clone())
+                },
                 create_time: l.created_at,
-                updater: if l.updater.is_empty() { None } else { Some(l.updater.clone()) },
+                updater: if l.updater.is_empty() {
+                    None
+                } else {
+                    Some(l.updater.clone())
+                },
                 update_time: l.updated_at,
-                deleted: if l.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if l.deleted == Deleted::Yes {
+                    DeletedStatus::Deleted
+                } else {
+                    DeletedStatus::Normal
+                },
             },
         )
     }
@@ -198,7 +260,11 @@ impl LoginLogRepository for ToastyLoginLogRepository {
         }
     }
 
-    async fn find_page(&self, query: &LoginLogQuery, page: Page<LoginLog>) -> AppResult<Page<LoginLog>> {
+    async fn find_page(
+        &self,
+        query: &LoginLogQuery,
+        page: Page<LoginLog>,
+    ) -> AppResult<Page<LoginLog>> {
         // SQL 层过滤 + COUNT + LIMIT/OFFSET + ID 倒序
         let (rows, total) = tx_di_toasty::toasty_page!(
             self.plugin.db().clone(),
@@ -266,7 +332,8 @@ impl LoginLogRepository for ToastyLoginLogRepository {
         let mut db = self.plugin.db().clone();
         for &id in ids {
             if let Ok(log) = SysLoginLog::get_by_id(&mut db, id).await {
-                log.delete().exec(&mut db)
+                log.delete()
+                    .exec(&mut db)
                     .await
                     .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
             }
@@ -282,7 +349,8 @@ impl LoginLogRepository for ToastyLoginLogRepository {
             .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
 
         for log in all {
-            log.delete().exec(&mut db)
+            log.delete()
+                .exec(&mut db)
                 .await
                 .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
         }

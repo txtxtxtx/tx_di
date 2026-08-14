@@ -139,9 +139,7 @@ impl<T: Clone + Send + Sync + 'static> InDialogTable<T> {
         // 同时尝试按 call_id+from_tag 清理（to_tag 可能未对齐）
         if key.to_tag.is_none() {
             self.map.retain(|k, _| {
-                !(k.call_id == key.call_id
-                    && k.from_tag == key.from_tag
-                    && k.to_tag.is_some())
+                !(k.call_id == key.call_id && k.from_tag == key.from_tag && k.to_tag.is_some())
             });
         }
     }

@@ -1,8 +1,8 @@
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
-use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent, Entity};
 use crate::shared::model::value_object::DeletedStatus;
+use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent, Entity};
 
 /// System config aggregate root
 #[derive(Debug, Clone, Serialize, Deserialize)]

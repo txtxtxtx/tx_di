@@ -642,7 +642,10 @@ impl<'de> Deserialize<'de> for FunctionTypeValue {
             4 => Ok(FunctionTypeValue::NonMotorVehicle),
             5 => Ok(FunctionTypeValue::Object),
             99 => Ok(FunctionTypeValue::Other),
-            _ => Err(serde::de::Error::custom(format!("invalid FunctionTypeValue: {}", num))),
+            _ => Err(serde::de::Error::custom(format!(
+                "invalid FunctionTypeValue: {}",
+                num
+            ))),
         }
     }
 }
@@ -657,7 +660,9 @@ pub struct FunctionTypes(pub Vec<FunctionTypeValue>);
 
 impl Serialize for FunctionTypes {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let s = self.0.iter()
+        let s = self
+            .0
+            .iter()
             .map(|v| format!("{:02}", v.clone() as u8))
             .collect::<Vec<_>>()
             .join("/");
@@ -679,7 +684,12 @@ impl<'de> Deserialize<'de> for FunctionTypes {
                 4 => FunctionTypeValue::NonMotorVehicle,
                 5 => FunctionTypeValue::Object,
                 99 => FunctionTypeValue::Other,
-                _ => return Err(serde::de::Error::custom(format!("invalid FunctionTypeValue: {}", num))),
+                _ => {
+                    return Err(serde::de::Error::custom(format!(
+                        "invalid FunctionTypeValue: {}",
+                        num
+                    )));
+                }
             };
             values.push(value);
         }
@@ -697,7 +707,9 @@ pub struct StreamNumberList(pub Vec<u8>);
 
 impl Serialize for StreamNumberList {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let s = self.0.iter()
+        let s = self
+            .0
+            .iter()
             .map(|v| v.to_string())
             .collect::<Vec<_>>()
             .join("/");
@@ -709,7 +721,8 @@ impl<'de> Deserialize<'de> for StreamNumberList {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
         let parts = s.split('/');
-        let values = parts.map(|p| p.parse::<u8>().map_err(serde::de::Error::custom))
+        let values = parts
+            .map(|p| p.parse::<u8>().map_err(serde::de::Error::custom))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(StreamNumberList(values))
     }
@@ -724,7 +737,9 @@ pub struct DownloadSpeed(pub Vec<u8>);
 
 impl Serialize for DownloadSpeed {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let s = self.0.iter()
+        let s = self
+            .0
+            .iter()
             .map(|v| v.to_string())
             .collect::<Vec<_>>()
             .join("/");
@@ -736,7 +751,8 @@ impl<'de> Deserialize<'de> for DownloadSpeed {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
         let parts = s.split('/');
-        let values = parts.map(|p| p.parse::<u8>().map_err(serde::de::Error::custom))
+        let values = parts
+            .map(|p| p.parse::<u8>().map_err(serde::de::Error::custom))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(DownloadSpeed(values))
     }
@@ -764,9 +780,16 @@ impl FromStr for Ratio {
         if parts.len() != 2 {
             return Err("invalid ratio format".to_string());
         }
-        let numerator = parts[0].parse().map_err(|_| "invalid numerator".to_string())?;
-        let denominator = parts[1].parse().map_err(|_| "invalid denominator".to_string())?;
-        Ok(Ratio { numerator, denominator })
+        let numerator = parts[0]
+            .parse()
+            .map_err(|_| "invalid numerator".to_string())?;
+        let denominator = parts[1]
+            .parse()
+            .map_err(|_| "invalid denominator".to_string())?;
+        Ok(Ratio {
+            numerator,
+            denominator,
+        })
     }
 }
 
@@ -779,7 +802,9 @@ pub struct SSVCRatioSupportList(pub Vec<Ratio>);
 
 impl Serialize for SSVCRatioSupportList {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let s = self.0.iter()
+        let s = self
+            .0
+            .iter()
             .map(|r| r.to_string())
             .collect::<Vec<_>>()
             .join("/");
@@ -791,7 +816,8 @@ impl<'de> Deserialize<'de> for SSVCRatioSupportList {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
         let parts = s.split('/');
-        let ratios = parts.map(|p| p.parse::<Ratio>().map_err(serde::de::Error::custom))
+        let ratios = parts
+            .map(|p| p.parse::<Ratio>().map_err(serde::de::Error::custom))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(SSVCRatioSupportList(ratios))
     }

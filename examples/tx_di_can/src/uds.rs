@@ -20,7 +20,7 @@
 //! | 0x3E | TesterPresent                   | `tester_present()`          |
 
 use crate::adapter::CanAdapter;
-use crate::event::{emit_event, CanEvent};
+use crate::event::{CanEvent, emit_event};
 use crate::isotp::{IsoTpChannel, IsoTpConfig};
 use anyhow::Result;
 use std::collections::HashMap;
@@ -224,21 +224,20 @@ impl UdsClient {
         })
         .await;
 
-        self.isotp
-            .send(&req)
-            .await
-            .map_err(UdsError::Transport)?;
+        self.isotp.send(&req).await.map_err(UdsError::Transport)?;
 
         // 等待响应，处理 NRC 0x78 pendingResponse
-        let deadline = tokio::time::Instant::now()
-            + std::time::Duration::from_millis(self.p2_star_timeout_ms);
+        let deadline =
+            tokio::time::Instant::now() + std::time::Duration::from_millis(self.p2_star_timeout_ms);
 
         loop {
-            let resp = self
-                .isotp
-                .recv(self.p2_timeout_ms)
-                .await
-                .map_err(|_| UdsError::Timeout { service: service as u8 })?;
+            let resp =
+                self.isotp
+                    .recv(self.p2_timeout_ms)
+                    .await
+                    .map_err(|_| UdsError::Timeout {
+                        service: service as u8,
+                    })?;
 
             if resp.is_empty() {
                 return Err(UdsError::InvalidResponse("空响应".to_string()));
@@ -260,7 +259,9 @@ impl UdsClient {
                         .await;
                         continue;
                     } else {
-                        return Err(UdsError::Timeout { service: service as u8 });
+                        return Err(UdsError::Timeout {
+                            service: service as u8,
+                        });
                     }
                 }
                 emit_event(CanEvent::UdsNegativeResponse {
@@ -321,10 +322,14 @@ impl UdsClient {
     /// 0x22 ReadDataByIdentifier
     pub async fn read_data(&self, did: u16) -> Result<Vec<u8>, UdsError> {
         let payload = [(did >> 8) as u8, (did & 0xFF) as u8];
-        let resp = self.request(UdsService::ReadDataByIdentifier, &payload).await?;
+        let resp = self
+            .request(UdsService::ReadDataByIdentifier, &payload)
+            .await?;
         // resp = [did_hi, did_lo, data...]
         if resp.len() < 2 {
-            return Err(UdsError::InvalidResponse("ReadDataByIdentifier 响应太短".to_string()));
+            return Err(UdsError::InvalidResponse(
+                "ReadDataByIdentifier 响应太短".to_string(),
+            ));
         }
         Ok(resp[2..].to_vec())
     }
@@ -333,7 +338,8 @@ impl UdsClient {
     pub async fn write_data(&self, did: u16, data: &[u8]) -> Result<(), UdsError> {
         let mut payload = vec![(did >> 8) as u8, (did & 0xFF) as u8];
         payload.extend_from_slice(data);
-        self.request(UdsService::WriteDataByIdentifier, &payload).await?;
+        self.request(UdsService::WriteDataByIdentifier, &payload)
+            .await?;
         Ok(())
     }
 
@@ -347,7 +353,8 @@ impl UdsClient {
             payload.push((did >> 8) as u8);
             payload.push((did & 0xFF) as u8);
         }
-        self.request(UdsService::ReadDataByIdentifier, &payload).await
+        self.request(UdsService::ReadDataByIdentifier, &payload)
+            .await
     }
 
     /// 将多 DID 读响应（已剥去 0x62 SID）按布局切分为 `DID → 数据`
@@ -396,7 +403,8 @@ impl UdsClient {
         let mut records = vec![];
         let mut i = 2usize;
         while i + 3 < resp.len() {
-            let code = ((resp[i] as u32) << 16) | ((resp[i + 1] as u32) << 8) | (resp[i + 2] as u32);
+            let code =
+                ((resp[i] as u32) << 16) | ((resp[i + 1] as u32) << 8) | (resp[i + 2] as u32);
             let status = resp[i + 3];
             records.push(DtcRecord {
                 dtc_code: code,
@@ -415,12 +423,12 @@ impl UdsClient {
         F: Fn(&[u8]) -> Vec<u8>,
     {
         // 步骤1：请求 seed（level = odd number，如 0x01）
-        let seed_resp = self
-            .request(UdsService::SecurityAccess, &[level])
-            .await?;
+        let seed_resp = self.request(UdsService::SecurityAccess, &[level]).await?;
         // seed_resp = [level+1, seed...]
         if seed_resp.is_empty() {
-            return Err(UdsError::InvalidResponse("SecurityAccess seed 响应为空".to_string()));
+            return Err(UdsError::InvalidResponse(
+                "SecurityAccess seed 响应为空".to_string(),
+            ));
         }
         let seed = &seed_resp[1..]; // 去掉 sub-function echo
 
@@ -457,9 +465,8 @@ impl UdsClient {
         let mut records = vec![];
         let mut i = 2usize; // skip sub_fn + availability_mask
         while i + 3 < resp.len() {
-            let code = ((resp[i] as u32) << 16)
-                | ((resp[i + 1] as u32) << 8)
-                | (resp[i + 2] as u32);
+            let code =
+                ((resp[i] as u32) << 16) | ((resp[i + 1] as u32) << 8) | (resp[i + 2] as u32);
             let status = resp[i + 3];
             records.push(DtcRecord {
                 dtc_code: code,
@@ -486,7 +493,9 @@ impl UdsClient {
         for i in (0..len_len).rev() {
             payload.push(((length >> (i * 8)) & 0xFF) as u8);
         }
-        let resp = self.request(UdsService::ReadMemoryByAddress, &payload).await?;
+        let resp = self
+            .request(UdsService::ReadMemoryByAddress, &payload)
+            .await?;
         Ok(resp)
     }
 
@@ -530,7 +539,9 @@ impl UdsClient {
         let resp = self.request(UdsService::RequestDownload, &payload).await?;
         // resp[0] = lengthFormatIdentifier, resp[1..] = maxBlockSize
         if resp.is_empty() {
-            return Err(UdsError::InvalidResponse("RequestDownload 响应为空".to_string()));
+            return Err(UdsError::InvalidResponse(
+                "RequestDownload 响应为空".to_string(),
+            ));
         }
         let size_field_len = ((resp[0] & 0xF0) >> 4) as usize;
         if resp.len() < 1 + size_field_len {
@@ -563,11 +574,15 @@ impl UdsClient {
         }
         let resp = self.request(UdsService::RequestUpload, &payload).await?;
         if resp.is_empty() {
-            return Err(UdsError::InvalidResponse("RequestUpload 响应为空".to_string()));
+            return Err(UdsError::InvalidResponse(
+                "RequestUpload 响应为空".to_string(),
+            ));
         }
         let size_field_len = ((resp[0] & 0xF0) >> 4) as usize;
         if resp.len() < 1 + size_field_len {
-            return Err(UdsError::InvalidResponse("RequestUpload 响应长度不足".to_string()));
+            return Err(UdsError::InvalidResponse(
+                "RequestUpload 响应长度不足".to_string(),
+            ));
         }
         let mut max_block = 0usize;
         for b in &resp[1..=size_field_len] {

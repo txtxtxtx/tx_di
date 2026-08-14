@@ -7,10 +7,10 @@ mod common;
 
 use std::sync::Arc;
 
-use admin_proto::{CreateConfigRequest, CreateDictTypeRequest, CreateDictDataRequest};
-use admin_proto::{CreateUserRequest, ChangePasswordRequest};
-use admin_proto::CreateRoleRequest;
 use admin_domain::user::repository::UserRepository;
+use admin_proto::CreateRoleRequest;
+use admin_proto::{ChangePasswordRequest, CreateUserRequest};
+use admin_proto::{CreateConfigRequest, CreateDictDataRequest, CreateDictTypeRequest};
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 1. UserAppService::change_password
@@ -19,12 +19,27 @@ use admin_domain::user::repository::UserRepository;
 #[tokio::test]
 async fn test_change_password() {
     let plugin = common::create_db_plugin().await;
-    let user_repo = Arc::new(admin_infra::user::repository::ToastyUserRepository::new(plugin.clone()));
-    let role_repo = Arc::new(admin_infra::role::repository::ToastyRoleRepository::new(plugin.clone()));
-    let dept_repo = Arc::new(admin_infra::department::repository::ToastyDepartmentRepository::new(plugin.clone()));
-    let menu_repo = Arc::new(admin_infra::menu::repository::ToastyMenuRepository::new(plugin.clone()));
-    let user_svc = Arc::new(admin_domain::user::service::UserService::new(user_repo.clone()));
-    let app = admin_app::user::app_service::UserAppService::new(user_svc.clone(), role_repo, dept_repo, menu_repo);
+    let user_repo = Arc::new(admin_infra::user::repository::ToastyUserRepository::new(
+        plugin.clone(),
+    ));
+    let role_repo = Arc::new(admin_infra::role::repository::ToastyRoleRepository::new(
+        plugin.clone(),
+    ));
+    let dept_repo = Arc::new(
+        admin_infra::department::repository::ToastyDepartmentRepository::new(plugin.clone()),
+    );
+    let menu_repo = Arc::new(admin_infra::menu::repository::ToastyMenuRepository::new(
+        plugin.clone(),
+    ));
+    let user_svc = Arc::new(admin_domain::user::service::UserService::new(
+        user_repo.clone(),
+    ));
+    let app = admin_app::user::app_service::UserAppService::new(
+        user_svc.clone(),
+        role_repo,
+        dept_repo,
+        menu_repo,
+    );
 
     // Create a user with an initial password
     let user = app
@@ -63,8 +78,14 @@ async fn test_change_password() {
 
     // Verify the password hash has changed
     let raw = user_repo.find_by_id(user.id).await.unwrap().unwrap();
-    assert_ne!(raw.password, initial_hash, "Password hash should have changed after change_password");
-    assert_ne!(raw.password, "new_password", "New password should also be hashed");
+    assert_ne!(
+        raw.password, initial_hash,
+        "Password hash should have changed after change_password"
+    );
+    assert_ne!(
+        raw.password, "new_password",
+        "New password should also be hashed"
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -103,7 +124,10 @@ async fn test_role_change_status() {
         .change_status(role.id, 0, Some("admin".into()))
         .await
         .unwrap();
-    assert_eq!(updated.status, 0, "Role status should be 0 after re-enabling");
+    assert_eq!(
+        updated.status, 0,
+        "Role status should be 0 after re-enabling"
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -147,13 +171,30 @@ async fn test_add_users_to_role_and_get_role_users() {
     // Both role and user services share the same database
     let plugin = common::create_db_plugin().await;
 
-    let user_repo = Arc::new(admin_infra::user::repository::ToastyUserRepository::new(plugin.clone()));
-    let role_repo = Arc::new(admin_infra::role::repository::ToastyRoleRepository::new(plugin.clone()));
-    let dept_repo = Arc::new(admin_infra::department::repository::ToastyDepartmentRepository::new(plugin.clone()));
-    let menu_repo = Arc::new(admin_infra::menu::repository::ToastyMenuRepository::new(plugin.clone()));
-    let user_svc = Arc::new(admin_domain::user::service::UserService::new(user_repo.clone()));
-    let role_svc = Arc::new(admin_domain::role::service::RoleService::new(role_repo.clone()));
-    let user_app = admin_app::user::app_service::UserAppService::new(user_svc.clone(), role_repo.clone(), dept_repo, menu_repo);
+    let user_repo = Arc::new(admin_infra::user::repository::ToastyUserRepository::new(
+        plugin.clone(),
+    ));
+    let role_repo = Arc::new(admin_infra::role::repository::ToastyRoleRepository::new(
+        plugin.clone(),
+    ));
+    let dept_repo = Arc::new(
+        admin_infra::department::repository::ToastyDepartmentRepository::new(plugin.clone()),
+    );
+    let menu_repo = Arc::new(admin_infra::menu::repository::ToastyMenuRepository::new(
+        plugin.clone(),
+    ));
+    let user_svc = Arc::new(admin_domain::user::service::UserService::new(
+        user_repo.clone(),
+    ));
+    let role_svc = Arc::new(admin_domain::role::service::RoleService::new(
+        role_repo.clone(),
+    ));
+    let user_app = admin_app::user::app_service::UserAppService::new(
+        user_svc.clone(),
+        role_repo.clone(),
+        dept_repo,
+        menu_repo,
+    );
     let role_app = admin_app::role::app_service::RoleAppService::new(role_svc.clone(), user_repo);
 
     // Create a role
@@ -229,13 +270,30 @@ async fn test_add_users_to_role_and_get_role_users() {
 async fn test_remove_users_from_role() {
     let plugin = common::create_db_plugin().await;
 
-    let user_repo = Arc::new(admin_infra::user::repository::ToastyUserRepository::new(plugin.clone()));
-    let role_repo = Arc::new(admin_infra::role::repository::ToastyRoleRepository::new(plugin.clone()));
-    let dept_repo = Arc::new(admin_infra::department::repository::ToastyDepartmentRepository::new(plugin.clone()));
-    let menu_repo = Arc::new(admin_infra::menu::repository::ToastyMenuRepository::new(plugin.clone()));
-    let user_svc = Arc::new(admin_domain::user::service::UserService::new(user_repo.clone()));
-    let role_svc = Arc::new(admin_domain::role::service::RoleService::new(role_repo.clone()));
-    let user_app = admin_app::user::app_service::UserAppService::new(user_svc.clone(), role_repo.clone(), dept_repo, menu_repo);
+    let user_repo = Arc::new(admin_infra::user::repository::ToastyUserRepository::new(
+        plugin.clone(),
+    ));
+    let role_repo = Arc::new(admin_infra::role::repository::ToastyRoleRepository::new(
+        plugin.clone(),
+    ));
+    let dept_repo = Arc::new(
+        admin_infra::department::repository::ToastyDepartmentRepository::new(plugin.clone()),
+    );
+    let menu_repo = Arc::new(admin_infra::menu::repository::ToastyMenuRepository::new(
+        plugin.clone(),
+    ));
+    let user_svc = Arc::new(admin_domain::user::service::UserService::new(
+        user_repo.clone(),
+    ));
+    let role_svc = Arc::new(admin_domain::role::service::RoleService::new(
+        role_repo.clone(),
+    ));
+    let user_app = admin_app::user::app_service::UserAppService::new(
+        user_svc.clone(),
+        role_repo.clone(),
+        dept_repo,
+        menu_repo,
+    );
     let role_app = admin_app::role::app_service::RoleAppService::new(role_svc.clone(), user_repo);
 
     // Create role and users
@@ -309,7 +367,6 @@ async fn test_remove_users_from_role() {
     assert_eq!(users[0].username, "rem_user2");
 }
 
-
 // ══════════════════════════════════════════════════════════════════════════════
 // 12. ConfigAppService::get_by_keys
 // ══════════════════════════════════════════════════════════════════════════════
@@ -374,7 +431,10 @@ async fn test_config_get_by_keys() {
     assert_eq!(result.len(), 2, "Should return 2 matching configs");
     assert_eq!(result.get("sys.site.name").unwrap(), "My Site");
     assert_eq!(result.get("mail.smtp.host").unwrap(), "smtp.example.com");
-    assert!(!result.contains_key("nonexistent.key"), "Non-existent key should not be in result");
+    assert!(
+        !result.contains_key("nonexistent.key"),
+        "Non-existent key should not be in result"
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -386,12 +446,19 @@ async fn test_dict_data_get_by_dict_types() {
     let plugin = common::create_db_plugin().await;
 
     // Create dict type repo and service for creating dict types
-    let dict_type_repo = Arc::new(admin_infra::dictionary::repository::ToastyDictTypeRepository::new(plugin.clone()));
-    let dict_type_svc = Arc::new(admin_domain::dictionary::service::DictTypeService::new(dict_type_repo));
+    let dict_type_repo = Arc::new(
+        admin_infra::dictionary::repository::ToastyDictTypeRepository::new(plugin.clone()),
+    );
+    let dict_type_svc = Arc::new(admin_domain::dictionary::service::DictTypeService::new(
+        dict_type_repo,
+    ));
     let dict_type_app = admin_app::dictionary::app_service::DictTypeAppService::new(dict_type_svc);
 
-    let dict_data_repo = Arc::new(admin_infra::dictionary::repository::ToastyDictDataRepository::new(plugin));
-    let dict_data_svc = Arc::new(admin_domain::dictionary::service::DictDataService::new(dict_data_repo));
+    let dict_data_repo =
+        Arc::new(admin_infra::dictionary::repository::ToastyDictDataRepository::new(plugin));
+    let dict_data_svc = Arc::new(admin_domain::dictionary::service::DictDataService::new(
+        dict_data_repo,
+    ));
     let dict_data_app = admin_app::dictionary::app_service::DictDataAppService::new(dict_data_svc);
 
     // Create dict types
@@ -475,8 +542,16 @@ async fn test_dict_data_get_by_dict_types() {
         .unwrap();
 
     assert_eq!(result.len(), 2, "Should return data for 2 dict types");
-    assert_eq!(result.get("sys_gender").unwrap().len(), 2, "sys_gender should have 2 entries");
-    assert_eq!(result.get("sys_status").unwrap().len(), 1, "sys_status should have 1 entry");
+    assert_eq!(
+        result.get("sys_gender").unwrap().len(),
+        2,
+        "sys_gender should have 2 entries"
+    );
+    assert_eq!(
+        result.get("sys_status").unwrap().len(),
+        1,
+        "sys_status should have 1 entry"
+    );
 
     // Verify labels
     let gender_data = result.get("sys_gender").unwrap();
@@ -488,7 +563,10 @@ async fn test_dict_data_get_by_dict_types() {
         .get_by_dict_types(vec!["nonexistent_type".into()])
         .await
         .unwrap();
-    assert!(result.is_empty(), "Non-existent dict type should return empty map");
+    assert!(
+        result.is_empty(),
+        "Non-existent dict type should return empty map"
+    );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -519,7 +597,10 @@ async fn test_download_file_stream() {
     let download = app.download_file_stream(file.id).await.unwrap();
     assert_eq!(download.filename, "report.pdf");
     assert_eq!(download.size, data.len() as u64);
-    assert_eq!(download.content_type, "application/pdf", "PDF files should have application/pdf content type");
+    assert_eq!(
+        download.content_type, "application/pdf",
+        "PDF files should have application/pdf content type"
+    );
 
     // Upload a PNG file and verify content type
     let png_data = b"This is a test PNG content.";
@@ -536,9 +617,15 @@ async fn test_download_file_stream() {
         .unwrap();
 
     let download = app.download_file_stream(png_file.id).await.unwrap();
-    assert_eq!(download.content_type, "image/png", "PNG files should have image/png content type");
+    assert_eq!(
+        download.content_type, "image/png",
+        "PNG files should have image/png content type"
+    );
 
     // Non-existent file should fail
     let result = app.download_file_stream(999999).await;
-    assert!(result.is_err(), "Non-existent file download should return error");
+    assert!(
+        result.is_err(),
+        "Non-existent file download should return error"
+    );
 }

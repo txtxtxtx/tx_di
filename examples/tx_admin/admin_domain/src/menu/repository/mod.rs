@@ -1,9 +1,9 @@
-use std::any::Any;
-use std::collections::HashSet;
-use async_trait::async_trait;
-use tx_error::AppResult;
 use crate::menu::model::aggregate::Menu;
 use crate::menu::model::value_object::MenuQuery;
+use async_trait::async_trait;
+use std::any::Any;
+use std::collections::HashSet;
+use tx_error::AppResult;
 
 /// Menu repository trait
 #[async_trait]

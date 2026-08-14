@@ -82,7 +82,12 @@ impl SipMiddleware for Gb28181AuthMiddleware {
 
     async fn process(&self, tx: SipTx, next: SipNextFn) -> RIE<()> {
         // 仅对 REGISTER 做认证/ACL；其余方法直接放行
-        if !tx.request().method.to_string().eq_ignore_ascii_case("REGISTER") {
+        if !tx
+            .request()
+            .method
+            .to_string()
+            .eq_ignore_ascii_case("REGISTER")
+        {
             return next(tx).await;
         }
 
@@ -91,8 +96,7 @@ impl SipMiddleware for Gb28181AuthMiddleware {
             .from_header()
             .map(|h| h.value().to_string())
             .unwrap_or_default();
-        let device_id =
-            extract_user_from_sip_uri(&from_str).unwrap_or_else(|| from_str.clone());
+        let device_id = extract_user_from_sip_uri(&from_str).unwrap_or_else(|| from_str.clone());
 
         // ── ACL 前置校验（黑名单/白名单）────────────────────────────────
         if let Err(reason) = self.config.check_device_allowed(&device_id) {
@@ -123,7 +127,11 @@ impl SipMiddleware for Gb28181AuthMiddleware {
             .request()
             .headers
             .iter()
-            .find(|h| format!("{}", h).to_lowercase().starts_with("authorization:"))
+            .find(|h| {
+                format!("{}", h)
+                    .to_lowercase()
+                    .starts_with("authorization:")
+            })
             .map(|h| format!("{}", h));
 
         match auth_header {

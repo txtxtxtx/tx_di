@@ -9,18 +9,15 @@ use rsipstack::sip::StatusCode;
 use rsipstack::transaction::transaction::Transaction;
 use tx_di_core::{Component, DepsTuple, RIE};
 
-use crate::middleware::{build_chain, SipMiddleware};
+use crate::middleware::{SipMiddleware, build_chain};
 use crate::sip_tx::SipTx;
 
 // ---------- 异步处理器类型 ----------
 /// SIP 消息异步处理函数（线程安全、可共享）
 ///
 /// 接收 [`SipTx`] 共享信封，返回 `RIE<()>`。
-pub type SipHandlerFn = Arc<
-    dyn Fn(SipTx) -> Pin<Box<dyn Future<Output = RIE<()>> + Send + 'static>>
-    + Send
-    + Sync,
->;
+pub type SipHandlerFn =
+    Arc<dyn Fn(SipTx) -> Pin<Box<dyn Future<Output = RIE<()>> + Send + 'static>> + Send + Sync>;
 
 // ---------- 内部条目结构 ----------
 /// 索引中存储的条目：优先级 + 处理器
@@ -108,7 +105,11 @@ impl SipRouter {
         entries.insert(pos, (priority, handler_fn));
 
         info!(
-            method = if key.is_empty() { "catch-all" } else { key.as_str() },
+            method = if key.is_empty() {
+                "catch-all"
+            } else {
+                key.as_str()
+            },
             priority,
             "SIP 处理器已注册 (total: {})",
             entries.len()
@@ -122,11 +123,7 @@ impl SipRouter {
     ///   若为 `None`，移除该方法的全部处理器。
     ///
     /// 返回实际移除的数量。
-    pub fn remove_handler(
-        &self,
-        method: Option<impl AsRef<str>>,
-        priority: Option<i32>,
-    ) -> usize {
+    pub fn remove_handler(&self, method: Option<impl AsRef<str>>, priority: Option<i32>) -> usize {
         let key = method
             .map(|m| m.as_ref().to_uppercase())
             .unwrap_or_default();
@@ -154,9 +151,12 @@ impl SipRouter {
 
         if removed > 0 {
             info!(
-                method = if key.is_empty() { "catch-all" } else { key.as_str() },
-                removed,
-                "已移除 SIP 处理器"
+                method = if key.is_empty() {
+                    "catch-all"
+                } else {
+                    key.as_str()
+                },
+                removed, "已移除 SIP 处理器"
             );
         }
         removed
@@ -207,7 +207,11 @@ impl SipRouter {
         let handler: SipHandlerFn = match handler {
             Some(h) => h,
             None => {
-                let default = self.default_handler.read().expect("default_handler lock").clone();
+                let default = self
+                    .default_handler
+                    .read()
+                    .expect("default_handler lock")
+                    .clone();
                 match default {
                     Some(h) => h,
                     None => {

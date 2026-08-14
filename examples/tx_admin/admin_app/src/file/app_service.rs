@@ -6,17 +6,19 @@ use tokio::io::{AsyncRead, ReadBuf};
 
 use admin_domain::file::model::aggregate::FileConfig;
 use admin_domain::file::model::value_object::{FileQuery, FileUploadCommand};
-use admin_domain::file::service::FileService;
 use admin_domain::file::repository::FileConfigRepository;
-use admin_proto::{ListFilesRequest, FileResponse};
+use admin_domain::file::service::FileService;
+use admin_proto::{FileResponse, ListFilesRequest};
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
-use tx_di_file::{user_key, FilePluginErr, StorageConfig};
-use tx_di_file::storage::{guess_mime_type, extract_extension, FileStorageErr, FileStorage, OpendalStorage};
 use tx_di_file::FilePlugin;
+use tx_di_file::storage::{
+    FileStorage, FileStorageErr, OpendalStorage, extract_extension, guess_mime_type,
+};
+use tx_di_file::{FilePluginErr, StorageConfig, user_key};
 use tx_error::{AppError, AppResult};
 
-use crate::file::dto::{file_to_response, DownloadFileStream, PreviewUrlResponse};
+use crate::file::dto::{DownloadFileStream, PreviewUrlResponse, file_to_response};
 
 /// 轻量字节计数器 —— 只计数不限制（大小限制由 axum DefaultBodyLimit 负责）
 struct CountingReader<R> {
@@ -26,12 +28,19 @@ struct CountingReader<R> {
 
 impl<R> CountingReader<R> {
     fn new(inner: R) -> Self {
-        Self { inner, bytes_read: 0 }
+        Self {
+            inner,
+            bytes_read: 0,
+        }
     }
 }
 
 impl<R: AsyncRead + Unpin> AsyncRead for CountingReader<R> {
-    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
         let this = self.get_mut();
         let before = buf.filled().len();
         let poll = Pin::new(&mut this.inner).poll_read(cx, buf);
@@ -332,10 +341,7 @@ impl FileAppService {
     // 查询
     // ========================================================================
 
-    pub async fn get_file_page(
-        &self,
-        req: ListFilesRequest,
-    ) -> AppResult<Page<FileResponse>> {
+    pub async fn get_file_page(&self, req: ListFilesRequest) -> AppResult<Page<FileResponse>> {
         let query = FileQuery {
             name: req.name,
             file_type: req.file_type,
@@ -406,7 +412,11 @@ impl FileAppService {
     }
 
     /// 设为主配置（业务不变式由领域服务保证）
-    pub async fn set_master_config(&self, id: u64, updater: Option<String>) -> AppResult<FileConfig> {
+    pub async fn set_master_config(
+        &self,
+        id: u64,
+        updater: Option<String>,
+    ) -> AppResult<FileConfig> {
         self.file_service.set_master_config(id, updater).await
     }
 }

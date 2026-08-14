@@ -133,7 +133,11 @@ pub fn is_option_arc_type(ty: &Type) -> bool {
         && inner
             .map(|i| {
                 if let Type::Path(tp) = &i {
-                    tp.path.segments.last().map(|s| s.ident == "Arc").unwrap_or(false)
+                    tp.path
+                        .segments
+                        .last()
+                        .map(|s| s.ident == "Arc")
+                        .unwrap_or(false)
                 } else {
                     false
                 }

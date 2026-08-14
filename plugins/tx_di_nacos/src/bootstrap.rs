@@ -11,8 +11,12 @@ use crate::config::RegistryConfig;
 /// 读取本地 TOML 配置（文件不存在 → 空 Table，允许无配置运行）
 pub fn load_local_toml(config_path: &str) -> RIE<toml::Value> {
     match std::fs::read_to_string(config_path) {
-        Ok(content) => toml::from_str(&content)
-            .map_err(|e| AppError::from(format!("配置文件解析失败: {:?}\n错误: {}\n请检查 TOML 语法是否正确。", config_path, e))),
+        Ok(content) => toml::from_str(&content).map_err(|e| {
+            AppError::from(format!(
+                "配置文件解析失败: {:?}\n错误: {}\n请检查 TOML 语法是否正确。",
+                config_path, e
+            ))
+        }),
         Err(_) => {
             tracing::warn!("配置文件不存在: {:?}，将使用默认配置", config_path);
             Ok(toml::Value::Table(toml::map::Map::new()))

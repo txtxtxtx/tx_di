@@ -8,7 +8,9 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use nacos_sdk::api::config::{ConfigChangeListener, ConfigResponse, ConfigService, ConfigServiceBuilder};
+use nacos_sdk::api::config::{
+    ConfigChangeListener, ConfigResponse, ConfigService, ConfigServiceBuilder,
+};
 use nacos_sdk::api::error::Error as NacosError;
 use nacos_sdk::api::props::ClientProps;
 use tx_error::{AppError, AppResult};

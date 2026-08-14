@@ -3,18 +3,18 @@
 //! Handler 通过 DiComp<T> 从 DI 容器注入 AppService，无需手动传递 App。
 
 pub mod auth_api;
-mod user_api;
-mod role_api;
-mod menu_api;
-mod dept_api;
 mod config_api;
+mod dept_api;
 mod dict_api;
-mod log_api;
 mod file_api;
-pub mod monitor_api;
-mod tool_api;
-mod job_api;
 mod health_api;
+mod job_api;
+mod log_api;
+mod menu_api;
+pub mod monitor_api;
+mod role_api;
+mod tool_api;
+mod user_api;
 
 use tx_di_axum::Router;
 
@@ -46,7 +46,10 @@ pub fn router(max_body_size: u64) -> Router {
         .nest(&format!("{API_VERSION}/config"), config_api::router())
         .nest(&format!("{API_VERSION}/dict"), dict_api::router())
         .nest(&format!("{API_VERSION}/log"), log_api::router())
-        .nest(&format!("{API_VERSION}/file"), file_api::router(max_body_size))
+        .nest(
+            &format!("{API_VERSION}/file"),
+            file_api::router(max_body_size),
+        )
         .nest(&format!("{API_VERSION}/monitor"), monitor_api::router())
         .nest(&format!("{API_VERSION}/job"), job_api::router())
         .nest(&format!("{API_VERSION}/tool"), tool_api::router())

@@ -4,10 +4,10 @@ use crate::file::model::aggregate::{File, FileConfig};
 use crate::file::model::value_object::{FileDownloadInfo, FileQuery, FileUploadCommand};
 use crate::file::repository::{FileConfigRepository, FileRepository};
 use crate::shared::repository::RepositoryError;
+use tx_common::id;
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
-use tx_common::id;
 
 #[derive(Component)]
 pub struct FileService {
@@ -135,7 +135,8 @@ impl FileService {
     /// - `NotFoundFile` - 当指定 file_id 的文件不存在时
     /// - 数据库操作错误 - 仓储查询失败时
     pub async fn get_file(&self, file_id: u64) -> AppResult<File> {
-        Ok(self.file_repo
+        Ok(self
+            .file_repo
             .find_by_id(file_id)
             .await?
             .ok_or_else(|| RepositoryError::NotFoundFile)?)
@@ -160,7 +161,8 @@ impl FileService {
     /// - `NotFoundFile` - 当指定 file_id 的文件不存在时
     /// - 数据库操作错误 - 仓储查询失败时
     pub async fn download_file(&self, file_id: u64) -> AppResult<FileDownloadInfo> {
-        let file = self.file_repo
+        let file = self
+            .file_repo
             .find_by_id(file_id)
             .await?
             .ok_or_else(|| RepositoryError::NotFoundFile)?;

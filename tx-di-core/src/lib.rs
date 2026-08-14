@@ -39,11 +39,11 @@ pub use tracing;
 // ── 内部模块 re-export ────────────────────────────────────────────────────
 // 注意：derive 宏 `Component` 和 trait `Component` 同名但不同命名空间，可以共存
 // `tx_cst` 和 `component` 是 derive 辅助属性，不需要单独 re-export
-pub use tx_di_macros::Component;   // derive 宏（宏命名空间）
-pub use tx_di_macros::intercept;    // AOP 方法拦截属性宏（#[intercept]）
-pub use tx_error::{AppErrCode, AppError, AppResult, CodeMsg};
 pub use crate::error::DiErr;
 pub use tx_common::{ApiR, ApiRes, FormattedDateTime, RCode};
+pub use tx_di_macros::Component; // derive 宏（宏命名空间）
+pub use tx_di_macros::intercept; // AOP 方法拦截属性宏（#[intercept]）
+pub use tx_error::{AppErrCode, AppError, AppResult, CodeMsg};
 
 /// RIE<T> = AppResult<T>
 pub type RIE<T> = AppResult<T>;
@@ -56,11 +56,12 @@ pub use config::AppAllConfig;
 pub use path_utils::{resolve_data_path, resolve_sqlite_url};
 // 内部错误模块：直接复用 tx_error 提供的统一错误类型
 // 详见 src/error.rs
+pub use aop::{ArgValue, BoxCall, CallContext, CallFn, CallResult, Interceptor, InterceptorChain};
 pub use lifecycle::{App, BuildContext, InnerContext};
-pub use registry::{ComponentMeta, COMPONENT_REGISTRY};
+pub use registry::{COMPONENT_REGISTRY, ComponentMeta};
 pub use scope::Scope;
-pub use store::{Store, CompRef, TraitImplEntry, TraitImplMap, inject_from_store, try_inject_from_store, inject_trait_from_store, try_inject_trait_from_store, inject_all_traits_from_store};
+pub use store::{
+    CompRef, Store, TraitImplEntry, TraitImplMap, inject_all_traits_from_store, inject_from_store,
+    inject_trait_from_store, try_inject_from_store, try_inject_trait_from_store,
+};
 pub use topology::topo_sort;
-pub use aop::{CallContext, CallResult, ArgValue, CallFn, BoxCall, Interceptor, InterceptorChain};
-
-

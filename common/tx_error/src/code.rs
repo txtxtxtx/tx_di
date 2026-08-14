@@ -16,7 +16,11 @@ pub struct AppErrCode {
 impl AppErrCode {
     #[inline]
     pub const fn new(domain: &'static str, code: i32, message: &'static str) -> Self {
-        Self { domain, code, message }
+        Self {
+            domain,
+            code,
+            message,
+        }
     }
 }
 

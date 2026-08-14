@@ -7,7 +7,7 @@
 //!   - Job 日志查询/清理
 
 mod common;
-use admin_proto::{CreateJobRequest, UpdateJobRequest, ListJobsRequest, ListJobLogsRequest};
+use admin_proto::{CreateJobRequest, ListJobLogsRequest, ListJobsRequest, UpdateJobRequest};
 use tx_di_job::ExecutionStatus;
 
 fn create_job_req(name: &str, handler: &str) -> CreateJobRequest {
@@ -28,7 +28,10 @@ fn create_job_req(name: &str, handler: &str) -> CreateJobRequest {
 async fn create_job_success() {
     let (app, _) = common::create_job_app().await;
     let job = app
-        .create_job(create_job_req("测试任务", "test_handler"), Some("admin".into()))
+        .create_job(
+            create_job_req("测试任务", "test_handler"),
+            Some("admin".into()),
+        )
         .await
         .unwrap();
 
@@ -88,7 +91,10 @@ async fn update_job_success() {
 async fn delete_job_soft_delete() {
     let (app, _) = common::create_job_app().await;
     let job = app
-        .create_job(create_job_req("待删除", "del_handler"), Some("admin".into()))
+        .create_job(
+            create_job_req("待删除", "del_handler"),
+            Some("admin".into()),
+        )
         .await
         .unwrap();
 
@@ -160,14 +166,20 @@ async fn get_job_page_filter_by_name() {
 async fn change_status_pause_and_resume() {
     let (app, _) = common::create_job_app().await;
     let job = app
-        .create_job(create_job_req("状态任务", "st_handler"), Some("admin".into()))
+        .create_job(
+            create_job_req("状态任务", "st_handler"),
+            Some("admin".into()),
+        )
         .await
         .unwrap();
 
     // 新建任务默认 Running(1)，暂停后应为 Paused(0)
     assert_eq!(job.status, 1);
 
-    let paused = app.change_status(job.id, 0, Some("admin".into())).await.unwrap();
+    let paused = app
+        .change_status(job.id, 0, Some("admin".into()))
+        .await
+        .unwrap();
     assert_eq!(paused.status, 0);
 
     // 持久化验证
@@ -175,16 +187,27 @@ async fn change_status_pause_and_resume() {
     assert_eq!(found.status, 0);
 
     // 恢复运行
-    let resumed = app.change_status(job.id, 1, Some("admin".into())).await.unwrap();
+    let resumed = app
+        .change_status(job.id, 1, Some("admin".into()))
+        .await
+        .unwrap();
     assert_eq!(resumed.status, 1);
 }
 
 #[tokio::test]
 async fn get_job_page_filter_by_status() {
     let (app, _) = common::create_job_app().await;
-    let j1 = app.create_job(create_job_req("运行中", "h1"), Some("admin".into())).await.unwrap();
-    let j2 = app.create_job(create_job_req("暂停中", "h2"), Some("admin".into())).await.unwrap();
-    app.change_status(j2.id, 0, Some("admin".into())).await.unwrap();
+    let j1 = app
+        .create_job(create_job_req("运行中", "h1"), Some("admin".into()))
+        .await
+        .unwrap();
+    let j2 = app
+        .create_job(create_job_req("暂停中", "h2"), Some("admin".into()))
+        .await
+        .unwrap();
+    app.change_status(j2.id, 0, Some("admin".into()))
+        .await
+        .unwrap();
 
     // 只查暂停的任务 (status=0)
     let page = app
@@ -261,7 +284,10 @@ async fn run_job_handler_not_found_logs_failure() {
 
     // 不注册任何 handler，直接执行
     let job = app
-        .create_job(create_job_req("失败任务", "nonexistent_handler"), Some("admin".into()))
+        .create_job(
+            create_job_req("失败任务", "nonexistent_handler"),
+            Some("admin".into()),
+        )
         .await
         .unwrap();
 
@@ -327,7 +353,10 @@ async fn clean_job_logs_by_job() {
     });
 
     let job = app
-        .create_job(create_job_req("清理日志任务", "clean_test"), Some("admin".into()))
+        .create_job(
+            create_job_req("清理日志任务", "clean_test"),
+            Some("admin".into()),
+        )
         .await
         .unwrap();
     app.run_job(job.id, Some("admin".into())).await.unwrap();
@@ -369,8 +398,14 @@ async fn clean_all_job_logs() {
         error: None,
     });
 
-    let j1 = app.create_job(create_job_req("任务A", "clean_all"), Some("admin".into())).await.unwrap();
-    let j2 = app.create_job(create_job_req("任务B", "clean_all"), Some("admin".into())).await.unwrap();
+    let j1 = app
+        .create_job(create_job_req("任务A", "clean_all"), Some("admin".into()))
+        .await
+        .unwrap();
+    let j2 = app
+        .create_job(create_job_req("任务B", "clean_all"), Some("admin".into()))
+        .await
+        .unwrap();
     app.run_job(j1.id, Some("admin".into())).await.unwrap();
     app.run_job(j2.id, Some("admin".into())).await.unwrap();
 

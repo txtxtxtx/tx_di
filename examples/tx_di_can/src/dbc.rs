@@ -71,10 +71,7 @@ impl Dbc {
                     .ok_or("消息名缺失")?
                     .trim_end_matches(':')
                     .to_string();
-                let dlc = it
-                    .next()
-                    .and_then(|v| v.parse::<u8>().ok())
-                    .unwrap_or(8);
+                let dlc = it.next().and_then(|v| v.parse::<u8>().ok()).unwrap_or(8);
                 cur = Some(DbcMessage {
                     id,
                     name,
@@ -163,11 +160,7 @@ fn parse_signal(s: &str) -> Option<DbcSignal> {
     }
 
     // "unit"
-    let unit = rest
-        .split('"')
-        .nth(1)
-        .unwrap_or("")
-        .to_string();
+    let unit = rest.split('"').nth(1).unwrap_or("").to_string();
 
     Some(DbcSignal {
         name,

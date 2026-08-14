@@ -1,8 +1,10 @@
-use admin_proto::{JobResponse, JobLogResponse};
+use admin_proto::{JobLogResponse, JobResponse};
 use tx_di_job::{InfrustJob, InfrustJobLog};
 
 // Re-export proto request types directly
-pub use admin_proto::{CreateJobRequest, UpdateJobRequest, ListJobsRequest, ListJobLogsRequest, CleanJobLogsRequest};
+pub use admin_proto::{
+    CleanJobLogsRequest, CreateJobRequest, ListJobLogsRequest, ListJobsRequest, UpdateJobRequest,
+};
 
 /// 将 InfrustJob 转换为 proto JobResponse
 pub fn job_to_response(job: InfrustJob) -> JobResponse {

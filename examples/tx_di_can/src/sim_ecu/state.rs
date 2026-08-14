@@ -217,7 +217,12 @@ impl SimEcuState {
                 r
             }
             // 0x01 reportNumberOfDTCByStatusMask
-            0x01 => vec![0x59, 0x01, 0xFF, (self.dtc_codes.len() as u8).wrapping_mul(4)],
+            0x01 => vec![
+                0x59,
+                0x01,
+                0xFF,
+                (self.dtc_codes.len() as u8).wrapping_mul(4),
+            ],
             // 0x0A reportSupportedDTCs
             0x0A => {
                 let mut r = vec![0x59, 0x0A, 0xFF];

@@ -2,8 +2,8 @@
 
 use crate::config::SaTokenConf;
 use std::sync::{Arc, OnceLock};
-use tx_di_core::{App, Component, DepsTuple, RIE};
 use tracing::info;
+use tx_di_core::{App, Component, DepsTuple, RIE};
 
 /// sa-token 全局状态（进程级单例）
 ///
@@ -128,10 +128,10 @@ async fn app_async_init(comp: Arc<SaTokenPlugin>, _app: Arc<App>) -> RIE<()> {
         tracing::warn!("SaTokenPlugin: state concurrently initialized");
     }
     info!(
-            token_name = %config.token_name,
-            timeout = config.timeout,
-            "SaToken 初始化完成"
-        );
+        token_name = %config.token_name,
+        timeout = config.timeout,
+        "SaToken 初始化完成"
+    );
     Ok(())
 }
 

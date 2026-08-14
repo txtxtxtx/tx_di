@@ -34,15 +34,13 @@
 //!
 //! [MediaMTX]: https://github.com/bluenviron/mediamtx
 
-use super::{
-    MediaBackend, MediaStreamInfo, OpenRtpRequest, PlayUrls, RtpServerHandle,
-};
+use super::{MediaBackend, MediaStreamInfo, OpenRtpRequest, PlayUrls, RtpServerHandle};
 use crate::err::GbErr;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::net::UdpSocket;
-use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU16, Ordering};
 use tracing::{debug, warn};
 use tx_di_core::{AppError as IE, RIE};
 // ── 配置 ─────────────────────────────────────────────────────────────────────
@@ -220,10 +218,7 @@ impl MediaMtxBackend {
     }
 
     /// 调用 MediaMTX API
-    async fn api_get<T: for<'de> serde::Deserialize<'de>>(
-        &self,
-        path: &str,
-    ) -> anyhow::Result<T> {
+    async fn api_get<T: for<'de> serde::Deserialize<'de>>(&self, path: &str) -> anyhow::Result<T> {
         let url = format!("{}{}", self.config.api_url, path);
         debug!(url = %url, "MediaMTX API 请求");
         let resp = self
@@ -247,14 +242,14 @@ impl MediaMtxBackend {
     }
 }
 
-
 #[async_trait::async_trait]
 impl MediaBackend for MediaMtxBackend {
     async fn open_rtp_server(&self, req: OpenRtpRequest) -> RIE<RtpServerHandle> {
         let port = if req.port != 0 {
             req.port
         } else {
-            self.allocate_port().map_err(|_| IE::from(GbErr::MediaApiRequestFailed))?
+            self.allocate_port()
+                .map_err(|_| IE::from(GbErr::MediaApiRequestFailed))?
         };
 
         self.rtp_ports

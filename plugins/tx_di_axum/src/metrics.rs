@@ -24,8 +24,7 @@ static REGISTRY: LazyLock<Registry> = LazyLock::new(Registry::new);
 /// HTTP 请求计数：method + 归一化路由路径
 static HTTP_REQUESTS: LazyLock<IntCounterVec> = LazyLock::new(|| {
     IntCounterVec::new(
-        Opts::new("http_requests_total", "Total HTTP requests processed")
-            .namespace("tx_di"),
+        Opts::new("http_requests_total", "Total HTTP requests processed").namespace("tx_di"),
         &["method", "path"],
     )
     .expect("http_requests_total metric created")
@@ -39,7 +38,9 @@ static HTTP_DURATION: LazyLock<HistogramVec> = LazyLock::new(|| {
             "HTTP request duration in seconds",
         )
         .namespace("tx_di")
-        .buckets(vec![0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]),
+        .buckets(vec![
+            0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
+        ]),
         &["method", "path"],
     )
     .expect("http_request_duration_seconds metric created")
@@ -122,7 +123,9 @@ where
 {
     type Response = S::Response;
     type Error = S::Error;
-    type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+    type Future = std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>,
+    >;
 
     fn poll_ready(
         &mut self,
@@ -141,9 +144,7 @@ where
 
         Box::pin(async move {
             let result = fut.await;
-            HTTP_REQUESTS
-                .with_label_values(&[&method, &path])
-                .inc();
+            HTTP_REQUESTS.with_label_values(&[&method, &path]).inc();
             HTTP_DURATION
                 .with_label_values(&[&method, &path])
                 .observe(start.elapsed().as_secs_f64());
@@ -175,15 +176,14 @@ async fn metrics_handler() -> impl IntoResponse {
     match encoder.encode(&metric_families, &mut buffer) {
         Ok(()) => {
             let body = String::from_utf8_lossy(&buffer).to_string();
-            (
-                [("content-type", "text/plain; version=0.0.4")],
-                body,
-            )
-                .into_response()
+            ([("content-type", "text/plain; version=0.0.4")], body).into_response()
         }
         Err(e) => {
             tracing::error!("Prometheus 指标编码失败: {e}");
-            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "metrics encoding error")
+            (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "metrics encoding error",
+            )
                 .into_response()
         }
     }

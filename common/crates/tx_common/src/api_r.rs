@@ -11,8 +11,6 @@ pub struct ApiR<T> {
     pub data: Option<T>,
 }
 
-
-
 impl<T> ApiR<T> {
     /// 成功响应（带数据）
     pub fn success(data: T) -> Self {
@@ -113,18 +111,13 @@ impl RCode {
     }
     /// 转换为ApiR
     pub fn to_api_r<T>(&self, data: T) -> ApiR<T> {
-        ApiR::error_with_data(self.code(),
-                              self.msg().to_string(),
-                              data)
+        ApiR::error_with_data(self.code(), self.msg().to_string(), data)
     }
 }
 /// 实现从 ErrorCode 到 ApiR<()> 的转换
 impl From<RCode> for ApiRes {
     fn from(error_code: RCode) -> Self {
-        ApiRes::error(
-            error_code.code(),
-            error_code.msg().to_string()
-        )
+        ApiRes::error(error_code.code(), error_code.msg().to_string())
     }
 }
 
@@ -139,7 +132,11 @@ impl From<tx_error::AppError> for ApiRes {
 }
 
 #[cfg(feature = "axum")]
-use axum::{http::StatusCode, response::{IntoResponse, Response}, Json};
+use axum::{
+    Json,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 
 /// 将 ApiR 类型的响应转换为 HTTP 响应（axum feature 启用时可用）
 //

@@ -3,15 +3,15 @@
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
-use admin_proto::admin::job::job_service_server::JobService;
+use admin_proto::Empty;
+use admin_proto::admin::common::PageResponse;
 use admin_proto::admin::job::job_log_service_server::JobLogService;
+use admin_proto::admin::job::job_service_server::JobService;
 use admin_proto::admin::job::{
     ChangeJobStatusRequest, CleanJobLogsRequest, CreateJobRequest, DeleteJobRequest,
     GetJobLogRequest, GetJobRequest, JobLogResponse, JobResponse, ListJobLogsRequest,
     ListJobLogsResponse, ListJobsRequest, ListJobsResponse, RunJobRequest, UpdateJobRequest,
 };
-use admin_proto::admin::common::PageResponse;
-use admin_proto::Empty;
 use tx_di_core::App;
 
 use super::auth_interceptor::{self, get_login_id};
@@ -35,7 +35,10 @@ impl JobService for JobGrpcService {
 
         let req = request.into_inner();
         let svc: Arc<admin_app::job::app_service::JobAppService> = self.app.inject();
-        let r = svc.create_job(req, Some(login_id)).await.map_err(err::to_status)?;
+        let r = svc
+            .create_job(req, Some(login_id))
+            .await
+            .map_err(err::to_status)?;
         Ok(Response::new(r))
     }
 
@@ -48,7 +51,10 @@ impl JobService for JobGrpcService {
 
         let req = request.into_inner();
         let svc: Arc<admin_app::job::app_service::JobAppService> = self.app.inject();
-        let r = svc.update_job(req, Some(login_id)).await.map_err(err::to_status)?;
+        let r = svc
+            .update_job(req, Some(login_id))
+            .await
+            .map_err(err::to_status)?;
         Ok(Response::new(r))
     }
 
@@ -116,10 +122,7 @@ impl JobService for JobGrpcService {
         Ok(Response::new(r))
     }
 
-    async fn run_job(
-        &self,
-        request: Request<RunJobRequest>,
-    ) -> Result<Response<Empty>, Status> {
+    async fn run_job(&self, request: Request<RunJobRequest>) -> Result<Response<Empty>, Status> {
         let login_id = get_login_id(&request)?;
         auth_interceptor::ensure_grpc_permission(&login_id, "job:execute").await?;
 

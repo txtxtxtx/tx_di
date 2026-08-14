@@ -26,9 +26,9 @@ use std::any::TypeId;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::RIE;
 use crate::component::Component;
 use crate::store::Store;
-use crate::RIE;
 
 // ── ArgValue ────────────────────────────────────────────────────────────────
 
@@ -48,12 +48,36 @@ pub enum ArgValue {
     },
 }
 
-impl From<i64> for ArgValue { fn from(v: i64) -> Self { ArgValue::I64(v) } }
-impl From<u64> for ArgValue { fn from(v: u64) -> Self { ArgValue::U64(v) } }
-impl From<f64> for ArgValue { fn from(v: f64) -> Self { ArgValue::F64(v) } }
-impl From<&str> for ArgValue { fn from(v: &str) -> Self { ArgValue::Str(v.to_string()) } }
-impl From<String> for ArgValue { fn from(v: String) -> Self { ArgValue::Str(v) } }
-impl From<bool> for ArgValue { fn from(v: bool) -> Self { ArgValue::Bool(v) } }
+impl From<i64> for ArgValue {
+    fn from(v: i64) -> Self {
+        ArgValue::I64(v)
+    }
+}
+impl From<u64> for ArgValue {
+    fn from(v: u64) -> Self {
+        ArgValue::U64(v)
+    }
+}
+impl From<f64> for ArgValue {
+    fn from(v: f64) -> Self {
+        ArgValue::F64(v)
+    }
+}
+impl From<&str> for ArgValue {
+    fn from(v: &str) -> Self {
+        ArgValue::Str(v.to_string())
+    }
+}
+impl From<String> for ArgValue {
+    fn from(v: String) -> Self {
+        ArgValue::Str(v)
+    }
+}
+impl From<bool> for ArgValue {
+    fn from(v: bool) -> Self {
+        ArgValue::Bool(v)
+    }
+}
 
 // ── CallContext ─────────────────────────────────────────────────────────────
 
@@ -68,7 +92,10 @@ pub struct CallContext {
 
 impl CallContext {
     pub fn new(method_name: &'static str) -> Self {
-        CallContext { method_name, args: Vec::new() }
+        CallContext {
+            method_name,
+            args: Vec::new(),
+        }
     }
 
     /// 添加命名参数
@@ -114,7 +141,9 @@ pub trait CallFn: Send {
 }
 
 impl<F: FnOnce() -> CallResult + Send> CallFn for F {
-    fn execute(self: Box<Self>) -> CallResult { self() }
+    fn execute(self: Box<Self>) -> CallResult {
+        self()
+    }
 }
 
 pub type BoxCall = Box<dyn CallFn>;
@@ -128,7 +157,9 @@ pub type BoxCall = Box<dyn CallFn>;
 /// - `around`：完全包裹调用，可短路 / 重试 / 替换返回
 pub trait Interceptor: Send + Sync + 'static {
     #[allow(unused_variables)]
-    fn before(&self, ctx: &CallContext) -> RIE<()> { Ok(()) }
+    fn before(&self, ctx: &CallContext) -> RIE<()> {
+        Ok(())
+    }
 
     #[allow(unused_variables)]
     fn after(&self, ctx: &CallContext, result: &CallResult) {}
@@ -150,7 +181,9 @@ pub struct InterceptorChain {
 
 impl InterceptorChain {
     pub fn new() -> Self {
-        InterceptorChain { interceptors: Vec::new() }
+        InterceptorChain {
+            interceptors: Vec::new(),
+        }
     }
 
     /// 添加拦截器（按值，自动 `Arc<dyn Interceptor>`）
@@ -193,7 +226,10 @@ impl InterceptorChain {
             let mn = method_name;
             let a = args.clone();
             call = Box::new(move || {
-                let ctx = CallContext { method_name: mn, args: a };
+                let ctx = CallContext {
+                    method_name: mn,
+                    args: a,
+                };
                 ic.around(&ctx, inner)
             });
         }
@@ -202,7 +238,9 @@ impl InterceptorChain {
 }
 
 impl Default for InterceptorChain {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── 内置拦截器 ──────────────────────────────────────────────────────────────
@@ -212,14 +250,26 @@ pub struct LoggingInterceptor;
 
 impl Component for LoggingInterceptor {
     type Deps = ();
-    fn build(_: Self::Deps, _store: &Store) -> Self { LoggingInterceptor }
+    fn build(_: Self::Deps, _store: &Store) -> Self {
+        LoggingInterceptor
+    }
     const SCOPE: crate::Scope = crate::Scope::Singleton;
 }
-impl Default for LoggingInterceptor { fn default() -> Self { LoggingInterceptor } }
+impl Default for LoggingInterceptor {
+    fn default() -> Self {
+        LoggingInterceptor
+    }
+}
 impl Interceptor for LoggingInterceptor {
     fn before(&self, ctx: &CallContext) -> RIE<()> {
-        tracing::info!("→ {} {:?}", ctx.method_name, ctx.args.iter()
-            .map(|(n, v)| format!("{}={:?}", n, v)).collect::<Vec<_>>());
+        tracing::info!(
+            "→ {} {:?}",
+            ctx.method_name,
+            ctx.args
+                .iter()
+                .map(|(n, v)| format!("{}={:?}", n, v))
+                .collect::<Vec<_>>()
+        );
         Ok(())
     }
     fn after(&self, ctx: &CallContext, result: &CallResult) {
@@ -231,20 +281,34 @@ impl Interceptor for LoggingInterceptor {
 }
 
 /// 指标拦截器
-pub struct MetricsInterceptor { pub counter: AtomicU64 }
+pub struct MetricsInterceptor {
+    pub counter: AtomicU64,
+}
 
 impl Component for MetricsInterceptor {
     type Deps = ();
     fn build(_: Self::Deps, _store: &Store) -> Self {
-        MetricsInterceptor { counter: AtomicU64::new(0) }
+        MetricsInterceptor {
+            counter: AtomicU64::new(0),
+        }
     }
     const SCOPE: crate::Scope = crate::Scope::Singleton;
 }
 impl MetricsInterceptor {
-    pub fn new() -> Self { MetricsInterceptor { counter: AtomicU64::new(0) } }
-    pub fn count(&self) -> u64 { self.counter.load(Ordering::Relaxed) }
+    pub fn new() -> Self {
+        MetricsInterceptor {
+            counter: AtomicU64::new(0),
+        }
+    }
+    pub fn count(&self) -> u64 {
+        self.counter.load(Ordering::Relaxed)
+    }
 }
-impl Default for MetricsInterceptor { fn default() -> Self { Self::new() } }
+impl Default for MetricsInterceptor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl Interceptor for MetricsInterceptor {
     fn before(&self, _ctx: &CallContext) -> RIE<()> {
         self.counter.fetch_add(1, Ordering::Relaxed);

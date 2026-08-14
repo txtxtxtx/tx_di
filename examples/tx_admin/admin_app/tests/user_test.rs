@@ -8,10 +8,13 @@
 //!   1.7 用户查询         ✅
 
 mod common;
-use admin_proto::{CreateUserRequest, UpdateUserRequest, ListUsersRequest, PageRequest, CreateRoleRequest, CreateDeptRequest};
 use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::user::model::value_object::{Sex, UserStatus};
 use admin_domain::user::repository::UserRepository;
+use admin_proto::{
+    CreateDeptRequest, CreateRoleRequest, CreateUserRequest, ListUsersRequest, PageRequest,
+    UpdateUserRequest,
+};
 
 // ── 1.1 用户 CRUD ──────────────────────────────────────────────────────────
 
@@ -58,7 +61,11 @@ async fn create_user_success() {
     assert_eq!(user.email, Some("test@example.com".into()));
     assert_eq!(user.mobile, Some("13800138000".into()));
     assert_eq!(Sex::from(user.sex as i32), Sex::Male);
-    assert_eq!(UserStatus::from(user.status), UserStatus::Active, "新用户默认状态应为 Active");
+    assert_eq!(
+        UserStatus::from(user.status),
+        UserStatus::Active,
+        "新用户默认状态应为 Active"
+    );
     assert_eq!(user.remark, None, "未提供备注时应为 None");
     assert!(user.role_ids.is_empty(), "未分配角色时 role_ids 应为空 Vec");
     assert!(user.dept_ids.is_empty(), "未分配部门时 dept_ids 应为空 Vec");
@@ -116,7 +123,10 @@ async fn create_user_success() {
     );
 
     // 密码：确认密码已哈希存储（argon2）
-    assert!(raw.password.starts_with("$argon2"), "密码应以 argon2 哈希存储");
+    assert!(
+        raw.password.starts_with("$argon2"),
+        "密码应以 argon2 哈希存储"
+    );
 }
 
 #[tokio::test]
@@ -125,21 +135,45 @@ async fn create_user_with_roles_and_depts() {
 
     // 先创建真实的角色和部门（而非使用不存在的假 ID）
     let role1 = role_app
-        .create_role(CreateRoleRequest {
-            name: "角色A".into(), code: "role_a".into(), sort: 1, remark: None, menu_ids: vec![],
-        }, Some("admin".into()))
-        .await.unwrap();
+        .create_role(
+            CreateRoleRequest {
+                name: "角色A".into(),
+                code: "role_a".into(),
+                sort: 1,
+                remark: None,
+                menu_ids: vec![],
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
     let role2 = role_app
-        .create_role(CreateRoleRequest {
-            name: "角色B".into(), code: "role_b".into(), sort: 2, remark: None, menu_ids: vec![],
-        }, Some("admin".into()))
-        .await.unwrap();
+        .create_role(
+            CreateRoleRequest {
+                name: "角色B".into(),
+                code: "role_b".into(),
+                sort: 2,
+                remark: None,
+                menu_ids: vec![],
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
     let dept = dept_app
-        .create_dept(CreateDeptRequest {
-            name: "技术部".into(), parent_id: 0, sort: 1, leader_user_id: None,
-            phone: None, email: None,
-        }, Some("admin".into()))
-        .await.unwrap();
+        .create_dept(
+            CreateDeptRequest {
+                name: "技术部".into(),
+                parent_id: 0,
+                sort: 1,
+                leader_user_id: None,
+                phone: None,
+                email: None,
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
 
     let user = user_app
         .create_user(
@@ -458,17 +492,50 @@ async fn assign_roles_to_user() {
         .unwrap();
 
     // 先创建真实角色（而非使用不存在的假 ID 1/2/3）
-    let r1 = role_app.create_role(CreateRoleRequest {
-        name: "角色1".into(), code: "r1".into(), sort: 1, remark: None, menu_ids: vec![],
-    }, Some("admin".into())).await.unwrap();
-    let r2 = role_app.create_role(CreateRoleRequest {
-        name: "角色2".into(), code: "r2".into(), sort: 2, remark: None, menu_ids: vec![],
-    }, Some("admin".into())).await.unwrap();
-    let r3 = role_app.create_role(CreateRoleRequest {
-        name: "角色3".into(), code: "r3".into(), sort: 3, remark: None, menu_ids: vec![],
-    }, Some("admin".into())).await.unwrap();
+    let r1 = role_app
+        .create_role(
+            CreateRoleRequest {
+                name: "角色1".into(),
+                code: "r1".into(),
+                sort: 1,
+                remark: None,
+                menu_ids: vec![],
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
+    let r2 = role_app
+        .create_role(
+            CreateRoleRequest {
+                name: "角色2".into(),
+                code: "r2".into(),
+                sort: 2,
+                remark: None,
+                menu_ids: vec![],
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
+    let r3 = role_app
+        .create_role(
+            CreateRoleRequest {
+                name: "角色3".into(),
+                code: "r3".into(),
+                sort: 3,
+                remark: None,
+                menu_ids: vec![],
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
 
-    user_app.assign_roles(user.id, vec![r1.id, r2.id, r3.id]).await.unwrap();
+    user_app
+        .assign_roles(user.id, vec![r1.id, r2.id, r3.id])
+        .await
+        .unwrap();
 
     // 回查验证角色已持久化
     let found = user_app.get_user(user.id).await.unwrap();
@@ -483,12 +550,32 @@ async fn assign_roles_empty_should_clear() {
     let (user_app, role_app, _, _) = common::create_user_app_with_shared().await;
 
     // 先创建真实角色
-    let r1 = role_app.create_role(CreateRoleRequest {
-        name: "初始角色".into(), code: "init_r".into(), sort: 1, remark: None, menu_ids: vec![],
-    }, Some("admin".into())).await.unwrap();
-    let r2 = role_app.create_role(CreateRoleRequest {
-        name: "初始角色2".into(), code: "init_r2".into(), sort: 2, remark: None, menu_ids: vec![],
-    }, Some("admin".into())).await.unwrap();
+    let r1 = role_app
+        .create_role(
+            CreateRoleRequest {
+                name: "初始角色".into(),
+                code: "init_r".into(),
+                sort: 1,
+                remark: None,
+                menu_ids: vec![],
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
+    let r2 = role_app
+        .create_role(
+            CreateRoleRequest {
+                name: "初始角色2".into(),
+                code: "init_r2".into(),
+                sort: 2,
+                remark: None,
+                menu_ids: vec![],
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
 
     let user = user_app
         .create_user(
@@ -569,16 +656,39 @@ async fn assign_departments_to_user() {
         .unwrap();
 
     // 先创建真实部门（而非使用不存在的假 ID 100/200）
-    let d1 = dept_app.create_dept(CreateDeptRequest {
-        name: "研发部".into(), parent_id: 0, sort: 1, leader_user_id: None,
-        phone: None, email: None,
-    }, Some("admin".into())).await.unwrap();
-    let d2 = dept_app.create_dept(CreateDeptRequest {
-        name: "产品部".into(), parent_id: 0, sort: 2, leader_user_id: None,
-        phone: None, email: None,
-    }, Some("admin".into())).await.unwrap();
+    let d1 = dept_app
+        .create_dept(
+            CreateDeptRequest {
+                name: "研发部".into(),
+                parent_id: 0,
+                sort: 1,
+                leader_user_id: None,
+                phone: None,
+                email: None,
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
+    let d2 = dept_app
+        .create_dept(
+            CreateDeptRequest {
+                name: "产品部".into(),
+                parent_id: 0,
+                sort: 2,
+                leader_user_id: None,
+                phone: None,
+                email: None,
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
 
-    user_app.assign_departments(user.id, vec![d1.id, d2.id]).await.unwrap();
+    user_app
+        .assign_departments(user.id, vec![d1.id, d2.id])
+        .await
+        .unwrap();
 
     // 回查验证部门已持久化
     let found = user_app.get_user(user.id).await.unwrap();
@@ -592,10 +702,20 @@ async fn assign_departments_empty_should_clear() {
     let (user_app, _, dept_app, _) = common::create_user_app_with_shared().await;
 
     // 先创建真实部门
-    let dept = dept_app.create_dept(CreateDeptRequest {
-        name: "初始部门".into(), parent_id: 0, sort: 1, leader_user_id: None,
-        phone: None, email: None,
-    }, Some("admin".into())).await.unwrap();
+    let dept = dept_app
+        .create_dept(
+            CreateDeptRequest {
+                name: "初始部门".into(),
+                parent_id: 0,
+                sort: 1,
+                leader_user_id: None,
+                phone: None,
+                email: None,
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
 
     let user = user_app
         .create_user(
@@ -779,7 +899,8 @@ async fn query_user_by_status() {
     assert!(
         page.list
             .iter()
-            .any(|u| u.username == "active_user" && UserStatus::from(u.status) == UserStatus::Disabled)
+            .any(|u| u.username == "active_user"
+                && UserStatus::from(u.status) == UserStatus::Disabled)
     );
 }
 

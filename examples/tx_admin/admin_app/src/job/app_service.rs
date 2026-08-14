@@ -1,13 +1,19 @@
 use std::sync::Arc;
 
-use admin_proto::{JobResponse, JobLogResponse};
+use admin_proto::{JobLogResponse, JobResponse};
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
-use tx_di_job::{JobPlugin, JobRepository, InfrustJob, InfrustJobLog, JobStatus, AuditFields, SoftDelete, ExecutionStatus};
+use tx_di_job::{
+    AuditFields, ExecutionStatus, InfrustJob, InfrustJobLog, JobPlugin, JobRepository, JobStatus,
+    SoftDelete,
+};
 use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
-use crate::job::dto::{CreateJobRequest, UpdateJobRequest, ListJobsRequest, ListJobLogsRequest, job_to_response, job_log_to_response};
+use crate::job::dto::{
+    CreateJobRequest, ListJobLogsRequest, ListJobsRequest, UpdateJobRequest, job_log_to_response,
+    job_to_response,
+};
 
 /// 定时任务应用服务
 ///
@@ -126,7 +132,10 @@ impl JobAppService {
     }
 
     /// 分页查询任务执行日志（SQL 层过滤 + 分页）
-    pub async fn get_job_log_page(&self, req: ListJobLogsRequest) -> AppResult<Page<JobLogResponse>> {
+    pub async fn get_job_log_page(
+        &self,
+        req: ListJobLogsRequest,
+    ) -> AppResult<Page<JobLogResponse>> {
         let (rows, total) = self
             .repo()
             .find_job_log_page(req.job_id, req.status, req.page, req.page_size)

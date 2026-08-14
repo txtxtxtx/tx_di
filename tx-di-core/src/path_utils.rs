@@ -101,6 +101,9 @@ mod tests {
             std::env::remove_var("APP_HOME");
         }
         assert_eq!(resolve_data_path("data/app.db"), "data/app.db");
-        assert_eq!(resolve_sqlite_url("sqlite:data/app.db"), "sqlite:data/app.db");
+        assert_eq!(
+            resolve_sqlite_url("sqlite:data/app.db"),
+            "sqlite:data/app.db"
+        );
     }
 }

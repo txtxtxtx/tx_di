@@ -3,12 +3,12 @@
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
+use admin_domain::shared::model::value_object::SessionEctData;
+use admin_proto::Empty;
 use admin_proto::admin::auth::auth_service_server::AuthService;
 use admin_proto::admin::auth::{
     GetUserInfoRequest, LoginRequest, LoginResponse, LogoutRequest, UserInfoResponse,
 };
-use admin_proto::Empty;
-use admin_domain::shared::model::value_object::SessionEctData;
 use tx_di_core::App;
 use tx_di_sa_token::StpUtil;
 
@@ -74,10 +74,7 @@ impl AuthService for AuthGrpcService {
         Ok(Response::new(r))
     }
 
-    async fn logout(
-        &self,
-        request: Request<LogoutRequest>,
-    ) -> Result<Response<Empty>, Status> {
+    async fn logout(&self, request: Request<LogoutRequest>) -> Result<Response<Empty>, Status> {
         let req = request.into_inner();
         let auth_svc: Arc<admin_app::auth::app_service::AuthAppService> = self.app.inject();
 

@@ -4,7 +4,7 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, FnArg, ImplItemFn, Pat};
+use syn::{FnArg, ImplItemFn, Pat, parse_macro_input};
 
 pub fn intercept_impl(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ImplItemFn);
@@ -78,7 +78,11 @@ pub fn intercept_impl(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
-    let async_prefix = if is_async { quote! { async } } else { quote! {} };
+    let async_prefix = if is_async {
+        quote! { async }
+    } else {
+        quote! {}
+    };
 
     let output_tokens = quote! {
         #visibility #constness #unsafety #async_prefix fn #fn_name #generics (#params) #output {
@@ -100,7 +104,8 @@ fn gen_arg_value(arg_ident: &syn::Ident, ty: &syn::Type) -> proc_macro2::TokenSt
     if ty_str == "i64" || ty_str == "i32" || ty_str == "i16" || ty_str == "i8" {
         return quote! { ::tx_di_core::aop::ArgValue::I64(#arg_ident as i64) };
     }
-    if ty_str == "u64" || ty_str == "u32" || ty_str == "u16" || ty_str == "u8" || ty_str == "usize" {
+    if ty_str == "u64" || ty_str == "u32" || ty_str == "u16" || ty_str == "u8" || ty_str == "usize"
+    {
         return quote! { ::tx_di_core::aop::ArgValue::U64(#arg_ident as u64) };
     }
     if ty_str == "f64" || ty_str == "f32" {

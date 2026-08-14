@@ -13,10 +13,10 @@
 //! - `intercept(...)` / `for(...)` — 占位（后续实现）
 
 use proc_macro2::TokenStream as TokenStream2;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::{
-    parse::{Parse, ParseStream},
     Attribute, Expr, Ident, Result as SynResult, Token, Type,
+    parse::{Parse, ParseStream},
 };
 
 /// 从属性列表中解析 `#[component(...)]`，未找到则返回 `None`
@@ -141,7 +141,7 @@ impl Parse for CompAttrArgs {
                             return Err(syn::Error::new_spanned(
                                 &value,
                                 format!("未知的 scope `{}`", other),
-                            ))
+                            ));
                         }
                     };
                 } else {
@@ -163,7 +163,10 @@ impl Parse for CompAttrArgs {
                     let value: Expr = input.parse()?;
                     init_sort = Some(value);
                 } else {
-                    return Err(syn::Error::new_spanned(&key, "init_sort 必须指定值，如 init_sort = i32::MAX"));
+                    return Err(syn::Error::new_spanned(
+                        &key,
+                        "init_sort 必须指定值，如 init_sort = i32::MAX",
+                    ));
                 }
             } else if key == "conf" {
                 if input.peek(Token![=]) {
@@ -236,4 +239,3 @@ impl Parse for CompAttrArgs {
         })
     }
 }
-

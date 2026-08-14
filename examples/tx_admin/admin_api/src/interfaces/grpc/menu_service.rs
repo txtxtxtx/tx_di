@@ -3,12 +3,12 @@
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
+use admin_proto::Empty;
 use admin_proto::admin::menu::menu_service_server::MenuService;
 use admin_proto::admin::menu::{
     CreateMenuRequest, DeleteMenuRequest, GetMenuRequest, ListMenusRequest, ListMenusResponse,
     MenuResponse, UpdateMenuRequest,
 };
-use admin_proto::Empty;
 use tx_di_core::App;
 
 use super::auth_interceptor::{self, get_login_id};
@@ -30,7 +30,10 @@ impl MenuService for MenuGrpcService {
 
         let req = request.into_inner();
         let svc: Arc<admin_app::menu::app_service::MenuAppService> = self.app.inject();
-        let r = svc.create_menu(req, Some(login_id)).await.map_err(err::to_status)?;
+        let r = svc
+            .create_menu(req, Some(login_id))
+            .await
+            .map_err(err::to_status)?;
         Ok(Response::new(r))
     }
 
@@ -43,7 +46,10 @@ impl MenuService for MenuGrpcService {
 
         let req = request.into_inner();
         let svc: Arc<admin_app::menu::app_service::MenuAppService> = self.app.inject();
-        let r = svc.update_menu(req, Some(login_id)).await.map_err(err::to_status)?;
+        let r = svc
+            .update_menu(req, Some(login_id))
+            .await
+            .map_err(err::to_status)?;
         Ok(Response::new(r))
     }
 

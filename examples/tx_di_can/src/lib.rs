@@ -63,25 +63,25 @@
 //! ```
 
 mod adapter;
+pub mod audit;
 mod config;
 pub mod db;
 pub mod dbc;
 pub mod err;
 mod event;
-mod frame;
 mod flash;
+mod frame;
 pub mod hex;
 mod isotp;
 mod plugin;
-pub mod sim_ecu;
-pub mod record;
-pub mod xcp;
-pub mod audit;
-pub mod report;
 pub mod project;
+pub mod record;
+pub mod report;
+pub mod sim_ecu;
 mod uds;
+pub mod xcp;
 
-pub use adapter::{CanAdapter, AdapterKind};
+pub use adapter::{AdapterKind, CanAdapter};
 
 #[cfg(test)]
 mod tests;
@@ -93,10 +93,10 @@ pub use flash::{FlashConfig, FlashEngine, FlashProgress, FlashResult};
 pub use frame::{CanFdFrame, CanFrame, FrameId, FrameKind};
 pub use isotp::{IsoTpChannel, IsoTpConfig};
 pub use plugin::{BusStats, CanPlugin, FrameFilter};
-pub use sim_ecu::{SimEcuConfig, spawn_sim_ecu};
-pub use record::CsvAnalysis;
 pub use project::ProjectConfig;
-pub use xcp::{parse_a2l, A2l, A2lType, Measurement, Characteristic, XcpMaster, XcpPacket, XcpSlave};
-pub use uds::{
-    DtcRecord, NrcCode, SessionType, UdsClient, UdsError, UdsService,
+pub use record::CsvAnalysis;
+pub use sim_ecu::{SimEcuConfig, spawn_sim_ecu};
+pub use uds::{DtcRecord, NrcCode, SessionType, UdsClient, UdsError, UdsService};
+pub use xcp::{
+    A2l, A2lType, Characteristic, Measurement, XcpMaster, XcpPacket, XcpSlave, parse_a2l,
 };

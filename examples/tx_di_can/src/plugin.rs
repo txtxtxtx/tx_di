@@ -1,21 +1,21 @@
 //! CAN/CANFD 上位机插件主体
 
-use crate::adapter::create_adapter;
 use crate::adapter::CanAdapter;
+use crate::adapter::create_adapter;
 use crate::config::{AdapterKind, CanConfig};
 use crate::db::DescDb;
-use crate::event::{emit_event, CanEvent};
+use crate::event::{CanEvent, emit_event};
 use crate::flash::{FlashConfig, FlashEngine, FlashResult};
 use crate::frame::{CanFdFrame, CanFrame};
 use crate::isotp::{IsoTpChannel, IsoTpConfig};
 use crate::record::Recorder;
-use crate::sim_ecu::{spawn_sim_ecu, SimEcuConfig};
+use crate::sim_ecu::{SimEcuConfig, spawn_sim_ecu};
 use crate::uds::UdsClient;
 use anyhow::Result;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
-use tokio::sync::broadcast::error::RecvError;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::sync::broadcast::error::RecvError;
 use tracing::{info, warn};
 use tx_di_core::{App, Component, DepsTuple, RIE, Store};
 
@@ -72,10 +72,9 @@ impl BusStats {
         } as f64;
         let bus_bits = bitrate as f64 * elapsed_s;
         if bus_bits > 0.0 {
-            self.load_permille = ((bits * (self.frame_count + self.fd_frame_count) as f64
-                / bus_bits)
-                * 1000.0)
-                .min(1000.0) as u32;
+            self.load_permille =
+                ((bits * (self.frame_count + self.fd_frame_count) as f64 / bus_bits) * 1000.0)
+                    .min(1000.0) as u32;
         }
     }
 }
@@ -130,7 +129,6 @@ static INSTANCE: RwLock<Option<Arc<CanPluginInner>>> = RwLock::new(None);
 
 /// 全局配置路径（由 BuildContext 注入）
 // CONFIG_PATH 已废弃：配置直接由 config_path 字段传入 inner_init
-
 
 #[derive(Clone)]
 pub(crate) struct CanPluginInner {
@@ -455,11 +453,7 @@ impl CanPlugin {
     }
 
     /// UDS 写入数据标识符（0x2E DID）
-    pub async fn write_data(
-        tx_id: u32,
-        did: u16,
-        data: &[u8],
-    ) -> Result<(), crate::uds::UdsError> {
+    pub async fn write_data(tx_id: u32, did: u16, data: &[u8]) -> Result<(), crate::uds::UdsError> {
         Self::uds_client(tx_id, tx_id.wrapping_add(8))
             .write_data(did, data)
             .await
