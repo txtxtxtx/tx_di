@@ -55,6 +55,9 @@
     - name: test-api
       # 接口层 E2E（含 gRPC 自动化回归 + admin_proto DTO 序列化）
       script: |
+        # admin_api 测试目标依赖 openssl-sys（reqwest/TLS、nacos-sdk），需安装系统库
+        apt-get update
+        apt-get install -y --no-install-recommends libssl-dev pkg-config
         export CARGO_HOME=/workspace/.cargo-home
         mkdir -p "$CARGO_HOME"
         cargo test -p admin_api
@@ -138,6 +141,9 @@ main:
             cargo test -p admin_app -- --test-threads=1
         - name: test-api
           script: |
+            # admin_api 测试目标依赖 openssl-sys（reqwest/TLS、nacos-sdk），需安装系统库
+            apt-get update
+            apt-get install -y --no-install-recommends libssl-dev pkg-config
             export CARGO_HOME=/workspace/.cargo-home
             mkdir -p "$CARGO_HOME"
             cargo test -p admin_api
