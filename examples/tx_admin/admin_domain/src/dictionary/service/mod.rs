@@ -50,7 +50,7 @@ impl DictTypeService {
         creator: Option<String>,
     ) -> AppResult<DictType> {
         if self.dict_type_repo.exists_by_type(&dict_type).await? {
-            return Err(RepositoryError::DuplicateDictType)?;
+            Err(RepositoryError::DuplicateDictType)?;
         }
         let id = id::next_id();
         let dt = DictType::create(id, name, dict_type, creator);
@@ -90,7 +90,7 @@ impl DictTypeService {
             .dict_type_repo
             .find_by_id(id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundDict)?;
+            .ok_or(RepositoryError::NotFoundDict)?;
         dt.update_info(name, dict_type, remark, updater);
         self.dict_type_repo.update(&dt).await?;
         Ok(dt)
@@ -118,7 +118,7 @@ impl DictTypeService {
             .dict_type_repo
             .find_by_id(id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundDict)?;
+            .ok_or(RepositoryError::NotFoundDict)?;
         dt.soft_delete(updater);
         self.dict_type_repo.update(&dt).await?;
         Ok(())
@@ -237,6 +237,7 @@ impl DictDataService {
     /// # 错误
     /// - `NotFoundDict` - 当指定 id 的字典数据不存在时
     /// - 数据库操作错误 - 仓储查询或更新失败时
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_dict_data(
         &self,
         id: u64,
@@ -253,7 +254,7 @@ impl DictDataService {
             .dict_data_repo
             .find_by_id(id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundDict)?;
+            .ok_or(RepositoryError::NotFoundDict)?;
         dd.update_info(
             sort, label, value, dict_type, color_type, css_class, remark, updater,
         );
@@ -283,7 +284,7 @@ impl DictDataService {
             .dict_data_repo
             .find_by_id(id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundDict)?;
+            .ok_or(RepositoryError::NotFoundDict)?;
         dd.soft_delete(updater);
         self.dict_data_repo.update(&dd).await?;
         Ok(())

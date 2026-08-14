@@ -48,6 +48,7 @@ pub struct Menu {
 
 impl Menu {
     /// 从持久化层恢复菜单（不触发领域事件）
+    #[allow(clippy::too_many_arguments)]
     pub fn restore(
         id: u64,
         name: String,
@@ -126,6 +127,7 @@ impl Menu {
     }
 
     /// Update menu info
+    #[allow(clippy::too_many_arguments)]
     pub fn update_info(
         &mut self,
         name: String,

@@ -89,7 +89,7 @@ impl FileService {
             .file_repo
             .find_by_id(file_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundFile)?;
+            .ok_or(RepositoryError::NotFoundFile)?;
 
         file.soft_delete(updater);
         self.file_repo.update(&file).await?;
@@ -139,7 +139,7 @@ impl FileService {
             .file_repo
             .find_by_id(file_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundFile)?)
+            .ok_or(RepositoryError::NotFoundFile)?)
     }
 
     /// 获取文件下载信息
@@ -165,7 +165,7 @@ impl FileService {
             .file_repo
             .find_by_id(file_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundFile)?;
+            .ok_or(RepositoryError::NotFoundFile)?;
 
         // Determine MIME type from file extension
         let content_type = match file.name.rsplit('.').next() {
@@ -250,7 +250,7 @@ impl FileService {
             .file_config_repo
             .find_by_id(id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundFile)?)
+            .ok_or(RepositoryError::NotFoundFile)?)
     }
 
     /// 创建配置
@@ -282,7 +282,7 @@ impl FileService {
             .file_config_repo
             .find_by_id(id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundFile)?;
+            .ok_or(RepositoryError::NotFoundFile)?;
         agg.update_info(name, storage, remark, config, updater);
         self.file_config_repo.update(&agg).await?;
         Ok(agg)
@@ -294,7 +294,7 @@ impl FileService {
             .file_config_repo
             .find_by_id(id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundFile)?;
+            .ok_or(RepositoryError::NotFoundFile)?;
         agg.soft_delete(updater);
         self.file_config_repo.update(&agg).await?;
         Ok(())
@@ -310,11 +310,11 @@ impl FileService {
         updater: Option<String>,
     ) -> AppResult<FileConfig> {
         // 1. 取消当前主配置
-        if let Some(mut current_master) = self.file_config_repo.find_master().await? {
-            if current_master.id != id {
-                current_master.unset_master(updater.clone());
-                self.file_config_repo.update(&current_master).await?;
-            }
+        if let Some(mut current_master) = self.file_config_repo.find_master().await?
+            && current_master.id != id
+        {
+            current_master.unset_master(updater.clone());
+            self.file_config_repo.update(&current_master).await?;
         }
 
         // 2. 设置新主配置
@@ -322,7 +322,7 @@ impl FileService {
             .file_config_repo
             .find_by_id(id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundFile)?;
+            .ok_or(RepositoryError::NotFoundFile)?;
         agg.set_master(updater);
         self.file_config_repo.update(&agg).await?;
         Ok(agg)

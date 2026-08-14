@@ -46,7 +46,7 @@ impl AuthService {
             .user_service
             .get_by_username(username)
             .await?
-            .ok_or_else(|| AppError::from_code(AuthError::UserNotFound))?;
+            .ok_or(AppError::from_code(AuthError::UserNotFound))?;
 
         if !user.is_active() {
             return Err(AppError::from_code(AuthError::UserDisabled));
