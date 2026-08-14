@@ -15,7 +15,8 @@ use tokio::sync::OnceCell;
 use tx_di_core::App;
 
 // 空导入：触发 admin_api lib 链接（AdminPlugin 等组件 linkme 注册）
-#[allow(unused_imports)]
+#[allow(unused_imports, clippy::single_component_path_imports)]
+use admin_api;
 
 /// 测试服务器句柄
 pub struct TestServer {
