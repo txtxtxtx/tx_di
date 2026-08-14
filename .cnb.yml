@@ -17,7 +17,11 @@
   runner:
     cpus: 8
   docker:
-    image: rust:1.97-slim
+    # 预装 admin_api 编译所需的 openssl 构建依赖（pkg-config/libssl-dev），
+    # 否则 rust:1.97-slim 缺包导致 openssl-sys 编译失败（test-api 阶段）。
+    # 镜像由平台自动缓存，仅当 ci/Dockerfile 变化时才重建。
+    build:
+      dockerfile: ./ci/Dockerfile
     volumes:
       - cargo-registry:/usr/local/cargo/registry:copy-on-write
       - target-cache:/workspace/target:copy-on-write
