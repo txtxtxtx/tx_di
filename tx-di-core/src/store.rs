@@ -14,10 +14,12 @@ use crate::error::{AppError, DiErr};
 /// 存储单元：
 /// - `Factory(Arc<dyn Fn>)` → 存工厂闭包，prototype 每次注入时调用
 /// - `Cached(Arc<dyn Any>)` → 已实例化的单例（擦除类型）
+type FactoryFn = dyn Fn(&Store) -> Arc<dyn Any + Send + Sync> + Send + Sync;
+
 #[derive(Clone)]
 pub enum CompRef {
     /// 工厂闭包：Prototype 作用域，每次注入调用
-    Factory(Arc<dyn Fn(&Store) -> Arc<dyn Any + Send + Sync> + Send + Sync>),
+    Factory(Arc<FactoryFn>),
     /// 已缓存的实例：Singleton 作用域
     Cached(Arc<dyn Any + Send + Sync>),
 }
@@ -54,7 +56,7 @@ impl Store {
     ///
     /// 每次工厂创建新实例后调用，将 `Arc` 转为 `Weak` 存储，便于 shutdown 时通知存活实例。
     pub(crate) fn track_prototype_raw(&self, instance: &Arc<dyn Any + Send + Sync>) {
-        let tid = (&**instance).type_id();
+        let tid = (**instance).type_id();
         let weak = Arc::downgrade(instance);
         self.prototype_instances.entry(tid).or_default().push(weak);
     }
@@ -90,8 +92,10 @@ impl Store {
 
     /// 注册已 Arc 包装的缓存实例
     pub fn insert_arc<T: Any + Send + Sync>(&self, arc: Arc<T>) {
-        self.inner
-            .insert(TypeId::of::<T>(), CompRef::Cached(arc as Arc<dyn Any + Send + Sync>));
+        self.inner.insert(
+            TypeId::of::<T>(),
+            CompRef::Cached(arc as Arc<dyn Any + Send + Sync>),
+        );
     }
 
     /// 注册工厂闭包（Prototype）
@@ -103,9 +107,12 @@ impl Store {
         F: Fn(&Store) -> Arc<T> + Send + Sync + 'static,
     {
         let type_id = TypeId::of::<T>();
-        self.inner.insert(type_id, CompRef::Factory(Arc::new(move |store| {
-            factory(store) as Arc<dyn Any + Send + Sync>
-        })));
+        self.inner.insert(
+            type_id,
+            CompRef::Factory(Arc::new(move |store| {
+                factory(store) as Arc<dyn Any + Send + Sync>
+            })),
+        );
     }
 
     /// 注入组件实例（类型安全）
@@ -129,7 +136,7 @@ impl Store {
                     CompRef::Factory(f) => f(self),
                 };
                 any_arc.downcast::<T>().map_err(|bad_arc| {
-                    let actual = (&*bad_arc).type_id();
+                    let actual = (*bad_arc).type_id();
                     AppError::with_context(
                         DiErr::InjectError,
                         format!(
@@ -246,9 +253,7 @@ pub type TraitImplMap = DashMap<TypeId, Vec<TraitImplEntry>>;
 /// # Panics
 ///
 /// trait 无实现时 panic。
-pub fn inject_trait_from_store<T: ?Sized + Any + Send + Sync + 'static>(
-    store: &Store,
-) -> Arc<T> {
+pub fn inject_trait_from_store<T: ?Sized + Any + Send + Sync + 'static>(store: &Store) -> Arc<T> {
     let tid = TypeId::of::<T>();
     let type_name = std::any::type_name::<T>();
 
@@ -264,12 +269,7 @@ pub fn inject_trait_from_store<T: ?Sized + Any + Send + Sync + 'static>(
                     CompRef::Cached(any_arc) => any_arc.clone(),
                     CompRef::Factory(f) => f(store),
                 })
-                .unwrap_or_else(|| {
-                    panic!(
-                        "[di] trait `{}` 的具体实现未注册到 store",
-                        type_name
-                    )
-                });
+                .unwrap_or_else(|| panic!("[di] trait `{}` 的具体实现未注册到 store", type_name));
             let trait_any = (entry.upcast)(concrete);
             trait_any
                 .downcast_ref::<Arc<T>>()
@@ -296,10 +296,13 @@ pub fn try_inject_trait_from_store<T: ?Sized + Any + Send + Sync + 'static>(
     let tid = TypeId::of::<T>();
 
     let entry = store.trait_impls.get(&tid)?.first().cloned()?;
-    let concrete = store.inner().get(&(entry.concrete_tid)()).map(|r| match &*r {
-        CompRef::Cached(any_arc) => any_arc.clone(),
-        CompRef::Factory(f) => f(store),
-    })?;
+    let concrete = store
+        .inner()
+        .get(&(entry.concrete_tid)())
+        .map(|r| match &*r {
+            CompRef::Cached(any_arc) => any_arc.clone(),
+            CompRef::Factory(f) => f(store),
+        })?;
     let trait_any = (entry.upcast)(concrete);
     trait_any.downcast_ref::<Arc<T>>().cloned()
 }
@@ -317,10 +320,14 @@ pub fn inject_all_traits_from_store<T: ?Sized + Any + Send + Sync + 'static>(
             entries
                 .iter()
                 .filter_map(|entry| {
-                    let concrete = store.inner().get(&(entry.concrete_tid)()).map(|r| match &*r {
-                        CompRef::Cached(any_arc) => any_arc.clone(),
-                        CompRef::Factory(f) => f(store),
-                    })?;
+                    let concrete =
+                        store
+                            .inner()
+                            .get(&(entry.concrete_tid)())
+                            .map(|r| match &*r {
+                                CompRef::Cached(any_arc) => any_arc.clone(),
+                                CompRef::Factory(f) => f(store),
+                            })?;
                     let trait_any = (entry.upcast)(concrete);
                     trait_any.downcast_ref::<Arc<T>>().cloned()
                 })

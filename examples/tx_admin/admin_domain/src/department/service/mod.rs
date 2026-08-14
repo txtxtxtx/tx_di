@@ -1,12 +1,12 @@
+use crate::department::model::aggregate::Department;
+use crate::department::model::value_object::{DeptQuery, DeptTreeNode};
+use crate::department::repository::DepartmentRepository;
+use crate::shared::model::value_object::DeletedStatus;
+use crate::shared::repository::RepositoryError;
 use std::sync::Arc;
 use tx_common::id;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
-use crate::shared::repository::RepositoryError;
-use crate::department::model::aggregate::Department;
-use crate::shared::model::value_object::DeletedStatus;
-use crate::department::model::value_object::{DeptQuery, DeptTreeNode};
-use crate::department::repository::DepartmentRepository;
 
 #[derive(Component)]
 pub struct DepartmentService {
@@ -78,6 +78,7 @@ impl DepartmentService {
     /// - `NotFoundDept` - 指定部门 ID 不存在
     /// - `ValidationDeptSelfParent` - 尝试将部门的父级设为自身
     /// - 数据库更新操作失败时返回仓储层错误
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_dept(
         &self,
         dept_id: u64,
@@ -93,10 +94,10 @@ impl DepartmentService {
             .dept_repo
             .find_by_id(dept_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundDept)?;
+            .ok_or(RepositoryError::NotFoundDept)?;
 
         if parent_id == dept_id {
-            return Err(RepositoryError::ValidationDeptSelfParent)?;
+            Err(RepositoryError::ValidationDeptSelfParent)?;
         }
 
         dept.update_info(name, parent_id, sort, leader_user_id, phone, email, updater);
@@ -125,23 +126,19 @@ impl DepartmentService {
     /// - `ValidationDeptHasUsers` - 该部门下存在用户，不允许删除
     /// - `NotFoundDept` - 指定部门 ID 不存在
     /// - 数据库更新操作失败时返回仓储层错误
-    pub async fn delete_dept(
-        &self,
-        dept_id: u64,
-        updater: Option<String>,
-    ) -> AppResult<()> {
+    pub async fn delete_dept(&self, dept_id: u64, updater: Option<String>) -> AppResult<()> {
         if self.dept_repo.has_children(dept_id).await? {
-            return Err(RepositoryError::ValidationDeptHasChildren)?;
+            Err(RepositoryError::ValidationDeptHasChildren)?;
         }
         if self.dept_repo.has_users(dept_id).await? {
-            return Err(RepositoryError::ValidationDeptHasUsers)?;
+            Err(RepositoryError::ValidationDeptHasUsers)?;
         }
 
         let mut dept = self
             .dept_repo
             .find_by_id(dept_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundDept)?;
+            .ok_or(RepositoryError::NotFoundDept)?;
 
         dept.soft_delete(updater);
         self.dept_repo.update(&dept).await?;
@@ -200,10 +197,11 @@ impl DepartmentService {
     /// - `NotFoundDept` - 指定部门 ID 不存在
     /// - 数据库查询操作失败时返回仓储层错误
     pub async fn get_dept(&self, dept_id: u64) -> AppResult<Department> {
-        Ok(self.dept_repo
+        Ok(self
+            .dept_repo
             .find_by_id(dept_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundDept)?)
+            .ok_or(RepositoryError::NotFoundDept)?)
     }
 
     /// 递归构建部门树（内部方法）

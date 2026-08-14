@@ -118,7 +118,7 @@ impl JobPlugin {
         handler_name: &str,
         handler_param: Option<&str>,
     ) -> JobResult {
-        let executor_type = ExecutorType::from_handler_name(&handler_name);
+        let executor_type = ExecutorType::from_handler_name(handler_name);
         match executor_type {
             ExecutorType::Internal => {
                 self.internal_exec()
@@ -558,17 +558,16 @@ impl JobPlugin {
                                 );
                             }
                             // 执行完成释放分布式锁（仅释放自己持有的锁）
-                            if let Some((cache, lock_key, token)) = &release_lock {
-                                if let Err(e) = cache
+                            if let Some((cache, lock_key, token)) = &release_lock
+                                && let Err(e) = cache
                                     .compare_and_del(lock_key, token.as_bytes())
                                     .await
-                                {
-                                    error!(
-                                        job_id = job.id,
-                                        error = %e,
-                                        "释放分布式锁失败（将由 TTL 兜底）"
-                                    );
-                                }
+                            {
+                                error!(
+                                    job_id = job.id,
+                                    error = %e,
+                                    "释放分布式锁失败（将由 TTL 兜底）"
+                                );
                             }
                         });
 
@@ -673,20 +672,38 @@ mod tests {
 
     #[test]
     fn test_executor_type_internal() {
-        assert_eq!(ExecutorType::from_handler_name("my_func"), ExecutorType::Internal);
-        assert_eq!(ExecutorType::from_handler_name("cleanup_logs"), ExecutorType::Internal);
+        assert_eq!(
+            ExecutorType::from_handler_name("my_func"),
+            ExecutorType::Internal
+        );
+        assert_eq!(
+            ExecutorType::from_handler_name("cleanup_logs"),
+            ExecutorType::Internal
+        );
     }
 
     #[test]
     fn test_executor_type_shell() {
-        assert_eq!(ExecutorType::from_handler_name("/opt/scripts/backup.sh"), ExecutorType::Shell);
-        assert_eq!(ExecutorType::from_handler_name("test.sh"), ExecutorType::Shell);
+        assert_eq!(
+            ExecutorType::from_handler_name("/opt/scripts/backup.sh"),
+            ExecutorType::Shell
+        );
+        assert_eq!(
+            ExecutorType::from_handler_name("test.sh"),
+            ExecutorType::Shell
+        );
     }
 
     #[test]
     fn test_executor_type_python() {
-        assert_eq!(ExecutorType::from_handler_name("/opt/scripts/analyze.py"), ExecutorType::Python);
-        assert_eq!(ExecutorType::from_handler_name("script.py"), ExecutorType::Python);
+        assert_eq!(
+            ExecutorType::from_handler_name("/opt/scripts/analyze.py"),
+            ExecutorType::Python
+        );
+        assert_eq!(
+            ExecutorType::from_handler_name("script.py"),
+            ExecutorType::Python
+        );
     }
 
     // ── InfrustJob 软删除 ────────────────────────────────
@@ -713,7 +730,10 @@ mod tests {
             soft_delete: SoftDelete::NORMAL,
         };
         assert!(!job.is_deleted());
-        let deleted = InfrustJob { soft_delete: SoftDelete::DELETED, ..job.clone() };
+        let deleted = InfrustJob {
+            soft_delete: SoftDelete::DELETED,
+            ..job.clone()
+        };
         assert!(deleted.is_deleted());
     }
 
@@ -780,12 +800,10 @@ mod tests {
     #[tokio::test]
     async fn test_internal_executor_success() {
         let executor = InternalJobExecutor::new(Duration::from_secs(30));
-        executor.register("success_fn", |_| {
-            JobResult {
-                status: ExecutionStatus::Success,
-                result: Some("done".into()),
-                error: None,
-            }
+        executor.register("success_fn", |_| JobResult {
+            status: ExecutionStatus::Success,
+            result: Some("done".into()),
+            error: None,
         });
         let result = executor.execute(1, "success_fn", None).await;
         assert_eq!(result.status, ExecutionStatus::Success);
@@ -803,14 +821,14 @@ mod tests {
     #[tokio::test]
     async fn test_internal_executor_param_passing() {
         let executor = InternalJobExecutor::new(Duration::from_secs(30));
-        executor.register("param_fn", |param| {
-            JobResult {
-                status: ExecutionStatus::Success,
-                result: param.map(|s| s.to_string()),
-                error: None,
-            }
+        executor.register("param_fn", |param| JobResult {
+            status: ExecutionStatus::Success,
+            result: param.map(|s| s.to_string()),
+            error: None,
         });
-        let result = executor.execute(1, "param_fn", Some(r#"{"key":"value"}"#)).await;
+        let result = executor
+            .execute(1, "param_fn", Some(r#"{"key":"value"}"#))
+            .await;
         assert_eq!(result.status, ExecutionStatus::Success);
         assert_eq!(result.result.as_deref(), Some(r#"{"key":"value"}"#));
     }

@@ -9,8 +9,8 @@ use crate::db::DescDb;
 use crate::flash::{FlashConfig, FlashEngine};
 use crate::isotp::IsoTpConfig;
 use crate::uds::UdsClient;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
 /// 在 SimBus 上启动仿真并返回 tester 客户端与停止标志
@@ -206,11 +206,8 @@ async fn sim_read_multi_did() {
         .read_data_multi(&[0xF190, 0xF195, 0x010B])
         .await
         .expect("多 DID 读应成功");
-    let map = UdsClient::parse_data_by_id(
-        &resp,
-        &[(0xF190, 17), (0xF195, 4), (0x010B, 1)],
-    )
-    .expect("解析应成功");
+    let map = UdsClient::parse_data_by_id(&resp, &[(0xF190, 17), (0xF195, 4), (0x010B, 1)])
+        .expect("解析应成功");
     assert_eq!(map[&0xF190], b"1HGCM82633A004352");
     assert_eq!(map[&0xF195], vec![0x01, 0x02, 0x03, 0x04]);
     assert_eq!(map[&0x010B], vec![0x38]);
@@ -227,9 +224,15 @@ async fn sim_read_dtc_subfn() {
     };
     let (ecu, _running) = setup(cfg).await;
     // 0x01 返回数量（可能无 DTC 记录），仅校验不报错
-    let _ = ecu.read_dtc_subfn(0x01, 0xFF).await.expect("sub-fn 0x01 应成功");
+    let _ = ecu
+        .read_dtc_subfn(0x01, 0xFF)
+        .await
+        .expect("sub-fn 0x01 应成功");
     // 0x0A 返回受支持 DTC 列表（含记录）
-    let dtcs2 = ecu.read_dtc_subfn(0x0A, 0xFF).await.expect("sub-fn 0x0A 应成功");
+    let dtcs2 = ecu
+        .read_dtc_subfn(0x0A, 0xFF)
+        .await
+        .expect("sub-fn 0x0A 应成功");
     assert!(!dtcs2.is_empty());
 }
 

@@ -4,10 +4,10 @@ use crate::file::model::aggregate::{File, FileConfig};
 use crate::file::model::value_object::{FileDownloadInfo, FileQuery, FileUploadCommand};
 use crate::file::repository::{FileConfigRepository, FileRepository};
 use crate::shared::repository::RepositoryError;
+use tx_common::id;
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
-use tx_common::id;
 
 #[derive(Component)]
 pub struct FileService {
@@ -89,7 +89,7 @@ impl FileService {
             .file_repo
             .find_by_id(file_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundFile)?;
+            .ok_or(RepositoryError::NotFoundFile)?;
 
         file.soft_delete(updater);
         self.file_repo.update(&file).await?;
@@ -135,10 +135,11 @@ impl FileService {
     /// - `NotFoundFile` - 当指定 file_id 的文件不存在时
     /// - 数据库操作错误 - 仓储查询失败时
     pub async fn get_file(&self, file_id: u64) -> AppResult<File> {
-        Ok(self.file_repo
+        Ok(self
+            .file_repo
             .find_by_id(file_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundFile)?)
+            .ok_or(RepositoryError::NotFoundFile)?)
     }
 
     /// 获取文件下载信息
@@ -160,10 +161,11 @@ impl FileService {
     /// - `NotFoundFile` - 当指定 file_id 的文件不存在时
     /// - 数据库操作错误 - 仓储查询失败时
     pub async fn download_file(&self, file_id: u64) -> AppResult<FileDownloadInfo> {
-        let file = self.file_repo
+        let file = self
+            .file_repo
             .find_by_id(file_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundFile)?;
+            .ok_or(RepositoryError::NotFoundFile)?;
 
         // Determine MIME type from file extension
         let content_type = match file.name.rsplit('.').next() {
@@ -248,7 +250,7 @@ impl FileService {
             .file_config_repo
             .find_by_id(id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundFile)?)
+            .ok_or(RepositoryError::NotFoundFile)?)
     }
 
     /// 创建配置
@@ -280,7 +282,7 @@ impl FileService {
             .file_config_repo
             .find_by_id(id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundFile)?;
+            .ok_or(RepositoryError::NotFoundFile)?;
         agg.update_info(name, storage, remark, config, updater);
         self.file_config_repo.update(&agg).await?;
         Ok(agg)
@@ -292,7 +294,7 @@ impl FileService {
             .file_config_repo
             .find_by_id(id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundFile)?;
+            .ok_or(RepositoryError::NotFoundFile)?;
         agg.soft_delete(updater);
         self.file_config_repo.update(&agg).await?;
         Ok(())
@@ -308,11 +310,11 @@ impl FileService {
         updater: Option<String>,
     ) -> AppResult<FileConfig> {
         // 1. 取消当前主配置
-        if let Some(mut current_master) = self.file_config_repo.find_master().await? {
-            if current_master.id != id {
-                current_master.unset_master(updater.clone());
-                self.file_config_repo.update(&current_master).await?;
-            }
+        if let Some(mut current_master) = self.file_config_repo.find_master().await?
+            && current_master.id != id
+        {
+            current_master.unset_master(updater.clone());
+            self.file_config_repo.update(&current_master).await?;
         }
 
         // 2. 设置新主配置
@@ -320,7 +322,7 @@ impl FileService {
             .file_config_repo
             .find_by_id(id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundFile)?;
+            .ok_or(RepositoryError::NotFoundFile)?;
         agg.set_master(updater);
         self.file_config_repo.update(&agg).await?;
         Ok(agg)

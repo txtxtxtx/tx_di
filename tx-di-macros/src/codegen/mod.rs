@@ -16,13 +16,13 @@ pub mod meta_entry;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{parse_macro_input, Ident, ItemStruct, Result as SynResult, Type, Visibility};
+use syn::{Ident, ItemStruct, Result as SynResult, Type, Visibility, parse_macro_input};
 
-use crate::attr::comp_attr::{parse_component_attr_from_attributes, CompAttr};
-use crate::classify::fields::{classify_fields, FieldKind};
+use crate::attr::comp_attr::{CompAttr, parse_component_attr_from_attributes};
+use crate::classify::fields::{FieldKind, classify_fields};
 use crate::type_utils::{
-    extract_trait_from_arc, extract_trait_from_option_arc, extract_trait_from_vec_arc,
-    is_arc_like, strip_arc_type,
+    extract_trait_from_arc, extract_trait_from_option_arc, extract_trait_from_vec_arc, is_arc_like,
+    strip_arc_type,
 };
 
 /// `#[derive(Component)]` 入口
@@ -80,17 +80,17 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
     // 非配置组件：校验 Inject 类型的字段是否确实是 Arc<T> 形式
     if !comp_attr.is_config_component() {
         for (ident, kind) in &fields_info {
-            if let FieldKind::Inject { ty } = kind {
-                if !is_arc_like(ty) {
-                    return Err(syn::Error::new_spanned(
-                        ty,
-                        format!(
-                            "字段 `{}` 的类型不是 Arc<Component> / Option<Component> / trait object 形式，\
-                             请使用 #[tx_cst(expr)] 指定值表达式，或 #[tx_cst(skip)] 跳过注入",
-                            ident
-                        ),
-                    ));
-                }
+            if let FieldKind::Inject { ty } = kind
+                && !is_arc_like(ty)
+            {
+                return Err(syn::Error::new_spanned(
+                    ty,
+                    format!(
+                        "字段 `{}` 的类型不是 Arc<Component> / Option<Component> / trait object 形式，\
+                         请使用 #[tx_cst(expr)] 指定值表达式，或 #[tx_cst(skip)] 跳过注入",
+                        ident
+                    ),
+                ));
             }
         }
     }

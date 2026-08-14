@@ -2,8 +2,8 @@
 
 use tonic::{Request, Response, Status};
 
-use admin_proto::admin::tool::tool_service_server::ToolService;
 use admin_proto::admin::tool::CacheStatsResponse;
+use admin_proto::admin::tool::tool_service_server::ToolService;
 
 use super::auth_interceptor::{self, get_login_id};
 

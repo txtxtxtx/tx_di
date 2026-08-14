@@ -1,13 +1,13 @@
+use crate::password;
+use crate::shared::repository::RepositoryError;
+use crate::user::model::aggregate::User;
+use crate::user::model::value_object::{Sex, UserQuery, UserStatus};
+use crate::user::repository::UserRepository;
 use std::sync::Arc;
 use tx_common::id;
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
-use crate::shared::repository::RepositoryError;
-use crate::user::model::aggregate::User;
-use crate::user::model::value_object::{Sex, UserQuery, UserStatus};
-use crate::user::repository::UserRepository;
-use crate::password;
 
 /// User domain service
 ///
@@ -94,7 +94,7 @@ impl UserService {
     ) -> AppResult<User> {
         // Check if username already exists
         if self.user_repo.exists_by_username(&username).await? {
-            return Err(RepositoryError::DuplicateUsername)?;
+            Err(RepositoryError::DuplicateUsername)?;
         }
 
         // Hash password with Argon2id
@@ -122,11 +122,17 @@ impl UserService {
         creator: Option<String>,
     ) -> AppResult<User> {
         if self.user_repo.exists_by_username(&username).await? {
-            return Err(RepositoryError::DuplicateUsername)?;
+            Err(RepositoryError::DuplicateUsername)?;
         }
         let hashed_password = password::hash_password(&password)?;
         let user_id = id::next_id();
-        Ok(User::create(user_id, username, hashed_password, nickname, creator))
+        Ok(User::create(
+            user_id,
+            username,
+            hashed_password,
+            nickname,
+            creator,
+        ))
     }
 
     /// 更新用户基本信息
@@ -151,6 +157,7 @@ impl UserService {
     /// # 错误
     /// - `NotFoundUser` - 指定用户不存在
     /// - 数据库更新失败时返回错误
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_user(
         &self,
         user_id: u64,
@@ -165,7 +172,7 @@ impl UserService {
             .user_repo
             .find_by_id(user_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundUser)?;
+            .ok_or(RepositoryError::NotFoundUser)?;
 
         user.set_basic_info(nickname, email, mobile, sex, remark, updater);
         self.user_repo.update(&user).await?;
@@ -189,16 +196,12 @@ impl UserService {
     /// # 错误
     /// - `NotFoundUser` - 指定用户不存在
     /// - 数据库更新失败时返回错误
-    pub async fn delete_user(
-        &self,
-        user_id: u64,
-        updater: Option<String>,
-    ) -> AppResult<()> {
+    pub async fn delete_user(&self, user_id: u64, updater: Option<String>) -> AppResult<()> {
         let mut user = self
             .user_repo
             .find_by_id(user_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundUser)?;
+            .ok_or(RepositoryError::NotFoundUser)?;
 
         user.soft_delete(updater);
         self.user_repo.update(&user).await?;
@@ -233,7 +236,7 @@ impl UserService {
             .user_repo
             .find_by_id(user_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundUser)?;
+            .ok_or(RepositoryError::NotFoundUser)?;
 
         user.change_status(status, updater);
         self.user_repo.update(&user).await?;
@@ -270,7 +273,7 @@ impl UserService {
             .user_repo
             .find_by_id(user_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundUser)?;
+            .ok_or(RepositoryError::NotFoundUser)?;
 
         // Hash new password with Argon2id
         let hashed_password = password::hash_password(&password)?;
@@ -323,7 +326,7 @@ impl UserService {
             .user_repo
             .find_by_id(user_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundUser)?;
+            .ok_or(RepositoryError::NotFoundUser)?;
         user.role_ids = self.user_repo.get_role_ids(user.id).await?;
         user.dept_ids = self.user_repo.get_dept_ids(user.id).await?;
         Ok(user)
@@ -363,16 +366,12 @@ impl UserService {
     /// # 错误
     /// - `NotFoundUser` - 指定用户不存在
     /// - 数据库更新失败时返回错误
-    pub async fn record_login(
-        &self,
-        user_id: u64,
-        ip: String,
-    ) -> AppResult<User> {
+    pub async fn record_login(&self, user_id: u64, ip: String) -> AppResult<User> {
         let mut user = self
             .user_repo
             .find_by_id(user_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundUser)?;
+            .ok_or(RepositoryError::NotFoundUser)?;
 
         user.record_login(ip);
         self.user_repo.update(&user).await?;

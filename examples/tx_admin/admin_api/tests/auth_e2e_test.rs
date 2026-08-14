@@ -8,7 +8,7 @@
 mod common;
 
 use common::*;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// 登录成功：返回 code=200 + token + Set-Cookie
 #[tokio::test]
@@ -28,10 +28,7 @@ async fn login_success_returns_token_and_cookie() {
         .expect("登录请求失败");
     assert_eq!(resp.status(), 200, "登录应返回 HTTP 200");
 
-    let set_cookie = resp
-        .headers()
-        .get(reqwest::header::SET_COOKIE)
-        .cloned();
+    let set_cookie = resp.headers().get(reqwest::header::SET_COOKIE).cloned();
     assert!(set_cookie.is_some(), "登录响应应包含 Set-Cookie 头");
 
     let body: Value = resp.json().await.expect("登录响应 JSON 解析失败");
@@ -137,9 +134,16 @@ async fn logout_clears_cookie_and_invalidates_token() {
         .send()
         .await
         .expect("登出请求失败");
-    assert_eq!(logout_resp.status(), 200, "登出应返回 HTTP 200: {logout_resp:?}");
+    assert_eq!(
+        logout_resp.status(),
+        200,
+        "登出应返回 HTTP 200: {logout_resp:?}"
+    );
     let logout_body: Value = logout_resp.json().await.expect("登出响应 JSON 解析失败");
-    assert_eq!(logout_body["code"], 200, "登出业务码应为 200: {logout_body}");
+    assert_eq!(
+        logout_body["code"], 200,
+        "登出业务码应为 200: {logout_body}"
+    );
 
     // 旧 token 应已失效
     let old_client = authed_client(&token);

@@ -345,7 +345,10 @@ pub fn rewrite_connection_address(sdp: &str, new_ip: &str) -> String {
             let _ = rest;
             out.push_str(&format!("c=IN {} {}\r\n", addr_type, new_ip));
         } else if let Some(rest) = trimmed.strip_prefix("o=") {
-            out.push_str(&format!("o={}\r\n", rewrite_o_line(rest, addr_type, new_ip)));
+            out.push_str(&format!(
+                "o={}\r\n",
+                rewrite_o_line(rest, addr_type, new_ip)
+            ));
         } else {
             out.push_str(line);
             out.push_str("\r\n");
@@ -1111,7 +1114,11 @@ s=Play\r\n\
 c=IN IP4 192.168.1.10\r\n\
 m=video 10000 RTP/AVP 96\r\n";
         let out = rewrite_connection_address(sdp, "203.0.113.50");
-        assert!(out.contains("c=IN IP4 203.0.113.50"), "c= 行应被重写: {}", out);
+        assert!(
+            out.contains("c=IN IP4 203.0.113.50"),
+            "c= 行应被重写: {}",
+            out
+        );
         assert!(
             out.contains("o=- 1 1 IN IP4 203.0.113.50"),
             "o= 行地址应被重写: {}",

@@ -1,8 +1,8 @@
-use std::any::Any;
-use async_trait::async_trait;
-use tx_error::AppResult;
 use crate::department::model::aggregate::Department;
 use crate::department::model::value_object::DeptQuery;
+use async_trait::async_trait;
+use std::any::Any;
+use tx_error::AppResult;
 
 #[async_trait]
 pub trait DepartmentRepository: Any + Send + Sync {

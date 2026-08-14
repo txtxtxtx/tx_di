@@ -4,7 +4,7 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, FnArg, ImplItemFn, Pat};
+use syn::{FnArg, ImplItemFn, Pat, parse_macro_input};
 
 pub fn intercept_impl(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ImplItemFn);
@@ -22,16 +22,16 @@ pub fn intercept_impl(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // ── 参数生成 ──────────────────────────────────────────────────
     let mut arg_calls = Vec::new();
     for param in params.iter() {
-        if let FnArg::Typed(pt) = param {
-            if let Pat::Ident(pat_ident) = &*pt.pat {
-                let arg_name = pat_ident.ident.to_string();
-                let arg_ident = &pat_ident.ident;
-                let ty = &pt.ty;
-                let arg_val = gen_arg_value(arg_ident, ty);
-                arg_calls.push(quote! {
-                    .with_arg(#arg_name, #arg_val)
-                });
-            }
+        if let FnArg::Typed(pt) = param
+            && let Pat::Ident(pat_ident) = &*pt.pat
+        {
+            let arg_name = pat_ident.ident.to_string();
+            let arg_ident = &pat_ident.ident;
+            let ty = &pt.ty;
+            let arg_val = gen_arg_value(arg_ident, ty);
+            arg_calls.push(quote! {
+                .with_arg(#arg_name, #arg_val)
+            });
         }
     }
 
@@ -78,7 +78,11 @@ pub fn intercept_impl(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
-    let async_prefix = if is_async { quote! { async } } else { quote! {} };
+    let async_prefix = if is_async {
+        quote! { async }
+    } else {
+        quote! {}
+    };
 
     let output_tokens = quote! {
         #visibility #constness #unsafety #async_prefix fn #fn_name #generics (#params) #output {
@@ -100,7 +104,8 @@ fn gen_arg_value(arg_ident: &syn::Ident, ty: &syn::Type) -> proc_macro2::TokenSt
     if ty_str == "i64" || ty_str == "i32" || ty_str == "i16" || ty_str == "i8" {
         return quote! { ::tx_di_core::aop::ArgValue::I64(#arg_ident as i64) };
     }
-    if ty_str == "u64" || ty_str == "u32" || ty_str == "u16" || ty_str == "u8" || ty_str == "usize" {
+    if ty_str == "u64" || ty_str == "u32" || ty_str == "u16" || ty_str == "u8" || ty_str == "usize"
+    {
         return quote! { ::tx_di_core::aop::ArgValue::U64(#arg_ident as u64) };
     }
     if ty_str == "f64" || ty_str == "f32" {
@@ -129,10 +134,10 @@ fn gen_arg_value(arg_ident: &syn::Ident, ty: &syn::Type) -> proc_macro2::TokenSt
 fn is_result_type(output: &syn::ReturnType) -> bool {
     match output {
         syn::ReturnType::Type(_, ty) => {
-            if let syn::Type::Path(tp) = ty.as_ref() {
-                if let Some(seg) = tp.path.segments.last() {
-                    return seg.ident == "Result";
-                }
+            if let syn::Type::Path(tp) = ty.as_ref()
+                && let Some(seg) = tp.path.segments.last()
+            {
+                return seg.ident == "Result";
             }
             false
         }

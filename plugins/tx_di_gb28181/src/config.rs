@@ -126,7 +126,7 @@ pub struct Gb28181ServerConfig {
     /// 级联配置（上下级平台互联）
     #[serde(default)]
     pub cascade: CascadeConfig,
-    
+
     /// 统一流媒体后端配置（新版）
     ///
     /// 通过 `[gb28181_server_config.media_backend]` 配置，支持 ZLM、MediaMTX、Null。
@@ -135,7 +135,6 @@ pub struct Gb28181ServerConfig {
     pub media_backend: MediaBackendConfig,
 
     // ── 访问控制 ──────────────────────────────────────────────────────────────
-
     /// 设备注册白名单（device_id 列表）
     ///
     /// 非空时：**仅白名单中的设备允许注册**，其余设备返回 403 Forbidden。
@@ -160,7 +159,6 @@ pub struct Gb28181ServerConfig {
     pub blocked_device_ids: Vec<String>,
 
     // ── 协议版本（每设备粒度）─────────────────────────────────────────────────
-
     /// 默认协议版本（新注册设备未在下表命中时使用），默认 2022
     ///
     /// ```toml
@@ -232,10 +230,10 @@ fn default_auth_password() -> String {
 /// # upper_platform_id = "34020000002000000001"
 /// # upper_auth_password = "12345678"
 /// ```
-#[derive(Debug, Clone, Deserialize,Default)]
+#[derive(Debug, Clone, Deserialize, Default)]
 pub struct CascadeConfig {
     /// 本平台是否同时作为上级（接收下级设备/平台注册）
-    #[serde(default="enable_upper")]
+    #[serde(default = "enable_upper")]
     pub enable_upper: bool,
 
     /// 本平台是否同时作为下级（向上级平台注册）
@@ -331,4 +329,3 @@ mod tests {
         assert_eq!(cfg.default_version, GbVersion::V2022);
     }
 }
-

@@ -1,12 +1,12 @@
+use crate::err::JobResult;
+use crate::executors::JobExecutor;
+use crate::models::ExecutionStatus;
+use async_trait::async_trait;
 use std::path::Path;
 use std::time::Duration;
-use async_trait::async_trait;
 use tokio::process::Command;
 use tokio::time::timeout;
-use tracing::{info, warn, error};
-use crate::err::JobResult;
-use crate::models::ExecutionStatus;
-use crate::executors::JobExecutor;
+use tracing::{error, info, warn};
 
 /// Shell 脚本执行器
 ///
@@ -28,7 +28,7 @@ impl ShellJobExecutor {
     pub fn new(timeout: Duration) -> Self {
         Self { timeout }
     }
-    
+
     /// 设置超时时间
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
@@ -40,7 +40,7 @@ impl ShellJobExecutor {
 impl JobExecutor for ShellJobExecutor {
     async fn execute(&self, job_id: u64, handler_name: &str, param: Option<&str>) -> JobResult {
         info!(job_id = job_id, script = handler_name, "执行 Shell 脚本");
-        
+
         // 检查脚本是否存在
         if !Path::new(handler_name).exists() {
             error!(job_id = job_id, script = handler_name, "脚本文件不存在");
@@ -50,29 +50,27 @@ impl JobExecutor for ShellJobExecutor {
                 error: Some(format!("脚本文件不存在: {}", handler_name)),
             };
         }
-        
+
         // 构建命令
         let mut cmd = Command::new("bash");
         cmd.arg(handler_name);
         if let Some(p) = param {
             cmd.arg(p);
         }
-        
+
         // 设置超时并执行
         let output = match timeout(self.timeout, cmd.output()).await {
-            Ok(result) => {
-                match result {
-                    Ok(output) => output,
-                    Err(e) => {
-                        error!(job_id = job_id, error = %e, "执行脚本失败");
-                        return JobResult {
-                            status: ExecutionStatus::Failed,
-                            result: None,
-                            error: Some(format!("执行脚本失败: {}", e)),
-                        };
-                    }
+            Ok(result) => match result {
+                Ok(output) => output,
+                Err(e) => {
+                    error!(job_id = job_id, error = %e, "执行脚本失败");
+                    return JobResult {
+                        status: ExecutionStatus::Failed,
+                        result: None,
+                        error: Some(format!("执行脚本失败: {}", e)),
+                    };
                 }
-            }
+            },
             Err(_) => {
                 warn!(job_id = job_id, "脚本执行超时");
                 return JobResult {
@@ -82,7 +80,7 @@ impl JobExecutor for ShellJobExecutor {
                 };
             }
         };
-        
+
         // 检查执行结果
         if output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout).to_string();

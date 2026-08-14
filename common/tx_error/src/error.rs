@@ -5,10 +5,10 @@
 //! - `WithContext` — 带动态上下文
 //! - `Internal` — 框架/IO/第三方库错误，带完整错误链
 
-use std::fmt;
+use crate::CodeMsg;
 use crate::code::AppErrCode;
 use crate::code::CodeMsg as CodeMsgTrait; // trait
-use crate::CodeMsg; // derive 宏
+use std::fmt; // derive 宏
 
 /// 统一错误类型。
 ///
@@ -41,14 +41,23 @@ impl AppError {
     #[inline]
     pub fn from_code<C: CodeMsgTrait>(code: C) -> Self {
         let c = code.err_code();
-        Self::ErrCode { domain: c.domain, code: c.code, message: c.message }
+        Self::ErrCode {
+            domain: c.domain,
+            code: c.code,
+            message: c.message,
+        }
     }
 
     /// 带上下文构造
     #[inline]
     pub fn with_context<C: CodeMsgTrait>(code: C, context: impl Into<String>) -> Self {
         let c = code.err_code();
-        Self::WithContext { domain: c.domain, code: c.code, message: c.message, context: context.into() }
+        Self::WithContext {
+            domain: c.domain,
+            code: c.code,
+            message: c.message,
+            context: context.into(),
+        }
     }
 
     /// 从 anyhow 构造内部错误
@@ -113,7 +122,9 @@ impl AppError {
     pub fn full_message(&self) -> String {
         match self {
             Self::ErrCode { message, .. } => message.to_string(),
-            Self::WithContext { message, context, .. } => format!("{message}: {context}"),
+            Self::WithContext {
+                message, context, ..
+            } => format!("{message}: {context}"),
             Self::Internal(e) => format!("{e}"),
         }
     }
@@ -122,9 +133,18 @@ impl AppError {
     pub fn err_code(&self) -> AppErrCode {
         match self {
             #[allow(clippy::explicit_auto_deref)]
-            Self::ErrCode { domain, code, message } => AppErrCode::new(*domain, *code, *message),
+            Self::ErrCode {
+                domain,
+                code,
+                message,
+            } => AppErrCode::new(*domain, *code, *message),
             #[allow(clippy::explicit_auto_deref)]
-            Self::WithContext { domain, code, message, .. } => AppErrCode::new(*domain, *code, *message),
+            Self::WithContext {
+                domain,
+                code,
+                message,
+                ..
+            } => AppErrCode::new(*domain, *code, *message),
             Self::Internal(e) => {
                 tracing::error!("internal error: {e:?}");
                 AppErrCode::new("SYS", 90000, "Internal error")
@@ -155,8 +175,17 @@ impl Eq for AppError {}
 impl fmt::Display for AppError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ErrCode { domain, code, message } => write!(f, "[{domain}:{code}] {message}"),
-            Self::WithContext { domain, code, message, context } => write!(f, "[{domain}:{code}] {message}: {context}"),
+            Self::ErrCode {
+                domain,
+                code,
+                message,
+            } => write!(f, "[{domain}:{code}] {message}"),
+            Self::WithContext {
+                domain,
+                code,
+                message,
+                context,
+            } => write!(f, "[{domain}:{code}] {message}: {context}"),
             Self::Internal(e) => write!(f, "{e}"),
         }
     }
@@ -164,7 +193,10 @@ impl fmt::Display for AppError {
 
 impl std::error::Error for AppError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self { Self::Internal(e) => Some(e.as_ref()), _ => None }
+        match self {
+            Self::Internal(e) => Some(e.as_ref()),
+            _ => None,
+        }
     }
 }
 
@@ -176,25 +208,34 @@ impl From<anyhow::Error> for AppError {
     }
 }
 
-
 impl From<String> for AppError {
-    fn from(s: String) -> Self { Self::Internal(anyhow::anyhow!(s)) }
+    fn from(s: String) -> Self {
+        Self::Internal(anyhow::anyhow!(s))
+    }
 }
 
 impl From<&str> for AppError {
-    fn from(s: &str) -> Self { Self::Internal(anyhow::anyhow!(s.to_string())) }
+    fn from(s: &str) -> Self {
+        Self::Internal(anyhow::anyhow!(s.to_string()))
+    }
 }
 
 impl From<std::io::Error> for AppError {
-    fn from(err: std::io::Error) -> Self { Self::Internal(err.into()) }
+    fn from(err: std::io::Error) -> Self {
+        Self::Internal(err.into())
+    }
 }
 
 impl From<serde_json::Error> for AppError {
-    fn from(err: serde_json::Error) -> Self { Self::Internal(err.into()) }
+    fn from(err: serde_json::Error) -> Self {
+        Self::Internal(err.into())
+    }
 }
 
 impl From<toml::de::Error> for AppError {
-    fn from(err: toml::de::Error) -> Self { Self::Internal(err.into()) }
+    fn from(err: toml::de::Error) -> Self {
+        Self::Internal(err.into())
+    }
 }
 
 // ── 类型别名 ────────────────────────────────────────────────
@@ -230,15 +271,19 @@ mod tests {
     #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
     #[err("SYS")]
     pub enum SysErr {
-        #[err(0, "Success")] Success,
-        #[err(1001, "Config load failed")] ConfigLoadFailed,
+        #[err(0, "Success")]
+        Success,
+        #[err(1001, "Config load failed")]
+        ConfigLoadFailed,
     }
 
     #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
     #[err("USER")]
     pub enum UserErr {
-        #[err(2001, "User not found")] NotFound,
-        #[err(2002, "Permission denied")] PermissionDenied,
+        #[err(2001, "User not found")]
+        NotFound,
+        #[err(2002, "Permission denied")]
+        PermissionDenied,
     }
 
     #[test]
@@ -285,7 +330,7 @@ mod tests {
         assert!(!a.is_same_kind(&b));
         assert!(!a.is_same_kind(&c));
     }
-    
+
     #[test]
     fn test_io_error_conversion() {
         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");

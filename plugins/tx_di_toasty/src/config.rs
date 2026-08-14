@@ -123,10 +123,10 @@ impl Default for ToastyConfig {
 fn init(this: &mut ToastyConfig, _store: &Store) -> RIE<()> {
     // 生产部署通过环境变量 DATABASE_URL 覆盖连接串（容器/多实例场景），
     // 优先级高于 TOML 配置，避免镜像内硬编码数据库口令。
-    if let Ok(url) = std::env::var("DATABASE_URL") {
-        if !url.trim().is_empty() {
-            this.database_url = url;
-        }
+    if let Ok(url) = std::env::var("DATABASE_URL")
+        && !url.trim().is_empty()
+    {
+        this.database_url = url;
     }
     // 生产部署通过 APP_HOME 锚定 SQLite 相对路径，避免依赖进程工作目录
     this.database_url = tx_di_core::resolve_sqlite_url(&this.database_url);

@@ -3,15 +3,15 @@
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
+use admin_domain::user::model::value_object::UserStatus;
+use admin_proto::Empty;
+use admin_proto::admin::common::PageResponse;
 use admin_proto::admin::user::user_service_server::UserService;
 use admin_proto::admin::user::{
     AssignDeptsRequest, AssignRolesRequest, ChangePasswordRequest, ChangeUserStatusRequest,
     CreateUserRequest, DeleteUserRequest, GetUserRequest, ListUsersRequest, ListUsersResponse,
     UpdateUserRequest, UserIdRequest, UserResponse,
 };
-use admin_proto::admin::common::PageResponse;
-use admin_proto::Empty;
-use admin_domain::user::model::value_object::UserStatus;
 use tx_di_core::App;
 
 use super::auth_interceptor::{self, get_login_id};
@@ -136,7 +136,9 @@ impl UserService for UserGrpcService {
 
         let req = request.into_inner();
         let svc: Arc<admin_app::user::app_service::UserAppService> = self.app.inject();
-        svc.assign_roles(req.user_id, req.role_ids).await.map_err(err::to_status)?;
+        svc.assign_roles(req.user_id, req.role_ids)
+            .await
+            .map_err(err::to_status)?;
         Ok(Response::new(Empty {}))
     }
 
@@ -202,10 +204,7 @@ impl UserService for UserGrpcService {
         Ok(Response::new(Empty {}))
     }
 
-    async fn lock_user(
-        &self,
-        request: Request<UserIdRequest>,
-    ) -> Result<Response<Empty>, Status> {
+    async fn lock_user(&self, request: Request<UserIdRequest>) -> Result<Response<Empty>, Status> {
         let login_id = get_login_id(&request)?;
         auth_interceptor::ensure_grpc_permission(&login_id, "user:status").await?;
 

@@ -5,24 +5,24 @@
 
 use rsipstack::dialog::authenticate::Credential;
 use rsipstack::dialog::client_dialog::ClientInviteDialog;
-use rsipstack::dialog::dialog::{DialogStateReceiver, DialogState};
+use rsipstack::dialog::dialog::{DialogState, DialogStateReceiver};
 use rsipstack::dialog::dialog_layer::DialogLayer;
 use rsipstack::dialog::invitation::{InviteAsyncResult, InviteOption};
 use rsipstack::dialog::registration::Registration;
 use rsipstack::sip as rsip;
-use rsipstack::sip::{CallId, ContentType, CSeq, Event, Expires, From, MaxForwards, To, Via};
 use rsipstack::sip::StatusCodeKind;
+use rsipstack::sip::{CSeq, CallId, ContentType, Event, Expires, From, MaxForwards, To, Via};
 use rsipstack::transaction::endpoint::EndpointInnerRef;
 use rsipstack::transaction::key::{TransactionKey, TransactionRole};
 use rsipstack::transaction::transaction::Transaction;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::Mutex;
 use tracing::info;
 use tx_di_core::RIE;
 
-use crate::config::{SipConfig, SipTransport};
 use crate::SipErr;
+use crate::config::{SipConfig, SipTransport};
 
 /// INVITE 会话句柄：对话框 + 状态通知通道 + 生命周期守卫
 ///

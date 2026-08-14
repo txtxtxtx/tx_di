@@ -1,13 +1,13 @@
+use crate::menu::model::aggregate::Menu;
+use crate::menu::model::value_object::{MenuQuery, MenuTreeNode};
+use crate::menu::repository::MenuRepository;
+use crate::shared::model::value_object::DeletedStatus;
+use crate::shared::repository::RepositoryError;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tx_common::id;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
-use crate::shared::repository::RepositoryError;
-use crate::menu::model::aggregate::Menu;
-use crate::shared::model::value_object::DeletedStatus;
-use crate::menu::model::value_object::{MenuQuery, MenuTreeNode};
-use crate::menu::repository::MenuRepository;
 
 /// Menu domain service
 #[derive(Component)]
@@ -49,6 +49,7 @@ impl MenuService {
     ///
     /// # 错误
     /// - 数据库插入操作失败时返回仓储层错误
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_menu(
         &self,
         name: String,
@@ -102,6 +103,7 @@ impl MenuService {
     /// - `NotFoundMenu` - 指定菜单 ID 不存在
     /// - `ValidationMenuSelfParent` - 尝试将菜单的父级设为自身
     /// - 数据库更新操作失败时返回仓储层错误
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_menu(
         &self,
         menu_id: u64,
@@ -122,16 +124,26 @@ impl MenuService {
             .menu_repo
             .find_by_id(menu_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundMenu)?;
+            .ok_or(RepositoryError::NotFoundMenu)?;
 
         // Cannot set self as parent
         if parent_id == menu_id {
-            return Err(RepositoryError::ValidationMenuSelfParent)?;
+            Err(RepositoryError::ValidationMenuSelfParent)?;
         }
 
         menu.update_info(
-            name, permission, types, sort, parent_id, path, icon, component, component_name,
-            visible, keep_alive, updater,
+            name,
+            permission,
+            types,
+            sort,
+            parent_id,
+            path,
+            icon,
+            component,
+            component_name,
+            visible,
+            keep_alive,
+            updater,
         );
         self.menu_repo.update(&menu).await?;
         Ok(menu)
@@ -156,20 +168,16 @@ impl MenuService {
     /// - `ValidationMenuHasChildren` - 该菜单下存在子菜单，不允许删除
     /// - `NotFoundMenu` - 指定菜单 ID 不存在
     /// - 数据库更新操作失败时返回仓储层错误
-    pub async fn delete_menu(
-        &self,
-        menu_id: u64,
-        updater: Option<String>,
-    ) -> AppResult<()> {
+    pub async fn delete_menu(&self, menu_id: u64, updater: Option<String>) -> AppResult<()> {
         if self.menu_repo.has_children(menu_id).await? {
-            return Err(RepositoryError::ValidationMenuHasChildren)?;
+            Err(RepositoryError::ValidationMenuHasChildren)?;
         }
 
         let mut menu = self
             .menu_repo
             .find_by_id(menu_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundMenu)?;
+            .ok_or(RepositoryError::NotFoundMenu)?;
 
         menu.soft_delete(updater);
         self.menu_repo.update(&menu).await?;
@@ -233,7 +241,9 @@ impl MenuService {
     ///
     /// 通过用户关联的角色，从菜单中 types==2 的记录提取 permission 字段
     pub async fn get_user_permission_codes(&self, user_id: u64) -> AppResult<HashSet<String>> {
-        self.menu_repo.find_permission_codes_by_user_id(user_id).await
+        self.menu_repo
+            .find_permission_codes_by_user_id(user_id)
+            .await
     }
 
     /// 递归构建菜单树（内部方法）

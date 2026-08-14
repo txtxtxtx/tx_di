@@ -27,14 +27,14 @@
 //! let db = app.inject::<ToastyPlugin>().db();
 //! ```
 
-use std::path::PathBuf;
+use crate::ToastyErr;
 use crate::config::ToastyConfig;
+use std::path::PathBuf;
 use std::sync::{Arc, OnceLock, RwLock};
 use toasty::ModelSet;
 use tx_di_core::inject_from_store;
 use tx_di_core::{App, AppAllConfig};
 use tx_di_core::{AppError, Component, DepsTuple, RIE};
-use crate::ToastyErr;
 
 /// Toasty 数据库实例的类型别名
 ///
@@ -112,7 +112,8 @@ impl ToastyPlugin {
     /// - 如果同一个 ModelId 被多次注册，后注册的模型定义会覆盖之前的
     /// - 此方法是线程安全的，内部使用写锁保护
     pub fn register_models(&self, models: ModelSet) {
-        let mut inner_models = self.models
+        let mut inner_models = self
+            .models
             .write()
             .expect("ToastyPlugin: 模型注册表 RwLock 被毒化");
 
@@ -125,9 +126,7 @@ impl ToastyPlugin {
     ///
     /// 必须在 `async_init` 完成后调用，否则 panic。
     pub fn db(&self) -> &ToastyDb {
-        self.db
-            .get()
-            .expect("ToastyPlugin: db 还未初始化")
+        self.db.get().expect("ToastyPlugin: db 还未初始化")
     }
 
     /// 尝试获取 Db 引用（安全版本）
@@ -158,7 +157,7 @@ impl ToastyPlugin {
     ///
     /// `Transaction` 由 `lib.rs` re-export；`ToastyErr::TxBeginFailed/TxCommitFailed`
     /// 提供标准错误码。
-
+    ///
     /// 将配置文件的 `auto_schema = true` 改为 `false`（按行替换，保留注释与格式）
     fn change_auto_schema_closed(path: PathBuf) {
         let content = match std::fs::read_to_string(&path) {
@@ -174,7 +173,10 @@ impl ToastyPlugin {
             .map(|line| {
                 let normalized: String = line.chars().filter(|c| !c.is_whitespace()).collect();
                 if normalized == "auto_schema=true" {
-                    let indent = line.chars().take_while(|c| c.is_whitespace()).collect::<String>();
+                    let indent = line
+                        .chars()
+                        .take_while(|c| c.is_whitespace())
+                        .collect::<String>();
                     format!("{}auto_schema = false", indent)
                 } else {
                     line.to_string()
@@ -261,7 +263,9 @@ async fn app_async_init(comp: Arc<ToastyPlugin>, _app: Arc<App>) -> RIE<()> {
         ToastyPlugin::change_auto_schema_closed(app_config.config_path.clone());
     }
     // 写入 OnceLock
-    comp.db.set(db).expect(&ToastyErr::AlreadyInitialized.to_string());
+    comp.db
+        .set(db)
+        .unwrap_or_else(|_| panic!("{}", ToastyErr::AlreadyInitialized.to_string()));
     tracing::info!("数据库初始化完成");
     Ok(())
 }
@@ -295,10 +299,7 @@ impl ToastyPlugin {
     ///     &config,
     /// ).await?;
     /// ```
-    pub async fn build_db_with_models(
-        models: ModelSet,
-        config: &ToastyConfig,
-    ) -> RIE<toasty::Db> {
+    pub async fn build_db_with_models(models: ModelSet, config: &ToastyConfig) -> RIE<toasty::Db> {
         let mut builder = toasty::Db::builder();
         builder.models(models);
 

@@ -3,12 +3,12 @@
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
+use admin_proto::Empty;
 use admin_proto::admin::dept::department_service_server::DepartmentService;
 use admin_proto::admin::dept::{
     CreateDeptRequest, DeleteDeptRequest, DeptResponse, GetDeptRequest, ListDeptsRequest,
     ListDeptsResponse, UpdateDeptRequest,
 };
-use admin_proto::Empty;
 use tx_di_core::App;
 
 use super::auth_interceptor::{self, get_login_id};
@@ -30,7 +30,10 @@ impl DepartmentService for DeptGrpcService {
 
         let req = request.into_inner();
         let svc: Arc<admin_app::department::app_service::DepartmentAppService> = self.app.inject();
-        let r = svc.create_dept(req, Some(login_id)).await.map_err(err::to_status)?;
+        let r = svc
+            .create_dept(req, Some(login_id))
+            .await
+            .map_err(err::to_status)?;
         Ok(Response::new(r))
     }
 
@@ -43,7 +46,10 @@ impl DepartmentService for DeptGrpcService {
 
         let req = request.into_inner();
         let svc: Arc<admin_app::department::app_service::DepartmentAppService> = self.app.inject();
-        let r = svc.update_dept(req, Some(login_id)).await.map_err(err::to_status)?;
+        let r = svc
+            .update_dept(req, Some(login_id))
+            .await
+            .map_err(err::to_status)?;
         Ok(Response::new(r))
     }
 

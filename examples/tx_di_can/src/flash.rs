@@ -27,12 +27,12 @@
 //! - **0xFF 填充区域**：自动跳过，避免额外擦除开销
 //! - **预擦除**：可通过 `erase_before_download=true` 配置显式全擦
 
-use crate::event::{emit_event, CanEvent};
+use crate::event::{CanEvent, emit_event};
 use crate::uds::{SessionType, UdsClient};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::path::Path;
-use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 use std::time::Instant;
 
 /// 刷写配置
@@ -124,11 +124,7 @@ impl FlashEngine {
     /// 执行完整刷写流程
     ///
     /// `key_fn`：ECU 安全算法回调（seed → key）
-    pub async fn flash<F>(
-        &self,
-        firmware: impl AsRef<Path>,
-        key_fn: F,
-    ) -> Result<FlashResult>
+    pub async fn flash<F>(&self, firmware: impl AsRef<Path>, key_fn: F) -> Result<FlashResult>
     where
         F: Fn(&[u8]) -> Vec<u8> + Send + Sync,
     {
@@ -144,9 +140,8 @@ impl FlashEngine {
         F: Fn(&[u8]) -> Vec<u8> + Send + Sync,
     {
         let total_bytes = data.len();
-        let total_blocks = ((total_bytes as f64)
-            / (self.config.default_block_size as f64 - 1.0))
-            .ceil() as u32;
+        let total_blocks =
+            ((total_bytes as f64) / (self.config.default_block_size as f64 - 1.0)).ceil() as u32;
 
         {
             let mut guard = self.start.lock().unwrap();
@@ -161,7 +156,10 @@ impl FlashEngine {
         );
 
         // ── 1. 安全访问 ──────────────────────────────
-        tracing::info!("[flash] 1/7 安全访问 (level={})", self.config.security_level);
+        tracing::info!(
+            "[flash] 1/7 安全访问 (level={})",
+            self.config.security_level
+        );
         if let Err(e) = self
             .uds
             .security_access(self.config.security_level, &key_fn)
@@ -176,10 +174,7 @@ impl FlashEngine {
         }
 
         // ── 2. 进入编程会话 ──────────────────────────
-        tracing::info!(
-            "[flash] 2/7 进入编程会话 ({:?})",
-            self.config.session_type
-        );
+        tracing::info!("[flash] 2/7 进入编程会话 ({:?})", self.config.session_type);
         if let Err(e) = self.uds.session_control(self.config.session_type).await {
             let reason = format!("进入编程会话失败: {e}");
             emit_event(CanEvent::FlashError {

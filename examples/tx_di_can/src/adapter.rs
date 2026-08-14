@@ -5,17 +5,17 @@
 //! - **SocketCAN**：Linux 原生 CAN，使用 libc PF_CAN
 //! - **PCAN**：PEAK PCAN USB 设备（Windows），需要 `features = ["pcan"]`
 
+use crate::adapter::pcan_impl::get_pcan;
 pub use crate::config::AdapterKind;
 use crate::err::CanErr;
 use crate::frame::{CanFdFrame, CanFrame};
 use anyhow::Result;
 use async_trait::async_trait;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::sync::broadcast;
 use tokio::task::JoinSet;
-use crate::adapter::pcan_impl::get_pcan;
 // ─────────────────────────────────────────────────────────────────────────────
 // Trait 定义
 // ─────────────────────────────────────────────────────────────────────────────
@@ -197,8 +197,7 @@ fn make_linux_can_frame(frame: &CanFrame) -> CanFrameLinux {
 #[cfg(target_os = "linux")]
 fn make_linux_fd_frame(frame: &CanFdFrame) -> CanFdFrameLinux {
     let len = frame.data.len().min(64) as u8;
-    let flags =
-        0x04u8 // CANFD flag
+    let flags = 0x04u8 // CANFD flag
         | if frame.brs { 0x01 } else { 0 }
         | if frame.esi { 0x02 } else { 0 };
     let mut cf = CanFdFrameLinux {
@@ -241,9 +240,7 @@ impl CanAdapter for SocketCanAdapter {
                 );
             }
 
-            let ret = unsafe {
-                libc::ioctl(sock, libc::SIOCGIFINDEX as _, ptr::addr_of_mut!(ifr))
-            };
+            let ret = unsafe { libc::ioctl(sock, libc::SIOCGIFINDEX as _, ptr::addr_of_mut!(ifr)) };
             if ret < 0 {
                 let err = std::io::Error::last_os_error();
                 unsafe { libc::close(sock) };
@@ -608,7 +605,8 @@ mod pcan_impl {
     // FFI 函数指针
     type PcanOpen = unsafe extern "system" fn(channel: u32) -> PcanHandle;
     type PcanClose = unsafe extern "system" fn(handle: PcanHandle) -> u32;
-    type PcanInit = unsafe extern "system" fn(handle: PcanHandle, btr0btr1: u16, hwtype: u32) -> u32;
+    type PcanInit =
+        unsafe extern "system" fn(handle: PcanHandle, btr0btr1: u16, hwtype: u32) -> u32;
     type PcanWrite = unsafe extern "system" fn(handle: PcanHandle, msg: *const PcanMsg) -> u32;
     /// CAN_ReadFD：读取 CAN / CAN-FD 帧（FD 通道同时支持两种帧）
     type PcanReadFd = unsafe extern "system" fn(handle: PcanHandle, msg: *mut PcanMsgFd) -> u32;
@@ -647,14 +645,15 @@ mod pcan_impl {
                 }
             }
 
-            let dll = dll.ok_or_else(|| {
-                anyhow::Error::from(CanErr::DllNotFound)
-            })?;
+            let dll = dll.ok_or_else(|| anyhow::Error::from(CanErr::DllNotFound))?;
 
             let get_sym = |name: &str| -> anyhow::Result<unsafe extern "system" fn() -> isize> {
                 let cname = CString::new(name).unwrap();
                 let sym = unsafe {
-                    GetProcAddress(dll, windows::core::PCSTR(cname.as_bytes_with_nul().as_ptr()))
+                    GetProcAddress(
+                        dll,
+                        windows::core::PCSTR(cname.as_bytes_with_nul().as_ptr()),
+                    )
                 };
                 if sym.is_none() {
                     return Err(anyhow::anyhow!(
@@ -686,20 +685,36 @@ mod pcan_impl {
     pub fn resolve_channel(name: &str) -> u32 {
         let upper = name.to_uppercase();
         if upper.contains("USBFD") || upper.contains("PROFD") {
-            if upper.contains('1') { PCAN_USBPROFDBUS1 }
-            else if upper.contains('2') { PCAN_USBPROFDBUS2 }
-            else { PCAN_USBBUS1 }
-        } else if upper.contains("USB1") { PCAN_USBBUS1 }
-        else if upper.contains("USB2") { PCAN_USBBUS2 }
-        else if upper.contains("USB3") { PCAN_USBBUS3 }
-        else if upper.contains("USB4") { PCAN_USBBUS4 }
-        else if upper.contains("USB5") { PCAN_USBBUS5 }
-        else if upper.contains("USB6") { PCAN_USBBUS6 }
-        else if upper.contains("USB7") { PCAN_USBBUS7 }
-        else if upper.contains("USB8") { PCAN_USBBUS8 }
-        else if upper.contains("PCI1") { PCAN_PCIBUS1 }
-        else if upper.contains("PCI2") { PCAN_PCIBUS2 }
-        else { PCAN_NONEBUS }
+            if upper.contains('1') {
+                PCAN_USBPROFDBUS1
+            } else if upper.contains('2') {
+                PCAN_USBPROFDBUS2
+            } else {
+                PCAN_USBBUS1
+            }
+        } else if upper.contains("USB1") {
+            PCAN_USBBUS1
+        } else if upper.contains("USB2") {
+            PCAN_USBBUS2
+        } else if upper.contains("USB3") {
+            PCAN_USBBUS3
+        } else if upper.contains("USB4") {
+            PCAN_USBBUS4
+        } else if upper.contains("USB5") {
+            PCAN_USBBUS5
+        } else if upper.contains("USB6") {
+            PCAN_USBBUS6
+        } else if upper.contains("USB7") {
+            PCAN_USBBUS7
+        } else if upper.contains("USB8") {
+            PCAN_USBBUS8
+        } else if upper.contains("PCI1") {
+            PCAN_PCIBUS1
+        } else if upper.contains("PCI2") {
+            PCAN_PCIBUS2
+        } else {
+            PCAN_NONEBUS
+        }
     }
 
     pub struct PcanState {
@@ -941,8 +956,7 @@ impl CanAdapter for PcanAdapter {
         let pcan = get_pcan();
         let msg_type = (PCAN_MESSAGE_FD
             | if frame.brs { PCAN_MESSAGE_BRS } else { 0 }
-            | if frame.esi { PCAN_MESSAGE_ESI } else { 0 })
-            as u8;
+            | if frame.esi { PCAN_MESSAGE_ESI } else { 0 }) as u8;
         // 构造 TPCANMsgFD：dlc 使用 FD DLC 编码（0..=15），DATA 最多 64 字节
         let mut msg: PcanMsgFd = unsafe { std::mem::zeroed() };
         msg.can_id = frame.id.raw();
@@ -994,7 +1008,9 @@ pub fn create_adapter(
         ),
         #[cfg(not(all(windows, feature = "pcan")))]
         AdapterKind::Pcan => {
-            tracing::warn!("[pcan] 适配器未启用，请使用 `features = [\"pcan\"]` 并在 Windows 上编译");
+            tracing::warn!(
+                "[pcan] 适配器未启用，请使用 `features = [\"pcan\"]` 并在 Windows 上编译"
+            );
             Arc::new(SimBusAdapter::new(interface, queue_size))
         }
         AdapterKind::Kvaser => {

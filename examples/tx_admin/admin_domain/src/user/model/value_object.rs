@@ -1,7 +1,7 @@
-use std::collections::HashSet;
+use crate::shared::model::value_object::TenantId;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use crate::shared::model::value_object::TenantId;
+use std::collections::HashSet;
 
 /// User query filters
 /// 用户查询结构体，用于封装用户查询相关的参数

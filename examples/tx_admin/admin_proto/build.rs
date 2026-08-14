@@ -5,7 +5,9 @@ fn main() -> Result<()> {
     // 使用 vendored protoc，无需系统安装
     let protoc_path = protoc_bin_vendored::protoc_bin_path().unwrap();
     // SAFETY: build.rs 是单线程的，set_var 仅用于引导 protoc 路径
-    unsafe { std::env::set_var("PROTOC", protoc_path); }
+    unsafe {
+        std::env::set_var("PROTOC", protoc_path);
+    }
 
     // 确保生成目录存在（首次 clone 构建时需要）
     std::fs::create_dir_all("src/pb")?;
@@ -44,7 +46,10 @@ fn main() -> Result<()> {
         .type_attribute(".", "#[serde_with::serde_as]")
         .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
         .type_attribute(".", "#[serde(rename_all = \"camelCase\")]")
-        .field_attribute("optional", "#[serde(skip_serializing_if = \"Option::is_none\")]")
+        .field_attribute(
+            "optional",
+            "#[serde(skip_serializing_if = \"Option::is_none\")]",
+        )
         // 生成文件描述符集合（供 gRPC 服务反射使用）
         .file_descriptor_set_path("src/pb/admin_descriptor.bin")
         .compile_protos(&proto_paths, &[proto_dir])?;
@@ -54,7 +59,7 @@ fn main() -> Result<()> {
     for entry in std::fs::read_dir(pb_dir)? {
         let entry = entry?;
         let path = entry.path();
-        if path.extension().map_or(false, |e| e == "rs") {
+        if path.extension().is_some_and(|e| e == "rs") {
             post_process_serde_as(&path)?;
         }
     }
@@ -93,10 +98,7 @@ fn post_process_serde_as(path: &Path) -> Result<()> {
             } else {
                 "crate::flexible_serde::FlexibleDisplayFromStr"
             };
-            result.push_str(&format!(
-                "{}#[serde_as(as = \"{}\")]\n",
-                indent, as_type
-            ));
+            result.push_str(&format!("{}#[serde_as(as = \"{}\")]\n", indent, as_type));
         }
     }
 

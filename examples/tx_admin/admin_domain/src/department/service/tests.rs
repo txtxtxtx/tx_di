@@ -4,16 +4,16 @@
 
 #[cfg(test)]
 mod department_service_tests {
-    use std::sync::Arc;
-    use async_trait::async_trait;
-    use tx_error::AppResult;
-    use crate::shared::model::value_object::DeletedStatus;
-    use crate::shared::repository::RepositoryError;
     use crate::department::model::aggregate::Department;
     use crate::department::model::value_object::DeptQuery;
     use crate::department::repository::DepartmentRepository;
     use crate::department::service::DepartmentService;
+    use crate::shared::model::value_object::DeletedStatus;
+    use crate::shared::repository::RepositoryError;
+    use async_trait::async_trait;
     use pretty_assertions::assert_eq;
+    use std::sync::Arc;
+    use tx_error::AppResult;
 
     struct TestDeptRepo {
         find_by_id_fn: Box<dyn Fn(u64) -> AppResult<Option<Department>> + Send + Sync>,
@@ -41,15 +41,33 @@ mod department_service_tests {
 
     #[async_trait]
     impl DepartmentRepository for TestDeptRepo {
-        async fn find_by_id(&self, id: u64) -> AppResult<Option<Department>> { (self.find_by_id_fn)(id) }
-        async fn find_all(&self, query: &DeptQuery) -> AppResult<Vec<Department>> { (self.find_all_fn)(query) }
-        async fn find_by_ids(&self, ids: &[u64]) -> AppResult<Vec<Department>> { (self.find_by_ids_fn)(ids) }
-        async fn find_by_parent_id(&self, _: u64) -> AppResult<Vec<Department>> { Ok(vec![]) }
-        async fn insert(&self, dept: &Department) -> AppResult<()> { (self.insert_fn)(dept) }
-        async fn update(&self, dept: &Department) -> AppResult<()> { (self.update_fn)(dept) }
-        async fn soft_delete(&self, _: u64) -> AppResult<()> { Ok(()) }
-        async fn has_children(&self, parent_id: u64) -> AppResult<bool> { (self.has_children_fn)(parent_id) }
-        async fn has_users(&self, dept_id: u64) -> AppResult<bool> { (self.has_users_fn)(dept_id) }
+        async fn find_by_id(&self, id: u64) -> AppResult<Option<Department>> {
+            (self.find_by_id_fn)(id)
+        }
+        async fn find_all(&self, query: &DeptQuery) -> AppResult<Vec<Department>> {
+            (self.find_all_fn)(query)
+        }
+        async fn find_by_ids(&self, ids: &[u64]) -> AppResult<Vec<Department>> {
+            (self.find_by_ids_fn)(ids)
+        }
+        async fn find_by_parent_id(&self, _: u64) -> AppResult<Vec<Department>> {
+            Ok(vec![])
+        }
+        async fn insert(&self, dept: &Department) -> AppResult<()> {
+            (self.insert_fn)(dept)
+        }
+        async fn update(&self, dept: &Department) -> AppResult<()> {
+            (self.update_fn)(dept)
+        }
+        async fn soft_delete(&self, _: u64) -> AppResult<()> {
+            Ok(())
+        }
+        async fn has_children(&self, parent_id: u64) -> AppResult<bool> {
+            (self.has_children_fn)(parent_id)
+        }
+        async fn has_users(&self, dept_id: u64) -> AppResult<bool> {
+            (self.has_users_fn)(dept_id)
+        }
     }
 
     fn make_dept() -> Department {
@@ -68,7 +86,9 @@ mod department_service_tests {
         repo.insert_fn = Box::new(|_| Ok(()));
 
         let svc = DepartmentService::new(Arc::new(repo));
-        let r = svc.create_dept("HR".into(), 0, 1, Some("admin".into())).await;
+        let r = svc
+            .create_dept("HR".into(), 0, 1, Some("admin".into()))
+            .await;
         assert!(r.is_ok());
         let dept = r.unwrap();
         assert_eq!(dept.name, "HR");
@@ -93,9 +113,18 @@ mod department_service_tests {
         repo.update_fn = Box::new(|_| Ok(()));
 
         let svc = DepartmentService::new(Arc::new(repo));
-        let r = svc.update_dept(
-            1, "NewName".into(), 0, 2, Some(10), Some("123".into()), Some("a@b.com".into()), Some("admin".into()),
-        ).await;
+        let r = svc
+            .update_dept(
+                1,
+                "NewName".into(),
+                0,
+                2,
+                Some(10),
+                Some("123".into()),
+                Some("a@b.com".into()),
+                Some("admin".into()),
+            )
+            .await;
         assert!(r.is_ok());
         let dept = r.unwrap();
         assert_eq!(dept.name, "NewName");
@@ -109,9 +138,11 @@ mod department_service_tests {
         repo.find_by_id_fn = Box::new(|_| Ok(None));
 
         let svc = DepartmentService::new(Arc::new(repo));
-        assert!(svc.update_dept(
-            999, "X".into(), 0, 0, None, None, None, None,
-        ).await.is_err());
+        assert!(
+            svc.update_dept(999, "X".into(), 0, 0, None, None, None, None,)
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]
@@ -121,9 +152,11 @@ mod department_service_tests {
 
         let svc = DepartmentService::new(Arc::new(repo));
         // parent_id == dept_id should fail
-        assert!(svc.update_dept(
-            1, "Name".into(), 1, 0, None, None, None, None,
-        ).await.is_err());
+        assert!(
+            svc.update_dept(1, "Name".into(), 1, 0, None, None, None, None,)
+                .await
+                .is_err()
+        );
     }
 
     // ---- delete_dept ----
@@ -206,10 +239,7 @@ mod department_service_tests {
         repo.find_all_fn = Box::new(|_| {
             let mut deleted = make_dept_with(2, "OldDept", 0);
             deleted.audit.deleted = DeletedStatus::Deleted;
-            Ok(vec![
-                make_dept_with(1, "Active", 0),
-                deleted,
-            ])
+            Ok(vec![make_dept_with(1, "Active", 0), deleted])
         });
 
         let svc = DepartmentService::new(Arc::new(repo));

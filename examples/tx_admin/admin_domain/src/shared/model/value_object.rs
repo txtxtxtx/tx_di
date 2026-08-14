@@ -1,7 +1,6 @@
-
-use std::str::FromStr;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use std::str::FromStr;
 
 /// 删除状态
 #[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -15,7 +14,7 @@ pub enum DeletedStatus {
 }
 
 /// 租户ID
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct TenantId(u64);
 
 impl TenantId {
@@ -25,11 +24,6 @@ impl TenantId {
 
     pub fn into_inner(self) -> u64 {
         self.0
-    }
-}
-impl Default for TenantId {
-    fn default() -> Self {
-        Self(0)
     }
 }
 impl From<u64> for TenantId {

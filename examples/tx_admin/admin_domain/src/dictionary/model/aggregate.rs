@@ -1,8 +1,8 @@
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
-use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent, Entity};
 use crate::shared::model::value_object::DeletedStatus;
+use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent, Entity};
 
 /// Dictionary type aggregate root
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,12 +56,7 @@ impl DictType {
         }
     }
 
-    pub fn create(
-        id: u64,
-        name: String,
-        dict_type: String,
-        creator: Option<String>,
-    ) -> Self {
+    pub fn create(id: u64, name: String, dict_type: String, creator: Option<String>) -> Self {
         let mut dt = Self {
             id,
             name,
@@ -81,13 +76,21 @@ impl DictType {
         dt
     }
 
-    pub fn update_info(&mut self, name: String, dict_type: String, remark: Option<String>, updater: Option<String>) {
+    pub fn update_info(
+        &mut self,
+        name: String,
+        dict_type: String,
+        remark: Option<String>,
+        updater: Option<String>,
+    ) {
         self.name = name;
         self.dict_type = dict_type;
         self.remark = remark;
         self.audit.updater = updater;
         self.audit.update_time = Timestamp::now();
-        self.add_event(DomainEvent::DictTypeUpdated { dict_type_id: self.id });
+        self.add_event(DomainEvent::DictTypeUpdated {
+            dict_type_id: self.id,
+        });
     }
 
     pub fn change_status(&mut self, status: i32, updater: Option<String>) {
@@ -100,7 +103,9 @@ impl DictType {
         self.audit.deleted = DeletedStatus::Deleted;
         self.audit.updater = updater;
         self.audit.update_time = Timestamp::now();
-        self.add_event(DomainEvent::DictTypeDeleted { dict_type_id: self.id });
+        self.add_event(DomainEvent::DictTypeDeleted {
+            dict_type_id: self.id,
+        });
     }
 }
 
@@ -141,6 +146,7 @@ impl AggregateRoot for DictData {
 
 impl DictData {
     /// 从持久化层恢复字典数据（不触发领域事件）
+    #[allow(clippy::too_many_arguments)]
     pub fn restore(
         id: u64,
         sort: i32,
@@ -199,6 +205,7 @@ impl DictData {
         dd
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn update_info(
         &mut self,
         sort: i32,
@@ -219,7 +226,9 @@ impl DictData {
         self.remark = remark;
         self.audit.updater = updater;
         self.audit.update_time = Timestamp::now();
-        self.add_event(DomainEvent::DictDataUpdated { dict_data_id: self.id });
+        self.add_event(DomainEvent::DictDataUpdated {
+            dict_data_id: self.id,
+        });
     }
 
     pub fn change_status(&mut self, status: i32, updater: Option<String>) {
@@ -232,6 +241,8 @@ impl DictData {
         self.audit.deleted = DeletedStatus::Deleted;
         self.audit.updater = updater;
         self.audit.update_time = Timestamp::now();
-        self.add_event(DomainEvent::DictDataDeleted { dict_data_id: self.id });
+        self.add_event(DomainEvent::DictDataDeleted {
+            dict_data_id: self.id,
+        });
     }
 }

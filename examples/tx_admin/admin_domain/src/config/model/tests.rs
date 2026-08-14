@@ -5,14 +5,22 @@
 
 #[cfg(test)]
 mod config_tests {
-    use crate::shared::model::value_object::DeletedStatus;
-    use crate::shared::model::AggregateRoot;
     use crate::config::model::aggregate::Config;
+    use crate::shared::model::AggregateRoot;
     use crate::shared::model::DomainEvent;
+    use crate::shared::model::value_object::DeletedStatus;
     use pretty_assertions::assert_eq;
 
     fn make_config() -> Config {
-        Config::create(1, "system".into(), 1, "SiteName".into(), "site.name".into(), "MyApp".into(), Some("admin".into()))
+        Config::create(
+            1,
+            "system".into(),
+            1,
+            "SiteName".into(),
+            "site.name".into(),
+            "MyApp".into(),
+            Some("admin".into()),
+        )
     }
 
     #[test]
@@ -27,15 +35,35 @@ mod config_tests {
 
     #[test]
     fn test_create_config_raises_event() {
-        let c = Config::create(2, "email".into(), 2, "SMTP".into(), "smtp.host".into(), "localhost".into(), None);
+        let c = Config::create(
+            2,
+            "email".into(),
+            2,
+            "SMTP".into(),
+            "smtp.host".into(),
+            "localhost".into(),
+            None,
+        );
         assert_eq!(c.events().len(), 1);
-        assert!(matches!(c.events()[0], DomainEvent::ConfigCreated { config_id: 2 }));
+        assert!(matches!(
+            c.events()[0],
+            DomainEvent::ConfigCreated { config_id: 2 }
+        ));
     }
 
     #[test]
     fn test_update_info_changes_all() {
         let mut c = make_config();
-        c.update_info("email".into(), 2, "SMTP Host".into(), "smtp.host".into(), "mail.example.com".into(), 0, Some("remark".into()), Some("updater".into()));
+        c.update_info(
+            "email".into(),
+            2,
+            "SMTP Host".into(),
+            "smtp.host".into(),
+            "mail.example.com".into(),
+            0,
+            Some("remark".into()),
+            Some("updater".into()),
+        );
 
         assert_eq!(c.category, "email");
         assert_eq!(c.value, "mail.example.com");
@@ -47,9 +75,21 @@ mod config_tests {
     fn test_update_info_raises_event() {
         let mut c = make_config();
         let before = c.events().len();
-        c.update_info("x".into(), 0, "x".into(), "x".into(), "x".into(), 0, None, None);
+        c.update_info(
+            "x".into(),
+            0,
+            "x".into(),
+            "x".into(),
+            "x".into(),
+            0,
+            None,
+            None,
+        );
         assert_eq!(c.events().len(), before + 1);
-        assert!(matches!(c.events().last(), Some(DomainEvent::ConfigUpdated { config_id: 1 })));
+        assert!(matches!(
+            c.events().last(),
+            Some(DomainEvent::ConfigUpdated { config_id: 1 })
+        ));
     }
 
     #[test]
@@ -65,7 +105,10 @@ mod config_tests {
         let before = c.events().len();
         c.soft_delete(None);
         assert_eq!(c.events().len(), before + 1);
-        assert!(matches!(c.events().last(), Some(DomainEvent::ConfigDeleted { config_id: 1 })));
+        assert!(matches!(
+            c.events().last(),
+            Some(DomainEvent::ConfigDeleted { config_id: 1 })
+        ));
     }
 
     // ============================================================
@@ -76,7 +119,14 @@ mod config_tests {
     fn test_restore_does_not_raise_events() {
         use crate::shared::model::AuditFields;
         let c = Config::restore(
-            1, "s".into(), 1, "N".into(), "k".into(), "v".into(), 1, None,
+            1,
+            "s".into(),
+            1,
+            "N".into(),
+            "k".into(),
+            "v".into(),
+            1,
+            None,
             AuditFields::default(),
         );
         assert!(c.events().is_empty());
@@ -112,7 +162,16 @@ mod config_tests {
     fn test_update_info_clears_remark() {
         let mut c = make_config();
         c.remark = Some("old".into());
-        c.update_info("s".into(), 1, "N".into(), "k".into(), "v".into(), 1, None, None);
+        c.update_info(
+            "s".into(),
+            1,
+            "N".into(),
+            "k".into(),
+            "v".into(),
+            1,
+            None,
+            None,
+        );
         assert!(c.remark.is_none());
     }
 }

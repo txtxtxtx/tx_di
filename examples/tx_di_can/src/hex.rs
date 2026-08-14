@@ -3,7 +3,7 @@
 //! 供刷写引擎加载固件使用。解码结果为"段列表" `(起始地址, 数据)`，
 //! 再线性化（按最低地址铺开，空隙填 0xFF），与 `FlashEngine` 的连续写入模型对齐。
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::path::Path;
 
 /// 单段：起始地址 + 数据
@@ -23,7 +23,13 @@ pub fn decode_s19(content: &str) -> Result<Vec<Segment>> {
         match record_type {
             b'0' | b'5' | b'6' | b'7' | b'8' | b'9' => continue, // 头/计数/起始地址，忽略
             b'1' | b'2' | b'3' => {}
-            _ => return Err(anyhow!("S-Record 未知记录类型 S{} (行 {})", record_type as char, lineno + 1)),
+            _ => {
+                return Err(anyhow!(
+                    "S-Record 未知记录类型 S{} (行 {})",
+                    record_type as char,
+                    lineno + 1
+                ));
+            }
         }
 
         // Sx <count><addr><data><checksum>，全部十六进制
@@ -92,7 +98,13 @@ pub fn decode_intel_hex(content: &str) -> Result<Vec<Segment>> {
                 }
             }
             0x03 | 0x05 => {} // 起始地址，忽略
-            _ => return Err(anyhow!("Intel HEX 未知记录类型 0x{:02X} (行 {})", rectype, lineno + 1)),
+            _ => {
+                return Err(anyhow!(
+                    "Intel HEX 未知记录类型 0x{:02X} (行 {})",
+                    rectype,
+                    lineno + 1
+                ));
+            }
         }
     }
     if segs.is_empty() {
@@ -107,11 +119,7 @@ pub fn segments_to_linear(segs: &[Segment]) -> Vec<u8> {
         return Vec::new();
     }
     let min_addr = segs.iter().map(|(a, _)| *a).min().unwrap();
-    let max_end = segs
-        .iter()
-        .map(|(a, d)| a + d.len() as u32)
-        .max()
-        .unwrap();
+    let max_end = segs.iter().map(|(a, d)| a + d.len() as u32).max().unwrap();
     let mut buf = vec![0xFFu8; (max_end - min_addr) as usize];
     for (addr, data) in segs {
         let off = (*addr - min_addr) as usize;
@@ -153,9 +161,10 @@ fn hex_str_to_bytes(s: &str) -> Result<Vec<u8>> {
     if s.len() % 2 != 0 {
         return Err(anyhow!("十六进制字符串长度必须为偶数"));
     }
-    (0..s.len()).step_by(2).map(|i| {
-        u8::from_str_radix(&s[i..i + 2], 16).map_err(|e| anyhow!("十六进制解析失败: {e}"))
-    }).collect()
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|e| anyhow!("十六进制解析失败: {e}")))
+        .collect()
 }
 
 #[cfg(test)]
@@ -170,7 +179,10 @@ mod tests {
         assert_eq!(segs[0].0, 0x0000);
         assert_eq!(
             segs[0].1,
-            vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10]
+            vec![
+                0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E,
+                0x0F, 0x10
+            ]
         );
     }
 

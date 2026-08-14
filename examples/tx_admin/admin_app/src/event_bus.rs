@@ -13,12 +13,15 @@ use admin_domain::shared::event_publisher::DomainEventPublisher;
 use admin_domain::shared::model::DomainEvent;
 use tx_di_core::{Component, DepsTuple};
 
+/// 事件订阅者回调类型
+pub type EventSubscriber = dyn Fn(DomainEvent) + Send + Sync;
+
 /// 进程内领域事件总线
 #[derive(Component)]
 #[component(as_trait = dyn DomainEventPublisher)]
 pub struct EventBus {
     #[tx_cst(RwLock::new(Vec::new()))]
-    subscribers: RwLock<Vec<Arc<dyn Fn(DomainEvent) + Send + Sync>>>,
+    subscribers: RwLock<Vec<Arc<EventSubscriber>>>,
 }
 
 impl EventBus {
@@ -56,9 +59,8 @@ impl DomainEventPublisher for EventBus {
         for event in events {
             for sub in &subs {
                 // 订阅者异常隔离，不影响发布方主流程
-                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    sub(event.clone())
-                }));
+                let _ =
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| sub(event.clone())));
             }
         }
     }

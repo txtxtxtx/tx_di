@@ -6,7 +6,7 @@
 //!   7.3 配置操作     ✅ (按Key查询)
 
 mod common;
-use admin_proto::{CreateConfigRequest, UpdateConfigRequest, ListConfigsRequest};
+use admin_proto::{CreateConfigRequest, ListConfigsRequest, UpdateConfigRequest};
 
 // ── 7.1 配置 CRUD ──────────────────────────────────────────────────────────
 
@@ -32,32 +32,57 @@ async fn create_config_success() {
 async fn create_duplicate_key_should_fail() {
     let (app, _, _) = common::create_config_app().await;
     let req = |key: &str, val: &str| CreateConfigRequest {
-        category: "sys".into(), config_type: 0,
-        name: "名称".into(), config_key: key.into(), value: val.into(), remark: None,
+        category: "sys".into(),
+        config_type: 0,
+        name: "名称".into(),
+        config_key: key.into(),
+        value: val.into(),
+        remark: None,
     };
-    app.create_config(req("dup.key", "v1"), Some("admin".into())).await.unwrap();
-    assert!(app.create_config(req("dup.key", "v2"), Some("admin".into())).await.is_err());
+    app.create_config(req("dup.key", "v1"), Some("admin".into()))
+        .await
+        .unwrap();
+    assert!(
+        app.create_config(req("dup.key", "v2"), Some("admin".into()))
+            .await
+            .is_err()
+    );
 }
 
 #[tokio::test]
 async fn update_config() {
     let (app, _, _) = common::create_config_app().await;
-    let cfg = app.create_config(CreateConfigRequest {
-        category: "email".into(), config_type: 0,
-        name: "SMTP".into(), config_key: "email.smtp".into(),
-        value: "smtp.old.com".into(), remark: None,
-    }, Some("admin".into())).await.unwrap();
+    let cfg = app
+        .create_config(
+            CreateConfigRequest {
+                category: "email".into(),
+                config_type: 0,
+                name: "SMTP".into(),
+                config_key: "email.smtp".into(),
+                value: "smtp.old.com".into(),
+                remark: None,
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
 
-    let updated = app.update_config(UpdateConfigRequest {
-        config_id: cfg.id,
-        category: "email".into(),
-        config_type: 0,
-        name: "SMTP服务器".into(),
-        config_key: "email.smtp".into(),
-        value: "smtp.new.com".into(),
-        visible: 1,
-        remark: Some("已更新".into()),
-    }, Some("admin".into())).await.unwrap();
+    let updated = app
+        .update_config(
+            UpdateConfigRequest {
+                config_id: cfg.id,
+                category: "email".into(),
+                config_type: 0,
+                name: "SMTP服务器".into(),
+                config_key: "email.smtp".into(),
+                value: "smtp.new.com".into(),
+                visible: 1,
+                remark: Some("已更新".into()),
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(updated.name, "SMTP服务器");
     assert_eq!(updated.value, "smtp.new.com");
@@ -66,13 +91,24 @@ async fn update_config() {
 #[tokio::test]
 async fn delete_config() {
     let (app, _, _) = common::create_config_app().await;
-    let cfg = app.create_config(CreateConfigRequest {
-        category: "test".into(), config_type: 0,
-        name: "待删除".into(), config_key: "test.del".into(),
-        value: "x".into(), remark: None,
-    }, Some("admin".into())).await.unwrap();
+    let cfg = app
+        .create_config(
+            CreateConfigRequest {
+                category: "test".into(),
+                config_type: 0,
+                name: "待删除".into(),
+                config_key: "test.del".into(),
+                value: "x".into(),
+                remark: None,
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
 
-    app.delete_config(cfg.id, Some("admin".into())).await.unwrap();
+    app.delete_config(cfg.id, Some("admin".into()))
+        .await
+        .unwrap();
     assert!(app.get_config(cfg.id).await.is_err());
 }
 
@@ -80,15 +116,31 @@ async fn delete_config() {
 async fn paginate_configs() {
     let (app, _, _) = common::create_config_app().await;
     for i in 0..5 {
-        app.create_config(CreateConfigRequest {
-            category: "test".into(), config_type: 0,
-            name: format!("配置{}", i), config_key: format!("test.k{}", i),
-            value: format!("v{}", i), remark: None,
-        }, Some("admin".into())).await.unwrap();
+        app.create_config(
+            CreateConfigRequest {
+                category: "test".into(),
+                config_type: 0,
+                name: format!("配置{}", i),
+                config_key: format!("test.k{}", i),
+                value: format!("v{}", i),
+                remark: None,
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
     }
-    let page = app.get_config_page(ListConfigsRequest {
-        category: None, config_key: None, name: None, config_type: None, page: 1, page_size: 2,
-    }).await.unwrap();
+    let page = app
+        .get_config_page(ListConfigsRequest {
+            category: None,
+            config_key: None,
+            name: None,
+            config_type: None,
+            page: 1,
+            page_size: 2,
+        })
+        .await
+        .unwrap();
     assert_eq!(page.list.len(), 2);
     assert_eq!(page.total, 5);
 }
@@ -98,11 +150,19 @@ async fn paginate_configs() {
 #[tokio::test]
 async fn get_config_by_key() {
     let (app, _, _) = common::create_config_app().await;
-    app.create_config(CreateConfigRequest {
-        category: "system".into(), config_type: 0,
-        name: "系统名称".into(), config_key: "sys.name".into(),
-        value: "MyApp".into(), remark: None,
-    }, Some("admin".into())).await.unwrap();
+    app.create_config(
+        CreateConfigRequest {
+            category: "system".into(),
+            config_type: 0,
+            name: "系统名称".into(),
+            config_key: "sys.name".into(),
+            value: "MyApp".into(),
+            remark: None,
+        },
+        Some("admin".into()),
+    )
+    .await
+    .unwrap();
 
     let cfg = app.get_by_key("sys.name").await.unwrap();
     assert_eq!(cfg.value, "MyApp");
@@ -117,19 +177,44 @@ async fn get_config_by_key_not_found() {
 #[tokio::test]
 async fn query_config_by_category() {
     let (app, _, _) = common::create_config_app().await;
-    app.create_config(CreateConfigRequest {
-        category: "email".into(), config_type: 0, name: "SMTP".into(),
-        config_key: "email.smtp".into(), value: "smtp.com".into(), remark: None,
-    }, Some("admin".into())).await.unwrap();
-    app.create_config(CreateConfigRequest {
-        category: "system".into(), config_type: 0, name: "名称".into(),
-        config_key: "sys.appname".into(), value: "App".into(), remark: None,
-    }, Some("admin".into())).await.unwrap();
+    app.create_config(
+        CreateConfigRequest {
+            category: "email".into(),
+            config_type: 0,
+            name: "SMTP".into(),
+            config_key: "email.smtp".into(),
+            value: "smtp.com".into(),
+            remark: None,
+        },
+        Some("admin".into()),
+    )
+    .await
+    .unwrap();
+    app.create_config(
+        CreateConfigRequest {
+            category: "system".into(),
+            config_type: 0,
+            name: "名称".into(),
+            config_key: "sys.appname".into(),
+            value: "App".into(),
+            remark: None,
+        },
+        Some("admin".into()),
+    )
+    .await
+    .unwrap();
 
-    let page = app.get_config_page(ListConfigsRequest {
-        category: Some("email".into()), config_key: None, name: None,
-        config_type: None, page: 1, page_size: 10,
-    }).await.unwrap();
+    let page = app
+        .get_config_page(ListConfigsRequest {
+            category: Some("email".into()),
+            config_key: None,
+            name: None,
+            config_type: None,
+            page: 1,
+            page_size: 10,
+        })
+        .await
+        .unwrap();
     assert_eq!(page.list.len(), 1);
     assert_eq!(page.list[0].config_key, "email.smtp");
 }

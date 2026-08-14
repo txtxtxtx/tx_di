@@ -1,22 +1,19 @@
 use std::sync::Arc;
 
 use crate::user::dto::*;
-use admin_proto::{
-    CreateUserRequest, UpdateUserRequest, ChangePasswordRequest,
-    ListUsersRequest,
-};
-use admin_domain::user::model::aggregate::User;
-use admin_domain::user::model::value_object::{LoginUser, Sex, UserQuery, UserStatus};
-use admin_domain::user::service::UserService;
-use admin_domain::role::repository::RoleRepository;
 use admin_domain::department::repository::DepartmentRepository;
 use admin_domain::menu::repository::MenuRepository;
+use admin_domain::role::repository::RoleRepository;
 use admin_domain::shared::event_publisher::DomainEventPublisher;
 use admin_domain::shared::model::AggregateRoot;
 use admin_domain::shared::repository::RepositoryError;
+use admin_domain::user::model::aggregate::User;
+use admin_domain::user::model::value_object::{LoginUser, Sex, UserQuery, UserStatus};
+use admin_domain::user::service::UserService;
+use admin_proto::{ChangePasswordRequest, CreateUserRequest, ListUsersRequest, UpdateUserRequest};
+use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
-use tx_common::page::Page;
 
 /// User application service - 编排领域操作 + 跨聚合校验
 #[derive(Component)]
@@ -81,17 +78,17 @@ impl UserAppService {
         let sex = req.sex.map(Sex::from).unwrap_or_default();
 
         // Check email uniqueness
-        if let Some(ref e) = email {
-            if self.user_service.exists_by_email(e).await? {
-                return Err(RepositoryError::DuplicateEmail)?;
-            }
+        if let Some(ref e) = email
+            && self.user_service.exists_by_email(e).await?
+        {
+            Err(RepositoryError::DuplicateEmail)?;
         }
 
         // Check mobile uniqueness
-        if let Some(ref m) = mobile {
-            if self.user_service.exists_by_mobile(m).await? {
-                return Err(RepositoryError::DuplicateMobile)?;
-            }
+        if let Some(ref m) = mobile
+            && self.user_service.exists_by_mobile(m).await?
+        {
+            Err(RepositoryError::DuplicateMobile)?;
         }
 
         // 构建领域对象（密码哈希等，不落库）
@@ -150,11 +147,7 @@ impl UserAppService {
     }
 
     /// 删除用户
-    pub async fn delete_user(
-        &self,
-        user_id: u64,
-        updater: Option<String>,
-    ) -> AppResult<()> {
+    pub async fn delete_user(&self, user_id: u64, updater: Option<String>) -> AppResult<()> {
         self.user_service.delete_user(user_id, updater).await
     }
 
@@ -165,7 +158,10 @@ impl UserAppService {
         status: UserStatus,
         updater: Option<String>,
     ) -> AppResult<UserResponse> {
-        let user = self.user_service.change_status(user_id, status, updater).await?;
+        let user = self
+            .user_service
+            .change_status(user_id, status, updater)
+            .await?;
         Ok(user_to_response(user))
     }
 
@@ -183,57 +179,57 @@ impl UserAppService {
 
     /// 为用户分配角色（跨聚合校验：校验角色存在且启用）
     pub async fn assign_roles(&self, user_id: u64, role_ids: Vec<u64>) -> AppResult<()> {
-        let user = self
-            .user_service
-            .get_user(user_id)
-            .await?;
+        let user = self.user_service.get_user(user_id).await?;
 
         // 用户必须为 Active 状态
         if user.status != UserStatus::Active {
-            return Err(RepositoryError::ValidationUserStatus)?;
+            Err(RepositoryError::ValidationUserStatus)?;
         }
 
         // 校验每个角色存在且为启用状态（status == 0 即 Enabled）
         let roles = self.role_repo.find_by_ids(&role_ids).await?;
         // 数据完整性校验：输入 ID 与命中记录数必须一致，防止悬空引用
         if roles.len() != role_ids.len() {
-            return Err(RepositoryError::NotFoundRole)?;
+            Err(RepositoryError::NotFoundRole)?;
         }
         for r in &roles {
             if r.status != 0 {
-                return Err(RepositoryError::ValidationUserStatus)?;
+                Err(RepositoryError::ValidationUserStatus)?;
             }
         }
 
-        self.user_service.user_repo().bind_roles(user_id, &role_ids).await?;
+        self.user_service
+            .user_repo()
+            .bind_roles(user_id, &role_ids)
+            .await?;
         Ok(())
     }
 
     /// 为用户分配部门（跨聚合校验：校验部门存在且启用）
     pub async fn assign_departments(&self, user_id: u64, dept_ids: Vec<u64>) -> AppResult<()> {
-        let user = self
-            .user_service
-            .get_user(user_id)
-            .await?;
+        let user = self.user_service.get_user(user_id).await?;
 
         // 用户必须为 Active 状态
         if user.status != UserStatus::Active {
-            return Err(RepositoryError::ValidationUserStatus)?;
+            Err(RepositoryError::ValidationUserStatus)?;
         }
 
         // 校验每个部门存在且为启用状态
         let depts = self.dept_repo.find_by_ids(&dept_ids).await?;
         // 数据完整性校验：输入 ID 与命中记录数必须一致，防止悬空引用
         if depts.len() != dept_ids.len() {
-            return Err(RepositoryError::NotFoundDept)?;
+            Err(RepositoryError::NotFoundDept)?;
         }
         for d in &depts {
             if d.status != 0 {
-                return Err(RepositoryError::ValidationDeptDisabled)?;
+                Err(RepositoryError::ValidationDeptDisabled)?;
             }
         }
 
-        self.user_service.user_repo().bind_departments(user_id, &dept_ids).await?;
+        self.user_service
+            .user_repo()
+            .bind_departments(user_id, &dept_ids)
+            .await?;
         Ok(())
     }
 
@@ -241,7 +237,10 @@ impl UserAppService {
     pub async fn build_login_user(&self, user: &User) -> AppResult<LoginUser> {
         let role_ids = self.user_service.user_repo().get_role_ids(user.id).await?;
         let dept_ids = self.user_service.user_repo().get_dept_ids(user.id).await?;
-        let permissions = self.menu_repo.find_permission_codes_by_user_id(user.id).await?;
+        let permissions = self
+            .menu_repo
+            .find_permission_codes_by_user_id(user.id)
+            .await?;
 
         Ok(LoginUser {
             user_id: user.id,
@@ -261,10 +260,7 @@ impl UserAppService {
     }
 
     /// 分页查询用户列表
-    pub async fn get_user_page(
-        &self,
-        req: ListUsersRequest,
-    ) -> AppResult<Page<UserResponse>> {
+    pub async fn get_user_page(&self, req: ListUsersRequest) -> AppResult<Page<UserResponse>> {
         let query = UserQuery {
             username: req.username,
             nickname: req.nickname,

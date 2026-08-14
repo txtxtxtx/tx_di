@@ -80,7 +80,7 @@ impl NacosClient {
                 &did,
                 &grp,
                 Box::new(move |_| {
-                    let _ = tx.send_modify(|v| *v += 1);
+                    tx.send_modify(|v| *v += 1);
                 }),
             )
             .await;
@@ -102,9 +102,8 @@ impl NacosClient {
     {
         let cc = self.config.clone();
         let initial = match cc.get_config(data_id, &self.cfg.group).await? {
-            Some(raw) => serde_json::from_str::<T>(&raw).map_err(|e| {
-                AppError::from(format!("配置 '{}' 反序列化失败: {}", data_id, e))
-            })?,
+            Some(raw) => serde_json::from_str::<T>(&raw)
+                .map_err(|e| AppError::from(format!("配置 '{}' 反序列化失败: {}", data_id, e)))?,
             None => T::default(),
         };
 
@@ -162,7 +161,9 @@ fn merge_toml(local: toml::Value, remote: toml::Value) -> toml::Value {
     match (local, remote) {
         (toml::Value::Table(mut lt), toml::Value::Table(rt)) => {
             for (k, v) in rt {
-                let prev = lt.remove(&k).unwrap_or(toml::Value::Table(toml::map::Map::new()));
+                let prev = lt
+                    .remove(&k)
+                    .unwrap_or(toml::Value::Table(toml::map::Map::new()));
                 lt.insert(k, merge_toml(prev, v));
             }
             toml::Value::Table(lt)

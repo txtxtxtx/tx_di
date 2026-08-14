@@ -3,10 +3,10 @@ use std::sync::Arc;
 use crate::log::model::aggregate::{LoginLog, OperateLog};
 use crate::log::model::value_object::{LoginLogQuery, OperateLogQuery};
 use crate::log::repository::{LoginLogRepository, OperateLogRepository};
+use tx_common::id;
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
-use tx_common::id;
 
 #[derive(Component)]
 pub struct OperateLogService {
@@ -45,6 +45,7 @@ impl OperateLogService {
     ///
     /// # 错误
     /// - 数据库操作错误 - 仓储插入失败时
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_log(
         &self,
         trace_id: String,
@@ -59,7 +60,8 @@ impl OperateLogService {
     ) -> AppResult<OperateLog> {
         let log_id = id::next_id();
         let log = OperateLog::create(
-            log_id, trace_id, user_id, user_type, log_type, sub_type, biz_id, action, success, extra,
+            log_id, trace_id, user_id, user_type, log_type, sub_type, biz_id, action, success,
+            extra,
         );
         self.log_repo.insert(&log).await?;
         Ok(log)
@@ -165,7 +167,9 @@ impl LoginLogService {
         result: i32,
     ) -> AppResult<LoginLog> {
         let log_id = id::next_id();
-        let log = LoginLog::create(log_id, user_id, user_type, username, login_ip, login_type, result);
+        let log = LoginLog::create(
+            log_id, user_id, user_type, username, login_ip, login_type, result,
+        );
         self.log_repo.insert(&log).await?;
         Ok(log)
     }

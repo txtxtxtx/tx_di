@@ -114,11 +114,11 @@ pub fn is_vec_arc_dyn_trait(ty: &Type) -> bool {
 ///
 /// 用于字段分类的兜底检查：非 Arc 形 + 无 #[tx_cst] 的字段应给出编译错误。
 pub fn is_arc_like(ty: &Type) -> bool {
-    if let Type::Path(tp) = ty {
-        if let Some(last) = tp.path.segments.last() {
-            // Arc<...> / Option<...> / Vec<...>
-            return last.ident == "Arc" || last.ident == "Option" || last.ident == "Vec";
-        }
+    if let Type::Path(tp) = ty
+        && let Some(last) = tp.path.segments.last()
+    {
+        // Arc<...> / Option<...> / Vec<...>
+        return last.ident == "Arc" || last.ident == "Option" || last.ident == "Vec";
     }
     false
 }
@@ -133,7 +133,11 @@ pub fn is_option_arc_type(ty: &Type) -> bool {
         && inner
             .map(|i| {
                 if let Type::Path(tp) = &i {
-                    tp.path.segments.last().map(|s| s.ident == "Arc").unwrap_or(false)
+                    tp.path
+                        .segments
+                        .last()
+                        .map(|s| s.ident == "Arc")
+                        .unwrap_or(false)
                 } else {
                     false
                 }

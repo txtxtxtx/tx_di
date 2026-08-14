@@ -6,17 +6,17 @@
 
 #[cfg(test)]
 mod role_service_tests {
-    use std::sync::Arc;
-    use async_trait::async_trait;
-    use tx_common::page::Page;
-    use tx_error::AppResult;
-    use crate::shared::model::AuditFields;
     use crate::role::model::aggregate::Role;
     use crate::role::model::value_object::RoleQuery;
     use crate::role::repository::RoleRepository;
     use crate::role::service::RoleService;
+    use crate::shared::model::AuditFields;
     use crate::user::model::aggregate::User;
+    use async_trait::async_trait;
     use pretty_assertions::assert_eq;
+    use std::sync::Arc;
+    use tx_common::page::Page;
+    use tx_error::AppResult;
 
     // ----------------------------------------------------------
     // TestRoleRepo: function-closure based mock
@@ -49,7 +49,9 @@ mod role_service_tests {
                 update_fn: Box::new(|_| panic!("unexpected call: update")),
                 exists_by_code_fn: Box::new(|_| panic!("unexpected call: exists_by_code")),
                 bind_menus_fn: Box::new(|_, _| panic!("unexpected call: bind_menus")),
-                find_users_by_role_id_fn: Box::new(|_| panic!("unexpected call: find_users_by_role_id")),
+                find_users_by_role_id_fn: Box::new(|_| {
+                    panic!("unexpected call: find_users_by_role_id")
+                }),
                 bind_users_fn: Box::new(|_, _| panic!("unexpected call: bind_users")),
                 unbind_users_fn: Box::new(|_, _| panic!("unexpected call: unbind_users")),
             }
@@ -58,22 +60,54 @@ mod role_service_tests {
 
     #[async_trait]
     impl RoleRepository for TestRoleRepo {
-        async fn find_by_id(&self, id: u64) -> AppResult<Option<Role>> { (self.find_by_id_fn)(id) }
-        async fn find_by_code(&self, code: &str) -> AppResult<Option<Role>> { (self.find_by_code_fn)(code) }
-        async fn find_by_ids(&self, ids: &[u64]) -> AppResult<Vec<Role>> { (self.find_by_ids_fn)(ids) }
-        async fn create_role_with_menus(&self, _: &Role, _: &[u64]) -> AppResult<()> { Ok(()) }
-        async fn find_page(&self, query: &RoleQuery, page: Page<Role>) -> AppResult<Page<Role>> { (self.find_page_fn)(query, page) }
-        async fn find_all(&self, query: &RoleQuery) -> AppResult<Vec<Role>> { (self.find_all_fn)(query) }
-        async fn insert(&self, role: &Role) -> AppResult<()> { (self.insert_fn)(role) }
-        async fn update(&self, role: &Role) -> AppResult<()> { (self.update_fn)(role) }
-        async fn soft_delete(&self, _id: u64) -> AppResult<()> { Ok(()) }
-        async fn exists_by_code(&self, code: &str) -> AppResult<bool> { (self.exists_by_code_fn)(code) }
-        async fn bind_menus(&self, role_id: u64, menu_ids: &[u64]) -> AppResult<()> { (self.bind_menus_fn)(role_id, menu_ids) }
-        async fn get_menu_ids(&self, _role_id: u64) -> AppResult<Vec<u64>> { Ok(vec![]) }
-        async fn get_user_ids(&self, _role_id: u64) -> AppResult<Vec<u64>> { Ok(vec![]) }
-        async fn find_users_by_role_id(&self, role_id: u64) -> AppResult<Vec<User>> { (self.find_users_by_role_id_fn)(role_id) }
-        async fn bind_users(&self, role_id: u64, user_ids: &[u64]) -> AppResult<()> { (self.bind_users_fn)(role_id, user_ids) }
-        async fn unbind_users(&self, role_id: u64, user_ids: &[u64]) -> AppResult<()> { (self.unbind_users_fn)(role_id, user_ids) }
+        async fn find_by_id(&self, id: u64) -> AppResult<Option<Role>> {
+            (self.find_by_id_fn)(id)
+        }
+        async fn find_by_code(&self, code: &str) -> AppResult<Option<Role>> {
+            (self.find_by_code_fn)(code)
+        }
+        async fn find_by_ids(&self, ids: &[u64]) -> AppResult<Vec<Role>> {
+            (self.find_by_ids_fn)(ids)
+        }
+        async fn create_role_with_menus(&self, _: &Role, _: &[u64]) -> AppResult<()> {
+            Ok(())
+        }
+        async fn find_page(&self, query: &RoleQuery, page: Page<Role>) -> AppResult<Page<Role>> {
+            (self.find_page_fn)(query, page)
+        }
+        async fn find_all(&self, query: &RoleQuery) -> AppResult<Vec<Role>> {
+            (self.find_all_fn)(query)
+        }
+        async fn insert(&self, role: &Role) -> AppResult<()> {
+            (self.insert_fn)(role)
+        }
+        async fn update(&self, role: &Role) -> AppResult<()> {
+            (self.update_fn)(role)
+        }
+        async fn soft_delete(&self, _id: u64) -> AppResult<()> {
+            Ok(())
+        }
+        async fn exists_by_code(&self, code: &str) -> AppResult<bool> {
+            (self.exists_by_code_fn)(code)
+        }
+        async fn bind_menus(&self, role_id: u64, menu_ids: &[u64]) -> AppResult<()> {
+            (self.bind_menus_fn)(role_id, menu_ids)
+        }
+        async fn get_menu_ids(&self, _role_id: u64) -> AppResult<Vec<u64>> {
+            Ok(vec![])
+        }
+        async fn get_user_ids(&self, _role_id: u64) -> AppResult<Vec<u64>> {
+            Ok(vec![])
+        }
+        async fn find_users_by_role_id(&self, role_id: u64) -> AppResult<Vec<User>> {
+            (self.find_users_by_role_id_fn)(role_id)
+        }
+        async fn bind_users(&self, role_id: u64, user_ids: &[u64]) -> AppResult<()> {
+            (self.bind_users_fn)(role_id, user_ids)
+        }
+        async fn unbind_users(&self, role_id: u64, user_ids: &[u64]) -> AppResult<()> {
+            (self.unbind_users_fn)(role_id, user_ids)
+        }
     }
 
     // ----------------------------------------------------------
@@ -81,7 +115,19 @@ mod role_service_tests {
     // ----------------------------------------------------------
 
     fn make_role() -> Role {
-        Role::restore(1, "Admin".into(), "admin".into(), 1, 4, None, 0, None, 0, AuditFields::default(), vec![])
+        Role::restore(
+            1,
+            "Admin".into(),
+            "admin".into(),
+            1,
+            4,
+            None,
+            0,
+            None,
+            0,
+            AuditFields::default(),
+            vec![],
+        )
     }
 
     // ==========================================================
@@ -96,7 +142,9 @@ mod role_service_tests {
         repo.insert_fn = Box::new(|_| Ok(()));
 
         let svc = RoleService::new(Arc::new(repo));
-        let result = svc.create_role("Editor".into(), "editor".into(), 2, Some("admin".into())).await;
+        let result = svc
+            .create_role("Editor".into(), "editor".into(), 2, Some("admin".into()))
+            .await;
         assert!(result.is_ok());
         let role = result.unwrap();
         assert_eq!(role.name, "Editor");
@@ -128,7 +176,17 @@ mod role_service_tests {
         repo.update_fn = Box::new(|_| Ok(()));
 
         let svc = RoleService::new(Arc::new(repo));
-        let result = svc.update_role(1, "SuperAdmin".into(), "admin".into(), 0, 1, Some("updated".into()), Some("admin".into())).await;
+        let result = svc
+            .update_role(
+                1,
+                "SuperAdmin".into(),
+                "admin".into(),
+                0,
+                1,
+                Some("updated".into()),
+                Some("admin".into()),
+            )
+            .await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().name, "SuperAdmin");
     }
@@ -140,7 +198,9 @@ mod role_service_tests {
         repo.find_by_id_fn = Box::new(|_| Ok(None));
 
         let svc = RoleService::new(Arc::new(repo));
-        let result = svc.update_role(999, "X".into(), "x".into(), 0, 4, None, None).await;
+        let result = svc
+            .update_role(999, "X".into(), "x".into(), 0, 4, None, None)
+            .await;
         assert!(result.is_err());
     }
 
@@ -154,7 +214,9 @@ mod role_service_tests {
         repo.find_by_code_fn = Box::new(move |_| Ok(Some(other.clone())));
 
         let svc = RoleService::new(Arc::new(repo));
-        let result = svc.update_role(1, "X".into(), "taken_code".into(), 0, 4, None, None).await;
+        let result = svc
+            .update_role(1, "X".into(), "taken_code".into(), 0, 4, None, None)
+            .await;
         assert!(result.is_err());
     }
 
@@ -259,9 +321,7 @@ mod role_service_tests {
     async fn test_get_role_page_success() {
         let mut repo = TestRoleRepo::new();
         let roles = vec![make_role()];
-        repo.find_page_fn = Box::new(move |_, _| {
-            Ok(Page::new(roles.clone(), 1, 10, 1))
-        });
+        repo.find_page_fn = Box::new(move |_, _| Ok(Page::new(roles.clone(), 1, 10, 1)));
 
         let svc = RoleService::new(Arc::new(repo));
         let query = RoleQuery::default();
@@ -353,7 +413,13 @@ mod role_service_tests {
         let mut repo = TestRoleRepo::new();
         repo.find_by_id_fn = Box::new(|_| Ok(Some(make_role())));
         repo.find_users_by_role_id_fn = Box::new(|_| {
-            Ok(vec![User::create(1, "user1".into(), "pwd".into(), "User One".into(), None)])
+            Ok(vec![User::create(
+                1,
+                "user1".into(),
+                "pwd".into(),
+                "User One".into(),
+                None,
+            )])
         });
 
         let svc = RoleService::new(Arc::new(repo));

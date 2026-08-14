@@ -3,10 +3,10 @@
 //! 封装所有 Session/Token 操作（sa-token），
 //! 使 API 层不再直接依赖 `StpUtil`。
 
+use admin_domain::shared::model::value_object::SessionEctData;
 use tx_di_core::{Component, DepsTuple};
 use tx_di_sa_token::StpUtil;
 use tx_error::{AppError, AppResult};
-use admin_domain::shared::model::value_object::SessionEctData;
 
 /// 认证会话服务
 ///
@@ -15,6 +15,12 @@ use admin_domain::shared::model::value_object::SessionEctData;
 /// - 登出时销毁会话、清除权限/角色缓存
 #[derive(Component)]
 pub struct AuthSessionService;
+
+impl Default for AuthSessionService {
+    fn default() -> Self {
+        Self
+    }
+}
 
 impl AuthSessionService {
     pub fn new() -> Self {
@@ -44,7 +50,9 @@ impl AuthSessionService {
         role_codes: Vec<String>,
     ) -> AppResult<String> {
         let login_id = user_id.to_string();
-        let token = StpUtil::login(&login_id).await.map_err(|e| AppError::from(e.to_string()))?;
+        let token = StpUtil::login(&login_id)
+            .await
+            .map_err(|e| AppError::from(e.to_string()))?;
         let token_str = token.to_string();
 
         // 写入扩展数据（供在线用户查询、操作日志中间件等使用）
@@ -53,10 +61,14 @@ impl AuthSessionService {
 
         // 非管理员绑定具体权限码
         if !is_admin {
-            StpUtil::set_permissions(&login_id, permissions).await.map_err(|e| AppError::from(e.to_string()))?;
+            StpUtil::set_permissions(&login_id, permissions)
+                .await
+                .map_err(|e| AppError::from(e.to_string()))?;
         }
         // 绑定角色编码
-        StpUtil::set_roles(&login_id, role_codes).await.map_err(|e| AppError::from(e.to_string()))?;
+        StpUtil::set_roles(&login_id, role_codes)
+            .await
+            .map_err(|e| AppError::from(e.to_string()))?;
 
         Ok(token_str)
     }
@@ -71,9 +83,15 @@ impl AuthSessionService {
     /// 2. 清除该用户的权限缓存
     /// 3. 清除该用户的角色缓存
     pub async fn logout(&self, login_id: &str) -> AppResult<()> {
-        StpUtil::logout_current().await.map_err(|e| AppError::from(e.to_string()))?;
-        StpUtil::clear_permissions(login_id).await.map_err(|e| AppError::from(e.to_string()))?;
-        StpUtil::clear_roles(login_id).await.map_err(|e| AppError::from(e.to_string()))?;
+        StpUtil::logout_current()
+            .await
+            .map_err(|e| AppError::from(e.to_string()))?;
+        StpUtil::clear_permissions(login_id)
+            .await
+            .map_err(|e| AppError::from(e.to_string()))?;
+        StpUtil::clear_roles(login_id)
+            .await
+            .map_err(|e| AppError::from(e.to_string()))?;
         Ok(())
     }
 }

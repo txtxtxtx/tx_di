@@ -1,8 +1,8 @@
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
-use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent, Entity};
 use crate::shared::model::value_object::DeletedStatus;
+use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent, Entity};
 
 /// File aggregate root
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,6 +39,7 @@ impl AggregateRoot for File {
 
 impl File {
     /// 从持久化层恢复文件（不触发领域事件）
+    #[allow(clippy::too_many_arguments)]
     pub fn restore(
         id: u64,
         config_id: Option<u64>,
@@ -62,6 +63,7 @@ impl File {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn create(
         id: u64,
         config_id: Option<u64>,

@@ -1,8 +1,8 @@
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
-use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent, Entity};
 use crate::shared::model::value_object::DeletedStatus;
+use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent, Entity};
 
 /// System config aggregate root
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,6 +40,7 @@ impl AggregateRoot for Config {
 
 impl Config {
     /// 从持久化层恢复配置（不触发领域事件）
+    #[allow(clippy::too_many_arguments)]
     pub fn restore(
         id: u64,
         category: String,
@@ -96,6 +97,7 @@ impl Config {
         config
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn update_info(
         &mut self,
         category: String,

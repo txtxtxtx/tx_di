@@ -1,19 +1,19 @@
+use async_trait::async_trait;
 use std::collections::HashSet;
 use std::sync::Arc;
-use async_trait::async_trait;
 
 use admin_domain::menu::model::aggregate::Menu;
 use admin_domain::menu::model::value_object::MenuQuery;
 use admin_domain::menu::repository::MenuRepository;
-use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::model::AuditFields;
+use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::repository::{RepositoryError, db_err};
 use tx_di_core::{Component, DepsTuple};
 use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
 use super::model::SysMenu;
-use crate::common::{Status, Deleted};
+use crate::common::{Deleted, Status};
 use crate::role::model::SysRoleMenu;
 use crate::user::model::SysUserRole;
 
@@ -37,20 +37,48 @@ impl ToastyMenuRepository {
             m.types,
             m.sort,
             m.parent_id,
-            if m.route_path.is_empty() { None } else { Some(m.route_path.clone()) },
-            if m.icon.is_empty() { None } else { Some(m.icon.clone()) },
-            if m.component.is_empty() { None } else { Some(m.component.clone()) },
-            if m.component_name.is_empty() { None } else { Some(m.component_name.clone()) },
+            if m.route_path.is_empty() {
+                None
+            } else {
+                Some(m.route_path.clone())
+            },
+            if m.icon.is_empty() {
+                None
+            } else {
+                Some(m.icon.clone())
+            },
+            if m.component.is_empty() {
+                None
+            } else {
+                Some(m.component.clone())
+            },
+            if m.component_name.is_empty() {
+                None
+            } else {
+                Some(m.component_name.clone())
+            },
             i32::from(m.status),
             m.visible,
             m.keep_alive,
             m.tenant_id,
             AuditFields {
-                creator: if m.creator.is_empty() { None } else { Some(m.creator.clone()) },
+                creator: if m.creator.is_empty() {
+                    None
+                } else {
+                    Some(m.creator.clone())
+                },
                 create_time: m.created_at,
-                updater: if m.updater.is_empty() { None } else { Some(m.updater.clone()) },
+                updater: if m.updater.is_empty() {
+                    None
+                } else {
+                    Some(m.updater.clone())
+                },
                 update_time: m.updated_at,
-                deleted: if m.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if m.deleted == Deleted::Yes {
+                    DeletedStatus::Deleted
+                } else {
+                    DeletedStatus::Normal
+                },
             },
         )
     }
@@ -77,14 +105,20 @@ impl MenuRepository for ToastyMenuRepository {
             .iter()
             .filter(|m| m.deleted == Deleted::No)
             .filter(|m| {
-                if let Some(ref name) = query.name {
-                    if !m.name.contains(name.as_str()) { return false; }
+                if let Some(ref name) = query.name
+                    && !m.name.contains(name.as_str())
+                {
+                    return false;
                 }
-                if let Some(status) = query.status {
-                    if i32::from(m.status) != status { return false; }
+                if let Some(status) = query.status
+                    && i32::from(m.status) != status
+                {
+                    return false;
                 }
-                if let Some(types) = query.types {
-                    if m.types != types { return false; }
+                if let Some(types) = query.types
+                    && m.types != types
+                {
+                    return false;
                 }
                 true
             })
@@ -196,7 +230,9 @@ impl MenuRepository for ToastyMenuRepository {
             .await
             .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
 
-        Ok(all.iter().any(|m| m.deleted == Deleted::No && m.parent_id == parent_id))
+        Ok(all
+            .iter()
+            .any(|m| m.deleted == Deleted::No && m.parent_id == parent_id))
     }
 
     async fn find_permission_codes_by_user_id(&self, user_id: u64) -> AppResult<HashSet<String>> {
@@ -218,10 +254,12 @@ impl MenuRepository for ToastyMenuRepository {
                 .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
 
             for rm in role_menus {
-                if let Ok(menu) = SysMenu::get_by_id(&mut db, rm.menu_id).await {
-                    if menu.types == 2 && menu.deleted == Deleted::No && !menu.permission.is_empty() {
-                        codes.insert(menu.permission.clone());
-                    }
+                if let Ok(menu) = SysMenu::get_by_id(&mut db, rm.menu_id).await
+                    && menu.types == 2
+                    && menu.deleted == Deleted::No
+                    && !menu.permission.is_empty()
+                {
+                    codes.insert(menu.permission.clone());
                 }
             }
         }

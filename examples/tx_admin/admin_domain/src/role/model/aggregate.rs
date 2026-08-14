@@ -1,9 +1,9 @@
 use jiff::Timestamp; // 引入时间处理库
 use serde::{Deserialize, Serialize}; // 引入序列化和反序列化库
 
-use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent}; // 引入共享模块中的模型定义
-use crate::shared::model::value_object::DeletedStatus;
 use crate::AggregateRoot;
+use crate::shared::model::value_object::DeletedStatus;
+use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent}; // 引入共享模块中的模型定义
 
 /// Role aggregate root
 #[derive(Debug, Clone, Serialize, Deserialize, AggregateRoot)]
@@ -38,6 +38,7 @@ pub struct Role {
 
 impl Role {
     /// 从持久化层恢复角色（不触发领域事件）
+    #[allow(clippy::too_many_arguments)]
     pub fn restore(
         id: u64,
         name: String,
@@ -68,13 +69,7 @@ impl Role {
     }
 
     /// Create a new role
-    pub fn create(
-        id: u64,
-        name: String,
-        code: String,
-        sort: i32,
-        creator: Option<String>,
-    ) -> Self {
+    pub fn create(id: u64, name: String, code: String, sort: i32, creator: Option<String>) -> Self {
         let mut role = Self {
             id,
             name,

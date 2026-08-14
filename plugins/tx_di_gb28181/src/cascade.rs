@@ -17,13 +17,13 @@
 
 use crate::config::CascadeConfig;
 use crate::device_registry::DeviceRegistry;
-use tx_gb28181::GbVersion;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 use tx_di_core::RIE;
 use tx_di_sip::{SipClient, SipClientConfig, SipPlugin};
+use tx_gb28181::GbVersion;
 
 /// 下级平台级联管理器
 ///
@@ -243,4 +243,3 @@ fn build_item_xml(item: &tx_gb28181::enums::ItemType) -> String {
     xml.push_str("\r\n</Item>");
     xml
 }
-

@@ -60,7 +60,10 @@ pub fn export_html(path: &str, title: &str, entries: &[AuditEntry]) -> std::io::
 /// 导出 PDF 报告到文件（极简手写 PDF，按行分页）
 pub fn export_pdf(path: &str, title: &str, entries: &[AuditEntry]) -> std::io::Result<()> {
     let lines: Vec<String> = {
-        let mut v = vec![format!("== {} ==", ascii_only(title)), format!("Total: {}", entries.len())];
+        let mut v = vec![
+            format!("== {} ==", ascii_only(title)),
+            format!("Total: {}", entries.len()),
+        ];
         for e in entries {
             v.push(format!(
                 "[{}] {} | {} | {}",
@@ -90,9 +93,7 @@ fn build_pdf(lines: &[String]) -> Vec<u8> {
     // 1 catalog
     objects.push("<< /Type /Catalog /Pages 2 0 R >>".to_string());
     // 2 pages
-    let kids: Vec<String> = (0..n_pages)
-        .map(|i| format!("{} 0 R", 3 + i))
-        .collect();
+    let kids: Vec<String> = (0..n_pages).map(|i| format!("{} 0 R", 3 + i)).collect();
     objects.push(format!(
         "<< /Type /Pages /Kids [{}] /Count {} >>",
         kids.join(" "),
@@ -123,7 +124,11 @@ fn build_pdf(lines: &[String]) -> Vec<u8> {
             }
         }
         stream.push_str("ET");
-        objects.push(format!("<< /Length {} >>\nstream\n{}\nendstream", stream.len(), stream));
+        objects.push(format!(
+            "<< /Length {} >>\nstream\n{}\nendstream",
+            stream.len(),
+            stream
+        ));
     }
 
     // 序列化并写 xref
@@ -143,16 +148,26 @@ fn build_pdf(lines: &[String]) -> Vec<u8> {
     for off in &offsets {
         out.extend_from_slice(format!("{:010} 00000 n \n", off).as_bytes());
     }
-    out.extend_from_slice(format!("trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{}\n%%EOF\n", total, xref_pos).as_bytes());
+    out.extend_from_slice(
+        format!(
+            "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{}\n%%EOF\n",
+            total, xref_pos
+        )
+        .as_bytes(),
+    );
     out
 }
 
 fn pdf_escape(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('(', "\\(").replace(')', "\\)")
+    s.replace('\\', "\\\\")
+        .replace('(', "\\(")
+        .replace(')', "\\)")
 }
 
 fn ascii_only(s: &str) -> String {
-    s.chars().map(|c| if (c as u32) < 0x80 { c } else { '?' }).collect()
+    s.chars()
+        .map(|c| if (c as u32) < 0x80 { c } else { '?' })
+        .collect()
 }
 
 fn escape_html(s: &str) -> String {

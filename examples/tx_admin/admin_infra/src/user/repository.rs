@@ -1,18 +1,18 @@
-use std::sync::Arc;
-use async_trait::async_trait;
-use admin_domain::shared::model::value_object::{DeletedStatus, TenantId};
 use admin_domain::shared::model::AuditFields;
+use admin_domain::shared::model::value_object::{DeletedStatus, TenantId};
 use admin_domain::shared::repository::{RepositoryError, db_err};
 use admin_domain::user::model::aggregate::User;
 use admin_domain::user::model::value_object::{UserQuery, UserStatus};
 use admin_domain::user::repository::UserRepository;
+use async_trait::async_trait;
+use std::sync::Arc;
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
 use super::model::{SysUser, SysUserDept, SysUserRole};
-use crate::common::{Sex, Status, Deleted};
+use crate::common::{Deleted, Sex, Status};
 
 /// Toasty 实现的 UserRepository
 #[derive(Component)]
@@ -33,21 +33,53 @@ impl ToastyUserRepository {
             u.username.clone(),
             u.password_hash.clone(),
             u.nickname.clone(),
-            if u.remark.is_empty() { None } else { Some(u.remark.clone()) },
-            if u.email.is_empty() { None } else { Some(u.email.clone()) },
-            if u.mobile.is_empty() { None } else { Some(u.mobile.clone()) },
+            if u.remark.is_empty() {
+                None
+            } else {
+                Some(u.remark.clone())
+            },
+            if u.email.is_empty() {
+                None
+            } else {
+                Some(u.email.clone())
+            },
+            if u.mobile.is_empty() {
+                None
+            } else {
+                Some(u.mobile.clone())
+            },
             admin_domain::user::model::value_object::Sex::from(u.sex),
-            if u.avatar.is_empty() { None } else { Some(u.avatar.clone()) },
+            if u.avatar.is_empty() {
+                None
+            } else {
+                Some(u.avatar.clone())
+            },
             UserStatus::from(u.status),
-            if u.login_ip.is_empty() { None } else { Some(u.login_ip.clone()) },
-            (u.login_date != jiff::Timestamp::UNIX_EPOCH).then(|| u.login_date),
+            if u.login_ip.is_empty() {
+                None
+            } else {
+                Some(u.login_ip.clone())
+            },
+            (u.login_date != jiff::Timestamp::UNIX_EPOCH).then_some(u.login_date),
             TenantId::new(u.tenant_id),
             AuditFields {
-                creator: if u.creator.is_empty() { None } else { Some(u.creator.clone()) },
+                creator: if u.creator.is_empty() {
+                    None
+                } else {
+                    Some(u.creator.clone())
+                },
                 create_time: u.created_at,
-                updater: if u.updater.is_empty() { None } else { Some(u.updater.clone()) },
+                updater: if u.updater.is_empty() {
+                    None
+                } else {
+                    Some(u.updater.clone())
+                },
                 update_time: u.updated_at,
-                deleted: if u.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if u.deleted == Deleted::Yes {
+                    DeletedStatus::Deleted
+                } else {
+                    DeletedStatus::Normal
+                },
             },
             role_ids,
             dept_ids,
@@ -58,7 +90,7 @@ impl ToastyUserRepository {
     async fn fetch_role_ids(&self, user_id: u64) -> AppResult<Vec<u64>> {
         let mut db = self.plugin.db().clone();
         let roles = SysUserRole::filter_by_user_id(user_id)
-            .select(SysUserRole::fields().role_id())   // 只选择 role_id 列
+            .select(SysUserRole::fields().role_id()) // 只选择 role_id 列
             .exec(&mut db)
             .await
             .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
@@ -81,7 +113,6 @@ impl ToastyUserRepository {
         let dept_ids = self.fetch_dept_ids(u.id).await?;
         Ok(Self::to_domain(u, role_ids, dept_ids))
     }
-
 }
 
 #[async_trait]
@@ -159,17 +190,25 @@ impl UserRepository for ToastyUserRepository {
 
         let mut users = Vec::new();
         for u in all.into_iter().filter(|u| u.deleted == Deleted::No) {
-            if let Some(ref username) = query.username {
-                if !u.username.contains(username.as_str()) { continue; }
+            if let Some(ref username) = query.username
+                && !u.username.contains(username.as_str())
+            {
+                continue;
             }
-            if let Some(ref nickname) = query.nickname {
-                if !u.nickname.contains(nickname.as_str()) { continue; }
+            if let Some(ref nickname) = query.nickname
+                && !u.nickname.contains(nickname.as_str())
+            {
+                continue;
             }
-            if let Some(ref mobile) = query.mobile {
-                if !u.mobile.contains(mobile.as_str()) { continue; }
+            if let Some(ref mobile) = query.mobile
+                && !u.mobile.contains(mobile.as_str())
+            {
+                continue;
             }
-            if let Some(status) = query.status {
-                if u.status != Status::from(status) { continue; }
+            if let Some(status) = query.status
+                && u.status != Status::from(status)
+            {
+                continue;
             }
             users.push(self.to_full_domain(&u).await?);
         }
@@ -282,7 +321,9 @@ impl UserRepository for ToastyUserRepository {
             .exec(&mut db)
             .await
             .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
-        Ok(all.iter().any(|u| u.deleted == Deleted::No && u.email == email))
+        Ok(all
+            .iter()
+            .any(|u| u.deleted == Deleted::No && u.email == email))
     }
 
     async fn exists_by_mobile(&self, mobile: &str) -> AppResult<bool> {
@@ -291,7 +332,9 @@ impl UserRepository for ToastyUserRepository {
             .exec(&mut db)
             .await
             .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
-        Ok(all.iter().any(|u| u.deleted == Deleted::No && u.mobile == mobile))
+        Ok(all
+            .iter()
+            .any(|u| u.deleted == Deleted::No && u.mobile == mobile))
     }
 
     async fn count(&self, query: &UserQuery) -> AppResult<i64> {
@@ -305,17 +348,25 @@ impl UserRepository for ToastyUserRepository {
             .iter()
             .filter(|u| u.deleted == Deleted::No)
             .filter(|u| {
-                if let Some(ref username) = query.username {
-                    if !u.username.contains(username.as_str()) { return false; }
+                if let Some(ref username) = query.username
+                    && !u.username.contains(username.as_str())
+                {
+                    return false;
                 }
-                if let Some(ref nickname) = query.nickname {
-                    if !u.nickname.contains(nickname.as_str()) { return false; }
+                if let Some(ref nickname) = query.nickname
+                    && !u.nickname.contains(nickname.as_str())
+                {
+                    return false;
                 }
-                if let Some(ref mobile) = query.mobile {
-                    if !u.mobile.contains(mobile.as_str()) { return false; }
+                if let Some(ref mobile) = query.mobile
+                    && !u.mobile.contains(mobile.as_str())
+                {
+                    return false;
                 }
-                if let Some(status) = query.status {
-                    if u.status != Status::from(status) { return false; }
+                if let Some(status) = query.status
+                    && u.status != Status::from(status)
+                {
+                    return false;
                 }
                 true
             })
@@ -333,10 +384,10 @@ impl UserRepository for ToastyUserRepository {
 
         let mut users = Vec::new();
         for ur in user_roles {
-            if let Ok(u) = SysUser::get_by_id(&mut db, ur.user_id).await {
-                if u.deleted == Deleted::No {
-                    users.push(self.to_full_domain(&u).await?);
-                }
+            if let Ok(u) = SysUser::get_by_id(&mut db, ur.user_id).await
+                && u.deleted == Deleted::No
+            {
+                users.push(self.to_full_domain(&u).await?);
             }
         }
         Ok(users)
@@ -351,10 +402,10 @@ impl UserRepository for ToastyUserRepository {
 
         let mut users = Vec::new();
         for ud in user_depts {
-            if let Ok(u) = SysUser::get_by_id(&mut db, ud.user_id).await {
-                if u.deleted == Deleted::No {
-                    users.push(self.to_full_domain(&u).await?);
-                }
+            if let Ok(u) = SysUser::get_by_id(&mut db, ud.user_id).await
+                && u.deleted == Deleted::No
+            {
+                users.push(self.to_full_domain(&u).await?);
             }
         }
         Ok(users)
@@ -424,7 +475,8 @@ impl UserRepository for ToastyUserRepository {
                 .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
 
             for ur in old {
-                ur.delete().exec(&mut *tx)
+                ur.delete()
+                    .exec(&mut *tx)
                     .await
                     .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
             }
@@ -452,7 +504,8 @@ impl UserRepository for ToastyUserRepository {
                 .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
 
             for ud in old {
-                ud.delete().exec(&mut *tx)
+                ud.delete()
+                    .exec(&mut *tx)
                     .await
                     .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
             }

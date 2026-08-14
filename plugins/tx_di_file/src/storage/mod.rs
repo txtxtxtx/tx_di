@@ -79,10 +79,7 @@ pub trait FileStorage: Send + Sync + std::fmt::Debug {
     ///
     /// 返回实现 `AsyncRead + AsyncSeek` 的读取器，
     /// 调用方可边读边处理（如流式 HTTP 响应）。
-    async fn read_stream(
-        &self,
-        path: &str,
-    ) -> AppResult<Pin<Box<dyn AsyncRead + Send + Unpin>>>;
+    async fn read_stream(&self, path: &str) -> AppResult<Pin<Box<dyn AsyncRead + Send + Unpin>>>;
 
     /// 删除文件
     async fn delete(&self, path: &str) -> AppResult<()>;

@@ -117,7 +117,13 @@ pub trait CacheService: Send + Sync + 'static {
     async fn zrem(&self, key: &str, members: &[&[u8]]) -> AppResult<usize>;
 
     /// 按排名范围获取成员（with_scores=true 时交替返回 member, score 的 bytes 表示）
-    async fn zrange(&self, key: &str, start: i64, stop: i64, with_scores: bool) -> AppResult<Vec<Vec<u8>>>;
+    async fn zrange(
+        &self,
+        key: &str,
+        start: i64,
+        stop: i64,
+        with_scores: bool,
+    ) -> AppResult<Vec<Vec<u8>>>;
 
     /// 按 score 范围获取成员
     async fn zrangebyscore(&self, key: &str, min: f64, max: f64) -> AppResult<Vec<Vec<u8>>>;

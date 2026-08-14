@@ -21,8 +21,11 @@ pub static ADMIN_ROLE: &str = "admin";
 /// ```
 pub async fn ensure_permission(permission: &str) -> Result<(), ApiErr> {
     let login_id = StpUtil::get_login_id_as_string().await?;
-    if StpUtil::check_role(login_id.clone(), ADMIN_ROLE).await.is_ok() {
-        debug!("{} is admin, skip permission check",login_id);
+    if StpUtil::check_role(login_id.clone(), ADMIN_ROLE)
+        .await
+        .is_ok()
+    {
+        debug!("{} is admin, skip permission check", login_id);
         return Ok(());
     }
     StpUtil::check_permission(login_id, permission).await?;

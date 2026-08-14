@@ -20,9 +20,9 @@ use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 use tx_di_core::{App, Component, DepsTuple, RIE};
 
-use crate::registration::{RegistrationHandle, SipRegistrationStore, backoff_delay};
 use crate::SipErr;
 use crate::SipPlugin;
+use crate::registration::{RegistrationHandle, SipRegistrationStore, backoff_delay};
 
 /// 心跳回调类型：`Fn() -> Future<RIE<()>>`（无参；上层闭包自行捕获上下文）
 type KeepaliveFn = Arc<dyn Fn() -> Pin<Box<dyn Future<Output = RIE<()>> + Send>> + Send + Sync>;
@@ -231,7 +231,8 @@ impl SipClient {
                 h(true);
             }
         } else {
-            self.store.mark_failed(&reg.username, &reg.registrar, &resp.status_code.to_string());
+            self.store
+                .mark_failed(&reg.username, &reg.registrar, &resp.status_code.to_string());
             warn!(status = %resp.status_code, "SIP 注册返回非成功状态码");
             if let Some(h) = self.registered_hook.get() {
                 h(false);
@@ -409,7 +410,10 @@ impl SipClient {
         loop {
             *fail_streak += 1;
             let streak = *fail_streak;
-            let delay = backoff_delay(streak.min(max_retries.max(1)).saturating_sub(1), backoff_base);
+            let delay = backoff_delay(
+                streak.min(max_retries.max(1)).saturating_sub(1),
+                backoff_base,
+            );
             info!(
                 delay_secs = delay.as_secs(),
                 fail_streak = streak,
@@ -466,7 +470,11 @@ mod tests {
             enabled: false,
         };
         // 通过 interval 计算路径验证默认值逻辑
-        let secs = if cfg.renew_secs > 0 { cfg.renew_secs } else { (cfg.expires / 2).max(30) };
+        let secs = if cfg.renew_secs > 0 {
+            cfg.renew_secs
+        } else {
+            (cfg.expires / 2).max(30)
+        };
         assert_eq!(secs, 100);
     }
 
@@ -484,7 +492,11 @@ mod tests {
             backoff_base_secs: 2,
             enabled: false,
         };
-        let secs = if cfg.renew_secs > 0 { cfg.renew_secs } else { (cfg.expires / 2).max(30) };
+        let secs = if cfg.renew_secs > 0 {
+            cfg.renew_secs
+        } else {
+            (cfg.expires / 2).max(30)
+        };
         assert_eq!(secs, 1800);
     }
 }

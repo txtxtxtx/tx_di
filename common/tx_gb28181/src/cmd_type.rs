@@ -51,23 +51,23 @@ pub enum Gb28181CmdType {
 impl std::fmt::Display for Gb28181CmdType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Keepalive       => write!(f, "Keepalive"),
-            Self::Catalog         => write!(f, "Catalog"),
-            Self::DeviceInfo      => write!(f, "DeviceInfo"),
-            Self::DeviceStatus    => write!(f, "DeviceStatus"),
-            Self::RecordInfo      => write!(f, "RecordInfo"),
-            Self::Alarm           => write!(f, "Alarm"),
-            Self::MediaStatus     => write!(f, "MediaStatus"),
-            Self::MobilePosition  => write!(f, "MobilePosition"),
-            Self::ConfigDownload  => write!(f, "ConfigDownload"),
-            Self::PresetList      => write!(f, "PresetList"),
-            Self::CruiseList      => write!(f, "CruiseList"),
-            Self::PresetQuery     => write!(f, "PresetQuery"),
-            Self::CruiseTrack     => write!(f, "CruiseTrack"),
+            Self::Keepalive => write!(f, "Keepalive"),
+            Self::Catalog => write!(f, "Catalog"),
+            Self::DeviceInfo => write!(f, "DeviceInfo"),
+            Self::DeviceStatus => write!(f, "DeviceStatus"),
+            Self::RecordInfo => write!(f, "RecordInfo"),
+            Self::Alarm => write!(f, "Alarm"),
+            Self::MediaStatus => write!(f, "MediaStatus"),
+            Self::MobilePosition => write!(f, "MobilePosition"),
+            Self::ConfigDownload => write!(f, "ConfigDownload"),
+            Self::PresetList => write!(f, "PresetList"),
+            Self::CruiseList => write!(f, "CruiseList"),
+            Self::PresetQuery => write!(f, "PresetQuery"),
+            Self::CruiseTrack => write!(f, "CruiseTrack"),
             Self::PtzPreciseStatus => write!(f, "PtzPreciseStatus"),
-            Self::GuardInfo       => write!(f, "GuardInfo"),
-            Self::Broadcast       => write!(f, "Broadcast"),
-            Self::DeviceControl   => write!(f, "DeviceControl"),
+            Self::GuardInfo => write!(f, "GuardInfo"),
+            Self::Broadcast => write!(f, "Broadcast"),
+            Self::DeviceControl => write!(f, "DeviceControl"),
         }
     }
 }
@@ -78,45 +78,45 @@ impl std::str::FromStr for Gb28181CmdType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         // 快速路径：精确匹配（绝大多数设备使用标准大小写）
         let cmd = match s {
-            "Keepalive"        => return Ok(Self::Keepalive),
-            "Catalog"          => return Ok(Self::Catalog),
-            "DeviceInfo"       => return Ok(Self::DeviceInfo),
-            "DeviceStatus"     => return Ok(Self::DeviceStatus),
-            "RecordInfo"       => return Ok(Self::RecordInfo),
-            "Alarm"            => return Ok(Self::Alarm),
-            "MediaStatus"      => return Ok(Self::MediaStatus),
-            "MobilePosition"   => return Ok(Self::MobilePosition),
-            "ConfigDownload"   => return Ok(Self::ConfigDownload),
-            "PresetList"       => return Ok(Self::PresetList),
-            "CruiseList"       => return Ok(Self::CruiseList),
-            "PresetQuery"      => return Ok(Self::PresetQuery),
-            "CruiseTrack"      => return Ok(Self::CruiseTrack),
+            "Keepalive" => return Ok(Self::Keepalive),
+            "Catalog" => return Ok(Self::Catalog),
+            "DeviceInfo" => return Ok(Self::DeviceInfo),
+            "DeviceStatus" => return Ok(Self::DeviceStatus),
+            "RecordInfo" => return Ok(Self::RecordInfo),
+            "Alarm" => return Ok(Self::Alarm),
+            "MediaStatus" => return Ok(Self::MediaStatus),
+            "MobilePosition" => return Ok(Self::MobilePosition),
+            "ConfigDownload" => return Ok(Self::ConfigDownload),
+            "PresetList" => return Ok(Self::PresetList),
+            "CruiseList" => return Ok(Self::CruiseList),
+            "PresetQuery" => return Ok(Self::PresetQuery),
+            "CruiseTrack" => return Ok(Self::CruiseTrack),
             "PtzPreciseStatus" => return Ok(Self::PtzPreciseStatus),
-            "GuardInfo"        => return Ok(Self::GuardInfo),
-            "Broadcast"        => return Ok(Self::Broadcast),
+            "GuardInfo" => return Ok(Self::GuardInfo),
+            "Broadcast" => return Ok(Self::Broadcast),
             _ => s,
         };
         // 大小写不敏感兜底（兼容部分厂商全小写/全大写实现）
         let lower = cmd.to_ascii_lowercase();
         match lower.as_str() {
-            "keepalive"        => Ok(Self::Keepalive),
-            "catalog"          => Ok(Self::Catalog),
-            "deviceinfo"       => Ok(Self::DeviceInfo),
-            "devicestatus"     => Ok(Self::DeviceStatus),
-            "recordinfo"       => Ok(Self::RecordInfo),
-            "alarm"            => Ok(Self::Alarm),
-            "mediastatus"      => Ok(Self::MediaStatus),
-            "mobileposition"   => Ok(Self::MobilePosition),
-            "configdownload"   => Ok(Self::ConfigDownload),
-            "presetlist"       => Ok(Self::PresetList),
-            "cruiselist"       => Ok(Self::CruiseList),
-            "presetquery"      => Ok(Self::PresetQuery),
-            "cruisetrack"      => Ok(Self::CruiseTrack),
+            "keepalive" => Ok(Self::Keepalive),
+            "catalog" => Ok(Self::Catalog),
+            "deviceinfo" => Ok(Self::DeviceInfo),
+            "devicestatus" => Ok(Self::DeviceStatus),
+            "recordinfo" => Ok(Self::RecordInfo),
+            "alarm" => Ok(Self::Alarm),
+            "mediastatus" => Ok(Self::MediaStatus),
+            "mobileposition" => Ok(Self::MobilePosition),
+            "configdownload" => Ok(Self::ConfigDownload),
+            "presetlist" => Ok(Self::PresetList),
+            "cruiselist" => Ok(Self::CruiseList),
+            "presetquery" => Ok(Self::PresetQuery),
+            "cruisetrack" => Ok(Self::CruiseTrack),
             "ptzprecisestatus" => Ok(Self::PtzPreciseStatus),
-            "guardinfo"        => Ok(Self::GuardInfo),
-            "broadcast"        => Ok(Self::Broadcast),
-            "devicecontrol"    => Ok(Self::DeviceControl),
-            _                  => Err(format!("未知的 GB28181 指令类型: {cmd}")),
+            "guardinfo" => Ok(Self::GuardInfo),
+            "broadcast" => Ok(Self::Broadcast),
+            "devicecontrol" => Ok(Self::DeviceControl),
+            _ => Err(format!("未知的 GB28181 指令类型: {cmd}")),
         }
     }
 }
@@ -131,18 +131,42 @@ mod tests {
 
     #[test]
     fn parse_exact_case() {
-        assert_eq!("Keepalive".parse::<Gb28181CmdType>().unwrap(), Gb28181CmdType::Keepalive);
-        assert_eq!("Catalog".parse::<Gb28181CmdType>().unwrap(), Gb28181CmdType::Catalog);
-        assert_eq!("Alarm".parse::<Gb28181CmdType>().unwrap(), Gb28181CmdType::Alarm);
-        assert_eq!("Broadcast".parse::<Gb28181CmdType>().unwrap(), Gb28181CmdType::Broadcast);
-        assert_eq!("DeviceControl".parse::<Gb28181CmdType>().unwrap(), Gb28181CmdType::DeviceControl);
+        assert_eq!(
+            "Keepalive".parse::<Gb28181CmdType>().unwrap(),
+            Gb28181CmdType::Keepalive
+        );
+        assert_eq!(
+            "Catalog".parse::<Gb28181CmdType>().unwrap(),
+            Gb28181CmdType::Catalog
+        );
+        assert_eq!(
+            "Alarm".parse::<Gb28181CmdType>().unwrap(),
+            Gb28181CmdType::Alarm
+        );
+        assert_eq!(
+            "Broadcast".parse::<Gb28181CmdType>().unwrap(),
+            Gb28181CmdType::Broadcast
+        );
+        assert_eq!(
+            "DeviceControl".parse::<Gb28181CmdType>().unwrap(),
+            Gb28181CmdType::DeviceControl
+        );
     }
 
     #[test]
     fn parse_case_insensitive() {
-        assert_eq!("keepalive".parse::<Gb28181CmdType>().unwrap(), Gb28181CmdType::Keepalive);
-        assert_eq!("CATALOG".parse::<Gb28181CmdType>().unwrap(), Gb28181CmdType::Catalog);
-        assert_eq!("cruiseTrack".parse::<Gb28181CmdType>().unwrap(), Gb28181CmdType::CruiseTrack);
+        assert_eq!(
+            "keepalive".parse::<Gb28181CmdType>().unwrap(),
+            Gb28181CmdType::Keepalive
+        );
+        assert_eq!(
+            "CATALOG".parse::<Gb28181CmdType>().unwrap(),
+            Gb28181CmdType::Catalog
+        );
+        assert_eq!(
+            "cruiseTrack".parse::<Gb28181CmdType>().unwrap(),
+            Gb28181CmdType::CruiseTrack
+        );
     }
 
     #[test]

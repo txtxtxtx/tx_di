@@ -9,8 +9,8 @@ use admin_app::auth::session_service::AuthSessionService;
 use admin_domain::menu::model::value_object::MenuTreeNode;
 use admin_proto::{Empty, LoginRequest, LogoutRequest, UserInfoResponse};
 use axum::Json;
-use axum::http::header::SET_COOKIE;
 use axum::http::HeaderValue;
+use axum::http::header::SET_COOKIE;
 use axum::response::{IntoResponse, Response};
 use std::sync::Arc;
 use tx_common::{ApiR, ApiRes};
@@ -25,8 +25,8 @@ use tx_di_sa_token::{LoginIdExtractor, SaTokenConf};
 /// `X-Forwarded-For`（见 SmartIpKeyExtractor 说明），否则所有请求共享代理 IP 额度。
 pub fn open_router() -> Router {
     use axum::routing::post;
-    use tower_governor::governor::GovernorConfigBuilder;
     use tower_governor::GovernorLayer;
+    use tower_governor::governor::GovernorConfigBuilder;
 
     // 登录限流：每 12 秒补充 1 个配额（≈5 次/分钟），桶容量 5 允许突发
     let governor_conf = Arc::new(
@@ -117,7 +117,10 @@ async fn logout(
     // 3. 清除 HttpOnly Cookie（Max-Age=0）
     let resp: ApiR<Empty> = ApiRes::ok().into_typed();
     let mut resp = resp.into_response();
-    let cookie = format!("{}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0", sa_conf.token_name);
+    let cookie = format!(
+        "{}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0",
+        sa_conf.token_name
+    );
     if let Ok(v) = HeaderValue::from_str(&cookie) {
         resp.headers_mut().insert(SET_COOKIE, v);
     }

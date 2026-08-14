@@ -6,14 +6,22 @@
 
 #[cfg(test)]
 mod menu_tests {
-    use crate::shared::model::value_object::DeletedStatus;
-    use crate::shared::model::AggregateRoot;
     use crate::menu::model::aggregate::Menu;
+    use crate::shared::model::AggregateRoot;
     use crate::shared::model::DomainEvent;
+    use crate::shared::model::value_object::DeletedStatus;
     use pretty_assertions::assert_eq;
 
     fn make_menu() -> Menu {
-        Menu::create(10, "Dashboard".into(), "dashboard".into(), 1, 0, 0, Some("admin".into()))
+        Menu::create(
+            10,
+            "Dashboard".into(),
+            "dashboard".into(),
+            1,
+            0,
+            0,
+            Some("admin".into()),
+        )
     }
 
     #[test]
@@ -32,15 +40,29 @@ mod menu_tests {
     fn test_create_menu_raises_event() {
         let m = Menu::create(1, "Home".into(), "home".into(), 1, 0, 0, None);
         assert_eq!(m.events().len(), 1);
-        assert!(matches!(m.events()[0], DomainEvent::MenuCreated { menu_id: 1 }));
+        assert!(matches!(
+            m.events()[0],
+            DomainEvent::MenuCreated { menu_id: 1 }
+        ));
     }
 
     #[test]
     fn test_update_info_all_fields() {
         let mut m = make_menu();
-        m.update_info("Settings".into(), "settings".into(), 1, 2, 0,
-            Some("/settings".into()), Some("gear".into()), Some("SettingsView".into()),
-            Some("settings".into()), 1, 1, Some("updater".into()));
+        m.update_info(
+            "Settings".into(),
+            "settings".into(),
+            1,
+            2,
+            0,
+            Some("/settings".into()),
+            Some("gear".into()),
+            Some("SettingsView".into()),
+            Some("settings".into()),
+            1,
+            1,
+            Some("updater".into()),
+        );
 
         assert_eq!(m.name, "Settings");
         assert_eq!(m.path.as_deref(), Some("/settings"));
@@ -53,9 +75,25 @@ mod menu_tests {
     fn test_update_info_raises_event() {
         let mut m = make_menu();
         let before = m.events().len();
-        m.update_info("X".into(), "x".into(), 0, 0, 0, None, None, None, None, 0, 0, None);
+        m.update_info(
+            "X".into(),
+            "x".into(),
+            0,
+            0,
+            0,
+            None,
+            None,
+            None,
+            None,
+            0,
+            0,
+            None,
+        );
         assert_eq!(m.events().len(), before + 1);
-        assert!(matches!(m.events().last(), Some(DomainEvent::MenuUpdated { menu_id: 10 })));
+        assert!(matches!(
+            m.events().last(),
+            Some(DomainEvent::MenuUpdated { menu_id: 10 })
+        ));
     }
 
     #[test]
@@ -104,7 +142,10 @@ mod menu_tests {
         let before = m.events().len();
         m.soft_delete(None);
         assert_eq!(m.events().len(), before + 1);
-        assert!(matches!(m.events().last(), Some(DomainEvent::MenuDeleted { menu_id: 10 })));
+        assert!(matches!(
+            m.events().last(),
+            Some(DomainEvent::MenuDeleted { menu_id: 10 })
+        ));
     }
 
     // ============================================================
@@ -128,8 +169,20 @@ mod menu_tests {
     fn test_restore_does_not_raise_events() {
         use crate::shared::model::AuditFields;
         let m = Menu::restore(
-            1, "M".into(), "m".into(), 1, 0, 0,
-            None, None, None, None, 0, 0, 0, 0,
+            1,
+            "M".into(),
+            "m".into(),
+            1,
+            0,
+            0,
+            None,
+            None,
+            None,
+            None,
+            0,
+            0,
+            0,
+            0,
             AuditFields::default(),
         );
         assert!(m.events().is_empty());
@@ -164,8 +217,20 @@ mod menu_tests {
         m.icon = Some("old-icon".into());
         m.component = Some("OldComp".into());
         m.component_name = Some("old".into());
-        m.update_info("X".into(), "x".into(), 0, 0, 0,
-            None, None, None, None, 0, 0, None);
+        m.update_info(
+            "X".into(),
+            "x".into(),
+            0,
+            0,
+            0,
+            None,
+            None,
+            None,
+            None,
+            0,
+            0,
+            None,
+        );
         assert!(m.path.is_none());
         assert!(m.icon.is_none());
         assert!(m.component.is_none());

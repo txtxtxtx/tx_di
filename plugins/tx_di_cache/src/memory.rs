@@ -3,7 +3,7 @@
 //! 使用 `DashMap` 实现并发安全的进程内缓存，支持全部 5 种数据类型。
 //! TTL 采用惰性过期（读取时检查），可选后台定时清理任务。
 
-use std::collections::{HashMap, HashSet, VecDeque, BTreeSet};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -21,6 +21,7 @@ use crate::service::CacheService;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// 缓存值的内部表示（区分数据类型）
+#[allow(clippy::enum_variant_names)]
 enum CacheValue {
     StringValue {
         data: Vec<u8>,
@@ -113,19 +114,19 @@ impl MemoryCache {
         if let Some(entry) = self.store.get(key) {
             let expired = match entry.value() {
                 CacheValue::StringValue { expires_at, .. } => {
-                    expires_at.map_or(false, |e| Instant::now() >= e)
+                    expires_at.is_some_and(|e| Instant::now() >= e)
                 }
                 CacheValue::HashValue { expires_at, .. } => {
-                    expires_at.map_or(false, |e| Instant::now() >= e)
+                    expires_at.is_some_and(|e| Instant::now() >= e)
                 }
                 CacheValue::ListValue { expires_at, .. } => {
-                    expires_at.map_or(false, |e| Instant::now() >= e)
+                    expires_at.is_some_and(|e| Instant::now() >= e)
                 }
                 CacheValue::SetValue { expires_at, .. } => {
-                    expires_at.map_or(false, |e| Instant::now() >= e)
+                    expires_at.is_some_and(|e| Instant::now() >= e)
                 }
                 CacheValue::SortedSetValue { expires_at, .. } => {
-                    expires_at.map_or(false, |e| Instant::now() >= e)
+                    expires_at.is_some_and(|e| Instant::now() >= e)
                 }
             };
             if expired {
@@ -174,10 +175,13 @@ impl CacheService for MemoryCache {
         if self.is_full() && !self.store.contains_key(&pk) {
             return Err(AppError::from_code(CacheErr::ResourceExhausted));
         }
-        self.store.insert(pk, CacheValue::StringValue {
-            data: value.to_vec(),
-            expires_at: Self::expires_at(ttl),
-        });
+        self.store.insert(
+            pk,
+            CacheValue::StringValue {
+                data: value.to_vec(),
+                expires_at: Self::expires_at(ttl),
+            },
+        );
         Ok(())
     }
 
@@ -299,13 +303,13 @@ impl CacheService for MemoryCache {
 
     async fn hdel(&self, key: &str, field: &str) -> AppResult<()> {
         let pk = self.prefixed(key);
-        if let Some(mut entry) = self.store.get_mut(&pk) {
-            if let CacheValue::HashValue { fields, .. } = entry.value_mut() {
-                fields.remove(field);
-                if fields.is_empty() {
-                    drop(entry);
-                    self.store.remove(&pk);
-                }
+        if let Some(mut entry) = self.store.get_mut(&pk)
+            && let CacheValue::HashValue { fields, .. } = entry.value_mut()
+        {
+            fields.remove(field);
+            if fields.is_empty() {
+                drop(entry);
+                self.store.remove(&pk);
             }
         }
         Ok(())
@@ -436,8 +440,16 @@ impl CacheService for MemoryCache {
             Some(entry) => match entry.value() {
                 CacheValue::ListValue { deque, .. } => {
                     let len = deque.len() as i64;
-                    let s = if start < 0 { (len + start).max(0) } else { start.min(len - 1) };
-                    let e = if stop < 0 { len + stop } else { stop.min(len - 1) };
+                    let s = if start < 0 {
+                        (len + start).max(0)
+                    } else {
+                        start.min(len - 1)
+                    };
+                    let e = if stop < 0 {
+                        len + stop
+                    } else {
+                        stop.min(len - 1)
+                    };
                     let result: Vec<Vec<u8>> = deque
                         .iter()
                         .skip(s as usize)
@@ -496,17 +508,17 @@ impl CacheService for MemoryCache {
     async fn srem(&self, key: &str, members: &[&[u8]]) -> AppResult<usize> {
         let pk = self.prefixed(key);
         let mut removed = 0;
-        if let Some(mut entry) = self.store.get_mut(&pk) {
-            if let CacheValue::SetValue { members: m, .. } = entry.value_mut() {
-                for val in members {
-                    if m.remove(&val.to_vec()) {
-                        removed += 1;
-                    }
+        if let Some(mut entry) = self.store.get_mut(&pk)
+            && let CacheValue::SetValue { members: m, .. } = entry.value_mut()
+        {
+            for val in members {
+                if m.remove(&val.to_vec()) {
+                    removed += 1;
                 }
-                if m.is_empty() {
-                    drop(entry);
-                    self.store.remove(&pk);
-                }
+            }
+            if m.is_empty() {
+                drop(entry);
+                self.store.remove(&pk);
             }
         }
         Ok(removed)
@@ -517,9 +529,7 @@ impl CacheService for MemoryCache {
         self.check_expiry(&pk);
         match self.store.get(&pk) {
             Some(entry) => match entry.value() {
-                CacheValue::SetValue { members, .. } => {
-                    Ok(members.iter().cloned().collect())
-                }
+                CacheValue::SetValue { members, .. } => Ok(members.iter().cloned().collect()),
                 _ => Err(AppError::from_code(CacheErr::TypeError)),
             },
             None => Ok(Vec::new()),
@@ -588,29 +598,35 @@ impl CacheService for MemoryCache {
     async fn zrem(&self, key: &str, members: &[&[u8]]) -> AppResult<usize> {
         let pk = self.prefixed(key);
         let mut removed = 0;
-        if let Some(mut entry) = self.store.get_mut(&pk) {
-            if let CacheValue::SortedSetValue { members: m, .. } = entry.value_mut() {
-                for member in members {
-                    let to_remove: Vec<ZMember> = m
-                        .iter()
-                        .filter(|zm| zm.member == member.to_vec())
-                        .cloned()
-                        .collect();
-                    for zm in to_remove {
-                        m.remove(&zm);
-                        removed += 1;
-                    }
+        if let Some(mut entry) = self.store.get_mut(&pk)
+            && let CacheValue::SortedSetValue { members: m, .. } = entry.value_mut()
+        {
+            for member in members {
+                let to_remove: Vec<ZMember> = m
+                    .iter()
+                    .filter(|zm| zm.member == member.to_vec())
+                    .cloned()
+                    .collect();
+                for zm in to_remove {
+                    m.remove(&zm);
+                    removed += 1;
                 }
-                if m.is_empty() {
-                    drop(entry);
-                    self.store.remove(&pk);
-                }
+            }
+            if m.is_empty() {
+                drop(entry);
+                self.store.remove(&pk);
             }
         }
         Ok(removed)
     }
 
-    async fn zrange(&self, key: &str, start: i64, stop: i64, with_scores: bool) -> AppResult<Vec<Vec<u8>>> {
+    async fn zrange(
+        &self,
+        key: &str,
+        start: i64,
+        stop: i64,
+        with_scores: bool,
+    ) -> AppResult<Vec<Vec<u8>>> {
         let pk = self.prefixed(key);
         self.check_expiry(&pk);
         match self.store.get(&pk) {
@@ -618,13 +634,23 @@ impl CacheService for MemoryCache {
                 CacheValue::SortedSetValue { members, .. } => {
                     let vec: Vec<&ZMember> = members.iter().collect();
                     let len = vec.len() as i64;
-                    let s = if start < 0 { (len + start).max(0) } else { start.min(len - 1).max(0) };
-                    let e = if stop < 0 { len + stop } else { stop.min(len - 1) };
+                    let s = if start < 0 {
+                        (len + start).max(0)
+                    } else {
+                        start.min(len - 1).max(0)
+                    };
+                    let e = if stop < 0 {
+                        len + stop
+                    } else {
+                        stop.min(len - 1)
+                    };
                     let mut result = Vec::new();
-                    for i in s as usize..=(e as usize).min(vec.len().saturating_sub(1)) {
-                        result.push(vec[i].member.clone());
+                    let start_idx = s as usize;
+                    let end_idx = (e as usize).min(vec.len().saturating_sub(1));
+                    for item in vec.iter().take(end_idx + 1).skip(start_idx) {
+                        result.push(item.member.clone());
                         if with_scores {
-                            result.push(vec[i].score.to_le_bytes().to_vec());
+                            result.push(item.score.to_le_bytes().to_vec());
                         }
                     }
                     Ok(result)
@@ -659,12 +685,10 @@ impl CacheService for MemoryCache {
         self.check_expiry(&pk);
         match self.store.get(&pk) {
             Some(entry) => match entry.value() {
-                CacheValue::SortedSetValue { members, .. } => {
-                    Ok(members
-                        .iter()
-                        .find(|zm| zm.member == member.to_vec())
-                        .map(|zm| zm.score))
-                }
+                CacheValue::SortedSetValue { members, .. } => Ok(members
+                    .iter()
+                    .find(|zm| zm.member == member.to_vec())
+                    .map(|zm| zm.score)),
                 _ => Err(AppError::from_code(CacheErr::TypeError)),
             },
             None => Ok(None),
@@ -736,7 +760,8 @@ impl CacheService for MemoryCache {
 
     async fn clear_prefix(&self, prefix: &str) -> AppResult<usize> {
         let full_prefix = self.prefixed(prefix);
-        let keys: Vec<String> = self.store
+        let keys: Vec<String> = self
+            .store
             .iter()
             .filter(|e| e.key().starts_with(&full_prefix))
             .map(|e| e.key().clone())

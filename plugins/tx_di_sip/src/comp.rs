@@ -139,7 +139,11 @@ async fn app_async_init(comp: Arc<SipPlugin>, app: Arc<App>) -> RIE<()> {
         .set(Arc::new(DialogLayer::new(endpoint_inner.clone())))
         .ok();
     comp.sender_cache
-        .set(SipSender::new(endpoint_inner, comp.config.clone(), comp.dialog_layer()))
+        .set(SipSender::new(
+            endpoint_inner,
+            comp.config.clone(),
+            comp.dialog_layer(),
+        ))
         .ok();
 
     // 收集中间件并注入 router（DI 收集，替代全局 REGISTRY，修 P1/P2）
@@ -303,15 +307,21 @@ impl SipPlugin {
             .ok_or("未设置sip端点")?
             .inner
             .clone();
-        Ok(SipSender::new(inner, self.config.clone(), self.dialog_layer()))
+        Ok(SipSender::new(
+            inner,
+            self.config.clone(),
+            self.dialog_layer(),
+        ))
     }
 
     /// 获取共享 DialogLayer（单例，UAS 管理器/业务层复用）
     pub fn dialog_layer(&self) -> Arc<DialogLayer> {
         self.dialog_layer
-            .get_or_init(|| Arc::new(DialogLayer::new(
-                self.endpoint.get().expect("sip 端点未设置").inner.clone(),
-            )))
+            .get_or_init(|| {
+                Arc::new(DialogLayer::new(
+                    self.endpoint.get().expect("sip 端点未设置").inner.clone(),
+                ))
+            })
             .clone()
     }
 
@@ -407,9 +417,10 @@ async fn build_tls_transport(
     addr: SocketAddr,
     transport_layer: &mut rsipstack::transport::TransportLayer,
 ) -> anyhow::Result<()> {
-    let tls_cfg = config.tls.as_ref().ok_or_else(|| {
-        anyhow::anyhow!("启用 TLS 传输但未配置 [sip_config.tls]")
-    })?;
+    let tls_cfg = config
+        .tls
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("启用 TLS 传输但未配置 [sip_config.tls]"))?;
 
     let cert_bytes = tokio::fs::read(&tls_cfg.cert_pem)
         .await
@@ -462,13 +473,10 @@ async fn build_tls_transport(
         .as_ref()
         .and_then(|ip| format!("{}:{}", ip, config.port).parse::<SocketAddr>().ok());
 
-    let tls_conn = rsipstack::transport::tls::TlsListenerConnection::new(
-        local_addr,
-        external,
-        rsip_tls,
-    )
-    .await
-    .map_err(|e| anyhow::anyhow!("TLS transport 绑定 {} 失败: {}", addr, e))?;
+    let tls_conn =
+        rsipstack::transport::tls::TlsListenerConnection::new(local_addr, external, rsip_tls)
+            .await
+            .map_err(|e| anyhow::anyhow!("TLS transport 绑定 {} 失败: {}", addr, e))?;
 
     transport_layer.add_transport(tls_conn.into());
     info!("SIP TLS transport 已绑定: {}", addr);
@@ -493,9 +501,7 @@ async fn build_ws_transport(
         .and_then(|ip| format!("{}:{}", ip, config.port).parse::<SocketAddr>().ok());
 
     let ws_conn = rsipstack::transport::websocket::WebSocketListenerConnection::new(
-        local_addr,
-        external,
-        false, // is_secure (WSS 需另行配置)
+        local_addr, external, false, // is_secure (WSS 需另行配置)
     )
     .await
     .map_err(|e| anyhow::anyhow!("WS transport 绑定 {} 失败: {}", addr, e))?;

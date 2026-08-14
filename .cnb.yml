@@ -19,15 +19,24 @@
   docker:
     image: rust:1.97-slim
     volumes:
-      - cargo-registry:/usr/local/cargo/registry:rw
-      - target-cache:/workspace/target:rw
+      # 数据卷使用纯绝对路径，缺省 type 为 copy-on-write(cow) 并发模式：
+      # 各构建 copy-on-write 独立写入、成功后合并，避免并发冲突
+      # （rw 串行模式在多并发构建下会因共享写入而 Permission denied）。
+      - /usr/local/cargo/registry
+      - /workspace/target
 
 .regression-stages: &regression-stages
   stages:
     - name: fmt
-      script: cargo fmt --check
+      # rust:*-slim 镜像默认不含 rustfmt，需先安装再检查格式
+      script: |
+        rustup component add rustfmt
+        cargo fmt --check
     - name: clippy
-      script: cargo clippy -p tx-di-core -p tx-di-macros -p admin_domain -p admin_app -p admin_api -- -D warnings
+      # rust:*-slim 镜像默认不含 clippy，需先安装再执行 lint
+      script: |
+        rustup component add clippy
+        cargo clippy -p tx-di-core -p tx-di-macros -p admin_domain -p admin_app -p admin_api -- -D warnings
     - name: test-core
       # 框架层核心测试（串行，避免全局状态竞态）
       script: cargo test -p tx-di-core -- --test-threads=1
@@ -35,10 +44,14 @@
       script: cargo test -p admin_domain
     - name: test-app
       # 集成测试串行（共享全局状态）
-      script: cargo test -p admin_app -- --test-threads=1
+      script: |
+        apt-get update && apt-get install -y --no-install-recommends libssl-dev pkg-config
+        cargo test -p admin_app -- --test-threads=1
     - name: test-api
       # 接口层 E2E（含 gRPC 自动化回归 + admin_proto DTO 序列化）
-      script: cargo test -p admin_api
+      script: |
+        apt-get update && apt-get install -y --no-install-recommends libssl-dev pkg-config
+        cargo test -p admin_api
   failStages:
     - name: notify-fail
       script: |
@@ -93,17 +106,27 @@ main:
         - docker
       stages:
         - name: fmt
-          script: cargo fmt --check
+          # rust:*-slim 镜像默认不含 rustfmt，需先安装再检查格式
+          script: |
+            rustup component add rustfmt
+            cargo fmt --check
         - name: clippy
-          script: cargo clippy -p tx-di-core -p tx-di-macros -p admin_domain -p admin_app -p admin_api -- -D warnings
+          # rust:*-slim 镜像默认不含 clippy，需先安装再执行 lint
+          script: |
+            rustup component add clippy
+            cargo clippy -p tx-di-core -p tx-di-macros -p admin_domain -p admin_app -p admin_api -- -D warnings
         - name: test-core
           script: cargo test -p tx-di-core -- --test-threads=1
         - name: test-domain
           script: cargo test -p admin_domain
         - name: test-app
-          script: cargo test -p admin_app -- --test-threads=1
+          script: |
+            apt-get update && apt-get install -y --no-install-recommends libssl-dev pkg-config
+            cargo test -p admin_app -- --test-threads=1
         - name: test-api
-          script: cargo test -p admin_api
+          script: |
+            apt-get update && apt-get install -y --no-install-recommends libssl-dev pkg-config
+            cargo test -p admin_api
         - name: build-image
           # 构建并推送 tx_admin Docker 镜像到 CNB 制品库（Tag 版本）
           # services: docker 已内置对 CNB 制品库的认证，无需显式 docker login

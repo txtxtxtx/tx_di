@@ -3,7 +3,7 @@
 //! - **序列化**：输出字符串 `"123"`（避免 JavaScript 数值精度丢失）
 //! - **反序列化**：同时接受数字 `123` 和字符串 `"123"`
 
-use serde::{de, Deserializer, Serializer};
+use serde::{Deserializer, Serializer, de};
 use serde_with::{DeserializeAs, SerializeAs};
 use std::fmt;
 use std::marker::PhantomData;
@@ -129,14 +129,12 @@ where
                         serde_json::Value::Number(n) => {
                             n.to_string().parse().map_err(de::Error::custom)?
                         }
-                        serde_json::Value::String(s) => {
-                            s.parse().map_err(de::Error::custom)?
-                        }
+                        serde_json::Value::String(s) => s.parse().map_err(de::Error::custom)?,
                         other => {
                             return Err(de::Error::custom(format!(
                                 "expected number or string, got {}",
                                 other
-                            )))
+                            )));
                         }
                     };
                     vec.push(parsed);

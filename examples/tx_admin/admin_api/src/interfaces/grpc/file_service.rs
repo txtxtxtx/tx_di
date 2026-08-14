@@ -3,13 +3,13 @@
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
+use admin_proto::Empty;
+use admin_proto::admin::common::PageResponse;
 use admin_proto::admin::file::file_service_server::FileService;
 use admin_proto::admin::file::{
     DeleteFileRequest, DownloadFileRequest, DownloadFileResponse, FileResponse, GetFileRequest,
     ListFilesRequest, ListFilesResponse, UploadFileRequest,
 };
-use admin_proto::admin::common::PageResponse;
-use admin_proto::Empty;
 use tx_di_core::App;
 
 use super::auth_interceptor::{self, get_login_id};
@@ -119,7 +119,9 @@ impl FileService for FileGrpcService {
             url: preview.url,
             filename: file.name,
             size: file.size as u64,
-            content_type: file.file_type.unwrap_or_else(|| "application/octet-stream".to_string()),
+            content_type: file
+                .file_type
+                .unwrap_or_else(|| "application/octet-stream".to_string()),
         }))
     }
 }

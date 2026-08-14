@@ -12,27 +12,29 @@
 //! ```
 
 use crate::config::Gb28181ServerConfig;
-use crate::device_registry::{DeviceRegistry};
+use crate::device_registry::DeviceRegistry;
+use crate::event::{Gb28181Event, emit};
 use crate::plugin::Gb28181Server;
-use tx_gb28181::device::GbDevice;
-use crate::event::{emit, Gb28181Event};
 use crate::xml::{
-    parse_alarm_notify, parse_catalog_items, parse_config_download_response,
-    parse_cruise_list, parse_cruise_track, parse_guard_info, parse_media_status,
-    parse_preset_list, parse_ptz_precise_status, parse_record_items,
-    parse_time_sync_response, parse_xml_field,
+    parse_alarm_notify, parse_catalog_items, parse_config_download_response, parse_cruise_list,
+    parse_cruise_track, parse_guard_info, parse_media_status, parse_preset_list,
+    parse_ptz_precise_status, parse_record_items, parse_time_sync_response, parse_xml_field,
 };
+use tx_gb28181::device::GbDevice;
 
 // ── 从公共模块 re-export Gb28181CmdType（向后兼容）─────────────────────────
-pub use tx_gb28181::Gb28181CmdType;
 use rsipstack::sip::{Header, HeadersExt, StatusCode};
 use std::sync::Arc;
 use tracing::{info, warn};
 use tx_di_core::RIE;
 use tx_di_sip::{SipTx, SipUasManager};
+pub use tx_gb28181::Gb28181CmdType;
 
 /// 创建简单的 SIP 响应处理器（回复 200 OK）
-fn create_ok_handler(method_name: &'static str) -> impl Fn(SipTx) -> std::pin::Pin<Box<dyn Future<Output = RIE<()>> + Send>> + Send + Sync + 'static {
+fn create_ok_handler(
+    method_name: &'static str,
+) -> impl Fn(SipTx) -> std::pin::Pin<Box<dyn Future<Output = RIE<()>> + Send>> + Send + Sync + 'static
+{
     move |tx: SipTx| {
         let method = method_name;
         Box::pin(async move {
@@ -180,7 +182,9 @@ async fn handle_device_invite(
     );
 
     // 记录广播会话 + 事件
-    server.broadcast_sessions.insert(device_id.clone(), rtp.port);
+    server
+        .broadcast_sessions
+        .insert(device_id.clone(), rtp.port);
     tokio::spawn(emit(Gb28181Event::BroadcastSessionStarted {
         device_id: device_id.clone(),
         audio_port: rtp.port,
@@ -196,7 +200,10 @@ async fn handle_device_invite(
         let mut finished = false;
         if let Some(mut rx) = sess2.take_state_rx() {
             while let Some(state) = rx.recv().await {
-                if matches!(state, rsipstack::dialog::dialog::DialogState::Terminated(..)) {
+                if matches!(
+                    state,
+                    rsipstack::dialog::dialog::DialogState::Terminated(..)
+                ) {
                     finished = true;
                     break;
                 }
@@ -378,8 +385,7 @@ async fn handle_message(
         .from_header() // 从 From 头中提取
         .map(|h| h.value().to_string())
         .unwrap_or_default();
-    let device_id =
-        extract_user_from_sip_uri(&from_str).unwrap_or_else(|| from_str.clone());
+    let device_id = extract_user_from_sip_uri(&from_str).unwrap_or_else(|| from_str.clone());
 
     let cmd: Gb28181CmdType = match cmd_type.parse() {
         Ok(cmd) => cmd,
@@ -402,7 +408,9 @@ async fn handle_message(
         Gb28181CmdType::PresetList => handle_preset_list(&device_id, &body).await,
         Gb28181CmdType::CruiseList => handle_cruise_list(&device_id, &body).await,
         Gb28181CmdType::CruiseTrack => handle_cruise_track_response(&device_id, &body).await,
-        Gb28181CmdType::PtzPreciseStatus => handle_ptz_precise_status_response(&device_id, &body).await,
+        Gb28181CmdType::PtzPreciseStatus => {
+            handle_ptz_precise_status_response(&device_id, &body).await
+        }
         Gb28181CmdType::GuardInfo => handle_guard_info(&device_id, &body).await,
         Gb28181CmdType::Broadcast => handle_broadcast(&device_id, &body).await,
         _ => {
@@ -413,16 +421,9 @@ async fn handle_message(
 }
 
 /// Keepalive 心跳处理器
-async fn handle_keepalive(
-    device_id: &str,
-    body: &str,
-    registry: &DeviceRegistry,
-) -> RIE<()> {
+async fn handle_keepalive(device_id: &str, body: &str, registry: &DeviceRegistry) -> RIE<()> {
     let status = parse_xml_field(body, "Status").unwrap_or_else(|| "OK".to_string());
-    let was_offline = registry
-        .get(device_id)
-        .map(|d| !d.online)
-        .unwrap_or(false);
+    let was_offline = registry.get(device_id).map(|d| !d.online).unwrap_or(false);
     let was_refreshed = registry.refresh_heartbeat(device_id);
 
     if !was_refreshed {
@@ -632,10 +633,8 @@ async fn handle_mobile_position(device_id: &str, body: &str) -> RIE<()> {
     let latitude = parse_xml_field(body, "Latitude")
         .and_then(|s| s.parse().ok())
         .unwrap_or(0.0f64);
-    let speed = parse_xml_field(body, "Speed")
-        .and_then(|s| s.parse().ok());
-    let direction = parse_xml_field(body, "Direction")
-        .and_then(|s| s.parse().ok());
+    let speed = parse_xml_field(body, "Speed").and_then(|s| s.parse().ok());
+    let direction = parse_xml_field(body, "Direction").and_then(|s| s.parse().ok());
 
     info!(
         device_id = %device_id,

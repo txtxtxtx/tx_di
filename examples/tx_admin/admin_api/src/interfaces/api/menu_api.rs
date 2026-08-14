@@ -1,16 +1,16 @@
 //! 菜单管理 HTTP API
 
-use axum::Json;
-use tx_di_sa_token::StpUtil;
-use tx_di_axum::Router;
-use axum::routing::{get, post, put, delete};
-use tx_di_axum::bound::DiComp;
-use admin_app::menu::app_service::MenuAppService;
-use admin_proto::{CreateMenuRequest, UpdateMenuRequest, ListMenusRequest, MenuResponse, Empty};
-use admin_domain::menu::model::value_object::MenuTreeNode;
-use tx_common::{ApiR, ApiRes};
 use crate::auth::ensure_permission;
 use crate::error::ApiErr;
+use admin_app::menu::app_service::MenuAppService;
+use admin_domain::menu::model::value_object::MenuTreeNode;
+use admin_proto::{CreateMenuRequest, Empty, ListMenusRequest, MenuResponse, UpdateMenuRequest};
+use axum::Json;
+use axum::routing::{delete, get, post, put};
+use tx_common::{ApiR, ApiRes};
+use tx_di_axum::Router;
+use tx_di_axum::bound::DiComp;
+use tx_di_sa_token::StpUtil;
 
 pub fn router() -> Router {
     Router::new()
@@ -41,9 +41,15 @@ async fn get_menu(
     axum::extract::Path(menu_id): axum::extract::Path<u64>,
 ) -> Result<ApiR<MenuResponse>, ApiErr> {
     ensure_permission("menu:view").await?;
-    let query = ListMenusRequest { name: None, status: None, types: None };
+    let query = ListMenusRequest {
+        name: None,
+        status: None,
+        types: None,
+    };
     let list = menu.get_menu_list(query).await?;
-    let r = list.into_iter().find(|m| m.id == menu_id)
+    let r = list
+        .into_iter()
+        .find(|m| m.id == menu_id)
         .ok_or_else(|| anyhow::anyhow!("not found"))?;
     Ok(ApiR::success(r))
 }

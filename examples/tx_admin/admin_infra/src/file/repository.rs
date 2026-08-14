@@ -1,11 +1,11 @@
-use std::sync::Arc;
 use async_trait::async_trait;
+use std::sync::Arc;
 
 use admin_domain::file::model::aggregate::{File, FileConfig};
 use admin_domain::file::model::value_object::FileQuery;
 use admin_domain::file::repository::{FileConfigRepository, FileRepository};
-use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::model::AuditFields;
+use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::repository::{RepositoryError, db_err};
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
@@ -30,18 +30,38 @@ impl ToastyFileRepository {
     fn to_domain(f: &SysFile) -> File {
         File::restore(
             f.id,
-            if f.config_id == 0 { None } else { Some(f.config_id) },
+            if f.config_id == 0 {
+                None
+            } else {
+                Some(f.config_id)
+            },
             f.name.clone(),
             f.file_path.clone(),
             f.url.clone(),
-            if f.file_type.is_empty() { None } else { Some(f.file_type.clone()) },
+            if f.file_type.is_empty() {
+                None
+            } else {
+                Some(f.file_type.clone())
+            },
             f.size,
             AuditFields {
-                creator: if f.creator.is_empty() { None } else { Some(f.creator.clone()) },
+                creator: if f.creator.is_empty() {
+                    None
+                } else {
+                    Some(f.creator.clone())
+                },
                 create_time: f.created_at,
-                updater: if f.updater.is_empty() { None } else { Some(f.updater.clone()) },
+                updater: if f.updater.is_empty() {
+                    None
+                } else {
+                    Some(f.updater.clone())
+                },
                 update_time: f.updated_at,
-                deleted: if f.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if f.deleted == Deleted::Yes {
+                    DeletedStatus::Deleted
+                } else {
+                    DeletedStatus::Normal
+                },
             },
         )
     }
@@ -67,10 +87,11 @@ impl FileRepository for ToastyFileRepository {
                     .filter(SysFile::fields().deleted().eq(Deleted::No))
                     .order_by(SysFile::fields().id().desc());
                 if let Some(ref name) = query.name {
-                    q = q.filter(SysFile::fields().name().like_with_escape(
-                        format!("%{}%", tx_di_toasty::like_escape(name)),
-                        '\\',
-                    ));
+                    q =
+                        q.filter(SysFile::fields().name().like_with_escape(
+                            format!("%{}%", tx_di_toasty::like_escape(name)),
+                            '\\',
+                        ));
                 }
                 if let Some(ref file_type) = query.file_type {
                     q = q.filter(SysFile::fields().file_type().like_with_escape(
@@ -173,15 +194,31 @@ impl ToastyFileConfigRepository {
             c.id,
             c.name.clone(),
             c.storage.into(),
-            if c.remark.is_empty() { None } else { Some(c.remark.clone()) },
+            if c.remark.is_empty() {
+                None
+            } else {
+                Some(c.remark.clone())
+            },
             c.master,
             c.config.clone(),
             AuditFields {
-                creator: if c.creator.is_empty() { None } else { Some(c.creator.clone()) },
+                creator: if c.creator.is_empty() {
+                    None
+                } else {
+                    Some(c.creator.clone())
+                },
                 create_time: c.created_at,
-                updater: if c.updater.is_empty() { None } else { Some(c.updater.clone()) },
+                updater: if c.updater.is_empty() {
+                    None
+                } else {
+                    Some(c.updater.clone())
+                },
                 update_time: c.updated_at,
-                deleted: if c.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if c.deleted == Deleted::Yes {
+                    DeletedStatus::Deleted
+                } else {
+                    DeletedStatus::Normal
+                },
             },
         )
     }
@@ -269,7 +306,8 @@ impl FileConfigRepository for ToastyFileConfigRepository {
             .await
             .map_err(|_| RepositoryError::NotFoundFile)?;
 
-        config.update()
+        config
+            .update()
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await

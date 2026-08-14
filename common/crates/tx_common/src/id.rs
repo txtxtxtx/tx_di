@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::LazyLock;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 /// 雪花算法ID生成器
 ///
 /// ID结构(64位):
@@ -15,6 +15,7 @@ use std::sync::LazyLock;
 /// - 时钟回拨采用指数退避算法，避免忙等待
 /// - 添加闰秒容忍处理机制，防止闰秒插入导致的ID重复或回拨错误
 /// - 支持批量生成ID，减少原子操作开销
+///
 /// ID生成器结构体，用于生成唯一的ID
 pub struct IdGenerator {
     /// 工作节点ID，用于标识不同的工作节点
@@ -137,7 +138,12 @@ impl IdGenerator {
             // CAS：如果状态自读取后未改变，则原子更新
             if self
                 .state
-                .compare_exchange(current_state, new_state, Ordering::AcqRel, Ordering::Acquire)
+                .compare_exchange(
+                    current_state,
+                    new_state,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                )
                 .is_ok()
             {
                 return ((timestamp - EPOCH) << TIMESTAMP_SHIFT)
@@ -210,7 +216,12 @@ impl IdGenerator {
 
             if self
                 .state
-                .compare_exchange(current_state, new_state, Ordering::AcqRel, Ordering::Acquire)
+                .compare_exchange(
+                    current_state,
+                    new_state,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                )
                 .is_err()
             {
                 // CAS失败 — 另一个线程先更新了状态，重试
@@ -284,13 +295,13 @@ impl IdGenerator {
                 std::time::Duration::from_millis(0)
             })
             .as_millis() as u64;
-            
+
         // 闰秒处理：如果当前时间小于上一次记录的时间，且差值在闰秒检测阈值内，
         // 则可能是闰秒导致的回拨，此时我们使用上一次的有效时间戳
         static LAST_VALID_TIMESTAMP: AtomicU64 = AtomicU64::new(0);
         static LEAP_SECOND_DETECTED: AtomicBool = AtomicBool::new(false);
         let last_valid = LAST_VALID_TIMESTAMP.load(Ordering::Relaxed);
-        
+
         if now < last_valid {
             let diff = last_valid - now;
             if diff <= LEAP_SECOND_THRESHOLD_MS {
@@ -303,7 +314,7 @@ impl IdGenerator {
             // 时间正常前进，重置闰秒检测状态
             LEAP_SECOND_DETECTED.store(false, Ordering::Relaxed);
         }
-        
+
         // 更新最后有效时间戳
         LAST_VALID_TIMESTAMP.store(now, Ordering::Relaxed);
         now
@@ -311,8 +322,7 @@ impl IdGenerator {
 }
 
 /// 全局ID生成器实例
-static GLOBAL_ID_GENERATOR: LazyLock<IdGenerator> =
-    LazyLock::new(|| IdGenerator::new(1, 1));
+static GLOBAL_ID_GENERATOR: LazyLock<IdGenerator> = LazyLock::new(|| IdGenerator::new(1, 1));
 
 /// 生成下一个全局ID
 pub fn next_id() -> u64 {
@@ -324,12 +334,11 @@ pub fn next_ids(count: usize) -> Vec<u64> {
     GLOBAL_ID_GENERATOR.next_ids(count)
 }
 
-
 #[cfg(test)]
 mod tests {
+    use super::*;
     use std::sync::Arc;
     use std::thread;
-    use super::*;
 
     #[test]
     fn test_single_id_generation() {
@@ -349,7 +358,7 @@ mod tests {
 
         // 验证ID单调递增
         for i in 1..ids.len() {
-            assert!(ids[i] > ids[i-1], "批量生成的ID应该单调递增");
+            assert!(ids[i] > ids[i - 1], "批量生成的ID应该单调递增");
         }
     }
 
@@ -377,7 +386,11 @@ mod tests {
             all_ids.extend(handle.join().unwrap());
         }
 
-        assert_eq!(all_ids.len(), ids_per_thread * num_threads, "应该生成正确数量的ID");
+        assert_eq!(
+            all_ids.len(),
+            ids_per_thread * num_threads,
+            "应该生成正确数量的ID"
+        );
 
         // 验证所有ID唯一
         let unique_ids: std::collections::HashSet<_> = all_ids.iter().collect();
@@ -393,9 +406,7 @@ mod tests {
 
         for _ in 0..num_threads {
             let arc_gen = generator.clone();
-            let handle = thread::spawn(move || {
-                arc_gen.next_ids(batch_size)
-            });
+            let handle = thread::spawn(move || arc_gen.next_ids(batch_size));
             handles.push(handle);
         }
 
@@ -404,7 +415,11 @@ mod tests {
             all_ids.extend(handle.join().unwrap());
         }
 
-        assert_eq!(all_ids.len(), batch_size * num_threads, "应该生成正确数量的ID");
+        assert_eq!(
+            all_ids.len(),
+            batch_size * num_threads,
+            "应该生成正确数量的ID"
+        );
 
         // 验证所有ID唯一
         let unique_ids: std::collections::HashSet<_> = all_ids.iter().collect();
@@ -427,7 +442,7 @@ mod tests {
 
         // 验证ID单调递增
         for i in 1..ids.len() {
-            assert!(ids[i] > ids[i-1], "批量生成的全局ID应该单调递增");
+            assert!(ids[i] > ids[i - 1], "批量生成的全局ID应该单调递增");
         }
     }
 
@@ -474,7 +489,7 @@ mod tests {
 
         // 验证ID单调递增
         for i in 1..ids.len() {
-            assert!(ids[i] > ids[i-1], "大批量生成的ID应该单调递增");
+            assert!(ids[i] > ids[i - 1], "大批量生成的ID应该单调递增");
         }
     }
 
@@ -521,7 +536,7 @@ mod tests {
 
         // 验证ID单调递增
         for i in 1..ids.len() {
-            assert!(ids[i] > ids[i-1], "序列号溢出后ID应该继续递增");
+            assert!(ids[i] > ids[i - 1], "序列号溢出后ID应该继续递增");
         }
     }
 
@@ -556,15 +571,22 @@ mod tests {
         }
 
         // 验证两种方式生成的ID结构一致
-        assert_eq!(batch_ids.len(), single_ids.len(), "两种方式应该生成相同数量的ID");
+        assert_eq!(
+            batch_ids.len(),
+            single_ids.len(),
+            "两种方式应该生成相同数量的ID"
+        );
 
         // 验证ID单调递增
         for i in 1..batch_ids.len() {
-            assert!(batch_ids[i] > batch_ids[i-1], "批量生成的ID应该单调递增");
+            assert!(batch_ids[i] > batch_ids[i - 1], "批量生成的ID应该单调递增");
         }
 
         for i in 1..single_ids.len() {
-            assert!(single_ids[i] > single_ids[i-1], "单个生成的ID应该单调递增");
+            assert!(
+                single_ids[i] > single_ids[i - 1],
+                "单个生成的ID应该单调递增"
+            );
         }
     }
 }
@@ -581,7 +603,11 @@ mod bench {
         let secs = elapsed.as_secs_f64();
         let throughput = count as f64 / secs;
         if throughput >= 1_000_000.0 {
-            format!("{:.2} ops/s ({:.2} M/s)", throughput, throughput / 1_000_000.0)
+            format!(
+                "{:.2} ops/s ({:.2} M/s)",
+                throughput,
+                throughput / 1_000_000.0
+            )
         } else if throughput >= 1_000.0 {
             format!("{:.2} ops/s ({:.2} K/s)", throughput, throughput / 1_000.0)
         } else {

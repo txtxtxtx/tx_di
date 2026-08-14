@@ -5,10 +5,10 @@ use crate::config::model::aggregate::Config;
 use crate::config::model::value_object::ConfigQuery;
 use crate::config::repository::ConfigRepository;
 use crate::shared::repository::RepositoryError;
+use tx_common::id;
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
-use tx_common::id;
 
 #[derive(Component)]
 pub struct ConfigService {
@@ -56,11 +56,19 @@ impl ConfigService {
         creator: Option<String>,
     ) -> AppResult<Config> {
         if self.config_repo.exists_by_key(&config_key).await? {
-            return Err(RepositoryError::DuplicateConfigKey)?;
+            Err(RepositoryError::DuplicateConfigKey)?;
         }
 
         let config_id = id::next_id();
-        let config = Config::create(config_id, category, config_type, name, config_key, value, creator);
+        let config = Config::create(
+            config_id,
+            category,
+            config_type,
+            name,
+            config_key,
+            value,
+            creator,
+        );
         self.config_repo.insert(&config).await?;
         Ok(config)
     }
@@ -91,6 +99,7 @@ impl ConfigService {
     /// - `NotFoundConfig` - 当指定 config_id 的配置不存在时
     /// - `DuplicateConfigKey` - 当新的 config_key 已被其他配置占用时
     /// - 数据库操作错误 - 仓储查询或更新失败时
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_config(
         &self,
         config_id: u64,
@@ -107,16 +116,25 @@ impl ConfigService {
             .config_repo
             .find_by_id(config_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundConfig)?;
+            .ok_or(RepositoryError::NotFoundConfig)?;
 
         // 检查 config_key 是否被其他配置占用
-        if let Some(existing) = self.config_repo.find_by_key(&config_key).await? {
-            if existing.id != config_id {
-                return Err(RepositoryError::DuplicateConfigKey)?;
-            }
+        if let Some(existing) = self.config_repo.find_by_key(&config_key).await?
+            && existing.id != config_id
+        {
+            Err(RepositoryError::DuplicateConfigKey)?;
         }
 
-        config.update_info(category, config_type, name, config_key, value, visible, remark, updater);
+        config.update_info(
+            category,
+            config_type,
+            name,
+            config_key,
+            value,
+            visible,
+            remark,
+            updater,
+        );
         self.config_repo.update(&config).await?;
         Ok(config)
     }
@@ -143,7 +161,7 @@ impl ConfigService {
             .config_repo
             .find_by_id(config_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundConfig)?;
+            .ok_or(RepositoryError::NotFoundConfig)?;
 
         config.soft_delete(updater);
         self.config_repo.update(&config).await?;
@@ -189,10 +207,11 @@ impl ConfigService {
     /// - `NotFoundConfig` - 当指定 config_id 的配置不存在时
     /// - 数据库操作错误 - 仓储查询失败时
     pub async fn get_config(&self, config_id: u64) -> AppResult<Config> {
-        Ok(self.config_repo
+        Ok(self
+            .config_repo
             .find_by_id(config_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundConfig)?)
+            .ok_or(RepositoryError::NotFoundConfig)?)
     }
 
     /// 根据配置键名获取单个配置
@@ -211,10 +230,11 @@ impl ConfigService {
     /// - `NotFoundConfig` - 当指定 key 的配置不存在时
     /// - 数据库操作错误 - 仓储查询失败时
     pub async fn get_by_key(&self, key: &str) -> AppResult<Config> {
-        Ok(self.config_repo
+        Ok(self
+            .config_repo
             .find_by_key(key)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundConfig)?)
+            .ok_or(RepositoryError::NotFoundConfig)?)
     }
 
     /// 批量根据配置键名获取配置值映射
@@ -233,7 +253,8 @@ impl ConfigService {
     /// - 数据库操作错误 - 仓储查询失败时
     pub async fn get_by_keys(&self, keys: &[String]) -> AppResult<HashMap<String, String>> {
         let configs = self.config_repo.find_by_keys(keys).await?;
-        let map = configs.into_iter()
+        let map = configs
+            .into_iter()
             .map(|c| (c.config_key, c.value))
             .collect();
         Ok(map)

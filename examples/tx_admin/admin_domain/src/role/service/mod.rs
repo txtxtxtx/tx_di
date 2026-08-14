@@ -1,12 +1,12 @@
+use crate::role::model::aggregate::Role;
+use crate::role::model::value_object::RoleQuery;
+use crate::role::repository::RoleRepository;
+use crate::shared::repository::RepositoryError;
 use std::sync::Arc;
 use tx_common::id;
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
-use crate::shared::repository::RepositoryError;
-use crate::role::model::aggregate::Role;
-use crate::role::model::value_object::RoleQuery;
-use crate::role::repository::RoleRepository;
 
 /// Role domain service
 ///
@@ -56,7 +56,7 @@ impl RoleService {
         creator: Option<String>,
     ) -> AppResult<Role> {
         if self.role_repo.exists_by_code(&code).await? {
-            return Err(RepositoryError::DuplicateRoleCode)?;
+            Err(RepositoryError::DuplicateRoleCode)?;
         }
 
         let role_id = id::next_id();
@@ -80,7 +80,7 @@ impl RoleService {
         creator: Option<String>,
     ) -> AppResult<Role> {
         if self.role_repo.exists_by_code(&code).await? {
-            return Err(RepositoryError::DuplicateRoleCode)?;
+            Err(RepositoryError::DuplicateRoleCode)?;
         }
         let role_id = id::next_id();
         Ok(Role::create(role_id, name, code, sort, creator))
@@ -110,6 +110,7 @@ impl RoleService {
     /// - `NotFoundRole` - 指定角色不存在
     /// - `DuplicateRoleCode` - 角色编码已被其他角色使用
     /// - 数据库更新失败时返回错误
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_role(
         &self,
         role_id: u64,
@@ -124,13 +125,13 @@ impl RoleService {
             .role_repo
             .find_by_id(role_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundRole)?;
+            .ok_or(RepositoryError::NotFoundRole)?;
 
         // Check if code is taken by another role
-        if let Some(existing) = self.role_repo.find_by_code(&code).await? {
-            if existing.id != role_id {
-                return Err(RepositoryError::DuplicateRoleCode)?;
-            }
+        if let Some(existing) = self.role_repo.find_by_code(&code).await?
+            && existing.id != role_id
+        {
+            Err(RepositoryError::DuplicateRoleCode)?;
         }
 
         role.update_info(name, code, sort, data_scope, remark, updater);
@@ -155,16 +156,12 @@ impl RoleService {
     /// # 错误
     /// - `NotFoundRole` - 指定角色不存在
     /// - 数据库更新失败时返回错误
-    pub async fn delete_role(
-        &self,
-        role_id: u64,
-        updater: Option<String>,
-    ) -> AppResult<()> {
+    pub async fn delete_role(&self, role_id: u64, updater: Option<String>) -> AppResult<()> {
         let mut role = self
             .role_repo
             .find_by_id(role_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundRole)?;
+            .ok_or(RepositoryError::NotFoundRole)?;
 
         role.soft_delete(updater);
         self.role_repo.update(&role).await?;
@@ -199,7 +196,7 @@ impl RoleService {
             .role_repo
             .find_by_id(role_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundRole)?;
+            .ok_or(RepositoryError::NotFoundRole)?;
 
         role.change_status(status, updater);
         self.role_repo.update(&role).await?;
@@ -226,20 +223,16 @@ impl RoleService {
     /// - `NotFoundRole` - 指定角色不存在
     /// - `ValidationRoleDisabled` - 角色已禁用，无法分配菜单权限
     /// - 数据库操作失败时返回错误
-    pub async fn assign_menus(
-        &self,
-        role_id: u64,
-        menu_ids: Vec<u64>,
-    ) -> AppResult<Role> {
+    pub async fn assign_menus(&self, role_id: u64, menu_ids: Vec<u64>) -> AppResult<Role> {
         let mut role = self
             .role_repo
             .find_by_id(role_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundRole)?;
+            .ok_or(RepositoryError::NotFoundRole)?;
 
         // 角色必须为启用状态才能分配菜单
         if role.status != 0 {
-            return Err(RepositoryError::ValidationRoleDisabled)?;
+            Err(RepositoryError::ValidationRoleDisabled)?;
         }
 
         role.set_menus(menu_ids.clone());
@@ -285,10 +278,11 @@ impl RoleService {
     /// - `NotFoundRole` - 指定角色不存在
     /// - 数据库查询异常时返回错误
     pub async fn get_role(&self, role_id: u64) -> AppResult<Role> {
-        Ok(self.role_repo
+        Ok(self
+            .role_repo
             .find_by_id(role_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundRole)?)
+            .ok_or(RepositoryError::NotFoundRole)?)
     }
 
     /// 根据 ID 列表批量获取角色
@@ -347,9 +341,16 @@ impl RoleService {
     /// # 错误
     /// - `NotFoundRole` - 指定角色不存在
     /// - 数据库查询异常时返回错误
-    pub async fn get_role_users(&self, role_id: u64) -> AppResult<Vec<crate::user::model::aggregate::User>> {
+    pub async fn get_role_users(
+        &self,
+        role_id: u64,
+    ) -> AppResult<Vec<crate::user::model::aggregate::User>> {
         // Verify role exists
-        let _role = self.role_repo.find_by_id(role_id).await?.ok_or_else(|| RepositoryError::NotFoundRole)?;
+        let _role = self
+            .role_repo
+            .find_by_id(role_id)
+            .await?
+            .ok_or(RepositoryError::NotFoundRole)?;
         self.role_repo.find_users_by_role_id(role_id).await
     }
 
@@ -366,10 +367,14 @@ impl RoleService {
     /// # 注意
     /// 用户的合法性校验（存在、Active）由 `RoleAppService` 在调用前完成。
     pub async fn add_users_to_role(&self, role_id: u64, user_ids: Vec<u64>) -> AppResult<()> {
-        let role = self.role_repo.find_by_id(role_id).await?.ok_or_else(|| RepositoryError::NotFoundRole)?;
+        let role = self
+            .role_repo
+            .find_by_id(role_id)
+            .await?
+            .ok_or(RepositoryError::NotFoundRole)?;
 
         if role.status != 0 {
-            return Err(RepositoryError::ValidationRoleDisabled)?;
+            Err(RepositoryError::ValidationRoleDisabled)?;
         }
 
         self.role_repo.bind_users(role_id, &user_ids).await
@@ -398,7 +403,11 @@ impl RoleService {
     /// - 数据库操作失败时返回错误
     pub async fn remove_users_from_role(&self, role_id: u64, user_ids: Vec<u64>) -> AppResult<()> {
         // Verify role exists
-        let _role = self.role_repo.find_by_id(role_id).await?.ok_or_else(|| RepositoryError::NotFoundRole)?;
+        let _role = self
+            .role_repo
+            .find_by_id(role_id)
+            .await?
+            .ok_or(RepositoryError::NotFoundRole)?;
         self.role_repo.unbind_users(role_id, &user_ids).await
     }
 }

@@ -1,4 +1,4 @@
-﻿//! XCP on CAN（ASAM MCD-1 XCP）标定支持（MVP）
+//! XCP on CAN（ASAM MCD-1 XCP）标定支持（MVP）
 //!
 //! 实现：
 //! - A2L 数据库解析（MEASUREMENT / CHARACTERISTIC / COMPU_METHOD 关键字段）
@@ -312,9 +312,15 @@ fn parse_measurement(tokens: &[String], i: &mut usize) -> Option<Measurement> {
         } else if t == "OFFSET" {
             offset = tokens.get(j + 1).and_then(|x| parse_num(x)).unwrap_or(0.0);
         } else if t == "LOWER_LIMIT" {
-            lower = tokens.get(j + 1).and_then(|x| parse_num(x)).unwrap_or(f64::MIN);
+            lower = tokens
+                .get(j + 1)
+                .and_then(|x| parse_num(x))
+                .unwrap_or(f64::MIN);
         } else if t == "UPPER_LIMIT" {
-            upper = tokens.get(j + 1).and_then(|x| parse_num(x)).unwrap_or(f64::MAX);
+            upper = tokens
+                .get(j + 1)
+                .and_then(|x| parse_num(x))
+                .unwrap_or(f64::MAX);
         }
         j += 1;
     }
@@ -358,9 +364,15 @@ fn parse_characteristic(tokens: &[String], i: &mut usize) -> Option<Characterist
         } else if t == "UNIT" {
             unit = tokens.get(j + 1).map(|t| unquote(t)).unwrap_or_default();
         } else if t == "LOWER_LIMIT" {
-            lower = tokens.get(j + 1).and_then(|x| parse_num(x)).unwrap_or(f64::MIN);
+            lower = tokens
+                .get(j + 1)
+                .and_then(|x| parse_num(x))
+                .unwrap_or(f64::MIN);
         } else if t == "UPPER_LIMIT" {
-            upper = tokens.get(j + 1).and_then(|x| parse_num(x)).unwrap_or(f64::MAX);
+            upper = tokens
+                .get(j + 1)
+                .and_then(|x| parse_num(x))
+                .unwrap_or(f64::MAX);
         }
         j += 1;
     }
@@ -501,14 +513,28 @@ impl XcpSlave {
                 for b in self.mem.iter().take(bs as usize) {
                     sum = sum.wrapping_add(*b as u32);
                 }
-                vec![PID_CRO, 0x00, (sum & 0xFF) as u8, ((sum >> 8) & 0xFF) as u8, ((sum >> 16) & 0xFF) as u8, ((sum >> 24) & 0xFF) as u8]
+                vec![
+                    PID_CRO,
+                    0x00,
+                    (sum & 0xFF) as u8,
+                    ((sum >> 8) & 0xFF) as u8,
+                    ((sum >> 16) & 0xFF) as u8,
+                    ((sum >> 24) & 0xFF) as u8,
+                ]
             }
             CMD_GET_DAQ_RESOLUTION_INFO => vec![PID_CRO, 0x00, 0x04, 0x00, 0x00, 0x00],
             CMD_ALLOC_DAQ => {
                 let count = read_u16_le(&slice2(&data, 1));
                 self.next_daq = count;
                 for n in 0..count {
-                    self.daq_lists.insert(n, DaqList { odt_count: 0, entries: Vec::new(), running: false });
+                    self.daq_lists.insert(
+                        n,
+                        DaqList {
+                            odt_count: 0,
+                            entries: Vec::new(),
+                            running: false,
+                        },
+                    );
                 }
                 vec![PID_CRO, 0x00]
             }
@@ -628,7 +654,14 @@ impl XcpMaster {
     }
 
     pub fn connect(&mut self) -> bool {
-        let res = self.slave.handle_cro(&XcpPacket::Cro { ctr: 1, cmd: CMD_CONNECT, data: vec![0x00] }.encode());
+        let res = self.slave.handle_cro(
+            &XcpPacket::Cro {
+                ctr: 1,
+                cmd: CMD_CONNECT,
+                data: vec![0x00],
+            }
+            .encode(),
+        );
         res.get(2) == Some(&0x10)
     }
 
@@ -654,17 +687,42 @@ impl XcpMaster {
             Some(m) => m.clone(),
             None => return false,
         };
-        let cro_alloc = XcpPacket::Cro { ctr: 1, cmd: CMD_ALLOC_DAQ, data: vec![0x00, 0x01, 0x00] }.encode();
+        let cro_alloc = XcpPacket::Cro {
+            ctr: 1,
+            cmd: CMD_ALLOC_DAQ,
+            data: vec![0x00, 0x01, 0x00],
+        }
+        .encode();
         self.slave.handle_cro(&cro_alloc);
-        let cro_odt = XcpPacket::Cro { ctr: 1, cmd: CMD_ALLOC_ODT, data: vec![0x00, 0x00, 0x00, 0x01] }.encode();
+        let cro_odt = XcpPacket::Cro {
+            ctr: 1,
+            cmd: CMD_ALLOC_ODT,
+            data: vec![0x00, 0x00, 0x00, 0x01],
+        }
+        .encode();
         self.slave.handle_cro(&cro_odt);
-        let cro_ptr = XcpPacket::Cro { ctr: 1, cmd: CMD_SET_DAQ_PTR, data: vec![0x00, 0x00, 0x00, 0x00, 0x00] }.encode();
+        let cro_ptr = XcpPacket::Cro {
+            ctr: 1,
+            cmd: CMD_SET_DAQ_PTR,
+            data: vec![0x00, 0x00, 0x00, 0x00, 0x00],
+        }
+        .encode();
         self.slave.handle_cro(&cro_ptr);
         let mut wd = vec![0x00, m.datatype.size() as u8, 0x00];
         wd.extend_from_slice(&m.address.to_le_bytes());
-        let cro_write = XcpPacket::Cro { ctr: 1, cmd: CMD_WRITE_DAQ, data: wd }.encode();
+        let cro_write = XcpPacket::Cro {
+            ctr: 1,
+            cmd: CMD_WRITE_DAQ,
+            data: wd,
+        }
+        .encode();
         self.slave.handle_cro(&cro_write);
-        let cro_start = XcpPacket::Cro { ctr: 1, cmd: CMD_START_STOP, data: vec![0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00] }.encode();
+        let cro_start = XcpPacket::Cro {
+            ctr: 1,
+            cmd: CMD_START_STOP,
+            data: vec![0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00],
+        }
+        .encode();
         self.slave.handle_cro(&cro_start);
         true
     }
@@ -711,7 +769,12 @@ mod tests {
 
     #[test]
     fn test_cro_dto_roundtrip() {
-        let cro = XcpPacket::Cro { ctr: 7, cmd: CMD_UPLOAD, data: vec![4] }.encode();
+        let cro = XcpPacket::Cro {
+            ctr: 7,
+            cmd: CMD_UPLOAD,
+            data: vec![4],
+        }
+        .encode();
         let pkt = XcpPacket::decode(&cro).unwrap();
         match pkt {
             XcpPacket::Cro { ctr, cmd, data } => {
@@ -727,14 +790,42 @@ mod tests {
     fn test_slave_connect_upload_download() {
         let mut slave = XcpSlave::new(64);
         slave.poke(0x10, &[0xAB, 0xCD]);
-        let res = slave.handle_cro(&XcpPacket::Cro { ctr: 1, cmd: CMD_CONNECT, data: vec![0] }.encode());
+        let res = slave.handle_cro(
+            &XcpPacket::Cro {
+                ctr: 1,
+                cmd: CMD_CONNECT,
+                data: vec![0],
+            }
+            .encode(),
+        );
         assert_eq!(res[2], 0x10);
         // SET_MTA -> 0x10，再 UPLOAD 读取该处内存
-        slave.handle_cro(&XcpPacket::Cro { ctr: 1, cmd: CMD_SET_MTA, data: vec![0, 0x10, 0, 0, 0] }.encode());
-        let up = slave.handle_cro(&XcpPacket::Cro { ctr: 2, cmd: CMD_UPLOAD, data: vec![2] }.encode());
+        slave.handle_cro(
+            &XcpPacket::Cro {
+                ctr: 1,
+                cmd: CMD_SET_MTA,
+                data: vec![0, 0x10, 0, 0, 0],
+            }
+            .encode(),
+        );
+        let up = slave.handle_cro(
+            &XcpPacket::Cro {
+                ctr: 2,
+                cmd: CMD_UPLOAD,
+                data: vec![2],
+            }
+            .encode(),
+        );
         assert_eq!(&up[2..4], &[0xAB, 0xCD]);
         // DOWNLOAD to MTA (after upload advanced) then verify via peek
-        let _ = slave.handle_cro(&XcpPacket::Cro { ctr: 3, cmd: CMD_DOWNLOAD, data: vec![2, 0x11, 0x22] }.encode());
+        let _ = slave.handle_cro(
+            &XcpPacket::Cro {
+                ctr: 3,
+                cmd: CMD_DOWNLOAD,
+                data: vec![2, 0x11, 0x22],
+            }
+            .encode(),
+        );
         assert_eq!(slave.peek(0x12, 2), vec![0x11, 0x22]);
     }
 
@@ -742,7 +833,14 @@ mod tests {
     fn test_checksum() {
         let mut slave = XcpSlave::new(4);
         slave.poke(0, &[0x01, 0x02, 0x03, 0x04]);
-        let res = slave.handle_cro(&XcpPacket::Cro { ctr: 1, cmd: CMD_BUILD_CHECKSUM, data: vec![0, 0, 0, 0, 0x04] }.encode());
+        let res = slave.handle_cro(
+            &XcpPacket::Cro {
+                ctr: 1,
+                cmd: CMD_BUILD_CHECKSUM,
+                data: vec![0, 0, 0, 0, 0x04],
+            }
+            .encode(),
+        );
         // 0x01+0x02+0x03+0x04 = 0x0A
         assert_eq!(res[2], 0x0A);
     }
@@ -760,5 +858,3 @@ mod tests {
         assert_eq!(s.len(), 2);
     }
 }
-
-

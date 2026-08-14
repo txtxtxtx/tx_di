@@ -31,19 +31,10 @@ pub trait ServiceRegistry: Send + Sync + 'static {
 #[async_trait::async_trait]
 pub trait ConfigCenter: Send + Sync + 'static {
     /// 获取配置（返回原始 JSON/TOML 字符串）
-    async fn get_config(
-        &self,
-        data_id: &str,
-        group: &str,
-    ) -> AppResult<Option<String>>;
+    async fn get_config(&self, data_id: &str, group: &str) -> AppResult<Option<String>>;
 
     /// 发布/更新配置
-    async fn publish_config(
-        &self,
-        data_id: &str,
-        group: &str,
-        content: &str,
-    ) -> AppResult<()>;
+    async fn publish_config(&self, data_id: &str, group: &str, content: &str) -> AppResult<()>;
 
     /// 删除配置
     async fn remove_config(&self, data_id: &str, group: &str) -> AppResult<()>;

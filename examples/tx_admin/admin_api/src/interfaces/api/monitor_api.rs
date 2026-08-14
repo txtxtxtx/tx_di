@@ -12,8 +12,8 @@ use ringbuf::traits::{Consumer, RingBuffer};
 use serde::Deserialize;
 use tokio::sync::RwLock;
 use tx_common::ApiR;
-use tx_di_axum::bound::DiComp;
 use tx_di_axum::Router;
+use tx_di_axum::bound::DiComp;
 
 use admin_app::user::app_service::UserAppService;
 use admin_proto::{DiskInfo, NetworkInfo, OnlineUser, OnlineUserListResponse, ServerInfo};
@@ -84,7 +84,11 @@ fn collect_server_info() -> ServerInfo {
         let used = total - available;
         total_disk += total;
         used_disk += used;
-        let usage = if total > 0 { (used as f64 / total as f64) * 100.0 } else { 0.0 };
+        let usage = if total > 0 {
+            (used as f64 / total as f64) * 100.0
+        } else {
+            0.0
+        };
         disk_infos.push(DiskInfo {
             name: format!(
                 "{}\n{}\n{}",
@@ -219,7 +223,10 @@ async fn get_online_users(
             mobile: None,
             status: status.map(|s| s as i32),
             dept_id: None,
-            page_info: Some(admin_proto::PageRequest { page: page_num, size: ONLINE_BATCH_SIZE }),
+            page_info: Some(admin_proto::PageRequest {
+                page: page_num,
+                size: ONLINE_BATCH_SIZE,
+            }),
         };
         let page_result = user_svc.get_user_page(req).await?;
         let is_last = page_result.list.len() < ONLINE_BATCH_SIZE as usize;
@@ -227,30 +234,30 @@ async fn get_online_users(
         for user in page_result.list {
             let user_id_str = user.id.to_string();
             // 检查该用户是否有活跃的 sa-token 会话
-            if let Ok(token) = StpUtil::get_token_by_login_id(&user_id_str).await {
-                if StpUtil::is_login(&token).await {
-                    let (login_ip, login_time) = match StpUtil::get_token_info(&token).await {
-                        Ok(info) => {
-                            let ip = info
-                                .extra_data
-                                .as_ref()
-                                .and_then(|d| d.get("login_ip"))
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("-")
-                                .to_string();
-                            let time = info.create_time.format("%Y-%m-%d %H:%M:%S").to_string();
-                            (ip, time)
-                        }
-                        Err(_) => ("-".to_string(), "-".to_string()),
-                    };
+            if let Ok(token) = StpUtil::get_token_by_login_id(&user_id_str).await
+                && StpUtil::is_login(&token).await
+            {
+                let (login_ip, login_time) = match StpUtil::get_token_info(&token).await {
+                    Ok(info) => {
+                        let ip = info
+                            .extra_data
+                            .as_ref()
+                            .and_then(|d| d.get("login_ip"))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("-")
+                            .to_string();
+                        let time = info.create_time.format("%Y-%m-%d %H:%M:%S").to_string();
+                        (ip, time)
+                    }
+                    Err(_) => ("-".to_string(), "-".to_string()),
+                };
 
-                    online_users.push(OnlineUser {
-                        user_id: user.id,
-                        username: user.username,
-                        login_ip,
-                        login_time,
-                    });
-                }
+                online_users.push(OnlineUser {
+                    user_id: user.id,
+                    username: user.username,
+                    login_ip,
+                    login_time,
+                });
             }
         }
 

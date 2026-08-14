@@ -10,23 +10,23 @@ pub struct JobConfig {
     /// 是否启用调度器 默认 启用
     #[serde(default = "default_enabled")]
     pub enabled: bool,
-    
+
     /// 调度器轮询间隔（秒） 默认 1s
     #[serde(default = "default_poll_interval")]
     pub poll_interval_secs: u64,
-    
+
     /// Shell 脚本执行超时时间（秒） 300s 5 分钟
     #[serde(default = "default_shell_timeout")]
     pub shell_timeout_secs: u64,
-    
+
     /// Python 脚本执行超时时间（秒）
     #[serde(default = "default_python_timeout")]
     pub python_timeout_secs: u64,
-    
+
     /// Python 解释器路径 /usr/bin/python3
     #[serde(default = "default_python_path")]
     pub python_path: PathBuf,
-    
+
     /// 任务执行线程池大小 4
     #[serde(default = "default_thread_pool_size")]
     pub thread_pool_size: usize,
@@ -69,7 +69,7 @@ impl Default for JobConfig {
 /// `#[component(init)]` 回调：验证配置
 fn init(this: &mut JobConfig, _store: &Store) -> RIE<()> {
     // 验证配置
-    if this.poll_interval_secs <= 0 {
+    if this.poll_interval_secs == 0 {
         tracing::warn!("poll_interval_secs 不能为 0，已重置为默认值 1");
         this.poll_interval_secs = default_poll_interval();
     }
@@ -114,12 +114,12 @@ impl JobConfig {
     pub fn shell_timeout(&self) -> Duration {
         Duration::from_secs(self.shell_timeout_secs)
     }
-    
+
     /// 获取 Python 执行超时
     pub fn python_timeout(&self) -> Duration {
         Duration::from_secs(self.python_timeout_secs)
     }
-    
+
     /// 获取轮询间隔
     pub fn poll_interval(&self) -> Duration {
         Duration::from_secs(self.poll_interval_secs)

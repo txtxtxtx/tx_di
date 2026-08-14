@@ -10,7 +10,7 @@
 
 use std::sync::Arc;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::sync::OnceCell;
 use tx_di_core::App;
 
@@ -57,10 +57,7 @@ async fn start_server() -> anyhow::Result<TestServer> {
 
     let mut cfg: toml::Value = toml::from_str(TEST_CONFIG).expect("测试配置解析失败");
     if let Some(web) = cfg.get_mut("web_config").and_then(|v| v.as_table_mut()) {
-        web.insert(
-            "port".to_string(),
-            toml::Value::Integer(web_port as i64),
-        );
+        web.insert("port".to_string(), toml::Value::Integer(web_port as i64));
     }
 
     // 常驻 runtime：泄漏的 Runtime 保证其内部 async_run 任务（Web server）跨测试存活。
@@ -83,7 +80,11 @@ async fn start_server() -> anyhow::Result<TestServer> {
     let base_url = format!("http://127.0.0.1:{web_port}");
     let grpc_url = format!("http://127.0.0.1:{grpc_port}");
     wait_for_ready(&base_url).await?;
-    Ok(TestServer { base_url, grpc_url, app })
+    Ok(TestServer {
+        base_url,
+        grpc_url,
+        app,
+    })
 }
 
 /// 测试配置模板（port 由运行时注入）
@@ -100,7 +101,11 @@ time_format = "local"
 token_name = "Authorization"
 timeout = 86400
 is_concurrent = true
-is_share = true
+# is_share=true 时同一账号(admin)的所有登录共享同一个 token，
+# 并行运行下 logout 用例会连带失效 admin_token() 的共享 token，
+# 导致 user_info_with_token_ok 偶发 401。测试中关闭共享，
+# 使各用例独立 token 互不干扰（与设计文档示例 is_share:false 一致）。
+is_share = false
 token_style = "simple-uuid"
 is_read_header = true
 is_read_cookie = false

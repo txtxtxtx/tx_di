@@ -2,9 +2,9 @@
 //!
 //! 服务器信息采集逻辑复用 HTTP 层的 monitor_api 缓存机制。
 
+use ringbuf::traits::Consumer;
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
-use ringbuf::traits::Consumer;
 
 use admin_proto::admin::monitor::monitor_service_server::MonitorService;
 use admin_proto::admin::monitor::{OnlineUser, OnlineUserListResponse, ServerInfo};
@@ -20,15 +20,14 @@ pub struct MonitorGrpcService {
 
 #[tonic::async_trait]
 impl MonitorService for MonitorGrpcService {
-    async fn get_server_info(
-        &self,
-        request: Request<()>,
-    ) -> Result<Response<ServerInfo>, Status> {
+    async fn get_server_info(&self, request: Request<()>) -> Result<Response<ServerInfo>, Status> {
         let login_id = get_login_id(&request)?;
         auth_interceptor::ensure_grpc_permission(&login_id, "system:view").await?;
 
         // 复用 HTTP 层的缓存采集逻辑
-        let cache = crate::interfaces::api::monitor_api::get_cache().read().await;
+        let cache = crate::interfaces::api::monitor_api::get_cache()
+            .read()
+            .await;
         let latest = cache.iter().last().cloned().unwrap_or_else(|| ServerInfo {
             os_name: "unknown".to_string(),
             os_version: "unknown".to_string(),
@@ -81,30 +80,29 @@ impl MonitorService for MonitorGrpcService {
 
             for user in page_result.list {
                 let user_id_str = user.id.to_string();
-                if let Ok(token) = StpUtil::get_token_by_login_id(&user_id_str).await {
-                    if StpUtil::is_login(&token).await {
-                        let (ip, time) = match StpUtil::get_token_info(&token).await {
-                            Ok(info) => {
-                                let ip = info
-                                    .extra_data
-                                    .as_ref()
-                                    .and_then(|d| d.get("login_ip"))
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("-")
-                                    .to_string();
-                                let time =
-                                    info.create_time.format("%Y-%m-%d %H:%M:%S").to_string();
-                                (ip, time)
-                            }
-                            Err(_) => ("-".to_string(), "-".to_string()),
-                        };
-                        online_users.push(OnlineUser {
-                            user_id: user.id,
-                            username: user.username,
-                            login_ip: ip,
-                            login_time: time,
-                        });
-                    }
+                if let Ok(token) = StpUtil::get_token_by_login_id(&user_id_str).await
+                    && StpUtil::is_login(&token).await
+                {
+                    let (ip, time) = match StpUtil::get_token_info(&token).await {
+                        Ok(info) => {
+                            let ip = info
+                                .extra_data
+                                .as_ref()
+                                .and_then(|d| d.get("login_ip"))
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("-")
+                                .to_string();
+                            let time = info.create_time.format("%Y-%m-%d %H:%M:%S").to_string();
+                            (ip, time)
+                        }
+                        Err(_) => ("-".to_string(), "-".to_string()),
+                    };
+                    online_users.push(OnlineUser {
+                        user_id: user.id,
+                        username: user.username,
+                        login_ip: ip,
+                        login_time: time,
+                    });
                 }
             }
 

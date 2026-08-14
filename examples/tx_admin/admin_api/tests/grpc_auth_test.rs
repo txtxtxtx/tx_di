@@ -13,8 +13,8 @@ mod common;
 use admin_proto::admin::auth::auth_service_client::AuthServiceClient;
 use admin_proto::admin::auth::{GetUserInfoRequest, LoginRequest, LogoutRequest};
 use admin_proto::admin::common::PageRequest;
-use admin_proto::admin::user::user_service_client::UserServiceClient;
 use admin_proto::admin::user::ListUsersRequest;
+use admin_proto::admin::user::user_service_client::UserServiceClient;
 use tonic::Request;
 
 /// 获取共享测试服务器（自动启动完整 App + gRPC 服务）

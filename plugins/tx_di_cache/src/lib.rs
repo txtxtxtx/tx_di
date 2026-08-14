@@ -42,8 +42,8 @@ mod service;
 mod redis;
 
 pub use config::CacheConfig;
-pub use service::CacheService;
 pub use memory::MemoryCache;
+pub use service::CacheService;
 
 #[cfg(feature = "redis")]
 pub use redis::RedisCache;

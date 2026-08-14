@@ -9,7 +9,7 @@
 mod common;
 
 use common::*;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// 生成唯一用户名（时间戳纳秒），避免并行用例冲突
@@ -163,7 +163,10 @@ async fn list_users_paged_contains_new_user() {
     assert_eq!(resp.status(), 200, "分页查询应返回 HTTP 200: {resp:?}");
     let body: Value = resp.json().await.expect("分页查询响应 JSON 解析失败");
     assert_eq!(body["code"], 200, "分页查询业务码应为 200: {body}");
-    assert_eq!(body["data"]["total"], 1, "按 username 精确过滤应命中 1 条: {body}");
+    assert_eq!(
+        body["data"]["total"], 1,
+        "按 username 精确过滤应命中 1 条: {body}"
+    );
     let list = body["data"]["list"].as_array().expect("list 应为数组");
     assert_eq!(list.len(), 1, "list 应包含 1 条: {body}");
     assert_eq!(list[0]["username"], username);
@@ -226,11 +229,7 @@ async fn change_status_ok() {
 }
 
 /// 查询用户状态码（0-正常, 1-禁用, 2-锁定），失败返回 -1
-async fn get_user_status(
-    client: &reqwest::Client,
-    base: &str,
-    user_id: &str,
-) -> i64 {
+async fn get_user_status(client: &reqwest::Client, base: &str, user_id: &str) -> i64 {
     let resp = client
         .get(format!("{base}/api/v1/user/{user_id}"))
         .send()
@@ -256,7 +255,11 @@ async fn status_shortcuts_disable_lock_unlock() {
         .await
         .expect("disable 请求失败");
     assert_eq!(resp.status(), 200, "disable 应返回 HTTP 200: {resp:?}");
-    assert_eq!(get_user_status(&client, &srv.base_url, &id).await, 1, "disable 后状态应为 1");
+    assert_eq!(
+        get_user_status(&client, &srv.base_url, &id).await,
+        1,
+        "disable 后状态应为 1"
+    );
 
     // lock → 2
     let resp = client
@@ -266,7 +269,11 @@ async fn status_shortcuts_disable_lock_unlock() {
         .await
         .expect("lock 请求失败");
     assert_eq!(resp.status(), 200, "lock 应返回 HTTP 200: {resp:?}");
-    assert_eq!(get_user_status(&client, &srv.base_url, &id).await, 2, "lock 后状态应为 2");
+    assert_eq!(
+        get_user_status(&client, &srv.base_url, &id).await,
+        2,
+        "lock 后状态应为 2"
+    );
 
     // unlock → 0（unlock 置为 Active）
     let resp = client
@@ -276,7 +283,11 @@ async fn status_shortcuts_disable_lock_unlock() {
         .await
         .expect("unlock 请求失败");
     assert_eq!(resp.status(), 200, "unlock 应返回 HTTP 200: {resp:?}");
-    assert_eq!(get_user_status(&client, &srv.base_url, &id).await, 0, "unlock 后状态应为 0");
+    assert_eq!(
+        get_user_status(&client, &srv.base_url, &id).await,
+        0,
+        "unlock 后状态应为 0"
+    );
 }
 
 /// 修改密码：成功返回 200

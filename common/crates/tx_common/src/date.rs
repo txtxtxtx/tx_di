@@ -1,7 +1,7 @@
-use std::fmt;
-use serde::{Serialize, Serializer, Deserialize, Deserializer, de};
 use chrono::{Local, Utc};
 use serde::de::Visitor;
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
+use std::fmt;
 
 /// 格式化日期时间包装器
 ///
@@ -11,7 +11,7 @@ use serde::de::Visitor;
 /// 使用
 ///
 /// ```rust,ignore
-/// #[serde(with = "as_timestamp_millis")] // 序列化为时间戳毫秒 
+/// #[serde(with = "as_timestamp_millis")] // 序列化为时间戳毫秒
 /// pub aaa: FormattedDateTime
 /// #[serde(with = "as_timestamp")] // 序列化为时间戳秒
 /// pub aaa: FormattedDateTime
@@ -48,21 +48,16 @@ impl FormattedDateTime {
 
     /// 从 Unix 时间戳（秒）创建
     pub fn from_timestamp(secs: i64) -> Option<Self> {
-        chrono::DateTime::from_timestamp(secs, 0)
-            .map(|dt| Self(dt.with_timezone(&Local)))
+        chrono::DateTime::from_timestamp(secs, 0).map(|dt| Self(dt.with_timezone(&Local)))
     }
 
     /// 从 Unix 时间戳（毫秒）创建
     pub fn from_timestamp_millis(millis: i64) -> Option<Self> {
         let secs = millis / 1000;
         let nsecs = ((millis % 1000) * 1_000_000) as u32;
-        chrono::DateTime::from_timestamp(secs, nsecs)
-            .map(|dt| Self(dt.with_timezone(&Local)))
+        chrono::DateTime::from_timestamp(secs, nsecs).map(|dt| Self(dt.with_timezone(&Local)))
     }
 }
-
-
-
 
 impl Serialize for FormattedDateTime {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -85,7 +80,8 @@ impl<'de> Deserialize<'de> for FormattedDateTime {
             type Value = FormattedDateTime;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("一个日期时间字符串（格式：YYYY-MM-DD HH:MM:SS，本地时间）或时间戳")
+                formatter
+                    .write_str("一个日期时间字符串（格式：YYYY-MM-DD HH:MM:SS，本地时间）或时间戳")
             }
 
             // 支持从 i64 时间戳反序列化（某些数据库场景）
@@ -129,11 +125,12 @@ impl<'de> Deserialize<'de> for FormattedDateTime {
                     chrono::LocalResult::Ambiguous(earliest, _latest) => {
                         // 夏令时回拨时的歧义时间，选择较早的那个
                         earliest
-                    },
+                    }
                     chrono::LocalResult::None => {
-                        return Err(de::Error::custom(
-                            format!("时间 '{}' 在本地时区不存在（可能是夏令时跳过的时间）", value)
-                        ));
+                        return Err(de::Error::custom(format!(
+                            "时间 '{}' 在本地时区不存在（可能是夏令时跳过的时间）",
+                            value
+                        )));
                     }
                 };
                 Ok(FormattedDateTime(dt))
@@ -164,10 +161,9 @@ impl std::ops::Deref for FormattedDateTime {
     }
 }
 
-
 pub mod as_timestamp {
     use super::*;
-    use serde::{Serializer, Deserializer};
+    use serde::{Deserializer, Serializer};
 
     #[allow(dead_code)]
     pub fn serialize<S>(dt: &FormattedDateTime, serializer: S) -> Result<S::Ok, S::Error>
@@ -190,7 +186,7 @@ pub mod as_timestamp {
 /// 用于数据库存储的时间戳（毫秒）序列化模块
 pub mod as_timestamp_millis {
     use super::*;
-    use serde::{Serializer, Deserializer};
+    use serde::{Deserializer, Serializer};
     #[allow(dead_code)]
     pub fn serialize<S>(dt: &FormattedDateTime, serializer: S) -> Result<S::Ok, S::Error>
     where

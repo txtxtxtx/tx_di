@@ -91,8 +91,8 @@ pub enum TimerWrapper {
 
 impl TimeFormat {
     pub fn to_timer(&self, format: &str) -> Result<TimerWrapper, anyhow::Error> {
-        let format = format_description::parse_owned::<2>(format)
-            .map_err(|e| anyhow::anyhow!(e))?;
+        let format =
+            format_description::parse_owned::<2>(format).map_err(|e| anyhow::anyhow!(e))?;
         match self {
             TimeFormat::Utc => Ok(TimerWrapper::Utc(UtcTime::new(format))),
             TimeFormat::Local => Ok(TimerWrapper::Local(LocalTime::new(format))),
