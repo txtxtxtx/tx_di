@@ -313,7 +313,7 @@ async fn log_operate_create_and_list_ok() {
 #[tokio::test]
 async fn config_dict_log_api_requires_auth() {
     let srv = server().await;
-    let client = reqwest::Client::new();
+    let client = http_client();
 
     let config_resp = client
         .get(format!("{}/api/v1/config/key/sys.name", srv.base_url))

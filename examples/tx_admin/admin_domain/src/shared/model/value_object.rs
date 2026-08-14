@@ -191,7 +191,7 @@ mod tests {
         let tid = TenantId::new(7);
         let tid2 = tid;
         assert_eq!(tid, tid2); // Copy
-        let tid3 = tid.clone();
+        let tid3 = tid;
         assert_eq!(tid, tid3); // Clone
     }
 

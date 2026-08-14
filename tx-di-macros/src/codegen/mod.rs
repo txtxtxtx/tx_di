@@ -87,7 +87,7 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
                     ty,
                     format!(
                         "字段 `{}` 的类型不是 Arc<Component> / Option<Component> / trait object 形式，\
-                         请使用 #[tx_cst(expr)] 指定值表达式，或 #[tx_cst(skip)] 跳过注入",
+                             请使用 #[tx_cst(expr)] 指定值表达式，或 #[tx_cst(skip)] 跳过注入",
                         ident
                     ),
                 ));

@@ -18,7 +18,7 @@ pub struct AuthSessionService;
 
 impl Default for AuthSessionService {
     fn default() -> Self {
-        Self
+        Self::new()
     }
 }
 

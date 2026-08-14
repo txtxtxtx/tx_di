@@ -17,41 +17,54 @@
   runner:
     cpus: 8
   docker:
-    image: rust:1.97-slim
+    # 预装 admin_api 编译所需的 openssl 构建依赖（pkg-config/libssl-dev），
+    # 否则 rust:1.97-slim 缺包导致 openssl-sys 编译失败（test-api 阶段）。
+    # 镜像由平台自动缓存，仅当 ci/Dockerfile 变化时才重建。
+    build:
+      dockerfile: ./ci/Dockerfile
     volumes:
-      # 数据卷使用纯绝对路径，缺省 type 为 copy-on-write(cow) 并发模式：
-      # 各构建 copy-on-write 独立写入、成功后合并，避免并发冲突
-      # （rw 串行模式在多并发构建下会因共享写入而 Permission denied）。
-      - /usr/local/cargo/registry
-      - /workspace/target
+      - cargo-registry:/usr/local/cargo/registry:copy-on-write
+      - target-cache:/workspace/target:copy-on-write
 
 .regression-stages: &regression-stages
   stages:
     - name: fmt
-      # rust:*-slim 镜像默认不含 rustfmt，需先安装再检查格式
       script: |
         rustup component add rustfmt
         cargo fmt --check
     - name: clippy
-      # rust:*-slim 镜像默认不含 clippy，需先安装再执行 lint
       script: |
         rustup component add clippy
+        # 共享 Cargo registry 卷权限受限，改用工作区可写目录作为 CARGO_HOME
+        export CARGO_HOME=/workspace/.cargo-home
+        mkdir -p "$CARGO_HOME"
         cargo clippy -p tx-di-core -p tx-di-macros -p admin_domain -p admin_app -p admin_api -- -D warnings
     - name: test-core
       # 框架层核心测试（串行，避免全局状态竞态）
-      script: cargo test -p tx-di-core -- --test-threads=1
+      script: |
+        export CARGO_HOME=/workspace/.cargo-home
+        mkdir -p "$CARGO_HOME"
+        cargo test -p tx-di-core -- --test-threads=1
     - name: test-domain
-      script: cargo test -p admin_domain
+      script: |
+        export CARGO_HOME=/workspace/.cargo-home
+        mkdir -p "$CARGO_HOME"
+        cargo test -p admin_domain
     - name: test-app
       # 集成测试串行（共享全局状态）
       script: |
-        apt-get update && apt-get install -y --no-install-recommends libssl-dev pkg-config
+        export CARGO_HOME=/workspace/.cargo-home
+        mkdir -p "$CARGO_HOME"
         cargo test -p admin_app -- --test-threads=1
     - name: test-api
       # 接口层 E2E（含 gRPC 自动化回归 + admin_proto DTO 序列化）
+      # 串行执行：E2E 测试共享进程级全局状态（ROUTER_REGISTRY / LAYER_REGISTRY /
+      # sa-token / GRPC_PORT 环境变量）并启动常驻 App，并行会触发多实例竞争与
+      # 端口/env 竞态，导致服务器无法就绪。详见 docs/10-测试说明书.md 与 CODEBUDDY.md。
       script: |
-        apt-get update && apt-get install -y --no-install-recommends libssl-dev pkg-config
-        cargo test -p admin_api
+        export CARGO_HOME=/workspace/.cargo-home
+        mkdir -p "$CARGO_HOME"
+        cargo test -p admin_api -- --test-threads=1
   failStages:
     - name: notify-fail
       script: |
@@ -106,27 +119,35 @@ main:
         - docker
       stages:
         - name: fmt
-          # rust:*-slim 镜像默认不含 rustfmt，需先安装再检查格式
           script: |
             rustup component add rustfmt
             cargo fmt --check
         - name: clippy
-          # rust:*-slim 镜像默认不含 clippy，需先安装再执行 lint
           script: |
             rustup component add clippy
+            export CARGO_HOME=/workspace/.cargo-home
+            mkdir -p "$CARGO_HOME"
             cargo clippy -p tx-di-core -p tx-di-macros -p admin_domain -p admin_app -p admin_api -- -D warnings
         - name: test-core
-          script: cargo test -p tx-di-core -- --test-threads=1
+          script: |
+            export CARGO_HOME=/workspace/.cargo-home
+            mkdir -p "$CARGO_HOME"
+            cargo test -p tx-di-core -- --test-threads=1
         - name: test-domain
-          script: cargo test -p admin_domain
+          script: |
+            export CARGO_HOME=/workspace/.cargo-home
+            mkdir -p "$CARGO_HOME"
+            cargo test -p admin_domain
         - name: test-app
           script: |
-            apt-get update && apt-get install -y --no-install-recommends libssl-dev pkg-config
+            export CARGO_HOME=/workspace/.cargo-home
+            mkdir -p "$CARGO_HOME"
             cargo test -p admin_app -- --test-threads=1
         - name: test-api
           script: |
-            apt-get update && apt-get install -y --no-install-recommends libssl-dev pkg-config
-            cargo test -p admin_api
+            export CARGO_HOME=/workspace/.cargo-home
+            mkdir -p "$CARGO_HOME"
+            cargo test -p admin_api -- --test-threads=1
         - name: build-image
           # 构建并推送 tx_admin Docker 镜像到 CNB 制品库（Tag 版本）
           # services: docker 已内置对 CNB 制品库的认证，无需显式 docker login

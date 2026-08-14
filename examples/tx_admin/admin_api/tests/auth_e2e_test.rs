@@ -14,7 +14,7 @@ use serde_json::{Value, json};
 #[tokio::test]
 async fn login_success_returns_token_and_cookie() {
     let srv = server().await;
-    let client = reqwest::Client::new();
+    let client = http_client();
 
     let resp = client
         .post(format!("{}/api/v1/auth/login", srv.base_url))
@@ -45,7 +45,7 @@ async fn login_success_returns_token_and_cookie() {
 #[tokio::test]
 async fn login_wrong_password_rejected() {
     let srv = server().await;
-    let client = reqwest::Client::new();
+    let client = http_client();
 
     let resp = client
         .post(format!("{}/api/v1/auth/login", srv.base_url))
@@ -72,7 +72,7 @@ async fn login_wrong_password_rejected() {
 #[tokio::test]
 async fn user_info_requires_auth() {
     let srv = server().await;
-    let client = reqwest::Client::new();
+    let client = http_client();
 
     let resp = client
         .get(format!("{}/api/v1/auth/user_info", srv.base_url))
@@ -107,7 +107,7 @@ async fn user_info_with_token_ok() {
 #[tokio::test]
 async fn logout_clears_cookie_and_invalidates_token() {
     let srv = server().await;
-    let client = reqwest::Client::new();
+    let client = http_client();
 
     // 独立登录
     let login_resp = client

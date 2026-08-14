@@ -116,7 +116,7 @@ pub struct AuthLayer;
 
 impl Default for AuthLayer {
     fn default() -> Self {
-        Self
+        Self::new()
     }
 }
 

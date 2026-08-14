@@ -11,15 +11,16 @@ use dashmap::DashMap;
 use crate::component::Component;
 use crate::error::{AppError, DiErr};
 
+/// 组件工厂闭包类型：`&Store` → `Arc<dyn Any + Send + Sync>`，用于 Prototype 每次注入时构建新实例
+pub type ComponentFactory = dyn Fn(&Store) -> Arc<dyn Any + Send + Sync> + Send + Sync;
+
 /// 存储单元：
 /// - `Factory(Arc<dyn Fn>)` → 存工厂闭包，prototype 每次注入时调用
 /// - `Cached(Arc<dyn Any>)` → 已实例化的单例（擦除类型）
-type FactoryFn = dyn Fn(&Store) -> Arc<dyn Any + Send + Sync> + Send + Sync;
-
 #[derive(Clone)]
 pub enum CompRef {
     /// 工厂闭包：Prototype 作用域，每次注入调用
-    Factory(Arc<FactoryFn>),
+    Factory(Arc<ComponentFactory>),
     /// 已缓存的实例：Singleton 作用域
     Cached(Arc<dyn Any + Send + Sync>),
 }

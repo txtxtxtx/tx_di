@@ -590,7 +590,7 @@ async fn dept_delete_leaf_ok() {
 #[tokio::test]
 async fn rbac_api_requires_auth() {
     let srv = server().await;
-    let client = reqwest::Client::new();
+    let client = http_client();
 
     let resp = client
         .get(format!("{}/api/v1/role/1", srv.base_url))

@@ -53,6 +53,7 @@ impl DepartmentService {
         Ok(dept)
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// 更新部门信息
     ///
     /// # 参数

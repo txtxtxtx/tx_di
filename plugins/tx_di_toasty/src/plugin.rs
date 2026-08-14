@@ -157,7 +157,6 @@ impl ToastyPlugin {
     ///
     /// `Transaction` 由 `lib.rs` re-export；`ToastyErr::TxBeginFailed/TxCommitFailed`
     /// 提供标准错误码。
-    ///
     /// 将配置文件的 `auto_schema = true` 改为 `false`（按行替换，保留注释与格式）
     fn change_auto_schema_closed(path: PathBuf) {
         let content = match std::fs::read_to_string(&path) {

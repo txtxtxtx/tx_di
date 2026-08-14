@@ -86,6 +86,7 @@ impl RoleService {
         Ok(Role::create(role_id, name, code, sort, creator))
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// 更新角色信息
     ///
     /// # 参数

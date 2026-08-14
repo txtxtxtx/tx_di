@@ -213,6 +213,7 @@ impl DictDataService {
         Ok(dd)
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// 更新已有字典数据项的信息
     ///
     /// # 参数

@@ -7,8 +7,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::timeout;
 
-/// 内部任务处理器函数类型
-pub type JobHandler = dyn Fn(Option<&str>) -> JobResult + Send + Sync;
+/// 内部处理器函数类型
+pub type InternalHandler = Arc<dyn Fn(Option<&str>) -> JobResult + Send + Sync>;
 
 /// 内部函数执行器
 ///
@@ -31,7 +31,7 @@ pub type JobHandler = dyn Fn(Option<&str>) -> JobResult + Send + Sync;
 /// ```
 pub struct InternalJobExecutor {
     /// 注册的函数映射表（无锁并发）
-    handlers: DashMap<String, Arc<JobHandler>>,
+    handlers: DashMap<String, InternalHandler>,
     /// 执行超时时间
     timeout: Duration,
 }
