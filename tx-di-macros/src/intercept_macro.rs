@@ -22,16 +22,16 @@ pub fn intercept_impl(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // ── 参数生成 ──────────────────────────────────────────────────
     let mut arg_calls = Vec::new();
     for param in params.iter() {
-        if let FnArg::Typed(pt) = param {
-            if let Pat::Ident(pat_ident) = &*pt.pat {
-                let arg_name = pat_ident.ident.to_string();
-                let arg_ident = &pat_ident.ident;
-                let ty = &pt.ty;
-                let arg_val = gen_arg_value(arg_ident, ty);
-                arg_calls.push(quote! {
-                    .with_arg(#arg_name, #arg_val)
-                });
-            }
+        if let FnArg::Typed(pt) = param
+            && let Pat::Ident(pat_ident) = &*pt.pat
+        {
+            let arg_name = pat_ident.ident.to_string();
+            let arg_ident = &pat_ident.ident;
+            let ty = &pt.ty;
+            let arg_val = gen_arg_value(arg_ident, ty);
+            arg_calls.push(quote! {
+                .with_arg(#arg_name, #arg_val)
+            });
         }
     }
 
@@ -134,10 +134,10 @@ fn gen_arg_value(arg_ident: &syn::Ident, ty: &syn::Type) -> proc_macro2::TokenSt
 fn is_result_type(output: &syn::ReturnType) -> bool {
     match output {
         syn::ReturnType::Type(_, ty) => {
-            if let syn::Type::Path(tp) = ty.as_ref() {
-                if let Some(seg) = tp.path.segments.last() {
-                    return seg.ident == "Result";
-                }
+            if let syn::Type::Path(tp) = ty.as_ref()
+                && let Some(seg) = tp.path.segments.last()
+            {
+                return seg.ident == "Result";
             }
             false
         }
