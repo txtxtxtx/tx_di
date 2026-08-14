@@ -25,7 +25,9 @@
 .regression-stages: &regression-stages
   stages:
     - name: fmt
-      script: cargo fmt --check
+      script: |
+        rustup component add rustfmt
+        cargo fmt --check
     - name: clippy
       script: cargo clippy -p tx-di-core -p tx-di-macros -p admin_domain -p admin_app -p admin_api -- -D warnings
     - name: test-core
@@ -93,7 +95,9 @@ main:
         - docker
       stages:
         - name: fmt
-          script: cargo fmt --check
+          script: |
+            rustup component add rustfmt
+            cargo fmt --check
         - name: clippy
           script: cargo clippy -p tx-di-core -p tx-di-macros -p admin_domain -p admin_app -p admin_api -- -D warnings
         - name: test-core
