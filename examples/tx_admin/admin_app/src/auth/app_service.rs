@@ -1,15 +1,17 @@
 use std::sync::Arc;
 
-use admin_proto::{LoginRequest, LoginResponse, LogoutRequest, UserInfoResponse, CreateLoginLogRequest};
-use admin_domain::auth::service::AuthService;
-use admin_domain::menu::model::value_object::MenuTreeNode;
-use admin_domain::menu::model::value_object::MenuQuery;
-use admin_domain::shared::model::value_object::SessionEctData;
-use admin_domain::role::service::RoleService;
-use admin_domain::menu::service::MenuService;
 use crate::auth::session_service::AuthSessionService;
 use crate::log::app_service::LoginLogAppService;
 use crate::user::app_service::UserAppService;
+use admin_domain::auth::service::AuthService;
+use admin_domain::menu::model::value_object::MenuQuery;
+use admin_domain::menu::model::value_object::MenuTreeNode;
+use admin_domain::menu::service::MenuService;
+use admin_domain::role::service::RoleService;
+use admin_domain::shared::model::value_object::SessionEctData;
+use admin_proto::{
+    CreateLoginLogRequest, LoginRequest, LoginResponse, LogoutRequest, UserInfoResponse,
+};
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
 
@@ -59,14 +61,21 @@ impl AuthAppService {
     /// 成功返回 `LoginResponse`（含 token）
     pub async fn login(&self, req: LoginRequest) -> AppResult<LoginResponse> {
         // ── 1. 认证（领域层封装，返回明确的 AuthError）────────
-        let user = self.auth_service.authenticate(&req.username, &req.password).await?;
+        let user = self
+            .auth_service
+            .authenticate(&req.username, &req.password)
+            .await?;
 
         // ── 2. 构建跨聚合 LoginUser ──────────────────────────
         let login_user = self.user_app.build_login_user(&user).await?;
 
         // ── 3. 旁路副作用（发后即忘，不影响主流程）────────────
         let login_ip = req.login_ip.clone();
-        let _ = self.user_app.user_service().record_login(user.id, login_ip.clone()).await;
+        let _ = self
+            .user_app
+            .user_service()
+            .record_login(user.id, login_ip.clone())
+            .await;
         let log_cmd = CreateLoginLogRequest {
             user_id: user.id,
             user_type: if user.id > 0 { 1 } else { 0 },
@@ -78,7 +87,10 @@ impl AuthAppService {
         let _ = self.login_log_service.create_log(log_cmd).await;
 
         // ── 4. 查询角色编码（构建 session 所需）───────────────
-        let roles = self.role_service.get_roles_by_ids(&login_user.role_ids).await?;
+        let roles = self
+            .role_service
+            .get_roles_by_ids(&login_user.role_ids)
+            .await?;
         let role_codes: Vec<String> = roles.into_iter().map(|r| r.code).collect();
         let is_admin = RoleService::has_admin_role(&role_codes);
 
@@ -91,7 +103,8 @@ impl AuthAppService {
             username: login_user.username.clone(),
         };
 
-        let token = self.session_service
+        let token = self
+            .session_service
             .login(
                 login_user.user_id,
                 is_admin,
@@ -150,37 +163,46 @@ impl AuthAppService {
         }
 
         // 获取完整菜单树
-        let all_tree = self.menu_service.get_menu_tree(&MenuQuery::default()).await?;
+        let all_tree = self
+            .menu_service
+            .get_menu_tree(&MenuQuery::default())
+            .await?;
 
         // 过滤
         Ok(Self::filter_tree(&all_tree, &menu_ids))
     }
 
     /// 递归过滤菜单树
-    fn filter_tree(nodes: &[MenuTreeNode], menu_ids: &std::collections::HashSet<u64>) -> Vec<MenuTreeNode> {
-        nodes.iter().filter_map(|n| {
-            let children = Self::filter_tree(&n.children, menu_ids);
-            if menu_ids.contains(&n.id) || !children.is_empty() {
-                Some(MenuTreeNode {
-                    id: n.id,
-                    name: n.name.clone(),
-                    permission: n.permission.clone(),
-                    types: n.types,
-                    sort: n.sort,
-                    parent_id: n.parent_id,
-                    path: n.path.clone(),
-                    icon: n.icon.clone(),
-                    component: n.component.clone(),
-                    component_name: n.component_name.clone(),
-                    status: n.status,
-                    visible: n.visible,
-                    keep_alive: n.keep_alive,
-                    children,
-                })
-            } else {
-                None
-            }
-        }).collect()
+    fn filter_tree(
+        nodes: &[MenuTreeNode],
+        menu_ids: &std::collections::HashSet<u64>,
+    ) -> Vec<MenuTreeNode> {
+        nodes
+            .iter()
+            .filter_map(|n| {
+                let children = Self::filter_tree(&n.children, menu_ids);
+                if menu_ids.contains(&n.id) || !children.is_empty() {
+                    Some(MenuTreeNode {
+                        id: n.id,
+                        name: n.name.clone(),
+                        permission: n.permission.clone(),
+                        types: n.types,
+                        sort: n.sort,
+                        parent_id: n.parent_id,
+                        path: n.path.clone(),
+                        icon: n.icon.clone(),
+                        component: n.component.clone(),
+                        component_name: n.component_name.clone(),
+                        status: n.status,
+                        visible: n.visible,
+                        keep_alive: n.keep_alive,
+                        children,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     /// 用户登出

@@ -53,30 +53,30 @@
 //! ctx.build_and_run().await.unwrap();
 //! ```
 
-mod config;
+pub mod auth;
+pub mod client;
 mod comp;
+mod config;
+mod dialog;
 pub mod err;
 mod handler;
-pub mod auth;
 mod middleware;
-mod sender;
-pub mod client;
-mod sip_tx;
-mod dialog;
-pub mod server_dialog;
 pub mod registration;
+mod sender;
+pub mod server_dialog;
+mod sip_tx;
 
-pub use config::*;
+pub use client::{SipClient, SipClientConfig};
 pub use comp::*;
+pub use config::*;
+pub use dialog::{DialogKey, InDialogTable};
 pub use err::SipErr;
 pub use handler::SipRouter;
 pub use middleware::{SipMiddleware, SipNextFn, SipNextFut};
-pub use sender::{SipSender, InviteHandle};
-pub use client::{SipClient, SipClientConfig};
-pub use sip_tx::SipTx;
-pub use dialog::{DialogKey, InDialogTable};
+pub use registration::{RegistrationHandle, SipRegistration, SipRegistrationStore};
+pub use sender::{InviteHandle, SipSender};
 pub use server_dialog::{SipUasManager, UasSession};
-pub use registration::{SipRegistration, SipRegistrationStore, RegistrationHandle};
+pub use sip_tx::SipTx;
 
 #[cfg(test)]
 mod tests {
@@ -280,31 +280,40 @@ mod tests {
 
     #[test]
     fn transport_via_config_udp() {
-        let cfg: SipConfig = toml::from_str(r#"
+        let cfg: SipConfig = toml::from_str(
+            r#"
             host = "0.0.0.0"
             port = 5060
             transport = "udp"
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
         assert_eq!(cfg.transport, SipTransport::Udp);
     }
 
     #[test]
     fn transport_via_config_tcp() {
-        let cfg: SipConfig = toml::from_str(r#"
+        let cfg: SipConfig = toml::from_str(
+            r#"
             host = "0.0.0.0"
             port = 5060
             transport = "tcp"
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
         assert_eq!(cfg.transport, SipTransport::Tcp);
     }
 
     #[test]
     fn transport_via_config_both() {
-        let cfg: SipConfig = toml::from_str(r#"
+        let cfg: SipConfig = toml::from_str(
+            r#"
             host = "0.0.0.0"
             port = 5060
             transport = "both"
-        "#).unwrap();
+        "#,
+        )
+        .unwrap();
         assert_eq!(cfg.transport, SipTransport::Both);
     }
 
@@ -328,13 +337,13 @@ mod tests {
 
         assert_eq!(cfg.host, "0.0.0.0");
         assert_eq!(cfg.port, 5060);
-        assert_eq!(cfg.transport, SipTransport::Both);    // 默认值
-        assert_eq!(cfg.user_agent, "tx-di-sip/1.0.0");   // 默认值
-        assert!(cfg.external_ip.is_none());               // 默认值
-        assert!(!cfg.log_messages);                       // 默认值
-        assert!(cfg.enabled);                             // 默认值
-        assert_eq!(cfg.dispatch_queue_size, 10_000);      // 默认值
-        assert_eq!(cfg.max_concurrent_handlers, 1000);    // 默认值
+        assert_eq!(cfg.transport, SipTransport::Both); // 默认值
+        assert_eq!(cfg.user_agent, "tx-di-sip/1.0.0"); // 默认值
+        assert!(cfg.external_ip.is_none()); // 默认值
+        assert!(!cfg.log_messages); // 默认值
+        assert!(cfg.enabled); // 默认值
+        assert_eq!(cfg.dispatch_queue_size, 10_000); // 默认值
+        assert_eq!(cfg.max_concurrent_handlers, 1000); // 默认值
     }
 
     #[test]
@@ -465,9 +474,9 @@ mod tests {
         assert_eq!(sip_router.handler_count(), 0);
 
         // ── 方法名自动转大写 ────────────────────────────────────────
-        sip_router.add_handler(Some("register"), 0, dummy_handler);  // 小写 → 大写
-        sip_router.add_handler(Some("Invite"), 0, dummy_handler);   // 混合 → 大写
-        sip_router.add_handler(Some("options"), 0, dummy_handler);  // 小写 → 大写
+        sip_router.add_handler(Some("register"), 0, dummy_handler); // 小写 → 大写
+        sip_router.add_handler(Some("Invite"), 0, dummy_handler); // 混合 → 大写
+        sip_router.add_handler(Some("options"), 0, dummy_handler); // 小写 → 大写
         assert_eq!(sip_router.handler_count(), 3);
 
         // ── catch-all (method = None) ──────────────────────────────

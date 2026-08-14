@@ -169,7 +169,12 @@ impl ServiceRegistry for NacosServiceRegistry {
     async fn discover(&self, service_name: &str) -> AppResult<Vec<ServiceInstance>> {
         let instances = self
             .client
-            .get_all_instances(service_name.to_string(), Some(self.group.clone()), Vec::new(), true)
+            .get_all_instances(
+                service_name.to_string(),
+                Some(self.group.clone()),
+                Vec::new(),
+                true,
+            )
             .await
             .map_err(|e| AppError::from(format!("Nacos 服务发现失败: {e}")))?;
         Ok(Self::to_service_instances(service_name, instances))

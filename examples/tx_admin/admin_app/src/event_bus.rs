@@ -56,9 +56,8 @@ impl DomainEventPublisher for EventBus {
         for event in events {
             for sub in &subs {
                 // 订阅者异常隔离，不影响发布方主流程
-                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    sub(event.clone())
-                }));
+                let _ =
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| sub(event.clone())));
             }
         }
     }

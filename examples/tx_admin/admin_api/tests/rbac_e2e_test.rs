@@ -11,7 +11,7 @@
 mod common;
 
 use common::*;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// 生成唯一标识（时间戳纳秒），避免并行用例冲突
@@ -138,7 +138,10 @@ async fn role_duplicate_code_rejected() {
         .expect("重复创建角色请求失败");
     assert_eq!(resp.status(), 200, "业务错误走 HTTP 200: {resp:?}");
     let body: Value = resp.json().await.expect("重复创建角色响应 JSON 解析失败");
-    assert_eq!(body["code"], 10202, "重复角色 code 业务码应为 10202: {body}");
+    assert_eq!(
+        body["code"], 10202,
+        "重复角色 code 业务码应为 10202: {body}"
+    );
 }
 
 #[tokio::test]
@@ -418,7 +421,10 @@ async fn menu_delete_has_children_rejected() {
         .await
         .expect("删除含子菜单的菜单请求失败");
     assert_eq!(resp.status(), 200, "业务错误走 HTTP 200: {resp:?}");
-    let body: Value = resp.json().await.expect("删除含子菜单的菜单响应 JSON 解析失败");
+    let body: Value = resp
+        .json()
+        .await
+        .expect("删除含子菜单的菜单响应 JSON 解析失败");
     assert_eq!(body["code"], 10307, "含子菜单删除应返回 10307: {body}");
 }
 
@@ -553,7 +559,10 @@ async fn dept_delete_has_children_rejected() {
         .await
         .expect("删除含子部门的部门请求失败");
     assert_eq!(resp.status(), 200, "业务错误走 HTTP 200: {resp:?}");
-    let body: Value = resp.json().await.expect("删除含子部门的部门响应 JSON 解析失败");
+    let body: Value = resp
+        .json()
+        .await
+        .expect("删除含子部门的部门响应 JSON 解析失败");
     assert_eq!(body["code"], 10309, "含子部门删除应返回 10309: {body}");
 }
 

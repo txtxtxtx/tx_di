@@ -7,16 +7,16 @@
 
 #[cfg(test)]
 mod user_service_tests {
-    use std::sync::Arc;
-    use tx_common::page::Page;
-    use tx_error::AppResult;
     use crate::user::model::aggregate::User;
     use crate::user::model::value_object::{UserQuery, UserStatus};
     use crate::user::service::UserService;
     use pretty_assertions::assert_eq;
+    use std::sync::Arc;
+    use tx_common::page::Page;
+    use tx_error::AppResult;
 
-    use async_trait::async_trait;
     use crate::user::repository::UserRepository;
+    use async_trait::async_trait;
 
     struct TestUserRepo {
         find_by_id_fn: Box<dyn Fn(u64) -> AppResult<Option<User>> + Send + Sync>,
@@ -50,24 +50,60 @@ mod user_service_tests {
 
     #[async_trait]
     impl UserRepository for TestUserRepo {
-        async fn find_by_id(&self, id: u64) -> AppResult<Option<User>> { (self.find_by_id_fn)(id) }
-        async fn find_by_username(&self, u: &str) -> AppResult<Option<User>> { (self.find_by_username_fn)(u) }
-        async fn find_page(&self, q: &UserQuery, p: Page<User>) -> AppResult<Page<User>> { (self.find_page_fn)(q, p) }
-        async fn find_all(&self, _: &UserQuery) -> AppResult<Vec<User>> { Ok(vec![]) }
-        async fn insert(&self, u: &User) -> AppResult<()> { (self.insert_fn)(u) }
-        async fn update(&self, u: &User) -> AppResult<()> { (self.update_fn)(u) }
-        async fn soft_delete(&self, _: u64) -> AppResult<()> { Ok(()) }
-        async fn exists_by_username(&self, u: &str) -> AppResult<bool> { (self.exists_by_username_fn)(u) }
-        async fn exists_by_email(&self, e: &str) -> AppResult<bool> { (self.exists_by_email_fn)(e) }
-        async fn exists_by_mobile(&self, m: &str) -> AppResult<bool> { (self.exists_by_mobile_fn)(m) }
-        async fn count(&self, _: &UserQuery) -> AppResult<i64> { Ok(0) }
-        async fn find_by_role_id(&self, _: u64) -> AppResult<Vec<User>> { Ok(vec![]) }
-        async fn find_by_dept_id(&self, _: u64) -> AppResult<Vec<User>> { Ok(vec![]) }
-        async fn bind_roles(&self, _: u64, _: &[u64]) -> AppResult<()> { Ok(()) }
-        async fn bind_departments(&self, _: u64, _: &[u64]) -> AppResult<()> { Ok(()) }
-        async fn create_user_with_bindings(&self, _: &User, _: &[u64], _: &[u64]) -> AppResult<()> { Ok(()) }
-        async fn get_role_ids(&self, uid: u64) -> AppResult<Vec<u64>> { (self.get_role_ids_fn)(uid) }
-        async fn get_dept_ids(&self, uid: u64) -> AppResult<Vec<u64>> { (self.get_dept_ids_fn)(uid) }
+        async fn find_by_id(&self, id: u64) -> AppResult<Option<User>> {
+            (self.find_by_id_fn)(id)
+        }
+        async fn find_by_username(&self, u: &str) -> AppResult<Option<User>> {
+            (self.find_by_username_fn)(u)
+        }
+        async fn find_page(&self, q: &UserQuery, p: Page<User>) -> AppResult<Page<User>> {
+            (self.find_page_fn)(q, p)
+        }
+        async fn find_all(&self, _: &UserQuery) -> AppResult<Vec<User>> {
+            Ok(vec![])
+        }
+        async fn insert(&self, u: &User) -> AppResult<()> {
+            (self.insert_fn)(u)
+        }
+        async fn update(&self, u: &User) -> AppResult<()> {
+            (self.update_fn)(u)
+        }
+        async fn soft_delete(&self, _: u64) -> AppResult<()> {
+            Ok(())
+        }
+        async fn exists_by_username(&self, u: &str) -> AppResult<bool> {
+            (self.exists_by_username_fn)(u)
+        }
+        async fn exists_by_email(&self, e: &str) -> AppResult<bool> {
+            (self.exists_by_email_fn)(e)
+        }
+        async fn exists_by_mobile(&self, m: &str) -> AppResult<bool> {
+            (self.exists_by_mobile_fn)(m)
+        }
+        async fn count(&self, _: &UserQuery) -> AppResult<i64> {
+            Ok(0)
+        }
+        async fn find_by_role_id(&self, _: u64) -> AppResult<Vec<User>> {
+            Ok(vec![])
+        }
+        async fn find_by_dept_id(&self, _: u64) -> AppResult<Vec<User>> {
+            Ok(vec![])
+        }
+        async fn bind_roles(&self, _: u64, _: &[u64]) -> AppResult<()> {
+            Ok(())
+        }
+        async fn bind_departments(&self, _: u64, _: &[u64]) -> AppResult<()> {
+            Ok(())
+        }
+        async fn create_user_with_bindings(&self, _: &User, _: &[u64], _: &[u64]) -> AppResult<()> {
+            Ok(())
+        }
+        async fn get_role_ids(&self, uid: u64) -> AppResult<Vec<u64>> {
+            (self.get_role_ids_fn)(uid)
+        }
+        async fn get_dept_ids(&self, uid: u64) -> AppResult<Vec<u64>> {
+            (self.get_dept_ids_fn)(uid)
+        }
     }
 
     fn make_user() -> User {
@@ -84,7 +120,11 @@ mod user_service_tests {
         repo.insert_fn = Box::new(|_| Ok(()));
 
         let svc = UserService::new(Arc::new(repo));
-        assert!(svc.create_user("new".into(), "p".into(), "N".into(), None).await.is_ok());
+        assert!(
+            svc.create_user("new".into(), "p".into(), "N".into(), None)
+                .await
+                .is_ok()
+        );
     }
 
     /// 用户名重复时 create_user 应失败。
@@ -94,7 +134,11 @@ mod user_service_tests {
         repo.exists_by_username_fn = Box::new(|_| Ok(true));
 
         let svc = UserService::new(Arc::new(repo));
-        assert!(svc.create_user("dup".into(), "p".into(), "N".into(), None).await.is_err());
+        assert!(
+            svc.create_user("dup".into(), "p".into(), "N".into(), None)
+                .await
+                .is_err()
+        );
     }
 
     // ── update_user ──
@@ -107,8 +151,17 @@ mod user_service_tests {
         repo.update_fn = Box::new(|_| Ok(()));
 
         let svc = UserService::new(Arc::new(repo));
-        let r = svc.update_user(1, "New".into(), None, None,
-            crate::user::model::value_object::Sex::Unknown, None, None).await;
+        let r = svc
+            .update_user(
+                1,
+                "New".into(),
+                None,
+                None,
+                crate::user::model::value_object::Sex::Unknown,
+                None,
+                None,
+            )
+            .await;
         assert!(r.is_ok());
         assert_eq!(r.unwrap().nickname, "New");
     }
@@ -120,8 +173,19 @@ mod user_service_tests {
         repo.find_by_id_fn = Box::new(|_| Ok(None));
 
         let svc = UserService::new(Arc::new(repo));
-        assert!(svc.update_user(999, "X".into(), None, None,
-            crate::user::model::value_object::Sex::Unknown, None, None).await.is_err());
+        assert!(
+            svc.update_user(
+                999,
+                "X".into(),
+                None,
+                None,
+                crate::user::model::value_object::Sex::Unknown,
+                None,
+                None
+            )
+            .await
+            .is_err()
+        );
     }
 
     // ── delete_user ──

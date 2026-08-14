@@ -1,14 +1,14 @@
-use std::net::{SocketAddr, TcpListener};
+use crate::WebConfig;
 use crate::bound::AppStatus;
-use crate::{WebConfig};
+use crate::layers::LAYER_REGISTRY;
 use axum::http::Request;
-use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 use socket2::{Domain, Protocol, Socket, Type};
+use std::net::{SocketAddr, TcpListener};
+use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 use tokio::net::TcpListener as TokioTcpListener;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 use tx_di_core::{App, Component, DepsTuple, RIE};
-use crate::layers::LAYER_REGISTRY;
 
 /// 全局路由器注册表
 ///
@@ -38,13 +38,14 @@ async fn app_async_init(comp: Arc<WebPlugin>, app: Arc<App>) -> RIE<()> {
     // ═══ 中间件内的路由（API 接口） ═══
     let mut api_router = WebPlugin::merge_routers();
     let app_status = AppStatus { app: app.clone() };
-    api_router = api_router
-        .layer(tower::ServiceBuilder::new()
+    api_router = api_router.layer(
+        tower::ServiceBuilder::new()
             .map_request(move |mut req: Request<_>| {
                 req.extensions_mut().insert(app_status.clone());
                 req
             })
-            .into_inner());
+            .into_inner(),
+    );
     // 应用中间件（日志、CORS、超时等）
     api_router = WebPlugin::layer_with_router(api_router);
 
@@ -62,7 +63,7 @@ async fn app_async_init(comp: Arc<WebPlugin>, app: Arc<App>) -> RIE<()> {
             "/static",
             tower_http::services::ServeDir::new(&static_dir)
                 .precompressed_gzip()
-                .precompressed_br()
+                .precompressed_br(),
         );
     } else {
         debug!("静态文件目录不存在，跳过静态文件服务: {:?}", static_dir);
@@ -91,7 +92,6 @@ async fn app_async_run(comp: Arc<WebPlugin>, app: Arc<App>, token: CancellationT
     Ok(())
 }
 
-
 impl WebPlugin {
     /// 配置静态文件服务（支持 SPA 和多前端项目）
     fn setup_spa_apps(mut router: axum::Router, config: &WebConfig) -> axum::Router {
@@ -103,14 +103,15 @@ impl WebPlugin {
                 if dist_path.exists() {
                     info!("注册 SPA 应用: {} -> {:?}", path_prefix, dist_path);
                     // 创建 fallback 服务，用于 SPA 路由
-                    let fallback = tower_http::services::ServeFile::new(dist_path.join("index.html"));
+                    let fallback =
+                        tower_http::services::ServeFile::new(dist_path.join("index.html"));
 
                     router = router.nest_service(
                         path_prefix,
                         tower_http::services::ServeDir::new(&dist_path)
                             .precompressed_gzip()
                             .precompressed_br()
-                            .fallback(fallback)
+                            .fallback(fallback),
                     );
                 } else {
                     error!("SPA 应用目录不存在: {:?}，已跳过", dist_path);
@@ -175,13 +176,16 @@ impl WebPlugin {
                 router = middleware.apply_to_router(router);
                 names.push(middleware.name());
             }
-            info!("已应用 {} 个中间件层（已按优先级排序）:[{}]", sorted_layers.len(),names.join(", "));
+            info!(
+                "已应用 {} 个中间件层（已按优先级排序）:[{}]",
+                sorted_layers.len(),
+                names.join(", ")
+            );
         } else {
             error!("无法获取中间件注册表的读锁");
         }
         router
     }
-
 
     /// 清空所有已注册的路由器
     ///
@@ -259,12 +263,16 @@ fn create_tcp_listener(addr: SocketAddr) -> RIE<TokioTcpListener> {
 /// # Errors
 ///
 /// 如果服务器绑定失败或运行出错，将返回错误
-async fn start_server(config: Arc<WebConfig>, router: axum::Router, token: CancellationToken) -> RIE<()> {
+async fn start_server(
+    config: Arc<WebConfig>,
+    router: axum::Router,
+    token: CancellationToken,
+) -> RIE<()> {
     let addr = config.socket_addr()?;
 
     info!("CORS 启用状态: {}", config.enable_cors);
     info!("最大请求体大小: {} bytes", config.max_body_size);
-    info!("静态文件夹路径:{}",config.static_dir);
+    info!("静态文件夹路径:{}", config.static_dir);
     info!("Web 服务器正在监听: {}", addr);
     let listener = create_tcp_listener(addr)?;
     // into_make_service_with_connect_info 注入客户端 SocketAddr（ConnectInfo），

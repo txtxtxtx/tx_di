@@ -5,10 +5,10 @@
 
 #[cfg(test)]
 mod dept_tests {
-    use crate::shared::model::value_object::DeletedStatus;
-    use crate::shared::model::AggregateRoot;
     use crate::department::model::aggregate::Department;
+    use crate::shared::model::AggregateRoot;
     use crate::shared::model::DomainEvent;
+    use crate::shared::model::value_object::DeletedStatus;
     use pretty_assertions::assert_eq;
 
     fn make_dept() -> Department {
@@ -30,13 +30,24 @@ mod dept_tests {
     fn test_create_raises_event() {
         let d = Department::create(2, "HR".into(), 1, 1, None);
         assert_eq!(d.events().len(), 1);
-        assert!(matches!(d.events()[0], DomainEvent::DepartmentCreated { dept_id: 2 }));
+        assert!(matches!(
+            d.events()[0],
+            DomainEvent::DepartmentCreated { dept_id: 2 }
+        ));
     }
 
     #[test]
     fn test_update_info() {
         let mut d = make_dept();
-        d.update_info("R&D".into(), 0, 2, Some(100), Some("123".into()), Some("rd@test.com".into()), Some("updater".into()));
+        d.update_info(
+            "R&D".into(),
+            0,
+            2,
+            Some(100),
+            Some("123".into()),
+            Some("rd@test.com".into()),
+            Some("updater".into()),
+        );
 
         assert_eq!(d.name, "R&D");
         assert_eq!(d.sort, 2);
@@ -51,7 +62,10 @@ mod dept_tests {
         let before = d.events().len();
         d.update_info("X".into(), 0, 0, None, None, None, None);
         assert_eq!(d.events().len(), before + 1);
-        assert!(matches!(d.events().last(), Some(DomainEvent::DepartmentUpdated { dept_id: 1 })));
+        assert!(matches!(
+            d.events().last(),
+            Some(DomainEvent::DepartmentUpdated { dept_id: 1 })
+        ));
     }
 
     #[test]
@@ -79,7 +93,10 @@ mod dept_tests {
         let before = d.events().len();
         d.soft_delete(None);
         assert_eq!(d.events().len(), before + 1);
-        assert!(matches!(d.events().last(), Some(DomainEvent::DepartmentDeleted { dept_id: 1 })));
+        assert!(matches!(
+            d.events().last(),
+            Some(DomainEvent::DepartmentDeleted { dept_id: 1 })
+        ));
     }
 
     // ============================================================
@@ -103,7 +120,15 @@ mod dept_tests {
     fn test_restore_does_not_raise_events() {
         use crate::shared::model::AuditFields;
         let d = Department::restore(
-            1, "D".into(), 0, 0, None, None, None, 0, 0,
+            1,
+            "D".into(),
+            0,
+            0,
+            None,
+            None,
+            None,
+            0,
+            0,
             AuditFields::default(),
         );
         assert!(d.events().is_empty());

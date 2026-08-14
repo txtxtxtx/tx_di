@@ -101,43 +101,39 @@
 //! server.hangup(&call_id).await.unwrap();
 //! ```
 
-mod config;
+mod auth;
 mod cascade;
+mod config;
 pub mod crypto;
 mod device_registry;
 pub mod err;
 mod event;
 mod handlers;
-mod auth;
+pub mod media;
 mod plugin;
+mod plugin_tail;
 pub mod sdp;
 pub mod xml;
-pub mod media;
-mod plugin_tail;
 
-pub use config::{Gb28181ServerConfig, MediaConfig, CascadeConfig};
+pub use auth::Gb28181AuthMiddleware;
+pub use config::{CascadeConfig, Gb28181ServerConfig, MediaConfig};
 pub use device_registry::DeviceRegistry;
 pub use event::{Gb28181Event, subscribe as subscribe_events};
 pub use handlers::Gb28181CmdType;
-pub use auth::Gb28181AuthMiddleware;
 pub use plugin::{Gb28181Server, SessionInfo};
-pub use sdp::{parse_sdp_ssrc, AudioCodec, AudioSessionInfo, SnapshotInfo};
+pub use sdp::{AudioCodec, AudioSessionInfo, SnapshotInfo, parse_sdp_ssrc};
 pub use xml::{
-    build_catalog_query_xml, build_device_info_query_xml, build_keepalive_xml,
-    build_mobile_position_query_xml, build_mobile_position_unsubscribe_xml,
-    build_ptz_lock_xml, build_ptz_unlock_xml, build_snapshot_control_xml,
-    build_config_push_xml,
-    parse_xml_field, PtzCommand, PtzSpeed, PlaybackControl, TimeSyncInfo, ConfigType,
-    ConfigItem, PresetInfo, CruiseInfo, CruiseTrack, CruisePoint,
-    PtzPreciseParam, ZoomRect, GuardMode, StorageStatus, PtzPreciseStatus,
-    TargetTrackMode, parse_storage_status, parse_cruise_track, parse_ptz_precise_status,
-    parse_guard_info, GuardInfo, AlarmType,
+    AlarmType, ConfigItem, ConfigType, CruiseInfo, CruisePoint, CruiseTrack, GuardInfo, GuardMode,
+    PlaybackControl, PresetInfo, PtzCommand, PtzPreciseParam, PtzPreciseStatus, PtzSpeed,
+    StorageStatus, TargetTrackMode, TimeSyncInfo, ZoomRect, build_catalog_query_xml,
+    build_config_push_xml, build_device_info_query_xml, build_keepalive_xml,
+    build_mobile_position_query_xml, build_mobile_position_unsubscribe_xml, build_ptz_lock_xml,
+    build_ptz_unlock_xml, build_snapshot_control_xml, parse_cruise_track, parse_guard_info,
+    parse_ptz_precise_status, parse_storage_status, parse_xml_field,
 };
 
 // media 统一接口再导出
 pub use media::{
-    MediaBackend, MediaBackendConfig, BackendType,
-    OpenRtpRequest, RtpServerHandle, PlayUrls,
-    MediaStreamInfo, StreamProxyHandle, TcpMode,
-    build_backend,
+    BackendType, MediaBackend, MediaBackendConfig, MediaStreamInfo, OpenRtpRequest, PlayUrls,
+    RtpServerHandle, StreamProxyHandle, TcpMode, build_backend,
 };

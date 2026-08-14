@@ -17,7 +17,11 @@ use crate::name_utils::camel_to_screaming_snake;
 /// 生成 linkme 注册条目
 ///
 /// `factory_fn` 为 `factory` 模块生成的闭包 TokenStream。
-pub fn gen_meta_entry(ctx: &CodeGenContext, factory_fn: TokenStream2, has_async_run: bool) -> TokenStream2 {
+pub fn gen_meta_entry(
+    ctx: &CodeGenContext,
+    factory_fn: TokenStream2,
+    has_async_run: bool,
+) -> TokenStream2 {
     let struct_name = &ctx.struct_name;
     let has_async_run_lit = has_async_run;
     let vis = &ctx.vis;

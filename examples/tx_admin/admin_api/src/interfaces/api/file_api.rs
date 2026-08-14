@@ -19,28 +19,28 @@
 //! - `DELETE /api/file/config/{id}`     删除配置
 //! - `PUT  /api/file/config/{id}/master` 设为主配置
 
+use crate::auth::ensure_permission;
+use crate::error::ApiErr;
+use admin_app::file::app_service::FileAppService;
+use admin_proto::{
+    CreateFileConfigRequest, Empty, FileConfigResponse, FileResponse, ListFilesRequest,
+    UpdateFileConfigRequest,
+};
 use axum::Json;
 use axum::extract::{Multipart, Path};
 use axum::http::header;
 use axum::response::{IntoResponse, Response};
-use tx_di_axum::Router;
-use axum::routing::{get, post, put, delete};
-use tx_di_axum::bound::DiComp;
-use admin_app::file::app_service::FileAppService;
-use admin_proto::{
-    ListFilesRequest, FileResponse, FileConfigResponse, Empty,
-    CreateFileConfigRequest, UpdateFileConfigRequest,
-};
+use axum::routing::{delete, get, post, put};
+use futures::StreamExt;
+use tokio_util::io::ReaderStream;
 use tx_common::{ApiR, ApiRes, Page};
-use tx_error::AppError;
+use tx_di_axum::BodySizeLimitLayer;
+use tx_di_axum::Router;
+use tx_di_axum::bound::DiComp;
 use tx_di_core::CodeMsg;
 use tx_di_file::storage::FileStorageErr;
-use tx_di_axum::BodySizeLimitLayer;
-use crate::auth::ensure_permission;
-use crate::error::ApiErr;
 use tx_di_sa_token::StpUtil;
-use tokio_util::io::ReaderStream;
-use futures::StreamExt;
+use tx_error::AppError;
 
 /// `max_body_size`: 全局请求体上限（字节），用于 Content-Length 提前拦截。0 表示不限制。
 pub fn router(max_body_size: u64) -> Router {
@@ -48,12 +48,11 @@ pub fn router(max_body_size: u64) -> Router {
     let file_routes = Router::new()
         .route(
             "/upload",
-            post(upload_files)
-                .route_layer(BodySizeLimitLayer::new(
-                    max_body_size,
-                    FileStorageErr::FileTooLarge.code(),
-                    FileStorageErr::FileTooLarge.message(),
-                )),
+            post(upload_files).route_layer(BodySizeLimitLayer::new(
+                max_body_size,
+                FileStorageErr::FileTooLarge.code(),
+                FileStorageErr::FileTooLarge.message(),
+            )),
         )
         .route("/{file_id}", get(get_file))
         .route("/{file_id}", delete(delete_file))
@@ -61,8 +60,7 @@ pub fn router(max_body_size: u64) -> Router {
         .route("/list", post(list_files));
 
     // 预览路由（需鉴权）
-    let pre_routes = Router::new()
-        .route("/url/{file_id}", get(get_preview_url));
+    let pre_routes = Router::new().route("/url/{file_id}", get(get_preview_url));
 
     // 文件配置路由
     let config_routes = Router::new()
@@ -73,7 +71,9 @@ pub fn router(max_body_size: u64) -> Router {
         .route("/{id}", delete(delete_config))
         .route("/{id}/master", put(set_master_config));
 
-    file_routes.nest("/pre", pre_routes).nest("/config", config_routes)
+    file_routes
+        .nest("/pre", pre_routes)
+        .nest("/config", config_routes)
 }
 
 /// 公开路由：无需鉴权（URL 含 UUID，不可猜测）
@@ -113,18 +113,14 @@ async fn upload_files(
                 config_id = text.parse().ok();
             }
             Some("file") => {
-                let filename = field
-                    .file_name()
-                    .unwrap_or("unknown")
-                    .to_string();
+                let filename = field.file_name().unwrap_or("unknown").to_string();
                 let content_type = field
                     .content_type()
                     .unwrap_or("application/octet-stream")
                     .to_string();
 
-                let byte_stream = field.map(|r| {
-                    r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
-                });
+                let byte_stream =
+                    field.map(|r| r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)));
                 let mut reader = tokio_util::io::StreamReader::new(byte_stream);
 
                 let r = file_svc
@@ -220,16 +216,17 @@ async fn list_configs(
 ) -> Result<ApiR<Vec<FileConfigResponse>>, ApiErr> {
     ensure_permission("file:view").await?;
     let configs = file_svc.get_config_all().await?;
-    let resp = configs.into_iter().map(|c| {
-        FileConfigResponse {
+    let resp = configs
+        .into_iter()
+        .map(|c| FileConfigResponse {
             id: c.id,
             name: c.name,
             storage: c.storage,
             remark: c.remark,
             master: c.master,
             config: c.config,
-        }
-    }).collect();
+        })
+        .collect();
     Ok(ApiR::success(resp))
 }
 
@@ -345,13 +342,18 @@ async fn serve_local_file(
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Result<impl IntoResponse, ApiErr> {
     let config_id: Option<u64> = params.get("cid").and_then(|v| v.parse().ok());
-    let base = file_svc.serve_base_dir(config_id).await.unwrap_or_else(|| "./uploads".into());
+    let base = file_svc
+        .serve_base_dir(config_id)
+        .await
+        .unwrap_or_else(|| "./uploads".into());
     let safe_path = path.trim_start_matches('/');
     let full = std::path::PathBuf::from(&base).join(safe_path);
 
     // 防止路径穿越
     let canonical = full.canonicalize().unwrap_or(full.clone());
-    let base_canonical = std::path::PathBuf::from(&base).canonicalize().unwrap_or(std::path::PathBuf::from(&base));
+    let base_canonical = std::path::PathBuf::from(&base)
+        .canonicalize()
+        .unwrap_or(std::path::PathBuf::from(&base));
     if !canonical.starts_with(&base_canonical) {
         return Err(ApiErr::from(AppError::with_context(
             FileStorageErr::NotFound,
@@ -363,7 +365,8 @@ async fn serve_local_file(
         Ok(file) => {
             let mime = tx_di_file::storage::guess_mime_type(&path);
             let metadata = file.metadata().await.unwrap();
-            let body = axum::body::Body::from_stream(ReaderStream::new(tokio::io::BufReader::new(file)));
+            let body =
+                axum::body::Body::from_stream(ReaderStream::new(tokio::io::BufReader::new(file)));
             Ok(Response::builder()
                 .header(header::CONTENT_TYPE, mime)
                 .header(header::CONTENT_LENGTH, metadata.len())

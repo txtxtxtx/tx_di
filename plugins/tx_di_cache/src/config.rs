@@ -69,7 +69,15 @@ fn init(this: &mut CacheConfig, _store: &Store) -> RIE<()> {
     Ok(())
 }
 
-fn default_ttl() -> u64 { 3600 }
-fn default_max_capacity() -> usize { 10000 }
-fn default_pool_size() -> u32 { 10 }
-fn default_timeout() -> u64 { 5 }
+fn default_ttl() -> u64 {
+    3600
+}
+fn default_max_capacity() -> usize {
+    10000
+}
+fn default_pool_size() -> u32 {
+    10
+}
+fn default_timeout() -> u64 {
+    5
+}

@@ -1,5 +1,5 @@
-use std::any::Any;
 use async_trait::async_trait;
+use std::any::Any;
 
 use crate::dictionary::model::aggregate::{DictData, DictType};
 use crate::dictionary::model::value_object::{DictDataQuery, DictTypeQuery};

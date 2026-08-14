@@ -15,22 +15,21 @@
 //!
 //! 注意：静态资源（/static、SPA、/docs）已排除在中间件之外，无需日志过滤
 
-use std::sync::{Arc, LazyLock, RwLock};
+use axum::Router;
 use axum::body::Body;
 use axum::http::Request;
-use axum::Router;
 use axum::routing::Route;
+use std::sync::{Arc, LazyLock, RwLock};
 use tower::Layer;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer};
-use tracing::{debug, error, Level};
+use tracing::{Level, debug, error};
 
 pub mod api_log;
 pub mod body_limit;
 pub mod security;
 
 /// 超时配置（秒）
-static TIMEOUT_SECS: LazyLock<Arc<RwLock<u64>>> =
-    LazyLock::new(|| Arc::new(RwLock::new(30)));
+static TIMEOUT_SECS: LazyLock<Arc<RwLock<u64>>> = LazyLock::new(|| Arc::new(RwLock::new(30)));
 
 /// 设置超时时间（秒）
 pub fn set_timeout_secs(secs: u64) {
@@ -51,7 +50,7 @@ fn get_timeout_secs() -> u64 {
 pub trait DynMiddleware: Send + Sync {
     /// 应用中间件到 Router
     fn apply_to_router(&self, router: Router) -> Router;
-    
+
     fn name(&self) -> &str;
 }
 
@@ -61,13 +60,15 @@ pub trait DynMiddleware: Send + Sync {
 /// 包括 tower-http 提供的各种中间件（TraceLayer、CorsLayer、CompressionLayer 等）
 impl<L> DynMiddleware for L
 where
-// 条件1: L 必须是一个能作用于 Route 的 Layer，且可克隆、线程安全、生命周期足够长
+    // 条件1: L 必须是一个能作用于 Route 的 Layer，且可克隆、线程安全、生命周期足够长
     L: Layer<Route> + Clone + Send + Sync + 'static,
-// 条件2: Layer 处理后产生的 Service 必须是 tower 的服务
+    // 条件2: Layer 处理后产生的 Service 必须是 tower 的服务
     <L as Layer<Route>>::Service: tower::Service<Request<Body>> + Clone + Send + Sync + 'static,
     <<L as Layer<Route>>::Service as tower::Service<Request<Body>>>::Future: Send + 'static,
-    <<L as Layer<Route>>::Service as tower::Service<Request<Body>>>::Response: axum::response::IntoResponse + 'static,
-    <<L as Layer<Route>>::Service as tower::Service<Request<Body>>>::Error: Into<std::convert::Infallible> + 'static,
+    <<L as Layer<Route>>::Service as tower::Service<Request<Body>>>::Response:
+        axum::response::IntoResponse + 'static,
+    <<L as Layer<Route>>::Service as tower::Service<Request<Body>>>::Error:
+        Into<std::convert::Infallible> + 'static,
 {
     fn apply_to_router(&self, router: Router) -> Router {
         router.layer(self.clone())
@@ -95,7 +96,11 @@ where
     if let Ok(mut layers) = LAYER_REGISTRY.write() {
         let middleware = Arc::new(middleware);
         layers.push((sort, middleware.clone()));
-        debug!("axum 中间件已注册到全局注册表: sort={},name={}", sort, middleware.name());
+        debug!(
+            "axum 中间件已注册到全局注册表: sort={},name={}",
+            sort,
+            middleware.name()
+        );
     } else {
         error!("无法获取中间件注册表的写锁");
     }
@@ -104,18 +109,21 @@ where
 /// 添加 Arc<dyn DynMiddleware> 到全局中间件,可添加自定义中间件
 ///
 /// layer 实现请参照 [ApiLogLayer](crate::layers::api_log::ApiLogLayer)
-pub fn add_arc_layer(middleware: Arc<dyn DynMiddleware>, sort: i32)
-{
+pub fn add_arc_layer(middleware: Arc<dyn DynMiddleware>, sort: i32) {
     if let Ok(mut layers) = LAYER_REGISTRY.write() {
         layers.push((sort, middleware.clone()));
-        debug!("axum 中间件已注册到全局注册表: sort={},name={}", sort, middleware.name());
+        debug!(
+            "axum 中间件已注册到全局注册表: sort={},name={}",
+            sort,
+            middleware.name()
+        );
     } else {
         error!("无法获取中间件注册表的写锁");
     }
 }
 
 /// 通过名称添加中间件
-pub fn add_layer_by_name(name: impl Into<String>, sort: i32){
+pub fn add_layer_by_name(name: impl Into<String>, sort: i32) {
     if let Some(middleware) = get_layer_by_name(name) {
         add_arc_layer(middleware, sort);
     }
@@ -124,46 +132,36 @@ pub fn add_layer_by_name(name: impl Into<String>, sort: i32){
 fn get_layer_by_name(name: impl Into<String>) -> Option<Arc<dyn DynMiddleware>> {
     let name = name.into();
     match name.as_str() {
-        "api_log" => {
-            Some(Arc::new(api_log::ApiLogLayer))
-        }
-        "security" => {
-            Some(Arc::new(security::SecurityHeadersLayer))
-        }
-        "cors" => {
-            Some(Arc::new(tower_http::cors::CorsLayer::permissive()))
-        }
+        "api_log" => Some(Arc::new(api_log::ApiLogLayer)),
+        "security" => Some(Arc::new(security::SecurityHeadersLayer)),
+        "cors" => Some(Arc::new(tower_http::cors::CorsLayer::permissive())),
         "trace" => {
             // 创建自定义的 TraceLayer，配置日志输出格式
             let trace_layer = TraceLayer::new_for_http()
                 .make_span_with(
                     DefaultMakeSpan::new()
                         .level(Level::INFO)
-                        .include_headers(true)
+                        .include_headers(true),
                 )
-                .on_request(
-                    DefaultOnRequest::new().level(Level::INFO)
-                )
-                .on_response(
-                    DefaultOnResponse::new().level(Level::INFO)
-                );
+                .on_request(DefaultOnRequest::new().level(Level::INFO))
+                .on_response(DefaultOnResponse::new().level(Level::INFO));
 
             Some(Arc::new(trace_layer))
         }
         "timeout" => {
             use std::time::Duration;
             let timeout_secs = get_timeout_secs();
-            Some(Arc::new(tower_http::timeout::TimeoutLayer::with_status_code(
-                http::StatusCode::REQUEST_TIMEOUT,
-                Duration::from_secs(timeout_secs),
-            )))        }
-        "compression" => {
-            Some(Arc::new(tower_http::compression::CompressionLayer::new()))
+            Some(Arc::new(
+                tower_http::timeout::TimeoutLayer::with_status_code(
+                    http::StatusCode::REQUEST_TIMEOUT,
+                    Duration::from_secs(timeout_secs),
+                ),
+            ))
         }
+        "compression" => Some(Arc::new(tower_http::compression::CompressionLayer::new())),
         _ => {
             error!("无法获取中间件: {}", name);
             None
         }
     }
-
 }

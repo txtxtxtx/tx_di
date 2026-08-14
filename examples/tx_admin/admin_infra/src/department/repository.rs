@@ -1,19 +1,19 @@
-use std::sync::Arc;
 use async_trait::async_trait;
+use std::sync::Arc;
 
 use admin_domain::department::model::aggregate::Department;
 use admin_domain::department::model::value_object::DeptQuery;
 use admin_domain::department::repository::DepartmentRepository;
-use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::model::AuditFields;
+use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::repository::{RepositoryError, db_err};
 use tx_di_core::{Component, DepsTuple};
 use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
 
 use super::model::SysDepartment;
+use crate::common::{Deleted, Status};
 use crate::user::model::SysUserDept;
-use crate::common::{Status, Deleted};
 
 /// Toasty 实现的 DepartmentRepository
 #[derive(Component)]
@@ -33,17 +33,41 @@ impl ToastyDepartmentRepository {
             d.name.clone(),
             d.parent_id,
             d.sort,
-            if d.leader_user_id == 0 { None } else { Some(d.leader_user_id) },
-            if d.phone.is_empty() { None } else { Some(d.phone.clone()) },
-            if d.email.is_empty() { None } else { Some(d.email.clone()) },
+            if d.leader_user_id == 0 {
+                None
+            } else {
+                Some(d.leader_user_id)
+            },
+            if d.phone.is_empty() {
+                None
+            } else {
+                Some(d.phone.clone())
+            },
+            if d.email.is_empty() {
+                None
+            } else {
+                Some(d.email.clone())
+            },
             i32::from(d.status),
             d.tenant_id,
             AuditFields {
-                creator: if d.creator.is_empty() { None } else { Some(d.creator.clone()) },
+                creator: if d.creator.is_empty() {
+                    None
+                } else {
+                    Some(d.creator.clone())
+                },
                 create_time: d.created_at,
-                updater: if d.updater.is_empty() { None } else { Some(d.updater.clone()) },
+                updater: if d.updater.is_empty() {
+                    None
+                } else {
+                    Some(d.updater.clone())
+                },
                 update_time: d.updated_at,
-                deleted: if d.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if d.deleted == Deleted::Yes {
+                    DeletedStatus::Deleted
+                } else {
+                    DeletedStatus::Normal
+                },
             },
         )
     }
@@ -71,10 +95,14 @@ impl DepartmentRepository for ToastyDepartmentRepository {
             .filter(|d| d.deleted == Deleted::No)
             .filter(|d| {
                 if let Some(ref name) = query.name {
-                    if !d.name.contains(name.as_str()) { return false; }
+                    if !d.name.contains(name.as_str()) {
+                        return false;
+                    }
                 }
                 if let Some(status) = query.status {
-                    if i32::from(d.status) != status { return false; }
+                    if i32::from(d.status) != status {
+                        return false;
+                    }
                 }
                 true
             })
@@ -176,7 +204,9 @@ impl DepartmentRepository for ToastyDepartmentRepository {
             .await
             .map_err(|e| db_err(e, RepositoryError::DatabaseDept))?;
 
-        Ok(all.iter().any(|d| d.deleted == Deleted::No && d.parent_id == parent_id))
+        Ok(all
+            .iter()
+            .any(|d| d.deleted == Deleted::No && d.parent_id == parent_id))
     }
 
     async fn has_users(&self, dept_id: u64) -> AppResult<bool> {

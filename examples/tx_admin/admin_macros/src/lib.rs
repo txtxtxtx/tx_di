@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, Fields};
+use syn::{Data, DeriveInput, Fields, parse_macro_input};
 
 /// 为聚合根自动实现 `Entity` 和 `AggregateRoot` trait。
 ///
@@ -41,14 +41,14 @@ fn expand_aggregate_root(input: DeriveInput) -> syn::Result<proc_macro2::TokenSt
                 return Err(syn::Error::new_spanned(
                     &input,
                     "AggregateRoot only supports named fields",
-                ))
+                ));
             }
         },
         _ => {
             return Err(syn::Error::new_spanned(
                 &input,
                 "AggregateRoot only supports structs",
-            ))
+            ));
         }
     };
 
@@ -68,9 +68,8 @@ fn expand_aggregate_root(input: DeriveInput) -> syn::Result<proc_macro2::TokenSt
         }
     }
 
-    let id_type = id_type.ok_or_else(|| {
-        syn::Error::new_spanned(&input, "missing `id` field in aggregate root")
-    })?;
+    let id_type = id_type
+        .ok_or_else(|| syn::Error::new_spanned(&input, "missing `id` field in aggregate root"))?;
 
     if !has_events {
         return Err(syn::Error::new_spanned(

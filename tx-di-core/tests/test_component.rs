@@ -22,12 +22,12 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::time::Duration;
 
-use tx_di_core::{
-    App, AppError, BuildContext, CompRef, Component, DepsTuple, DiErr, RIE, Scope,
-    Store, inject_all_traits_from_store, inject_from_store, inject_trait_from_store,
-};
 use tx_di_core::aop::{BoxCall, CallContext, CallResult, Interceptor, InterceptorChain};
 use tx_di_core::intercept;
+use tx_di_core::{
+    App, AppError, BuildContext, CompRef, Component, DepsTuple, DiErr, RIE, Scope, Store,
+    inject_all_traits_from_store, inject_from_store, inject_trait_from_store,
+};
 #[allow(unused_imports)]
 use tx_di_log::LogPlugins;
 
@@ -38,7 +38,7 @@ use tx_di_log::LogPlugins;
 // ── 1. 基础组件 ─────────────────────────────────────────────────────────
 
 #[derive(Component, Default)]
-pub struct DbPool{
+pub struct DbPool {
     #[tx_cst(AtomicU32::new(0))]
     pub counter: AtomicU32, // 用于验证生命周期钩子
     #[tx_cst("sqlite".to_string())]
@@ -423,7 +423,9 @@ fn test_store_try_inject_unregistered() {
     struct Unregistered;
     impl Component for Unregistered {
         type Deps = ();
-        fn build(_: (), _store: &Store) -> Self { Unregistered }
+        fn build(_: (), _store: &Store) -> Self {
+            Unregistered
+        }
     }
 
     let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
@@ -436,7 +438,9 @@ fn test_store_inject_returns_error() {
     struct Unregistered2;
     impl Component for Unregistered2 {
         type Deps = ();
-        fn build(_: (), _store: &Store) -> Self { Unregistered2 }
+        fn build(_: (), _store: &Store) -> Self {
+            Unregistered2
+        }
     }
 
     let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
@@ -563,8 +567,12 @@ fn test_interceptor_chain() {
 
     let counter = Arc::new(AtomicU32::new(0));
     let mut chain = InterceptorChain::new();
-    chain.push(CountingInterceptor { counter: counter.clone() });
-    chain.push(CountingInterceptor { counter: counter.clone() });
+    chain.push(CountingInterceptor {
+        counter: counter.clone(),
+    });
+    chain.push(CountingInterceptor {
+        counter: counter.clone(),
+    });
 
     let ctx = CallContext::new("test");
     chain.before_all(&ctx).unwrap();
@@ -747,14 +755,13 @@ async fn test_aop_intercept_macro_end_to_end() {
         "async 方法应触发第二次 before 拦截"
     );
 
-        // 优雅关闭后台任务
-        arc.shutdown_token.cancel();
-        if let Some(handle) = arc.task_handle.write().await.take() {
-            let _ = tokio::time::timeout(Duration::from_secs(2), handle).await;
-        }
-        arc.shutdown().await;
+    // 优雅关闭后台任务
+    arc.shutdown_token.cancel();
+    if let Some(handle) = arc.task_handle.write().await.take() {
+        let _ = tokio::time::timeout(Duration::from_secs(2), handle).await;
+    }
+    arc.shutdown().await;
 }
-
 
 // ── 10. 错误处理 ─────────────────────────────────────────────────────────
 
@@ -764,7 +771,9 @@ fn test_inject_unregistered_panics() {
     struct Ghost;
     impl Component for Ghost {
         type Deps = ();
-        fn build(_: (), _store: &Store) -> Self { Ghost }
+        fn build(_: (), _store: &Store) -> Self {
+            Ghost
+        }
     }
 
     let ctx = BuildContext::new::<std::path::PathBuf>(None).unwrap();
@@ -804,13 +813,12 @@ fn test_concurrent_inject_prototype() {
     let handles: Vec<_> = (0..8)
         .map(|_| {
             let ctx = ctx.clone();
-            thread::spawn(move || {
-                ctx.inject::<RequestContext>()
-            })
+            thread::spawn(move || ctx.inject::<RequestContext>())
         })
         .collect();
 
-    let results: Vec<Arc<RequestContext>> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+    let results: Vec<Arc<RequestContext>> =
+        handles.into_iter().map(|h| h.join().unwrap()).collect();
 
     // Prototype: 每个线程拿到不同实例
     for i in 1..results.len() {
@@ -863,7 +871,8 @@ fn test_app_init_hook() {
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        let _ = BuildContext::new::<PathBuf>(None).unwrap()
+        let _ = BuildContext::new::<PathBuf>(None)
+            .unwrap()
             .build_and_run()
             .await
             .unwrap();
@@ -881,7 +890,8 @@ fn test_app_async_init_hook() {
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        let _ = BuildContext::new::<PathBuf>(None).unwrap()
+        let _ = BuildContext::new::<PathBuf>(None)
+            .unwrap()
             .build_and_run()
             .await
             .unwrap();
@@ -918,7 +928,8 @@ fn test_init_sort_ordering() {
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        let _ = BuildContext::new::<PathBuf>(None).unwrap()
+        let _ = BuildContext::new::<PathBuf>(None)
+            .unwrap()
             .build_and_run()
             .await
             .unwrap();
@@ -926,14 +937,8 @@ fn test_init_sort_ordering() {
 
     let order = INIT_ORDER.lock().unwrap();
     assert_eq!(order.len(), 2, "两个 init 组件都应被调用");
-    assert_eq!(
-        order[0], "EarlyInit",
-        "init_sort=10 应先执行"
-    );
-    assert_eq!(
-        order[1], "LateInit",
-        "init_sort=20 后执行"
-    );
+    assert_eq!(order[0], "EarlyInit", "init_sort=10 应先执行");
+    assert_eq!(order[1], "LateInit", "init_sort=20 后执行");
 }
 
 #[test]
@@ -1011,10 +1016,7 @@ fn test_store_insert_factory() {
 
     assert!(store.contains::<String>());
     let entry = store.inner().get(&TypeId::of::<String>()).unwrap();
-    assert!(
-        matches!(&*entry, CompRef::Factory(_)),
-        "应为 Factory 变体"
-    );
+    assert!(matches!(&*entry, CompRef::Factory(_)), "应为 Factory 变体");
 }
 
 #[test]
@@ -1086,16 +1088,8 @@ fn test_inject_all_traits_from_store() {
     assert!(!reporters.is_empty(), "应有至少一个 Reporter 实现");
 
     let data: Vec<&str> = reporters.iter().map(|r| r.report()).collect();
-    assert!(
-        data.contains(&"json"),
-        "应包含 json 实现, got: {:?}",
-        data
-    );
-    assert!(
-        data.contains(&"xml"),
-        "应包含 xml 实现, got: {:?}",
-        data
-    );
+    assert!(data.contains(&"json"), "应包含 json 实现, got: {:?}", data);
+    assert!(data.contains(&"xml"), "应包含 xml 实现, got: {:?}", data);
 }
 
 #[test]
@@ -1356,8 +1350,5 @@ fn test_list_trait_inject_mixed() {
     let consumer = ctx.inject::<MixedConsumer>();
 
     assert_eq!(consumer.db.url, "sqlite");
-    assert!(
-        consumer.reporters.len() >= 2,
-        "混合字段也应正确注入列表"
-    );
+    assert!(consumer.reporters.len() >= 2, "混合字段也应正确注入列表");
 }

@@ -1,12 +1,12 @@
+use crate::role::model::aggregate::Role;
+use crate::role::model::value_object::RoleQuery;
+use crate::role::repository::RoleRepository;
+use crate::shared::repository::RepositoryError;
 use std::sync::Arc;
 use tx_common::id;
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
-use crate::shared::repository::RepositoryError;
-use crate::role::model::aggregate::Role;
-use crate::role::model::value_object::RoleQuery;
-use crate::role::repository::RoleRepository;
 
 /// Role domain service
 ///
@@ -155,11 +155,7 @@ impl RoleService {
     /// # 错误
     /// - `NotFoundRole` - 指定角色不存在
     /// - 数据库更新失败时返回错误
-    pub async fn delete_role(
-        &self,
-        role_id: u64,
-        updater: Option<String>,
-    ) -> AppResult<()> {
+    pub async fn delete_role(&self, role_id: u64, updater: Option<String>) -> AppResult<()> {
         let mut role = self
             .role_repo
             .find_by_id(role_id)
@@ -226,11 +222,7 @@ impl RoleService {
     /// - `NotFoundRole` - 指定角色不存在
     /// - `ValidationRoleDisabled` - 角色已禁用，无法分配菜单权限
     /// - 数据库操作失败时返回错误
-    pub async fn assign_menus(
-        &self,
-        role_id: u64,
-        menu_ids: Vec<u64>,
-    ) -> AppResult<Role> {
+    pub async fn assign_menus(&self, role_id: u64, menu_ids: Vec<u64>) -> AppResult<Role> {
         let mut role = self
             .role_repo
             .find_by_id(role_id)
@@ -285,7 +277,8 @@ impl RoleService {
     /// - `NotFoundRole` - 指定角色不存在
     /// - 数据库查询异常时返回错误
     pub async fn get_role(&self, role_id: u64) -> AppResult<Role> {
-        Ok(self.role_repo
+        Ok(self
+            .role_repo
             .find_by_id(role_id)
             .await?
             .ok_or_else(|| RepositoryError::NotFoundRole)?)
@@ -347,9 +340,16 @@ impl RoleService {
     /// # 错误
     /// - `NotFoundRole` - 指定角色不存在
     /// - 数据库查询异常时返回错误
-    pub async fn get_role_users(&self, role_id: u64) -> AppResult<Vec<crate::user::model::aggregate::User>> {
+    pub async fn get_role_users(
+        &self,
+        role_id: u64,
+    ) -> AppResult<Vec<crate::user::model::aggregate::User>> {
         // Verify role exists
-        let _role = self.role_repo.find_by_id(role_id).await?.ok_or_else(|| RepositoryError::NotFoundRole)?;
+        let _role = self
+            .role_repo
+            .find_by_id(role_id)
+            .await?
+            .ok_or_else(|| RepositoryError::NotFoundRole)?;
         self.role_repo.find_users_by_role_id(role_id).await
     }
 
@@ -366,7 +366,11 @@ impl RoleService {
     /// # 注意
     /// 用户的合法性校验（存在、Active）由 `RoleAppService` 在调用前完成。
     pub async fn add_users_to_role(&self, role_id: u64, user_ids: Vec<u64>) -> AppResult<()> {
-        let role = self.role_repo.find_by_id(role_id).await?.ok_or_else(|| RepositoryError::NotFoundRole)?;
+        let role = self
+            .role_repo
+            .find_by_id(role_id)
+            .await?
+            .ok_or_else(|| RepositoryError::NotFoundRole)?;
 
         if role.status != 0 {
             return Err(RepositoryError::ValidationRoleDisabled)?;
@@ -398,7 +402,11 @@ impl RoleService {
     /// - 数据库操作失败时返回错误
     pub async fn remove_users_from_role(&self, role_id: u64, user_ids: Vec<u64>) -> AppResult<()> {
         // Verify role exists
-        let _role = self.role_repo.find_by_id(role_id).await?.ok_or_else(|| RepositoryError::NotFoundRole)?;
+        let _role = self
+            .role_repo
+            .find_by_id(role_id)
+            .await?
+            .ok_or_else(|| RepositoryError::NotFoundRole)?;
         self.role_repo.unbind_users(role_id, &user_ids).await
     }
 }

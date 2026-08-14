@@ -1,11 +1,11 @@
-use std::sync::Arc;
 use async_trait::async_trait;
+use std::sync::Arc;
 
 use admin_domain::config::model::aggregate::Config;
 use admin_domain::config::model::value_object::ConfigQuery;
 use admin_domain::config::repository::ConfigRepository;
-use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::model::AuditFields;
+use admin_domain::shared::model::value_object::DeletedStatus;
 use admin_domain::shared::repository::{RepositoryError, db_err};
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
@@ -36,13 +36,29 @@ impl ToastyConfigRepository {
             c.config_key.clone(),
             c.value.clone(),
             c.visible,
-            if c.remark.is_empty() { None } else { Some(c.remark.clone()) },
+            if c.remark.is_empty() {
+                None
+            } else {
+                Some(c.remark.clone())
+            },
             AuditFields {
-                creator: if c.creator.is_empty() { None } else { Some(c.creator.clone()) },
+                creator: if c.creator.is_empty() {
+                    None
+                } else {
+                    Some(c.creator.clone())
+                },
                 create_time: c.created_at,
-                updater: if c.updater.is_empty() { None } else { Some(c.updater.clone()) },
+                updater: if c.updater.is_empty() {
+                    None
+                } else {
+                    Some(c.updater.clone())
+                },
                 update_time: c.updated_at,
-                deleted: if c.deleted == Deleted::Yes { DeletedStatus::Deleted } else { DeletedStatus::Normal },
+                deleted: if c.deleted == Deleted::Yes {
+                    DeletedStatus::Deleted
+                } else {
+                    DeletedStatus::Normal
+                },
             },
         )
     }
@@ -93,10 +109,11 @@ impl ConfigRepository for ToastyConfigRepository {
             {
                 let mut q = SysConfig::all().filter(SysConfig::fields().deleted().eq(Deleted::No));
                 if let Some(ref name) = query.name {
-                    q = q.filter(SysConfig::fields().name().like_with_escape(
-                        format!("%{}%", tx_di_toasty::like_escape(name)),
-                        '\\',
-                    ));
+                    q =
+                        q.filter(SysConfig::fields().name().like_with_escape(
+                            format!("%{}%", tx_di_toasty::like_escape(name)),
+                            '\\',
+                        ));
                 }
                 if let Some(ref category) = query.category {
                     q = q.filter(SysConfig::fields().category().eq(category));
@@ -131,10 +148,14 @@ impl ConfigRepository for ToastyConfigRepository {
             .filter(|c| c.deleted == Deleted::No)
             .filter(|c| {
                 if let Some(ref category) = query.category {
-                    if c.category != *category { return false; }
+                    if c.category != *category {
+                        return false;
+                    }
                 }
                 if let Some(ref name) = query.name {
-                    if !c.name.contains(name.as_str()) { return false; }
+                    if !c.name.contains(name.as_str()) {
+                        return false;
+                    }
                 }
                 true
             })
@@ -191,7 +212,8 @@ impl ConfigRepository for ToastyConfigRepository {
             .await
             .map_err(|_| RepositoryError::NotFoundConfig)?;
 
-        config.update()
+        config
+            .update()
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await

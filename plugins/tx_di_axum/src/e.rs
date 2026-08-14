@@ -1,4 +1,8 @@
-use axum::{http::StatusCode, response::{IntoResponse, Response}, Json};
+use axum::{
+    Json,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use thiserror::Error;
 use tx_di_core::{ApiRes, AppError};
 
@@ -21,8 +25,12 @@ impl IntoResponse for WebErr {
                 tracing::error!("internal server error:{e:?}");
                 // 不暴露原始错误链给前端，使用统一内部错误码
                 let app_err = AppError::from_anyhow(e);
-                (StatusCode::OK, Json(ApiRes::error(app_err.code(), app_err.message().to_string())))
+                (
+                    StatusCode::OK,
+                    Json(ApiRes::error(app_err.code(), app_err.message().to_string())),
+                )
             }
-        }.into_response()
+        }
+        .into_response()
     }
 }

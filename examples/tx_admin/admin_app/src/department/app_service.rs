@@ -118,10 +118,7 @@ impl DepartmentAppService {
     ///
     /// # 错误
     /// - 数据库查询异常
-    pub async fn get_dept_list(
-        &self,
-        request: ListDeptsRequest,
-    ) -> AppResult<Vec<DeptResponse>> {
+    pub async fn get_dept_list(&self, request: ListDeptsRequest) -> AppResult<Vec<DeptResponse>> {
         let query = DeptQuery {
             name: request.name,
             status: request.status,
@@ -144,10 +141,7 @@ impl DepartmentAppService {
     ///
     /// # 错误
     /// - 数据库查询异常
-    pub async fn get_dept_tree(
-        &self,
-        request: ListDeptsRequest,
-    ) -> AppResult<Vec<DeptTreeNode>> {
+    pub async fn get_dept_tree(&self, request: ListDeptsRequest) -> AppResult<Vec<DeptTreeNode>> {
         let query = DeptQuery {
             name: request.name,
             status: request.status,

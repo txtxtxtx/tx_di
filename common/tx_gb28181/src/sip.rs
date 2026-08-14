@@ -24,10 +24,7 @@
 /// ```
 pub fn extract_user_from_sip_uri(uri_str: &str) -> Option<String> {
     // 去掉尖括号及 display-name
-    let clean = uri_str
-        .trim()
-        .trim_start_matches('"')
-        .trim();
+    let clean = uri_str.trim().trim_start_matches('"').trim();
 
     // 提取 < > 内的部分
     let inner = if let (Some(s), Some(e)) = (clean.find('<'), clean.rfind('>')) {
@@ -92,19 +89,13 @@ mod tests {
     #[test]
     fn extract_sips() {
         let uri = "sips:user@host";
-        assert_eq!(
-            extract_user_from_sip_uri(uri),
-            Some("user".into())
-        );
+        assert_eq!(extract_user_from_sip_uri(uri), Some("user".into()));
     }
 
     #[test]
     fn extract_with_tag() {
         let uri = "<sip:user@host>;tag=abc123";
-        assert_eq!(
-            extract_user_from_sip_uri(uri),
-            Some("user".into())
-        );
+        assert_eq!(extract_user_from_sip_uri(uri), Some("user".into()));
     }
 
     #[test]

@@ -1,14 +1,16 @@
 //! 配置管理 HTTP API
 
-use axum::Json;
-use tx_di_axum::Router;
-use axum::routing::{get, post, put, delete};
-use tx_di_axum::bound::DiComp;
-use admin_app::config::app_service::ConfigAppService;
-use admin_proto::{CreateConfigRequest, UpdateConfigRequest, ListConfigsRequest, ConfigResponse, Empty};
-use tx_common::{ApiR, ApiRes, Page};
 use crate::auth::ensure_permission;
 use crate::error::ApiErr;
+use admin_app::config::app_service::ConfigAppService;
+use admin_proto::{
+    ConfigResponse, CreateConfigRequest, Empty, ListConfigsRequest, UpdateConfigRequest,
+};
+use axum::Json;
+use axum::routing::{delete, get, post, put};
+use tx_common::{ApiR, ApiRes, Page};
+use tx_di_axum::Router;
+use tx_di_axum::bound::DiComp;
 use tx_di_sa_token::StpUtil;
 
 pub fn router() -> Router {

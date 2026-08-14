@@ -14,8 +14,7 @@ use crate::codegen::CodeGenContext;
 
 /// 生成 `inner_init` 方法实现；无需覆盖时返回空 TokenStream
 pub fn gen_inner_init(ctx: &CodeGenContext) -> TokenStream2 {
-    let has_trait_inject =
-        !ctx.trait_inject_fields.is_empty() || !ctx.list_trait_fields.is_empty();
+    let has_trait_inject = !ctx.trait_inject_fields.is_empty() || !ctx.list_trait_fields.is_empty();
 
     if !has_trait_inject && !ctx.comp_attr.has_init {
         return quote! {};

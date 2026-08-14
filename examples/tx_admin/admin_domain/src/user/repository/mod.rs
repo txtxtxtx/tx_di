@@ -1,9 +1,9 @@
-use std::any::Any;
-use async_trait::async_trait;
-use tx_common::page::Page;
-use tx_error::AppResult;
 use crate::user::model::aggregate::User;
 use crate::user::model::value_object::UserQuery;
+use async_trait::async_trait;
+use std::any::Any;
+use tx_common::page::Page;
+use tx_error::AppResult;
 
 /// User repository trait
 #[async_trait]
@@ -15,11 +15,7 @@ pub trait UserRepository: Any + Send + Sync {
     async fn find_by_username(&self, username: &str) -> AppResult<Option<User>>;
 
     /// Find users with pagination
-    async fn find_page(
-        &self,
-        query: &UserQuery,
-        page: Page<User>,
-    ) -> AppResult<Page<User>>;
+    async fn find_page(&self, query: &UserQuery, page: Page<User>) -> AppResult<Page<User>>;
 
     /// Find all users
     async fn find_all(&self, query: &UserQuery) -> AppResult<Vec<User>>;

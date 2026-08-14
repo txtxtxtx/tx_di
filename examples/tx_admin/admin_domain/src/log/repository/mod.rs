@@ -1,5 +1,5 @@
-use std::any::Any;
 use async_trait::async_trait;
+use std::any::Any;
 
 use crate::log::model::aggregate::{LoginLog, OperateLog};
 use crate::log::model::value_object::{LoginLogQuery, OperateLogQuery};

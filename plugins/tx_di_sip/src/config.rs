@@ -1,10 +1,10 @@
+use crate::SipErr;
 use serde::Deserialize;
 use std::net::SocketAddr;
 use tx_di_core::{Component, RIE};
-use crate::SipErr;
 
 /// SIP 传输协议类型
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq,Default)]
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum SipTransport {
     /// 仅启用 UDP
@@ -220,7 +220,8 @@ impl SipConfig {
     /// 将配置转换为 `SocketAddr`
     pub fn socket_addr(&self) -> RIE<SocketAddr> {
         let raw = format!("{}:{}", self.host, self.port);
-        Ok(raw.parse::<SocketAddr>()
+        Ok(raw
+            .parse::<SocketAddr>()
             .map_err(|_| SipErr::InvalidAddress)?)
     }
 

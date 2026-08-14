@@ -57,7 +57,13 @@ impl FrameRecord {
             .join(" ");
         format!(
             "{},{},{:X},{},{},{},{}\n",
-            self.timestamp_us, kind, self.id, brs, esi, self.data.len(), data
+            self.timestamp_us,
+            kind,
+            self.id,
+            brs,
+            esi,
+            self.data.len(),
+            data
         )
     }
 

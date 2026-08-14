@@ -11,10 +11,8 @@
 //! 哈希后的密码格式: `$argon2id$v=19$m=19456,t=2,p=1$<base64_salt>$<base64_hash>`
 
 use argon2::{
-    password_hash::{
-        rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString,
-    },
     Argon2, Params, Version,
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
 };
 use tx_error::AppResult;
 
@@ -100,7 +98,10 @@ mod tests {
         let hashed = hash_password(password).unwrap();
 
         // 验证格式: 应该以 $argon2id$ 开头
-        assert!(hashed.starts_with("$argon2id$"), "哈希应该使用 argon2id 算法");
+        assert!(
+            hashed.starts_with("$argon2id$"),
+            "哈希应该使用 argon2id 算法"
+        );
 
         // 验证格式: 应该包含版本号和参数
         assert!(hashed.contains("$v=19$"), "应该包含版本号 v=19");
@@ -147,10 +148,7 @@ mod tests {
         let password = "some_password";
         let hashed = hash_password(password).unwrap();
 
-        assert!(
-            !verify_password("", &hashed).unwrap(),
-            "空密码应该验证失败"
-        );
+        assert!(!verify_password("", &hashed).unwrap(), "空密码应该验证失败");
     }
 
     #[test]

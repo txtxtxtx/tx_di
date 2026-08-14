@@ -42,7 +42,10 @@ pub struct SecurityHeadersMiddleware<S> {
 
 impl<S> Service<Request<Body>> for SecurityHeadersMiddleware<S>
 where
-    S: Service<Request<Body>, Response = Response<Body>, Error = Infallible> + Clone + Send + 'static,
+    S: Service<Request<Body>, Response = Response<Body>, Error = Infallible>
+        + Clone
+        + Send
+        + 'static,
     S::Future: Send + 'static,
 {
     type Response = Response<Body>;
@@ -71,7 +74,11 @@ pub fn apply_security_headers(headers: &mut axum::http::HeaderMap) {
         axum::http::HeaderName::from_static("x-content-type-options"),
         "nosniff",
     );
-    insert_if_absent(headers, axum::http::HeaderName::from_static("x-frame-options"), "DENY");
+    insert_if_absent(
+        headers,
+        axum::http::HeaderName::from_static("x-frame-options"),
+        "DENY",
+    );
     insert_if_absent(
         headers,
         axum::http::HeaderName::from_static("x-xss-protection"),

@@ -1,5 +1,5 @@
-use tx_error::CodeMsg;
 use crate::ExecutionStatus;
+use tx_error::CodeMsg;
 
 /// Job 插件业务错误码
 ///
@@ -68,5 +68,3 @@ pub struct JobResult {
     pub result: Option<String>,
     pub error: Option<String>,
 }
-
-

@@ -1,13 +1,12 @@
-
+use axum::extract::FromRequestParts;
 use std::ops::Deref;
 use std::sync::Arc;
-use axum::extract::{FromRequestParts};
 
 use axum::http::request::Parts;
 
-use tx_di_core::{App, AppError, Component, RIE};
 use crate::WebErrCode;
 use crate::e::WebErr;
+use tx_di_core::{App, AppError, Component, RIE};
 
 #[derive(Clone)]
 pub struct AppStatus {
@@ -22,7 +21,8 @@ pub trait RequestPartsExt {
 
 impl RequestPartsExt for Parts {
     fn app_status(&self) -> &AppStatus {
-        self.extensions.get::<AppStatus>()
+        self.extensions
+            .get::<AppStatus>()
             .expect("AppStatus not found in request extensions; 请确认已通过 layer 注入 AppStatus")
     }
 

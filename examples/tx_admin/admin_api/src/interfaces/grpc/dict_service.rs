@@ -3,6 +3,8 @@
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
+use admin_proto::Empty;
+use admin_proto::admin::common::PageResponse;
 use admin_proto::admin::dict::dict_service_server::DictService;
 use admin_proto::admin::dict::{
     CreateDictDataRequest, CreateDictTypeRequest, DeleteDictDataRequest, DeleteDictTypeRequest,
@@ -10,8 +12,6 @@ use admin_proto::admin::dict::{
     GetDictDataRequest, GetDictTypeRequest, ListDictDataRequest, ListDictDataResponse,
     ListDictTypesRequest, ListDictTypesResponse, UpdateDictDataRequest, UpdateDictTypeRequest,
 };
-use admin_proto::admin::common::PageResponse;
-use admin_proto::Empty;
 use tx_di_core::App;
 
 use super::auth_interceptor::{self, get_login_id};
@@ -35,7 +35,10 @@ impl DictService for DictGrpcService {
 
         let req = r.into_inner();
         let svc: Arc<admin_app::dictionary::app_service::DictTypeAppService> = self.app.inject();
-        let r = svc.create_dict_type(req, Some(login_id)).await.map_err(err::to_status)?;
+        let r = svc
+            .create_dict_type(req, Some(login_id))
+            .await
+            .map_err(err::to_status)?;
         Ok(Response::new(r))
     }
 
@@ -48,7 +51,10 @@ impl DictService for DictGrpcService {
 
         let req = r.into_inner();
         let svc: Arc<admin_app::dictionary::app_service::DictTypeAppService> = self.app.inject();
-        let r = svc.update_dict_type(req, Some(login_id)).await.map_err(err::to_status)?;
+        let r = svc
+            .update_dict_type(req, Some(login_id))
+            .await
+            .map_err(err::to_status)?;
         Ok(Response::new(r))
     }
 
@@ -123,7 +129,10 @@ impl DictService for DictGrpcService {
 
         let req = r.into_inner();
         let svc: Arc<admin_app::dictionary::app_service::DictDataAppService> = self.app.inject();
-        let r = svc.create_dict_data(req, Some(login_id)).await.map_err(err::to_status)?;
+        let r = svc
+            .create_dict_data(req, Some(login_id))
+            .await
+            .map_err(err::to_status)?;
         Ok(Response::new(r))
     }
 
@@ -136,7 +145,10 @@ impl DictService for DictGrpcService {
 
         let req = r.into_inner();
         let svc: Arc<admin_app::dictionary::app_service::DictDataAppService> = self.app.inject();
-        let r = svc.update_dict_data(req, Some(login_id)).await.map_err(err::to_status)?;
+        let r = svc
+            .update_dict_data(req, Some(login_id))
+            .await
+            .map_err(err::to_status)?;
         Ok(Response::new(r))
     }
 

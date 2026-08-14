@@ -113,11 +113,11 @@
 //! 当前版本暂不支持 Feature Flags。
 
 // 私有模块
+mod comp;
 mod config;
 mod err;
 mod models;
 mod repository;
-mod comp;
 
 // 公共模块
 pub mod executors;
@@ -127,7 +127,11 @@ pub use config::JobConfig;
 pub use err::JobErr;
 pub use err::JobResult;
 
-pub use models::{InfrustJob, InfrustJobLog, AuditFields, SoftDelete, register_models, ExecutionStatus, JobStatus};
-pub use repository::JobRepository;
 pub use comp::JobPlugin;
-pub use executors::{JobExecutor, ExecutorType, InternalJobExecutor, ShellJobExecutor, PythonJobExecutor};
+pub use executors::{
+    ExecutorType, InternalJobExecutor, JobExecutor, PythonJobExecutor, ShellJobExecutor,
+};
+pub use models::{
+    AuditFields, ExecutionStatus, InfrustJob, InfrustJobLog, JobStatus, SoftDelete, register_models,
+};
+pub use repository::JobRepository;

@@ -1,5 +1,5 @@
 pub mod model;
 pub mod repository;
 
-pub use model::{SysOperateLog, SysLoginLog};
-pub use repository::{ToastyOperateLogRepository, ToastyLoginLogRepository};
+pub use model::{SysLoginLog, SysOperateLog};
+pub use repository::{ToastyLoginLogRepository, ToastyOperateLogRepository};

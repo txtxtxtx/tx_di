@@ -70,7 +70,13 @@ pub struct SipRegistrationStore {
 
 impl SipRegistrationStore {
     /// 记录注册成功
-    pub fn mark_success(&self, username: &str, registrar: &str, expires: u32, public: Option<&str>) {
+    pub fn mark_success(
+        &self,
+        username: &str,
+        registrar: &str,
+        expires: u32,
+        public: Option<&str>,
+    ) {
         let mut entry = self
             .regs
             .entry(username.to_string())
@@ -141,7 +147,14 @@ pub struct RegistrationHandle {
 
 impl RegistrationHandle {
     /// 创建句柄（不发起注册；需在 Endpoint 就绪后调用）
-    pub fn new(endpoint: EndpointInnerRef, registrar: &str, username: &str, password: &str, realm: Option<String>, expires: u32) -> Self {
+    pub fn new(
+        endpoint: EndpointInnerRef,
+        registrar: &str,
+        username: &str,
+        password: &str,
+        realm: Option<String>,
+        expires: u32,
+    ) -> Self {
         let registrar_uri = normalize_registrar(registrar);
         let credential = Credential {
             username: username.to_string(),
@@ -185,7 +198,11 @@ impl RegistrationHandle {
 
     /// 服务端确认的有效期
     pub fn expires(&self) -> u32 {
-        self.reg.try_lock().ok().map(|r| r.expires()).unwrap_or(self.expires)
+        self.reg
+            .try_lock()
+            .ok()
+            .map(|r| r.expires())
+            .unwrap_or(self.expires)
     }
 }
 
@@ -222,7 +239,12 @@ mod tests {
     #[test]
     fn store_mark_success_and_query() {
         let store = SipRegistrationStore::default();
-        store.mark_success("34020000001320000001", "sip:192.168.1.1:5060", 3600, Some("1.2.3.4:5060"));
+        store.mark_success(
+            "34020000001320000001",
+            "sip:192.168.1.1:5060",
+            3600,
+            Some("1.2.3.4:5060"),
+        );
         let r = store.get("34020000001320000001").expect("应查到");
         assert!(r.registered);
         assert_eq!(r.expires, 3600);
@@ -257,8 +279,14 @@ mod tests {
 
     #[test]
     fn normalize_registrar_variants() {
-        assert_eq!(normalize_registrar("192.168.1.1:5060"), "sip:192.168.1.1:5060");
-        assert_eq!(normalize_registrar("sip:192.168.1.1:5060"), "sip:192.168.1.1:5060");
+        assert_eq!(
+            normalize_registrar("192.168.1.1:5060"),
+            "sip:192.168.1.1:5060"
+        );
+        assert_eq!(
+            normalize_registrar("sip:192.168.1.1:5060"),
+            "sip:192.168.1.1:5060"
+        );
         assert_eq!(normalize_registrar("sips:x.com"), "sips:x.com");
     }
 }

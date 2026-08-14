@@ -1,9 +1,9 @@
 //! sa-token 配置组件
 
+use sa_token_plugin_axum::SaStorage;
 use serde::Deserialize;
 use std::sync::Arc;
 use tx_di_core::{Component, RIE, Store};
-use sa_token_plugin_axum::SaStorage;
 // MemoryStorage 始终可用：sa-token-storage-memory 为直接依赖，不依赖任何 feature。
 // 开启 redis feature 时内存存储仍作为兜底（如未配置 redis_url）。
 use sa_token_storage_memory::MemoryStorage;
@@ -161,7 +161,7 @@ impl SaTokenConf {
     ) -> RIE<sa_token_plugin_axum::SaTokenStateBuilder> {
         // 根据特性选择存储后端
         let storage = self.create_storage().await?;
-        
+
         let mut b = builder
             .storage(storage)
             .token_name(&self.token_name)
@@ -178,7 +178,7 @@ impl SaTokenConf {
 
         Ok(b)
     }
-    
+
     /// 创建存储后端
     ///
     /// 语义（内存始终兜底）：
@@ -193,14 +193,12 @@ impl SaTokenConf {
                 .or_else(|| std::env::var("REDIS_URL").ok());
             if let Some(url) = redis_url {
                 tracing::info!("使用 Redis 存储后端 (RedisStorage: {url})");
-                let storage = RedisStorage::new(&url, "sa-token:")
-                    .await
-                    .map_err(|e| {
-                        tx_di_core::AppError::with_context(
-                            tx_di_core::DiErr::InjectError,
-                            format!("Redis 存储连接失败 ({}): {}", url, e),
-                        )
-                    })?;
+                let storage = RedisStorage::new(&url, "sa-token:").await.map_err(|e| {
+                    tx_di_core::AppError::with_context(
+                        tx_di_core::DiErr::InjectError,
+                        format!("Redis 存储连接失败 ({}): {}", url, e),
+                    )
+                })?;
                 return Ok(Arc::new(storage));
             }
         }

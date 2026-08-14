@@ -134,10 +134,7 @@ impl MenuAppService {
     ///
     /// # 错误
     /// - 数据库查询异常
-    pub async fn get_menu_list(
-        &self,
-        request: ListMenusRequest,
-    ) -> AppResult<Vec<MenuResponse>> {
+    pub async fn get_menu_list(&self, request: ListMenusRequest) -> AppResult<Vec<MenuResponse>> {
         let query = MenuQuery {
             name: request.name,
             status: request.status,
@@ -161,10 +158,7 @@ impl MenuAppService {
     ///
     /// # 错误
     /// - 数据库查询异常
-    pub async fn get_menu_tree(
-        &self,
-        request: ListMenusRequest,
-    ) -> AppResult<Vec<MenuTreeNode>> {
+    pub async fn get_menu_tree(&self, request: ListMenusRequest) -> AppResult<Vec<MenuTreeNode>> {
         let query = MenuQuery {
             name: request.name,
             status: request.status,

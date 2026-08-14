@@ -1,7 +1,9 @@
 use admin_domain::role::model::aggregate::Role;
 
 // Re-export proto types directly (no hand-written DTOs)
-pub use admin_proto::{CreateRoleRequest, UpdateRoleRequest, AssignMenusRequest, ListRolesRequest, RoleResponse};
+pub use admin_proto::{
+    AssignMenusRequest, CreateRoleRequest, ListRolesRequest, RoleResponse, UpdateRoleRequest,
+};
 
 /// 将领域层的 Role 聚合根转换为 proto 的 RoleResponse
 pub fn role_to_response(role: Role) -> RoleResponse {

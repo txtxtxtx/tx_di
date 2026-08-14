@@ -1,10 +1,10 @@
-use std::sync::Arc;
-use tx_error::{AppError, AppResult};
 use crate::err::JobErr;
 use crate::models::{
     AuditFields, ExecutionStatus, InfrustJob, InfrustJobLog, JobStatus, SoftDelete,
 };
+use std::sync::Arc;
 use tx_di_toasty::ToastyPlugin;
+use tx_error::{AppError, AppResult};
 
 /// toasty::Error → AppError 辅助转换
 #[inline]
@@ -128,7 +128,10 @@ impl JobRepository {
     }
 
     /// 分页查询运行中的任务（id 倒序，排除已删除）
-    pub async fn get_running_jobs(&self, page: tx_common::Page<InfrustJob>) -> AppResult<Vec<InfrustJob>> {
+    pub async fn get_running_jobs(
+        &self,
+        page: tx_common::Page<InfrustJob>,
+    ) -> AppResult<Vec<InfrustJob>> {
         let mut db = self.tp.db().clone();
         let offset = page.offset() as usize;
 
@@ -190,7 +193,11 @@ impl JobRepository {
     }
 
     /// 分页查询任务的执行日志（id 倒序，全部在数据库层完成）
-    pub async fn get_job_logs(&self, job_id: u64, page: tx_common::page::Page<InfrustJobLog>) -> AppResult<Vec<InfrustJobLog>> {
+    pub async fn get_job_logs(
+        &self,
+        job_id: u64,
+        page: tx_common::page::Page<InfrustJobLog>,
+    ) -> AppResult<Vec<InfrustJobLog>> {
         let mut db = self.tp.db().clone();
         let offset = page.offset() as usize;
 
@@ -225,13 +232,18 @@ impl JobRepository {
                     .filter(InfrustJob::fields().soft_delete().eq(SoftDelete::NORMAL))
                     .order_by(InfrustJob::fields().id().desc());
                 if let Some(n) = name {
-                    q = q.filter(InfrustJob::fields().name().like_with_escape(
-                        format!("%{}%", tx_di_toasty::like_escape(n)),
-                        '\\',
-                    ));
+                    q = q.filter(
+                        InfrustJob::fields()
+                            .name()
+                            .like_with_escape(format!("%{}%", tx_di_toasty::like_escape(n)), '\\'),
+                    );
                 }
                 if let Some(st) = status {
-                    let s = if st == 0 { JobStatus::Paused } else { JobStatus::Running };
+                    let s = if st == 0 {
+                        JobStatus::Paused
+                    } else {
+                        JobStatus::Running
+                    };
                     q = q.filter(InfrustJob::fields().status().eq(s));
                 }
                 q
@@ -325,7 +337,11 @@ impl JobRepository {
                     q = q.filter(InfrustJobLog::fields().job_id().eq(jid));
                 }
                 if let Some(st) = status {
-                    let s = if st == 0 { ExecutionStatus::Failed } else { ExecutionStatus::Success };
+                    let s = if st == 0 {
+                        ExecutionStatus::Failed
+                    } else {
+                        ExecutionStatus::Success
+                    };
                     q = q.filter(InfrustJobLog::fields().status().eq(s));
                 }
                 q

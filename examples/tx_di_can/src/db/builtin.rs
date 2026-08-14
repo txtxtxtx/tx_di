@@ -3,8 +3,8 @@
 //! 内置通用汽车诊断描述集，供 ECU 仿真节点应答与前端描述展示共用。
 //! 用户可通过 `DescDb::load_json` / `DescDb::load_toml` 追加自定义描述。
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// 数据标识符（DID）元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -200,16 +200,66 @@ pub fn builtin_dtcs() -> HashMap<u32, DtcMeta> {
         );
     };
 
-    add(&mut m, 0x000101, "P0101 Mass Air Flow Circuit Range/Performance", Some("medium"));
-    add(&mut m, 0x000102, "P0102 Mass Air Flow Circuit Low", Some("medium"));
-    add(&mut m, 0x000300, "P0300 Random/Multiple Cylinder Misfire Detected", Some("high"));
-    add(&mut m, 0x000420, "P0420 Catalyst System Efficiency Below Threshold (Bank 1)", Some("high"));
-    add(&mut m, 0x000701, "P0701 Transmission Control System Range/Performance", Some("medium"));
-    add(&mut m, 0x00C021, "C0211 Wheel Speed Sensor Front Right Circuit", Some("high"));
-    add(&mut m, 0x00C024, "C0241 ABS Hydraulic Pump Motor Circuit", Some("high"));
-    add(&mut m, 0x008001, "B0001 Driver Frontal Stage 1 Deployment", Some("high"));
-    add(&mut m, 0x000420, "U0420 Lost Communication With Battery Energy Control Module", Some("medium"));
-    add(&mut m, 0x009001, "U0100 Lost Communication With ECM/PCM", Some("high"));
+    add(
+        &mut m,
+        0x000101,
+        "P0101 Mass Air Flow Circuit Range/Performance",
+        Some("medium"),
+    );
+    add(
+        &mut m,
+        0x000102,
+        "P0102 Mass Air Flow Circuit Low",
+        Some("medium"),
+    );
+    add(
+        &mut m,
+        0x000300,
+        "P0300 Random/Multiple Cylinder Misfire Detected",
+        Some("high"),
+    );
+    add(
+        &mut m,
+        0x000420,
+        "P0420 Catalyst System Efficiency Below Threshold (Bank 1)",
+        Some("high"),
+    );
+    add(
+        &mut m,
+        0x000701,
+        "P0701 Transmission Control System Range/Performance",
+        Some("medium"),
+    );
+    add(
+        &mut m,
+        0x00C021,
+        "C0211 Wheel Speed Sensor Front Right Circuit",
+        Some("high"),
+    );
+    add(
+        &mut m,
+        0x00C024,
+        "C0241 ABS Hydraulic Pump Motor Circuit",
+        Some("high"),
+    );
+    add(
+        &mut m,
+        0x008001,
+        "B0001 Driver Frontal Stage 1 Deployment",
+        Some("high"),
+    );
+    add(
+        &mut m,
+        0x000420,
+        "U0420 Lost Communication With Battery Energy Control Module",
+        Some("medium"),
+    );
+    add(
+        &mut m,
+        0x009001,
+        "U0100 Lost Communication With ECM/PCM",
+        Some("high"),
+    );
 
     m
 }

@@ -3,14 +3,14 @@
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
+use admin_proto::Empty;
+use admin_proto::admin::common::PageResponse;
 use admin_proto::admin::role::role_service_server::RoleService;
 use admin_proto::admin::role::{
     AddUsersToRoleRequest, AssignMenusRequest, CreateRoleRequest, DeleteRoleRequest,
-    GetRoleRequest, GetRoleUsersRequest, GetRoleUsersResponse, ListRolesRequest,
-    ListRolesResponse, RemoveUsersFromRoleRequest, RoleResponse, UpdateRoleRequest,
+    GetRoleRequest, GetRoleUsersRequest, GetRoleUsersResponse, ListRolesRequest, ListRolesResponse,
+    RemoveUsersFromRoleRequest, RoleResponse, UpdateRoleRequest,
 };
-use admin_proto::admin::common::PageResponse;
-use admin_proto::Empty;
 use tx_di_core::App;
 
 use super::auth_interceptor::{self, get_login_id};
@@ -32,7 +32,10 @@ impl RoleService for RoleGrpcService {
 
         let req = request.into_inner();
         let svc: Arc<admin_app::role::app_service::RoleAppService> = self.app.inject();
-        let r = svc.create_role(req, Some(login_id)).await.map_err(err::to_status)?;
+        let r = svc
+            .create_role(req, Some(login_id))
+            .await
+            .map_err(err::to_status)?;
         Ok(Response::new(r))
     }
 
@@ -45,7 +48,10 @@ impl RoleService for RoleGrpcService {
 
         let req = request.into_inner();
         let svc: Arc<admin_app::role::app_service::RoleAppService> = self.app.inject();
-        let r = svc.update_role(req, Some(login_id)).await.map_err(err::to_status)?;
+        let r = svc
+            .update_role(req, Some(login_id))
+            .await
+            .map_err(err::to_status)?;
         Ok(Response::new(r))
     }
 
@@ -106,7 +112,9 @@ impl RoleService for RoleGrpcService {
 
         let req = request.into_inner();
         let svc: Arc<admin_app::role::app_service::RoleAppService> = self.app.inject();
-        svc.assign_menus(req.role_id, req.menu_ids).await.map_err(err::to_status)?;
+        svc.assign_menus(req.role_id, req.menu_ids)
+            .await
+            .map_err(err::to_status)?;
         Ok(Response::new(Empty {}))
     }
 

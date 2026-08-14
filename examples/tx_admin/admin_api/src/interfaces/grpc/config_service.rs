@@ -3,13 +3,13 @@
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
+use admin_proto::Empty;
+use admin_proto::admin::common::PageResponse;
 use admin_proto::admin::config::config_service_server::ConfigService;
 use admin_proto::admin::config::{
     ConfigResponse, CreateConfigRequest, DeleteConfigRequest, GetByKeysRequest, GetByKeysResponse,
     GetConfigRequest, ListConfigsRequest, ListConfigsResponse, UpdateConfigRequest,
 };
-use admin_proto::admin::common::PageResponse;
-use admin_proto::Empty;
 use tx_di_core::App;
 
 use super::auth_interceptor::{self, get_login_id};
@@ -31,7 +31,10 @@ impl ConfigService for ConfigGrpcService {
 
         let req = request.into_inner();
         let svc: Arc<admin_app::config::app_service::ConfigAppService> = self.app.inject();
-        let r = svc.create_config(req, Some(login_id)).await.map_err(err::to_status)?;
+        let r = svc
+            .create_config(req, Some(login_id))
+            .await
+            .map_err(err::to_status)?;
         Ok(Response::new(r))
     }
 
@@ -44,7 +47,10 @@ impl ConfigService for ConfigGrpcService {
 
         let req = request.into_inner();
         let svc: Arc<admin_app::config::app_service::ConfigAppService> = self.app.inject();
-        let r = svc.update_config(req, Some(login_id)).await.map_err(err::to_status)?;
+        let r = svc
+            .update_config(req, Some(login_id))
+            .await
+            .map_err(err::to_status)?;
         Ok(Response::new(r))
     }
 
@@ -72,7 +78,10 @@ impl ConfigService for ConfigGrpcService {
 
         let req = request.into_inner();
         let svc: Arc<admin_app::config::app_service::ConfigAppService> = self.app.inject();
-        let r = svc.get_config(req.config_id).await.map_err(err::to_status)?;
+        let r = svc
+            .get_config(req.config_id)
+            .await
+            .map_err(err::to_status)?;
         Ok(Response::new(r))
     }
 
@@ -105,10 +114,7 @@ impl ConfigService for ConfigGrpcService {
 
         let req = request.into_inner();
         let svc: Arc<admin_app::config::app_service::ConfigAppService> = self.app.inject();
-        let configs = svc
-            .get_by_keys(req.keys)
-            .await
-            .map_err(err::to_status)?;
+        let configs = svc.get_by_keys(req.keys).await.map_err(err::to_status)?;
         Ok(Response::new(GetByKeysResponse { configs }))
     }
 }

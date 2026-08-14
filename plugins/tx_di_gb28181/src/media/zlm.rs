@@ -14,9 +14,9 @@ use super::{
     MediaBackend, MediaStreamInfo, OpenRtpRequest, PlayUrls, RtpServerHandle, StreamProxyHandle,
 };
 use crate::err::GbErr;
-use tx_di_core::AppError as IE;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
+use tx_di_core::AppError as IE;
 use tx_di_core::RIE;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -196,13 +196,12 @@ impl ZlmClient {
     }
 
     /// 查询媒体流列表
-    pub async fn get_media_list(
-        &self,
-        app: &str,
-        stream: &str,
-    ) -> anyhow::Result<Vec<MediaInfo>> {
+    pub async fn get_media_list(&self, app: &str, stream: &str) -> anyhow::Result<Vec<MediaInfo>> {
         let val = self
-            .get_raw("/index/api/getMediaList", &[("app", app), ("stream", stream)])
+            .get_raw(
+                "/index/api/getMediaList",
+                &[("app", app), ("stream", stream)],
+            )
             .await?;
 
         let arr = val
@@ -430,10 +429,7 @@ impl MediaBackend for ZlmBackend {
                 "webrtc://{}:{}/index/api/webrtc?app=rtp&stream={}",
                 host, http_port, stream_id
             ),
-            flv: format!(
-                "http://{}:{}/rtp/{}.live.flv",
-                host, http_port, stream_id
-            ),
+            flv: format!("http://{}:{}/rtp/{}.live.flv", host, http_port, stream_id),
             flv_https: String::new(),
         };
 
@@ -468,11 +464,7 @@ impl MediaBackend for ZlmBackend {
             .collect())
     }
 
-    async fn add_stream_proxy(
-        &self,
-        stream_id: &str,
-        source_url: &str,
-    ) -> RIE<StreamProxyHandle> {
+    async fn add_stream_proxy(&self, stream_id: &str, source_url: &str) -> RIE<StreamProxyHandle> {
         let key = self
             .client
             .add_stream_proxy("rtp", stream_id, source_url)
@@ -497,9 +489,7 @@ impl MediaBackend for ZlmBackend {
             .get_media_list("", "")
             .await
             .map(|_| ())
-            .map_err(|_| {
-                IE::from(GbErr::MediaApiRequestFailed)
-            })
+            .map_err(|_| IE::from(GbErr::MediaApiRequestFailed))
     }
 }
 

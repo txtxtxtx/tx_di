@@ -4,16 +4,16 @@
 
 #[cfg(test)]
 mod config_service_tests {
-    use std::sync::Arc;
-    use async_trait::async_trait;
-    use tx_common::page::Page;
-    use tx_error::AppResult;
     use crate::config::model::aggregate::Config;
     use crate::config::model::value_object::ConfigQuery;
     use crate::config::repository::ConfigRepository;
     use crate::config::service::ConfigService;
     use crate::shared::model::AuditFields;
+    use async_trait::async_trait;
     use pretty_assertions::assert_eq;
+    use std::sync::Arc;
+    use tx_common::page::Page;
+    use tx_error::AppResult;
 
     // ----------------------------------------------------------
     // TestConfigRepo: function-closure based mock
@@ -23,7 +23,8 @@ mod config_service_tests {
         find_by_id_fn: Box<dyn Fn(u64) -> AppResult<Option<Config>> + Send + Sync>,
         find_by_key_fn: Box<dyn Fn(&str) -> AppResult<Option<Config>> + Send + Sync>,
         find_by_keys_fn: Box<dyn Fn(&[String]) -> AppResult<Vec<Config>> + Send + Sync>,
-        find_page_fn: Box<dyn Fn(&ConfigQuery, Page<Config>) -> AppResult<Page<Config>> + Send + Sync>,
+        find_page_fn:
+            Box<dyn Fn(&ConfigQuery, Page<Config>) -> AppResult<Page<Config>> + Send + Sync>,
         find_all_fn: Box<dyn Fn(&ConfigQuery) -> AppResult<Vec<Config>> + Send + Sync>,
         insert_fn: Box<dyn Fn(&Config) -> AppResult<()> + Send + Sync>,
         update_fn: Box<dyn Fn(&Config) -> AppResult<()> + Send + Sync>,
@@ -56,7 +57,11 @@ mod config_service_tests {
         async fn find_by_keys(&self, keys: &[String]) -> AppResult<Vec<Config>> {
             (self.find_by_keys_fn)(keys)
         }
-        async fn find_page(&self, query: &ConfigQuery, page: Page<Config>) -> AppResult<Page<Config>> {
+        async fn find_page(
+            &self,
+            query: &ConfigQuery,
+            page: Page<Config>,
+        ) -> AppResult<Page<Config>> {
             (self.find_page_fn)(query, page)
         }
         async fn find_all(&self, query: &ConfigQuery) -> AppResult<Vec<Config>> {
@@ -105,14 +110,16 @@ mod config_service_tests {
         repo.insert_fn = Box::new(|_| Ok(()));
 
         let svc = ConfigService::new(Arc::new(repo));
-        let result = svc.create_config(
-            "system".into(),
-            1,
-            "Site Name".into(),
-            "site.name".into(),
-            "My App".into(),
-            Some("admin".into()),
-        ).await;
+        let result = svc
+            .create_config(
+                "system".into(),
+                1,
+                "Site Name".into(),
+                "site.name".into(),
+                "My App".into(),
+                Some("admin".into()),
+            )
+            .await;
         assert!(result.is_ok());
         let config = result.unwrap();
         assert_eq!(config.name, "Site Name");
@@ -126,14 +133,16 @@ mod config_service_tests {
         repo.exists_by_key_fn = Box::new(|_| Ok(true));
 
         let svc = ConfigService::new(Arc::new(repo));
-        let result = svc.create_config(
-            "system".into(),
-            1,
-            "Dup".into(),
-            "site.name".into(),
-            "val".into(),
-            None,
-        ).await;
+        let result = svc
+            .create_config(
+                "system".into(),
+                1,
+                "Dup".into(),
+                "site.name".into(),
+                "val".into(),
+                None,
+            )
+            .await;
         assert!(result.is_err());
     }
 
@@ -149,17 +158,19 @@ mod config_service_tests {
         repo.update_fn = Box::new(|_| Ok(()));
 
         let svc = ConfigService::new(Arc::new(repo));
-        let result = svc.update_config(
-            1,
-            "system".into(),
-            1,
-            "Site Name Updated".into(),
-            "site.name".into(),
-            "New Value".into(),
-            1,
-            Some("updated remark".into()),
-            Some("admin".into()),
-        ).await;
+        let result = svc
+            .update_config(
+                1,
+                "system".into(),
+                1,
+                "Site Name Updated".into(),
+                "site.name".into(),
+                "New Value".into(),
+                1,
+                Some("updated remark".into()),
+                Some("admin".into()),
+            )
+            .await;
         assert!(result.is_ok());
         let config = result.unwrap();
         assert_eq!(config.name, "Site Name Updated");
@@ -172,17 +183,19 @@ mod config_service_tests {
         repo.find_by_id_fn = Box::new(|_| Ok(None));
 
         let svc = ConfigService::new(Arc::new(repo));
-        let result = svc.update_config(
-            999,
-            "system".into(),
-            1,
-            "X".into(),
-            "x".into(),
-            "v".into(),
-            1,
-            None,
-            None,
-        ).await;
+        let result = svc
+            .update_config(
+                999,
+                "system".into(),
+                1,
+                "X".into(),
+                "x".into(),
+                "v".into(),
+                1,
+                None,
+                None,
+            )
+            .await;
         assert!(result.is_err());
     }
 
@@ -217,9 +230,7 @@ mod config_service_tests {
     async fn test_get_config_page_success() {
         let mut repo = TestConfigRepo::new();
         let configs = vec![make_config()];
-        repo.find_page_fn = Box::new(move |_, _| {
-            Ok(Page::new(configs.clone(), 1, 10, 1))
-        });
+        repo.find_page_fn = Box::new(move |_, _| Ok(Page::new(configs.clone(), 1, 10, 1)));
 
         let svc = ConfigService::new(Arc::new(repo));
         let query = ConfigQuery::default();

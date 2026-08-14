@@ -147,7 +147,6 @@ impl Default for GbDevice {
             version: GbVersion::default(),
         }
     }
-
 }
 
 impl GbDevice {
@@ -295,7 +294,7 @@ impl GbDevice {
             ..Default::default()
         }
     }
-    
+
     // ==================== 2022 版 CatalogItem 转换 ====================
 
     /// 从 2022 版 [`ItemType`] 构建
@@ -340,8 +339,14 @@ mod tests {
 
     #[test]
     fn status_type_from_str() {
-        assert_eq!(StatusType::try_from("ON".to_string()).unwrap(), StatusType::ON);
-        assert_eq!(StatusType::try_from("OFF".to_string()).unwrap(), StatusType::OFF);
+        assert_eq!(
+            StatusType::try_from("ON".to_string()).unwrap(),
+            StatusType::ON
+        );
+        assert_eq!(
+            StatusType::try_from("OFF".to_string()).unwrap(),
+            StatusType::OFF
+        );
         assert!(StatusType::try_from("Unknown".to_string()).is_err());
     }
 
@@ -350,7 +355,7 @@ mod tests {
         assert_eq!(StatusType::ON.as_str(), "ON");
         assert_eq!(StatusType::OFF.as_str(), "OFF");
     }
-    
+
     // ── GbDeviceType ───────────────────────────────────────────────────────────
 
     #[test]
@@ -388,7 +393,10 @@ mod tests {
     fn gb_device_new_device() {
         let dev = GbDevice::new_device("34020000001320000001", "TestDevice");
         assert_eq!(dev.device_type, GbDeviceType::Device);
-        assert_eq!(dev.item.device_id, DeviceIDType::Len20("34020000001320000001".into()));
+        assert_eq!(
+            dev.item.device_id,
+            DeviceIDType::Len20("34020000001320000001".into())
+        );
         assert_eq!(dev.item.name, "TestDevice");
         assert_eq!(dev.item.parental, 1);
         assert!(dev.is_parent());
@@ -411,7 +419,7 @@ mod tests {
         assert_eq!(area.item.device_id, DeviceIDType::Len20("330100".into()));
         assert!(area.is_parent());
     }
-    
+
     // ── 2022 ItemType <-> GbDevice 往返 ────────────────────────────────────
 
     #[test]
@@ -441,7 +449,10 @@ mod tests {
 
         // ItemType (parental=0) -> GbDevice
         let gb = GbDevice::from_item_type(&original);
-        assert_eq!(gb.item.device_id, DeviceIDType::Len20("34020000001320000001".into()));
+        assert_eq!(
+            gb.item.device_id,
+            DeviceIDType::Len20("34020000001320000001".into())
+        );
         assert_eq!(gb.device_type, GbDeviceType::SubDevice);
         assert_eq!(gb.item.parent_id, "34020000001320000000");
         assert_eq!(gb.item.parental, 0);
@@ -450,7 +461,10 @@ mod tests {
 
         // GbDevice -> ItemType
         let back = gb.to_item_type();
-        assert_eq!(back.device_id, DeviceIDType::Len20("34020000001320000001".into()));
+        assert_eq!(
+            back.device_id,
+            DeviceIDType::Len20("34020000001320000001".into())
+        );
         assert_eq!(back.name, "Camera-01");
         assert_eq!(back.manufacturer, "Hikvision");
         assert_eq!(back.status, StatusType::ON);

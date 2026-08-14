@@ -1,6 +1,6 @@
 use toasty::Model;
 
-use crate::common::{Status, Deleted};
+use crate::common::{Deleted, Status};
 
 /// 系统菜单表
 #[derive(Debug, Clone, Model)]

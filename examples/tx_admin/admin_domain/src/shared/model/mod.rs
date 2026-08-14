@@ -1,9 +1,9 @@
 pub mod value_object;
 
-use jiff::Timestamp;
-use serde::{Deserialize, Serialize};
 use crate::shared::model::value_object::DeletedStatus;
 use crate::user::model::value_object::UserStatus;
+use jiff::Timestamp;
+use serde::{Deserialize, Serialize};
 
 /// Base trait for all entities
 pub trait Entity {
@@ -93,8 +93,8 @@ impl AuditFields {
         self.deleted == DeletedStatus::Deleted
     }
 
-    pub fn delete(&mut self,updater: Option<String>) {
-    // 将deleted字段设置为DeletedStatus::Deleted，表示对象已被删除
+    pub fn delete(&mut self, updater: Option<String>) {
+        // 将deleted字段设置为DeletedStatus::Deleted，表示对象已被删除
         self.deleted = DeletedStatus::Deleted;
         self.updater = updater;
         self.update_time = Timestamp::now();

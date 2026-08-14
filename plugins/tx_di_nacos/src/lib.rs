@@ -46,13 +46,13 @@ pub mod endpoints;
 pub mod model;
 pub mod traits;
 
-mod nacos;
 mod app_loop;
+mod nacos;
 
 pub use bootstrap::{load_bootstrap, load_local_toml};
 pub use client::NacosClient;
 pub use config::RegistryConfig;
 pub use dynamic_config::DynamicConfig;
-pub use endpoints::{register_endpoints, take_endpoints, EndpointProvider};
+pub use endpoints::{EndpointProvider, register_endpoints, take_endpoints};
 pub use model::{Protocol, ServiceEndpoint, ServiceInstance};
 pub use traits::{ConfigCenter, ServiceRegistry};

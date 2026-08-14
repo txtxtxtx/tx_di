@@ -20,10 +20,10 @@ use std::time::Instant;
 use tracing::{debug, info, warn};
 use tx_di_core::{Component, DepsTuple, RIE};
 
+use crate::SipPlugin;
 use crate::dialog::{DialogKey, InDialogTable};
 use crate::err::SipErr;
 use crate::sip_tx::SipTx;
-use crate::SipPlugin;
 
 /// UAS 邀请会话：业务侧通过 [`SipUasManager`] 获取/控制
 #[derive(Clone)]
@@ -83,7 +83,10 @@ impl SipUasManager {
         let (state_tx, state_rx) = dialog_layer.new_dialog_state_channel();
 
         // 取出真实 Transaction（此后不可再通过 SipTx 回复，由 dialog 接管）
-        let mut transaction = tx.take_transaction().await.ok_or(SipErr::TransactionMissing)?;
+        let mut transaction = tx
+            .take_transaction()
+            .await
+            .ok_or(SipErr::TransactionMissing)?;
 
         // 半对话键 → 完整键（生成 to-tag 后）
         let half_key = DialogKey::from_request(&transaction.original).ok_or(SipErr::InvalidUri)?;
@@ -206,7 +209,10 @@ impl SipUasManager {
 
         if let Some(session) = self.sessions.lookup(&key) {
             let dialog_layer = self.sip.dialog_layer();
-            let mut transaction = tx.take_transaction().await.ok_or(SipErr::TransactionMissing)?;
+            let mut transaction = tx
+                .take_transaction()
+                .await
+                .ok_or(SipErr::TransactionMissing)?;
 
             // 让 dialog 状态机处理 BYE（内部回复 200 OK + 转 Terminated）
             let mut dlg = session.dialog.clone();

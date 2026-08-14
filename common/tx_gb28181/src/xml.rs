@@ -17,9 +17,9 @@
 //! - Broadcast       — 广播通知
 //! - ConfigDownload  — 配置下载
 
+use crate::enums::{DeviceIDType, ItemType, StatusType};
 use quick_xml::Reader;
 use quick_xml::events::Event;
-use crate::enums::{DeviceIDType, ItemType, StatusType};
 // ── 解析工具 ──────────────────────────────────────────────────────────────────
 
 /// 从 GB28181 XML 中提取指定字段值（使用 quick-xml）
@@ -627,19 +627,47 @@ pub fn decode_ptz_cmd(hex: &str) -> Option<PtzCommand> {
     let v1 = bytes[5];
     let v2 = bytes[6];
     let v3 = bytes[7];
-    let pan = PtzSpeed { pan: v1, tilt: 0, zoom: 0 };
-    let tilt = PtzSpeed { pan: 0, tilt: v2, zoom: 0 };
-    let zoom = PtzSpeed { pan: 0, tilt: 0, zoom: v3 & 0x0F };
+    let pan = PtzSpeed {
+        pan: v1,
+        tilt: 0,
+        zoom: 0,
+    };
+    let tilt = PtzSpeed {
+        pan: 0,
+        tilt: v2,
+        zoom: 0,
+    };
+    let zoom = PtzSpeed {
+        pan: 0,
+        tilt: 0,
+        zoom: v3 & 0x0F,
+    };
     Some(match hh {
         0x00 => PtzCommand::Stop,
         0x01 => PtzCommand::Right(pan),
         0x02 => PtzCommand::Left(pan),
         0x04 => PtzCommand::Down(tilt),
         0x08 => PtzCommand::Up(tilt),
-        0x05 => PtzCommand::RightDown(PtzSpeed { pan: v1, tilt: v2, zoom: 0 }),
-        0x09 => PtzCommand::RightUp(PtzSpeed { pan: v1, tilt: v2, zoom: 0 }),
-        0x06 => PtzCommand::LeftDown(PtzSpeed { pan: v1, tilt: v2, zoom: 0 }),
-        0x0A => PtzCommand::LeftUp(PtzSpeed { pan: v1, tilt: v2, zoom: 0 }),
+        0x05 => PtzCommand::RightDown(PtzSpeed {
+            pan: v1,
+            tilt: v2,
+            zoom: 0,
+        }),
+        0x09 => PtzCommand::RightUp(PtzSpeed {
+            pan: v1,
+            tilt: v2,
+            zoom: 0,
+        }),
+        0x06 => PtzCommand::LeftDown(PtzSpeed {
+            pan: v1,
+            tilt: v2,
+            zoom: 0,
+        }),
+        0x0A => PtzCommand::LeftUp(PtzSpeed {
+            pan: v1,
+            tilt: v2,
+            zoom: 0,
+        }),
         0x10 => PtzCommand::ZoomIn(zoom),
         0x20 => PtzCommand::ZoomOut(zoom),
         0x40 => match v3 {
@@ -2572,11 +2600,7 @@ impl std::fmt::Display for AlarmType {
 ///
 /// GB28181-2022 A.2.4.5：平台主动查询设备位置
 /// `interval` 为 `None` 时表示仅查一次，`Some(secs)` 时表示设备按间隔持续上报
-pub fn build_mobile_position_query_xml(
-    device_id: &str,
-    sn: u32,
-    interval: Option<u32>,
-) -> String {
+pub fn build_mobile_position_query_xml(device_id: &str, sn: u32, interval: Option<u32>) -> String {
     let interval_str = interval
         .map(|i| format!("\r\n<Interval>{}</Interval>", i))
         .unwrap_or_default();
@@ -2763,14 +2787,22 @@ mod tests {
 
     #[test]
     fn test_decode_ptz_cmd_roundtrip() {
-        let encoded = encode_ptz_cmd(&PtzCommand::Right(PtzSpeed { pan: 50, tilt: 0, zoom: 0 }));
+        let encoded = encode_ptz_cmd(&PtzCommand::Right(PtzSpeed {
+            pan: 50,
+            tilt: 0,
+            zoom: 0,
+        }));
         let decoded = decode_ptz_cmd(&encoded).expect("应可解码");
         assert_eq!(encode_ptz_cmd(&decoded), encoded);
     }
 
     #[test]
     fn test_parse_ptz_control_xml() {
-        let encoded = encode_ptz_cmd(&PtzCommand::Left(PtzSpeed { pan: 10, tilt: 0, zoom: 0 }));
+        let encoded = encode_ptz_cmd(&PtzCommand::Left(PtzSpeed {
+            pan: 10,
+            tilt: 0,
+            zoom: 0,
+        }));
         let xml = format!(
             "<Control><CmdType>DeviceControl</CmdType><DeviceID>ch9</DeviceID><PTZCmd>{}</PTZCmd></Control>",
             encoded

@@ -1,9 +1,7 @@
-
-
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Page<T>{
+pub struct Page<T> {
     #[serde(default)]
     pub list: Vec<T>,
     #[serde(default = "default_page")]
@@ -14,9 +12,13 @@ pub struct Page<T>{
     pub total: i64,
 }
 
-fn default_page() -> i64 { 1 }
-fn default_size() -> i64 { 10 }
-impl <T> Page<T> {
+fn default_page() -> i64 {
+    1
+}
+fn default_size() -> i64 {
+    10
+}
+impl<T> Page<T> {
     /// 构造完整的分页结果
     pub fn new(list: Vec<T>, page: i64, size: i64, total: i64) -> Self {
         Self {
@@ -59,7 +61,9 @@ impl <T> Page<T> {
 
     /// 总页数
     pub fn total_pages(&self) -> i64 {
-        if self.total == 0 { return 0; }
+        if self.total == 0 {
+            return 0;
+        }
         (self.total + self.size - 1) / self.size
     }
 
