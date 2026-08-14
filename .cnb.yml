@@ -41,10 +41,14 @@
       script: cargo test -p admin_domain
     - name: test-app
       # 集成测试串行（共享全局状态）
-      script: cargo test -p admin_app -- --test-threads=1
+      script: |
+        apt-get update && apt-get install -y --no-install-recommends libssl-dev pkg-config
+        cargo test -p admin_app -- --test-threads=1
     - name: test-api
       # 接口层 E2E（含 gRPC 自动化回归 + admin_proto DTO 序列化）
-      script: cargo test -p admin_api
+      script: |
+        apt-get update && apt-get install -y --no-install-recommends libssl-dev pkg-config
+        cargo test -p admin_api
   failStages:
     - name: notify-fail
       script: |
@@ -113,9 +117,13 @@ main:
         - name: test-domain
           script: cargo test -p admin_domain
         - name: test-app
-          script: cargo test -p admin_app -- --test-threads=1
+          script: |
+            apt-get update && apt-get install -y --no-install-recommends libssl-dev pkg-config
+            cargo test -p admin_app -- --test-threads=1
         - name: test-api
-          script: cargo test -p admin_api
+          script: |
+            apt-get update && apt-get install -y --no-install-recommends libssl-dev pkg-config
+            cargo test -p admin_api
         - name: build-image
           # 构建并推送 tx_admin Docker 镜像到 CNB 制品库（Tag 版本）
           # services: docker 已内置对 CNB 制品库的认证，无需显式 docker login
