@@ -8,15 +8,18 @@
 
 mod common;
 
-use common::{authed_client, login, server};
+use common::{authed_client, http_client, login, server};
 use serde_json::Value;
 
 #[tokio::test]
 async fn health_endpoints_ok() {
     let srv = server().await;
+    let client = http_client();
 
     // /health/live：存活探针
-    let resp = reqwest::get(format!("{}/health/live", srv.base_url))
+    let resp = client
+        .get(format!("{}/health/live", srv.base_url))
+        .send()
         .await
         .expect("health/live 请求失败");
     assert_eq!(resp.status(), 200, "health/live 状态码错误");
@@ -24,7 +27,9 @@ async fn health_endpoints_ok() {
     assert_eq!(body["status"], "alive", "health/live 响应错误: {body}");
 
     // /health/ready：就绪探针（校验数据库）
-    let resp = reqwest::get(format!("{}/health/ready", srv.base_url))
+    let resp = client
+        .get(format!("{}/health/ready", srv.base_url))
+        .send()
         .await
         .expect("health/ready 请求失败");
     assert_eq!(resp.status(), 200, "health/ready 状态码错误");
@@ -32,7 +37,9 @@ async fn health_endpoints_ok() {
     assert_eq!(body["db"], "ok", "health/ready 数据库未就绪: {body}");
 
     // /health：综合健康信息
-    let resp = reqwest::get(format!("{}/health", srv.base_url))
+    let resp = client
+        .get(format!("{}/health", srv.base_url))
+        .send()
         .await
         .expect("health 请求失败");
     assert_eq!(resp.status(), 200, "health 状态码错误");
@@ -43,7 +50,7 @@ async fn health_endpoints_ok() {
 #[tokio::test]
 async fn login_success_returns_token() {
     let srv = server().await;
-    let client = reqwest::Client::new();
+    let client = http_client();
     let token = login(&client, &srv.base_url).await.expect("登录失败");
     assert!(!token.is_empty(), "登录返回的 token 为空");
 }
@@ -51,7 +58,10 @@ async fn login_success_returns_token() {
 #[tokio::test]
 async fn protected_api_requires_token() {
     let srv = server().await;
-    let resp = reqwest::get(format!("{}/api/v1/auth/user_info", srv.base_url))
+    let client = http_client();
+    let resp = client
+        .get(format!("{}/api/v1/auth/user_info", srv.base_url))
+        .send()
         .await
         .expect("请求失败");
     assert_eq!(resp.status(), 401, "未登录访问受保护接口应返回 401");
@@ -60,7 +70,7 @@ async fn protected_api_requires_token() {
 #[tokio::test]
 async fn protected_api_with_token_ok() {
     let srv = server().await;
-    let client = reqwest::Client::new();
+    let client = http_client();
     let token = login(&client, &srv.base_url).await.expect("登录失败");
     let authed = authed_client(&token);
     let resp = authed
