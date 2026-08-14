@@ -19,11 +19,11 @@
   docker:
     image: rust:1.97-slim
     volumes:
-      # rw(串行) 模式下，PR/main/tag 多个并发构建共享同一命名卷会发生写冲突
-      # (cargo registry Permission denied)。改用默认 cow(并发) 模式，
-      # 各构建 copy-on-write 独立写入、成功后合并，避免并发冲突。
-      - cargo-registry:/usr/local/cargo/registry
-      - target-cache:/workspace/target
+      # 数据卷使用纯绝对路径，缺省 type 为 copy-on-write(cow) 并发模式：
+      # 各构建 copy-on-write 独立写入、成功后合并，避免并发冲突
+      # （rw 串行模式在多并发构建下会因共享写入而 Permission denied）。
+      - /usr/local/cargo/registry
+      - /workspace/target
 
 .regression-stages: &regression-stages
   stages:
