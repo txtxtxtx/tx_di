@@ -18,44 +18,43 @@
     cpus: 8
   docker:
     image: rust:1.97-slim
-    # CARGO_HOME 指向工作区内 target-cache 数据卷，规避共享 cargo-registry 命名卷
-    # 在 /usr/local/cargo/registry 上的属主/权限不一致导致的 Permission denied(13)。
+    # CARGO_HOME 指向 /tmp（容器内可写文件系统），规避共享持久卷跨 runner
+    # 复用时属主/权限不一致导致的 Permission denied(13)。
     volumes:
       - target-cache:/workspace/target:rw
   env:
-    CARGO_HOME: /workspace/target/cargo-home
+    CARGO_HOME: /tmp/cargo-home
 
 .regression-stages: &regression-stages
   stages:
     - name: fmt
       script: |
         rustup component add rustfmt
-        mkdir -p "$CARGO_HOME" && chmod -R a+rwX "$CARGO_HOME" 2>/dev/null || true
+        mkdir -p "$CARGO_HOME"
         cargo fmt --check
     - name: clippy
       script: |
         rustup component add clippy
-        # 确保 CARGO_HOME（位于 target-cache 持久卷）可写，规避历史卷属主不一致的 Permission denied
-        mkdir -p "$CARGO_HOME" && chmod -R a+rwX "$CARGO_HOME" 2>/dev/null || true
+        mkdir -p "$CARGO_HOME"
         cargo clippy -p tx-di-core -p tx-di-macros -p admin_domain -p admin_app -p admin_api -- -D warnings
     - name: test-core
       # 框架层核心测试（串行，避免全局状态竞态）
       script: |
-        mkdir -p "$CARGO_HOME" && chmod -R a+rwX "$CARGO_HOME" 2>/dev/null || true
+        mkdir -p "$CARGO_HOME"
         cargo test -p tx-di-core -- --test-threads=1
     - name: test-domain
       script: |
-        mkdir -p "$CARGO_HOME" && chmod -R a+rwX "$CARGO_HOME" 2>/dev/null || true
+        mkdir -p "$CARGO_HOME"
         cargo test -p admin_domain
     - name: test-app
       # 集成测试串行（共享全局状态）
       script: |
-        mkdir -p "$CARGO_HOME" && chmod -R a+rwX "$CARGO_HOME" 2>/dev/null || true
+        mkdir -p "$CARGO_HOME"
         cargo test -p admin_app -- --test-threads=1
     - name: test-api
       # 接口层 E2E（含 gRPC 自动化回归 + admin_proto DTO 序列化）
       script: |
-        mkdir -p "$CARGO_HOME" && chmod -R a+rwX "$CARGO_HOME" 2>/dev/null || true
+        mkdir -p "$CARGO_HOME"
         # admin_api 依赖 openssl-sys，需安装 OpenSSL 开发库
         apt-get update -qq && apt-get install -y -qq --no-install-recommends libssl-dev pkg-config protobuf-compiler
         cargo test -p admin_api
@@ -115,28 +114,28 @@ main:
         - name: fmt
           script: |
             rustup component add rustfmt
-            mkdir -p "$CARGO_HOME" && chmod -R a+rwX "$CARGO_HOME" 2>/dev/null || true
+            mkdir -p "$CARGO_HOME"
             cargo fmt --check
         - name: clippy
           script: |
             rustup component add clippy
-            mkdir -p "$CARGO_HOME" && chmod -R a+rwX "$CARGO_HOME" 2>/dev/null || true
+            mkdir -p "$CARGO_HOME"
             cargo clippy -p tx-di-core -p tx-di-macros -p admin_domain -p admin_app -p admin_api -- -D warnings
         - name: test-core
           script: |
-            mkdir -p "$CARGO_HOME" && chmod -R a+rwX "$CARGO_HOME" 2>/dev/null || true
+            mkdir -p "$CARGO_HOME"
             cargo test -p tx-di-core -- --test-threads=1
         - name: test-domain
           script: |
-            mkdir -p "$CARGO_HOME" && chmod -R a+rwX "$CARGO_HOME" 2>/dev/null || true
+            mkdir -p "$CARGO_HOME"
             cargo test -p admin_domain
         - name: test-app
           script: |
-            mkdir -p "$CARGO_HOME" && chmod -R a+rwX "$CARGO_HOME" 2>/dev/null || true
+            mkdir -p "$CARGO_HOME"
             cargo test -p admin_app -- --test-threads=1
         - name: test-api
           script: |
-            mkdir -p "$CARGO_HOME" && chmod -R a+rwX "$CARGO_HOME" 2>/dev/null || true
+            mkdir -p "$CARGO_HOME"
             # admin_api 依赖 openssl-sys，需安装 OpenSSL 开发库
             apt-get update -qq && apt-get install -y -qq --no-install-recommends libssl-dev pkg-config protobuf-compiler
             cargo test -p admin_api
