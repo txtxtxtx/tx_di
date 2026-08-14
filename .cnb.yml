@@ -58,10 +58,13 @@
         cargo test -p admin_app -- --test-threads=1
     - name: test-api
       # 接口层 E2E（含 gRPC 自动化回归 + admin_proto DTO 序列化）
+      # 串行执行：E2E 测试共享进程级全局状态（ROUTER_REGISTRY / LAYER_REGISTRY /
+      # sa-token / GRPC_PORT 环境变量）并启动常驻 App，并行会触发多实例竞争与
+      # 端口/env 竞态，导致服务器无法就绪。详见 docs/10-测试说明书.md 与 CODEBUDDY.md。
       script: |
         export CARGO_HOME=/workspace/.cargo-home
         mkdir -p "$CARGO_HOME"
-        cargo test -p admin_api
+        cargo test -p admin_api -- --test-threads=1
   failStages:
     - name: notify-fail
       script: |
@@ -144,7 +147,7 @@ main:
           script: |
             export CARGO_HOME=/workspace/.cargo-home
             mkdir -p "$CARGO_HOME"
-            cargo test -p admin_api
+            cargo test -p admin_api -- --test-threads=1
         - name: build-image
           # 构建并推送 tx_admin Docker 镜像到 CNB 制品库（Tag 版本）
           # services: docker 已内置对 CNB 制品库的认证，无需显式 docker login
