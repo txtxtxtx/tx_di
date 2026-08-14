@@ -69,18 +69,14 @@ pub enum FilePluginErr {
 pub fn map_opendal_error(e: opendal::Error, path: impl Into<String>) -> AppError {
     let path = path.into();
     match e.kind() {
-        opendal::ErrorKind::NotFound => {
-            AppError::with_context(FileStorageErr::NotFound, path)
-        }
+        opendal::ErrorKind::NotFound => AppError::with_context(FileStorageErr::NotFound, path),
         opendal::ErrorKind::AlreadyExists => {
             AppError::with_context(FileStorageErr::AlreadyExists, path)
         }
         opendal::ErrorKind::PermissionDenied => {
             AppError::from(std::io::Error::new(std::io::ErrorKind::PermissionDenied, e))
         }
-        opendal::ErrorKind::Unsupported => {
-            AppError::from_anyhow(anyhow::anyhow!(e))
-        }
+        opendal::ErrorKind::Unsupported => AppError::from_anyhow(anyhow::anyhow!(e)),
         _ => {
             let msg = e.to_string();
             if msg.contains("not found") || msg.contains("NotFound") {

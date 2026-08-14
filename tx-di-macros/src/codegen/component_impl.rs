@@ -9,10 +9,10 @@ use quote::quote;
 use syn::Type;
 
 use crate::classify::fields::FieldKind;
+use crate::codegen::CodeGenContext;
 use crate::codegen::inner_init::gen_inner_init;
 use crate::codegen::intercept;
-use crate::codegen::lifecycle::{gen_lifecycle_overrides, LifecycleOverrides};
-use crate::codegen::CodeGenContext;
+use crate::codegen::lifecycle::{LifecycleOverrides, gen_lifecycle_overrides};
 use crate::type_utils::strip_arc_type;
 
 /// 生成 `impl ::tx_di_core::Component for #struct_name { ... }`
@@ -22,11 +22,7 @@ pub fn gen_component_impl(ctx: &CodeGenContext) -> TokenStream2 {
     let is_config_component = ctx.comp_attr.is_config_component();
 
     // ── Deps 元组类型 ────────────────────────────────────────────────
-    let dep_types: Vec<&Type> = ctx
-        .inject_fields
-        .iter()
-        .map(|(_, ty)| ty)
-        .collect();
+    let dep_types: Vec<&Type> = ctx.inject_fields.iter().map(|(_, ty)| ty).collect();
     let dep_count = dep_types.len();
 
     let deps_type = if dep_count == 0 {
@@ -149,4 +145,3 @@ pub fn gen_component_impl(ctx: &CodeGenContext) -> TokenStream2 {
         }
     }
 }
-

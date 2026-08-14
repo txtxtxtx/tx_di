@@ -16,13 +16,13 @@ pub mod meta_entry;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{parse_macro_input, Ident, ItemStruct, Result as SynResult, Type, Visibility};
+use syn::{Ident, ItemStruct, Result as SynResult, Type, Visibility, parse_macro_input};
 
-use crate::attr::comp_attr::{parse_component_attr_from_attributes, CompAttr};
-use crate::classify::fields::{classify_fields, FieldKind};
+use crate::attr::comp_attr::{CompAttr, parse_component_attr_from_attributes};
+use crate::classify::fields::{FieldKind, classify_fields};
 use crate::type_utils::{
-    extract_trait_from_arc, extract_trait_from_option_arc, extract_trait_from_vec_arc,
-    is_arc_like, strip_arc_type,
+    extract_trait_from_arc, extract_trait_from_option_arc, extract_trait_from_vec_arc, is_arc_like,
+    strip_arc_type,
 };
 
 /// `#[derive(Component)]` 入口

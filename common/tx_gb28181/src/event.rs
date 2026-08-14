@@ -12,18 +12,17 @@
 //! - **向后兼容**：`tx_di_gb28181`（服务端插件）和 `tx_di_gb28181_client`（设备客户端插件）
 //!   均通过 `pub use tx_gb28181::event::*` 重新导出，对外 API 不变。
 
+use crate::enums::ItemType;
 use crate::xml::CruiseTrack;
 use crate::xml::RecordItem;
 use std::future::Future;
 use std::sync::OnceLock;
 use tokio::sync::broadcast;
-use crate::enums::ItemType;
 
 /// GB28181 事件类型（GB28181-2022 完整版）
 #[derive(Debug, Clone)]
 pub enum Gb28181Event {
     // ── 设备注册管理 ─────────────────────────────────────────────────────────
-
     /// 设备注册上线
     DeviceRegistered {
         device_id: String,
@@ -41,13 +40,9 @@ pub enum Gb28181Event {
     DeviceOnline { device_id: String },
 
     /// 收到设备心跳
-    Keepalive {
-        device_id: String,
-        status: String,
-    },
+    Keepalive { device_id: String, status: String },
 
     // ── 设备查询响应 ─────────────────────────────────────────────────────────
-
     /// 收到目录响应（通道列表）
     CatalogReceived {
         device_id: String,
@@ -81,7 +76,6 @@ pub enum Gb28181Event {
     },
 
     // ── 媒体会话 ─────────────────────────────────────────────────────────────
-
     /// 点播/回放会话建立（200 OK + ACK 后）
     SessionStarted {
         device_id: String,
@@ -105,7 +99,6 @@ pub enum Gb28181Event {
     },
 
     // ── 报警 ─────────────────────────────────────────────────────────────────
-
     /// 收到设备报警通知
     AlarmReceived {
         device_id: String,
@@ -118,7 +111,6 @@ pub enum Gb28181Event {
     },
 
     // ── 位置 ─────────────────────────────────────────────────────────────────
-
     /// 移动设备位置上报
     MobilePosition {
         device_id: String,
@@ -129,7 +121,6 @@ pub enum Gb28181Event {
     },
 
     // ── 网络校时 ─────────────────────────────────────────────────────────────
-
     /// 收到设备校时响应
     ///
     /// 可用于分析设备时间偏差
@@ -141,7 +132,6 @@ pub enum Gb28181Event {
     },
 
     // ── 配置/预置位查询 ───────────────────────────────────────────────────────
-
     /// 收到设备配置查询响应
     ConfigDownloaded {
         device_id: String,
@@ -196,7 +186,6 @@ pub enum Gb28181Event {
     },
 
     // ── 图像抓拍 ─────────────────────────────────────────────────────────────
-
     /// 设备抓拍完成（图片已就绪）
     SnapshotTaken {
         device_id: String,
@@ -206,7 +195,6 @@ pub enum Gb28181Event {
     },
 
     // ── 语音广播/对讲 ───────────────────────────────────────────────────────
-
     /// 收到设备发起的语音广播邀请
     ///
     /// 平台收到设备发来的广播 MESSAGE，需要确认是否接受
@@ -224,9 +212,7 @@ pub enum Gb28181Event {
     },
 
     /// 语音广播会话结束
-    BroadcastSessionEnded {
-        device_id: String,
-    },
+    BroadcastSessionEnded { device_id: String },
 
     /// 对讲音频会话建立
     AudioTalkbackStarted {
@@ -239,13 +225,9 @@ pub enum Gb28181Event {
     },
 
     /// 对讲音频会话结束
-    AudioTalkbackEnded {
-        device_id: String,
-        call_id: String,
-    },
+    AudioTalkbackEnded { device_id: String, call_id: String },
 
     // ── 设备控制结果 ─────────────────────────────────────────────────────────
-
     /// 录像控制结果通知
     RecordControlResult {
         device_id: String,
@@ -279,7 +261,6 @@ pub enum Gb28181Event {
     },
 
     // ── 级联管理 ─────────────────────────────────────────────────────────────
-
     /// 上级平台注册到本平台
     UpperPlatformRegistered {
         platform_id: String,
@@ -287,9 +268,7 @@ pub enum Gb28181Event {
     },
 
     /// 上级平台注销
-    UpperPlatformUnregistered {
-        platform_id: String,
-    },
+    UpperPlatformUnregistered { platform_id: String },
 }
 
 // ── broadcast 通道 ──────────────────────────────────────────────────────────
@@ -359,15 +338,12 @@ where
                     }
                 }
                 Err(broadcast::error::RecvError::Lagged(n)) => {
-                    tracing::warn!(
-                        skipped = n,
-                        "GB28181 事件订阅者落后，跳过了 {n} 条事件"
-                    );
+                    tracing::warn!(skipped = n, "GB28181 事件订阅者落后，跳过了 {n} 条事件");
                 }
                 Err(broadcast::error::RecvError::Closed) => {
                     tracing::info!("GB28181 事件订阅者已关闭");
-                    break
-                },
+                    break;
+                }
             }
         }
     });

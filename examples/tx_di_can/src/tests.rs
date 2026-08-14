@@ -14,13 +14,13 @@
 
 #[cfg(test)]
 mod tests {
+    use crate::adapter::{CanAdapter, SimBusAdapter, create_adapter};
     use crate::config::{AdapterKind, CanConfig};
+    use crate::event::CanEvent;
+    use crate::flash::{FlashConfig, is_all_ff};
     use crate::frame::{CanFdFrame, CanFrame, FrameId, FrameKind};
     use crate::isotp::IsoTpConfig;
     use crate::uds::{NrcCode, SessionType, UdsService};
-    use crate::flash::{FlashConfig, is_all_ff};
-    use crate::adapter::{SimBusAdapter, create_adapter, CanAdapter};
-    use crate::event::CanEvent;
     use std::fs;
     use std::path::PathBuf;
 
@@ -98,7 +98,7 @@ mod tests {
         // CANFD DLC 映射（ISO 11898-1:2015）
         assert_eq!(CanFdFrame::new(0x100, vec![]).fd_dlc(), 0);
         assert_eq!(CanFdFrame::new(0x100, vec![0; 8]).fd_dlc(), 8);
-        assert_eq!(CanFdFrame::new(0x100, vec![0; 12]).fd_dlc(), 9);  // 9..12 → 9
+        assert_eq!(CanFdFrame::new(0x100, vec![0; 12]).fd_dlc(), 9); // 9..12 → 9
         assert_eq!(CanFdFrame::new(0x100, vec![0; 16]).fd_dlc(), 10); // 13..16 → 10
         assert_eq!(CanFdFrame::new(0x100, vec![0; 64]).fd_dlc(), 15); // 49..64 → 15
     }
@@ -226,13 +226,10 @@ mod tests {
         let tx_frame = CanFrame::new(0x123, vec![0xDE, 0xAD, 0xBE, 0xEF]);
         adapter.send(&tx_frame).await.expect("send 应成功");
 
-        let received = tokio::time::timeout(
-            std::time::Duration::from_millis(500),
-            rx.recv(),
-        )
-        .await
-        .expect("接收不应超时")
-        .expect("recv 应成功");
+        let received = tokio::time::timeout(std::time::Duration::from_millis(500), rx.recv())
+            .await
+            .expect("接收不应超时")
+            .expect("recv 应成功");
 
         assert!(matches!(received.id, FrameId::Standard(0x123)));
         assert_eq!(received.data, vec![0xDE, 0xAD, 0xBE, 0xEF]);
@@ -249,13 +246,10 @@ mod tests {
         let tx_frame = CanFdFrame::new(0x200, vec![0x11; 32]);
         adapter.send_fd(&tx_frame).await.expect("send_fd 应成功");
 
-        let received = tokio::time::timeout(
-            std::time::Duration::from_millis(500),
-            rx_fd.recv(),
-        )
-        .await
-        .expect("接收FD帧不应超时")
-        .expect("recv_fd 应成功");
+        let received = tokio::time::timeout(std::time::Duration::from_millis(500), rx_fd.recv())
+            .await
+            .expect("接收FD帧不应超时")
+            .expect("recv_fd 应成功");
 
         assert_eq!(received.data.len(), 32);
     }
@@ -268,7 +262,10 @@ mod tests {
         let mut rx1 = adapter.subscribe();
         let mut rx2 = adapter.subscribe();
 
-        adapter.send(&CanFrame::new(0x500, vec![0xAA])).await.unwrap();
+        adapter
+            .send(&CanFrame::new(0x500, vec![0xAA]))
+            .await
+            .unwrap();
 
         // 两个订阅者都应该收到
         let f1 = tokio::time::timeout(std::time::Duration::from_millis(200), rx1.recv());
@@ -406,7 +403,10 @@ mod tests {
     #[test]
     fn test_nrc_display() {
         assert_eq!(format!("{}", NrcCode::GeneralReject), "通用拒绝(0x10)");
-        assert_eq!(format!("{}", NrcCode::SecurityAccessDenied), "安全访问被拒绝(0x33)");
+        assert_eq!(
+            format!("{}", NrcCode::SecurityAccessDenied),
+            "安全访问被拒绝(0x33)"
+        );
         assert_eq!(format!("{}", NrcCode::ResponsePending), "响应挂起(0x78)");
         assert_eq!(format!("{}", NrcCode::Unknown(0xAB)), "未知NRC(0xAB)");
     }
@@ -572,10 +572,7 @@ mod tests {
     fn test_can_config_load_from_toml_missing_section() {
         // 创建临时 TOML 文件（无 [can_config] 段）
         let temp_dir = std::env::temp_dir();
-        let path: PathBuf = temp_dir.join(format!(
-            "can_test_{}.toml",
-            std::process::id()
-        ));
+        let path: PathBuf = temp_dir.join(format!("can_test_{}.toml", std::process::id()));
         fs::write(&path, "[other_section]\nkey = \"value\"\n").unwrap();
 
         let result = CanConfig::load_from_toml(path.to_str().unwrap());

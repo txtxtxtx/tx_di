@@ -6,7 +6,10 @@
 use syn::{Expr, GenericArgument, Ident, ItemStruct, PathArguments, Result as SynResult, Type};
 
 use crate::attr::field_attr::{extract_inject_expr, has_skip_attr};
-use crate::type_utils::{extract_option_inner, is_option_arc_dyn_trait, is_option_arc_type, is_option_type, is_plain_arc_dyn_trait, is_vec_arc_dyn_trait};
+use crate::type_utils::{
+    extract_option_inner, is_option_arc_dyn_trait, is_option_arc_type, is_option_type,
+    is_plain_arc_dyn_trait, is_vec_arc_dyn_trait,
+};
 
 /// 字段注入类别
 ///
@@ -50,13 +53,19 @@ pub fn classify_fields(input: &ItemStruct) -> SynResult<Vec<(Ident, FieldKind)>>
             FieldKind::Custom { expr }
         } else if is_plain_arc_dyn_trait(&field.ty) {
             // Arc<dyn Trait> — 必选 trait object 注入
-            FieldKind::TraitInjectRequired { ty: field.ty.clone() }
+            FieldKind::TraitInjectRequired {
+                ty: field.ty.clone(),
+            }
         } else if is_vec_arc_dyn_trait(&field.ty) {
             // Vec<Arc<dyn Trait>> — 列表 trait object 注入
-            FieldKind::TraitInjectList { ty: field.ty.clone() }
+            FieldKind::TraitInjectList {
+                ty: field.ty.clone(),
+            }
         } else if is_option_arc_dyn_trait(&field.ty) {
             // Option<Arc<dyn Trait>> — 可选 trait object 注入
-            FieldKind::TraitInject { ty: field.ty.clone() }
+            FieldKind::TraitInject {
+                ty: field.ty.clone(),
+            }
         } else if is_option_arc_type(&field.ty) {
             // Option<Arc<T>> — 可选普通组件注入（非 trait object）
             let inner = extract_option_inner(&field.ty).unwrap();
@@ -66,15 +75,23 @@ pub fn classify_fields(input: &ItemStruct) -> SynResult<Vec<(Ident, FieldKind)>>
                 && let PathArguments::AngleBracketed(ab) = &last.arguments
                 && let Some(GenericArgument::Type(t)) = ab.args.first()
             {
-                FieldKind::OptionalInject { inner_ty: t.clone() }
+                FieldKind::OptionalInject {
+                    inner_ty: t.clone(),
+                }
             } else {
                 // fallback: 无法解析内层则归为 Optional（安全回退）
-                FieldKind::Optional { _ty: field.ty.clone() }
+                FieldKind::Optional {
+                    _ty: field.ty.clone(),
+                }
             }
         } else if is_option_type(&field.ty) {
-            FieldKind::Optional { _ty: field.ty.clone() }
+            FieldKind::Optional {
+                _ty: field.ty.clone(),
+            }
         } else {
-            FieldKind::Inject { ty: field.ty.clone() }
+            FieldKind::Inject {
+                ty: field.ty.clone(),
+            }
         };
         fields_info.push((ident.clone(), kind));
     }

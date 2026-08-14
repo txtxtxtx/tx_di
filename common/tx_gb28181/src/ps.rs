@@ -24,7 +24,7 @@ pub struct PsHeader {
     ///
     /// 32 位，固定值 0x000001BA
     #[deku(bits = "32")]
-    pub pack_start_code: u32,  // 0x000001BA
+    pub pack_start_code: u32, // 0x000001BA
     /// SCR 之前 有 2 位固定值 —— 必须是 01
     #[deku(bits = "2", assert_eq = "0b01")]
     pub marker_bits: u8, // 必须为 0b01
@@ -121,16 +121,16 @@ pub const PSM_START_CODE: u32 = 0x000001BC;
 
 /// 流类型（stream_type）常量
 pub mod stream_type {
-    pub const H264:  u8 = 0x1B;
-    pub const H265:  u8 = 0x24;
+    pub const H264: u8 = 0x1B;
+    pub const H265: u8 = 0x24;
     pub const MPEG4: u8 = 0x10;
-    pub const SVAC:  u8 = 0x80;
+    pub const SVAC: u8 = 0x80;
     pub const G711A: u8 = 0x90;
     pub const G711U: u8 = 0x91;
     pub const G7221: u8 = 0x92;
     pub const G7231: u8 = 0x93;
-    pub const G729:  u8 = 0x99;
-    pub const AAC:   u8 = 0x0F;
+    pub const G729: u8 = 0x99;
+    pub const AAC: u8 = 0x0F;
 }
 
 /// 基本流 ID（elementary_stream_id）常量
@@ -185,7 +185,6 @@ pub struct PSM {
         assert = "elementary_stream_map_length % 4 == 0"
     )]
     pub elementary_stream_infos: Vec<ElementaryStreamInfo>,
-
     // 注：GB/T 28181 实践中通常不需要 CRC_32，因此本文不再定义。
 }
 
@@ -296,9 +295,7 @@ pub fn encode_pts_bytes(pts: u64) -> [u8; 5] {
     let pts = pts & 0x1FFFFFFFF; // 确保只有 33 位
     [
         // 第 1 字节：4 bit 0011 + PTS[32..30] + marker_bit(1)
-        0b0011_0000
-            | (((pts >> 30) & 0x07) as u8) << 1
-            | 1u8,
+        0b0011_0000 | (((pts >> 30) & 0x07) as u8) << 1 | 1u8,
         // 第 2 字节：PTS[29..22] + marker_bit(1)
         ((pts >> 22) & 0xFF) as u8,
         // 第 3 字节：PTS[21..15] + marker_bit(1)

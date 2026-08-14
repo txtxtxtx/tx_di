@@ -10,8 +10,8 @@ use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use redis::aio::ConnectionManager;
 use redis::AsyncCommands;
+use redis::aio::ConnectionManager;
 use tx_di_core::Component;
 use tx_error::{AppError, AppResult};
 
@@ -82,7 +82,9 @@ impl CacheService for RedisCache {
         let pk = self.prefixed(key);
         let mut conn = self.get_mgr().await?.clone();
         if let Some(ttl) = ttl {
-            conn.set_ex(&pk, value, ttl.as_secs() as usize).await.map_err(Self::redis_err)?;
+            conn.set_ex(&pk, value, ttl.as_secs() as usize)
+                .await
+                .map_err(Self::redis_err)?;
         } else {
             conn.set(&pk, value).await.map_err(Self::redis_err)?;
         }
@@ -140,13 +142,19 @@ impl CacheService for RedisCache {
         let pk = self.prefixed(key);
         let mut conn = self.get_mgr().await?.clone();
         let secs: i64 = conn.ttl(&pk).await.map_err(Self::redis_err)?;
-        Ok(if secs < 0 { None } else { Some(Duration::from_secs(secs as u64)) })
+        Ok(if secs < 0 {
+            None
+        } else {
+            Some(Duration::from_secs(secs as u64))
+        })
     }
 
     async fn expire(&self, key: &str, ttl: Duration) -> AppResult<()> {
         let pk = self.prefixed(key);
         let mut conn = self.get_mgr().await?.clone();
-        conn.expire(&pk, ttl.as_secs() as usize).await.map_err(Self::redis_err)?;
+        conn.expire(&pk, ttl.as_secs() as usize)
+            .await
+            .map_err(Self::redis_err)?;
         Ok(())
     }
 
@@ -161,7 +169,9 @@ impl CacheService for RedisCache {
     async fn hset(&self, key: &str, field: &str, value: &[u8]) -> AppResult<()> {
         let pk = self.prefixed(key);
         let mut conn = self.get_mgr().await?.clone();
-        conn.hset(&pk, field, value).await.map_err(Self::redis_err)?;
+        conn.hset(&pk, field, value)
+            .await
+            .map_err(Self::redis_err)?;
         Ok(())
     }
 
@@ -283,7 +293,10 @@ impl CacheService for RedisCache {
         let mut conn = self.get_mgr().await?.clone();
         let mut count = 0usize;
         for (member, score) in members {
-            count = conn.zadd(&pk, member, *score).await.map_err(Self::redis_err)?;
+            count = conn
+                .zadd(&pk, member, *score)
+                .await
+                .map_err(Self::redis_err)?;
         }
         Ok(count)
     }
@@ -298,11 +311,20 @@ impl CacheService for RedisCache {
         Ok(count)
     }
 
-    async fn zrange(&self, key: &str, start: i64, stop: i64, with_scores: bool) -> AppResult<Vec<Vec<u8>>> {
+    async fn zrange(
+        &self,
+        key: &str,
+        start: i64,
+        stop: i64,
+        with_scores: bool,
+    ) -> AppResult<Vec<Vec<u8>>> {
         let pk = self.prefixed(key);
         let mut conn = self.get_mgr().await?.clone();
         if with_scores {
-            let val: Vec<String> = conn.zrange_withscores(&pk, start, stop).await.map_err(Self::redis_err)?;
+            let val: Vec<String> = conn
+                .zrange_withscores(&pk, start, stop)
+                .await
+                .map_err(Self::redis_err)?;
             Ok(val.into_iter().map(|s| s.into_bytes()).collect())
         } else {
             conn.zrange(&pk, start, stop).await.map_err(Self::redis_err)
@@ -312,7 +334,9 @@ impl CacheService for RedisCache {
     async fn zrangebyscore(&self, key: &str, min: f64, max: f64) -> AppResult<Vec<Vec<u8>>> {
         let pk = self.prefixed(key);
         let mut conn = self.get_mgr().await?.clone();
-        conn.zrangebyscore(&pk, min, max).await.map_err(Self::redis_err)
+        conn.zrangebyscore(&pk, min, max)
+            .await
+            .map_err(Self::redis_err)
     }
 
     async fn zscore(&self, key: &str, member: &[u8]) -> AppResult<Option<f64>> {
@@ -341,7 +365,9 @@ impl CacheService for RedisCache {
         for (key, value) in pairs {
             let pk = self.prefixed(key);
             if let Some(ttl) = ttl {
-                conn.set_ex(&pk, value, ttl.as_secs() as usize).await.map_err(Self::redis_err)?;
+                conn.set_ex(&pk, value, ttl.as_secs() as usize)
+                    .await
+                    .map_err(Self::redis_err)?;
             } else {
                 conn.set(&pk, value).await.map_err(Self::redis_err)?;
             }
@@ -365,7 +391,8 @@ impl CacheService for RedisCache {
         if self.config.key_prefix.is_empty() {
             Ok(val)
         } else {
-            Ok(val.into_iter()
+            Ok(val
+                .into_iter()
                 .filter_map(|k| k.strip_prefix(&self.config.key_prefix).map(String::from))
                 .collect())
         }
@@ -373,7 +400,10 @@ impl CacheService for RedisCache {
 
     async fn clear(&self) -> AppResult<()> {
         let mut conn = self.get_mgr().await?.clone();
-        redis::cmd("FLUSHDB").query_async(&mut *conn).await.map_err(Self::redis_err)?;
+        redis::cmd("FLUSHDB")
+            .query_async(&mut *conn)
+            .await
+            .map_err(Self::redis_err)?;
         Ok(())
     }
 

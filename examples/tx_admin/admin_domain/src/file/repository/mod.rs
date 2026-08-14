@@ -1,5 +1,5 @@
-use std::any::Any;
 use async_trait::async_trait;
+use std::any::Any;
 
 use crate::file::model::aggregate::{File, FileConfig};
 use crate::file::model::value_object::FileQuery;
@@ -9,11 +9,7 @@ use tx_error::AppResult;
 #[async_trait]
 pub trait FileRepository: Any + Send + Sync {
     async fn find_by_id(&self, id: u64) -> AppResult<Option<File>>;
-    async fn find_page(
-        &self,
-        query: &FileQuery,
-        page: Page<File>,
-    ) -> AppResult<Page<File>>;
+    async fn find_page(&self, query: &FileQuery, page: Page<File>) -> AppResult<Page<File>>;
     async fn insert(&self, file: &File) -> AppResult<()>;
     async fn update(&self, file: &File) -> AppResult<()>;
     async fn soft_delete(&self, id: u64) -> AppResult<()>;

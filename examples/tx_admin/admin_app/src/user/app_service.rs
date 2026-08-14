@@ -1,22 +1,19 @@
 use std::sync::Arc;
 
 use crate::user::dto::*;
-use admin_proto::{
-    CreateUserRequest, UpdateUserRequest, ChangePasswordRequest,
-    ListUsersRequest,
-};
-use admin_domain::user::model::aggregate::User;
-use admin_domain::user::model::value_object::{LoginUser, Sex, UserQuery, UserStatus};
-use admin_domain::user::service::UserService;
-use admin_domain::role::repository::RoleRepository;
 use admin_domain::department::repository::DepartmentRepository;
 use admin_domain::menu::repository::MenuRepository;
+use admin_domain::role::repository::RoleRepository;
 use admin_domain::shared::event_publisher::DomainEventPublisher;
 use admin_domain::shared::model::AggregateRoot;
 use admin_domain::shared::repository::RepositoryError;
+use admin_domain::user::model::aggregate::User;
+use admin_domain::user::model::value_object::{LoginUser, Sex, UserQuery, UserStatus};
+use admin_domain::user::service::UserService;
+use admin_proto::{ChangePasswordRequest, CreateUserRequest, ListUsersRequest, UpdateUserRequest};
+use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
-use tx_common::page::Page;
 
 /// User application service - 编排领域操作 + 跨聚合校验
 #[derive(Component)]
@@ -150,11 +147,7 @@ impl UserAppService {
     }
 
     /// 删除用户
-    pub async fn delete_user(
-        &self,
-        user_id: u64,
-        updater: Option<String>,
-    ) -> AppResult<()> {
+    pub async fn delete_user(&self, user_id: u64, updater: Option<String>) -> AppResult<()> {
         self.user_service.delete_user(user_id, updater).await
     }
 
@@ -165,7 +158,10 @@ impl UserAppService {
         status: UserStatus,
         updater: Option<String>,
     ) -> AppResult<UserResponse> {
-        let user = self.user_service.change_status(user_id, status, updater).await?;
+        let user = self
+            .user_service
+            .change_status(user_id, status, updater)
+            .await?;
         Ok(user_to_response(user))
     }
 
@@ -183,10 +179,7 @@ impl UserAppService {
 
     /// 为用户分配角色（跨聚合校验：校验角色存在且启用）
     pub async fn assign_roles(&self, user_id: u64, role_ids: Vec<u64>) -> AppResult<()> {
-        let user = self
-            .user_service
-            .get_user(user_id)
-            .await?;
+        let user = self.user_service.get_user(user_id).await?;
 
         // 用户必须为 Active 状态
         if user.status != UserStatus::Active {
@@ -205,16 +198,16 @@ impl UserAppService {
             }
         }
 
-        self.user_service.user_repo().bind_roles(user_id, &role_ids).await?;
+        self.user_service
+            .user_repo()
+            .bind_roles(user_id, &role_ids)
+            .await?;
         Ok(())
     }
 
     /// 为用户分配部门（跨聚合校验：校验部门存在且启用）
     pub async fn assign_departments(&self, user_id: u64, dept_ids: Vec<u64>) -> AppResult<()> {
-        let user = self
-            .user_service
-            .get_user(user_id)
-            .await?;
+        let user = self.user_service.get_user(user_id).await?;
 
         // 用户必须为 Active 状态
         if user.status != UserStatus::Active {
@@ -233,7 +226,10 @@ impl UserAppService {
             }
         }
 
-        self.user_service.user_repo().bind_departments(user_id, &dept_ids).await?;
+        self.user_service
+            .user_repo()
+            .bind_departments(user_id, &dept_ids)
+            .await?;
         Ok(())
     }
 
@@ -241,7 +237,10 @@ impl UserAppService {
     pub async fn build_login_user(&self, user: &User) -> AppResult<LoginUser> {
         let role_ids = self.user_service.user_repo().get_role_ids(user.id).await?;
         let dept_ids = self.user_service.user_repo().get_dept_ids(user.id).await?;
-        let permissions = self.menu_repo.find_permission_codes_by_user_id(user.id).await?;
+        let permissions = self
+            .menu_repo
+            .find_permission_codes_by_user_id(user.id)
+            .await?;
 
         Ok(LoginUser {
             user_id: user.id,
@@ -261,10 +260,7 @@ impl UserAppService {
     }
 
     /// 分页查询用户列表
-    pub async fn get_user_page(
-        &self,
-        req: ListUsersRequest,
-    ) -> AppResult<Page<UserResponse>> {
+    pub async fn get_user_page(&self, req: ListUsersRequest) -> AppResult<Page<UserResponse>> {
         let query = UserQuery {
             username: req.username,
             nickname: req.nickname,

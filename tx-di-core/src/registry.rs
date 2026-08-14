@@ -9,7 +9,7 @@ use std::sync::Arc;
 use crate::component::BoxFuture;
 use crate::scope::Scope;
 use crate::store::{Store, TraitImplEntry};
-use crate::{RIE, App, CancellationToken};
+use crate::{App, CancellationToken, RIE};
 
 /// linkme 分布式切片：收集所有 `#[derive(Component)]` 标注的组件
 #[linkme::distributed_slice]
@@ -22,7 +22,6 @@ pub static COMPONENT_REGISTRY: [ComponentMeta] = [..];
 /// 解决 ComponentMeta 类型擦除后无法调用 trait 方法的问题。
 pub struct ComponentMeta {
     // ── 核心字段 ──────────────────────────────────────────────────────
-
     /// 返回组件类型 `TypeId`
     pub type_id: fn() -> TypeId,
 
@@ -45,7 +44,6 @@ pub struct ComponentMeta {
     pub trait_impls: &'static [TraitImplEntry],
 
     // ── 生命周期函数指针（宏生成，内部调用 Component trait 方法）──────
-
     /// 初始化排序值（值越小越先执行）
     pub init_sort_fn: fn() -> i32,
 

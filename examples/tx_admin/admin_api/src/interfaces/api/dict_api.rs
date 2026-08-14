@@ -2,17 +2,20 @@
 
 use std::collections::HashMap;
 
-use axum::Json;
-use axum::extract::Query;
-use serde::Deserialize;
-use tx_di_axum::Router;
-use axum::routing::{get, post, put, delete};
-use tx_di_axum::bound::DiComp;
-use admin_app::dictionary::app_service::{DictTypeAppService, DictDataAppService};
-use admin_proto::{CreateDictTypeRequest, UpdateDictTypeRequest, ListDictTypesRequest, DictTypeResponse, CreateDictDataRequest, UpdateDictDataRequest, ListDictDataRequest, DictDataResponse, Empty};
-use tx_common::{ApiR, ApiRes, Page};
 use crate::auth::ensure_permission;
 use crate::error::ApiErr;
+use admin_app::dictionary::app_service::{DictDataAppService, DictTypeAppService};
+use admin_proto::{
+    CreateDictDataRequest, CreateDictTypeRequest, DictDataResponse, DictTypeResponse, Empty,
+    ListDictDataRequest, ListDictTypesRequest, UpdateDictDataRequest, UpdateDictTypeRequest,
+};
+use axum::Json;
+use axum::extract::Query;
+use axum::routing::{delete, get, post, put};
+use serde::Deserialize;
+use tx_common::{ApiR, ApiRes, Page};
+use tx_di_axum::Router;
+use tx_di_axum::bound::DiComp;
 use tx_di_sa_token::StpUtil;
 
 pub fn router() -> Router {
@@ -47,9 +50,18 @@ async fn get_dict_type(
     axum::extract::Path(id): axum::extract::Path<u64>,
 ) -> Result<ApiR<DictTypeResponse>, ApiErr> {
     ensure_permission("dict:view").await?;
-    let q = ListDictTypesRequest { name: None, dict_type: None, status: None, page: 1, page_size: 100 };
+    let q = ListDictTypesRequest {
+        name: None,
+        dict_type: None,
+        status: None,
+        page: 1,
+        page_size: 100,
+    };
     let page = dict_type.get_dict_type_page(q).await?;
-    let r = page.list.into_iter().find(|d| d.id == id)
+    let r = page
+        .list
+        .into_iter()
+        .find(|d| d.id == id)
         .ok_or_else(|| anyhow::anyhow!("not found"))?;
     Ok(ApiR::success(r))
 }
@@ -101,9 +113,18 @@ async fn get_dict_data(
     axum::extract::Path(id): axum::extract::Path<u64>,
 ) -> Result<ApiR<DictDataResponse>, ApiErr> {
     ensure_permission("dict:view").await?;
-    let q = ListDictDataRequest { dict_type: None, label: None, status: None, page: 1, page_size: 100 };
+    let q = ListDictDataRequest {
+        dict_type: None,
+        label: None,
+        status: None,
+        page: 1,
+        page_size: 100,
+    };
     let page = dict_data.get_dict_data_page(q).await?;
-    let r = page.list.into_iter().find(|d| d.id == id)
+    let r = page
+        .list
+        .into_iter()
+        .find(|d| d.id == id)
         .ok_or_else(|| anyhow::anyhow!("not found"))?;
     Ok(ApiR::success(r))
 }
@@ -173,7 +194,12 @@ async fn get_dict_data_batch(
     Query(q): Query<BatchQuery>,
 ) -> Result<ApiR<HashMap<String, Vec<DictDataResponse>>>, ApiErr> {
     ensure_permission("dict:view").await?;
-    let types: Vec<String> = q.types.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+    let types: Vec<String> = q
+        .types
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
     let map = dict_data.get_by_dict_types(types).await?;
     Ok(ApiR::success(map))
 }

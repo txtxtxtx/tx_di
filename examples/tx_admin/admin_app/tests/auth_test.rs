@@ -5,24 +5,26 @@
 
 mod common;
 
-use std::sync::Arc;
-use admin_proto::{LoginRequest, LogoutRequest, CreateRoleRequest, CreateMenuRequest, CreateUserRequest};
 use admin_app::auth::app_service::AuthAppService;
+use admin_app::auth::session_service::AuthSessionService;
+use admin_app::log::app_service::LoginLogAppService;
 use admin_domain::auth::service::AuthService;
-use admin_domain::user::service::UserService;
-use admin_domain::role::service::RoleService;
+use admin_domain::log::service::LoginLogService;
 use admin_domain::menu::service::MenuService;
-use admin_domain::user::repository::UserRepository;
 use admin_domain::role::repository::RoleRepository;
+use admin_domain::role::service::RoleService;
 use admin_domain::user::model::value_object::UserStatus;
-use admin_infra::user::repository::ToastyUserRepository;
-use admin_infra::role::repository::ToastyRoleRepository;
-use admin_infra::menu::repository::ToastyMenuRepository;
+use admin_domain::user::repository::UserRepository;
+use admin_domain::user::service::UserService;
 use admin_infra::department::repository::ToastyDepartmentRepository;
 use admin_infra::log::repository::ToastyLoginLogRepository;
-use admin_domain::log::service::LoginLogService;
-use admin_app::log::app_service::LoginLogAppService;
-use admin_app::auth::session_service::AuthSessionService;
+use admin_infra::menu::repository::ToastyMenuRepository;
+use admin_infra::role::repository::ToastyRoleRepository;
+use admin_infra::user::repository::ToastyUserRepository;
+use admin_proto::{
+    CreateMenuRequest, CreateRoleRequest, CreateUserRequest, LoginRequest, LogoutRequest,
+};
+use std::sync::Arc;
 use std::sync::OnceLock;
 use tx_di_sa_token::{MemoryStorage, SaTokenStateBuilder};
 
@@ -62,14 +64,25 @@ async fn create_auth_test_env() -> (
     let login_log_app = Arc::new(LoginLogAppService::new(login_log_svc));
 
     let user_app = Arc::new(admin_app::user::app_service::UserAppService::new(
-        user_svc.clone(), role_repo.clone(), dept_repo, menu_repo.clone(),
+        user_svc.clone(),
+        role_repo.clone(),
+        dept_repo,
+        menu_repo.clone(),
     ));
-    let role_app = admin_app::role::app_service::RoleAppService::new(role_svc.clone(), user_repo.clone());
+    let role_app =
+        admin_app::role::app_service::RoleAppService::new(role_svc.clone(), user_repo.clone());
     let menu_app = admin_app::menu::app_service::MenuAppService::new(menu_svc.clone());
 
     let auth_svc = Arc::new(AuthService::new(user_svc.clone()));
     let session_svc = Arc::new(AuthSessionService::new());
-    let auth_app = AuthAppService::new(auth_svc, user_app.clone(), role_svc, menu_svc, login_log_app, session_svc);
+    let auth_app = AuthAppService::new(
+        auth_svc,
+        user_app.clone(),
+        role_svc,
+        menu_svc,
+        login_log_app,
+        session_svc,
+    );
 
     (auth_app, user_app, role_app, menu_app, user_repo, role_repo)
 }
@@ -82,36 +95,70 @@ async fn login_success() {
         create_auth_test_env().await;
 
     // 创建用户（密码由 UserAppService 自动哈希）
-    let user = user_app.create_user(CreateUserRequest {
-        username: "admin".into(),
-        password: "password123".into(),
-        nickname: "管理员".into(),
-        email: None, mobile: None, sex: None, remark: None,
-        role_ids: vec![], dept_ids: vec![],
-    }, Some("admin".into())).await.unwrap();
+    let user = user_app
+        .create_user(
+            CreateUserRequest {
+                username: "admin".into(),
+                password: "password123".into(),
+                nickname: "管理员".into(),
+                email: None,
+                mobile: None,
+                sex: None,
+                remark: None,
+                role_ids: vec![],
+                dept_ids: vec![],
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
 
     // 创建角色
-    let role = role_app.create_role(CreateRoleRequest {
-        name: "管理员".into(), code: "admin".into(), sort: 1,
-        remark: None, menu_ids: vec![],
-    }, Some("admin".into())).await.unwrap();
+    let role = role_app
+        .create_role(
+            CreateRoleRequest {
+                name: "管理员".into(),
+                code: "admin".into(),
+                sort: 1,
+                remark: None,
+                menu_ids: vec![],
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
 
     // 创建通配权限菜单
-    let menu = menu_app.create_menu(CreateMenuRequest {
-        name: "全部权限".into(), permission: "*".into(),
-        types: 2, sort: 1, parent_id: 0,
-        path: None, icon: None, component: None, component_name: None,
-    }, Some("admin".into())).await.unwrap();
+    let menu = menu_app
+        .create_menu(
+            CreateMenuRequest {
+                name: "全部权限".into(),
+                permission: "*".into(),
+                types: 2,
+                sort: 1,
+                parent_id: 0,
+                path: None,
+                icon: None,
+                component: None,
+                component_name: None,
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
 
     // 绑定用户到角色，绑定菜单到角色
     user_repo.bind_roles(user.id, &[role.id]).await.unwrap();
     role_repo.bind_menus(role.id, &[menu.id]).await.unwrap();
 
-    let resp = auth_app.login(LoginRequest {
-        username: "admin".into(),
-        password: "password123".into(),
-        login_ip: "127.0.0.1".into(),
-    }).await.unwrap();
+    let resp = auth_app
+        .login(LoginRequest {
+            username: "admin".into(),
+            password: "password123".into(),
+            login_ip: "127.0.0.1".into(),
+        })
+        .await
+        .unwrap();
 
     assert_eq!(resp.user_id, user.id);
     assert_eq!(resp.username, "admin");
@@ -125,19 +172,31 @@ async fn login_success() {
 async fn login_wrong_password() {
     let (auth_app, user_app, _, _, _, _) = create_auth_test_env().await;
 
-    user_app.create_user(CreateUserRequest {
-        username: "admin".into(),
-        password: "password123".into(),
-        nickname: "管理员".into(),
-        email: None, mobile: None, sex: None, remark: None,
-        role_ids: vec![], dept_ids: vec![],
-    }, Some("admin".into())).await.unwrap();
+    user_app
+        .create_user(
+            CreateUserRequest {
+                username: "admin".into(),
+                password: "password123".into(),
+                nickname: "管理员".into(),
+                email: None,
+                mobile: None,
+                sex: None,
+                remark: None,
+                role_ids: vec![],
+                dept_ids: vec![],
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
 
-    let r = auth_app.login(LoginRequest {
-        username: "admin".into(),
-        password: "wrong_pwd".into(),
-        login_ip: "127.0.0.1".into(),
-    }).await;
+    let r = auth_app
+        .login(LoginRequest {
+            username: "admin".into(),
+            password: "wrong_pwd".into(),
+            login_ip: "127.0.0.1".into(),
+        })
+        .await;
     assert!(r.is_err());
 }
 
@@ -145,11 +204,13 @@ async fn login_wrong_password() {
 async fn login_nonexistent_user() {
     let (auth_app, _, _, _, _, _) = create_auth_test_env().await;
 
-    let r = auth_app.login(LoginRequest {
-        username: "ghost".into(),
-        password: "pwd".into(),
-        login_ip: "127.0.0.1".into(),
-    }).await;
+    let r = auth_app
+        .login(LoginRequest {
+            username: "ghost".into(),
+            password: "pwd".into(),
+            login_ip: "127.0.0.1".into(),
+        })
+        .await;
     assert!(r.is_err());
 }
 
@@ -157,23 +218,37 @@ async fn login_nonexistent_user() {
 async fn login_disabled_user() {
     let (auth_app, user_app, _, _, _, _) = create_auth_test_env().await;
 
-    let user = user_app.create_user(CreateUserRequest {
-        username: "admin".into(),
-        password: "password123".into(),
-        nickname: "管理员".into(),
-        email: None, mobile: None, sex: None, remark: None,
-        role_ids: vec![], dept_ids: vec![],
-    }, Some("admin".into())).await.unwrap();
+    let user = user_app
+        .create_user(
+            CreateUserRequest {
+                username: "admin".into(),
+                password: "password123".into(),
+                nickname: "管理员".into(),
+                email: None,
+                mobile: None,
+                sex: None,
+                remark: None,
+                role_ids: vec![],
+                dept_ids: vec![],
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
 
     // 禁用用户
-    user_app.change_status(user.id, UserStatus::Disabled, Some("admin".into()))
-        .await.unwrap();
+    user_app
+        .change_status(user.id, UserStatus::Disabled, Some("admin".into()))
+        .await
+        .unwrap();
 
-    let r = auth_app.login(LoginRequest {
-        username: "admin".into(),
-        password: "password123".into(),
-        login_ip: "127.0.0.1".into(),
-    }).await;
+    let r = auth_app
+        .login(LoginRequest {
+            username: "admin".into(),
+            password: "password123".into(),
+            login_ip: "127.0.0.1".into(),
+        })
+        .await;
     assert!(r.is_err());
 }
 
@@ -181,23 +256,37 @@ async fn login_disabled_user() {
 async fn login_locked_user() {
     let (auth_app, user_app, _, _, _, _) = create_auth_test_env().await;
 
-    let user = user_app.create_user(CreateUserRequest {
-        username: "admin".into(),
-        password: "password123".into(),
-        nickname: "管理员".into(),
-        email: None, mobile: None, sex: None, remark: None,
-        role_ids: vec![], dept_ids: vec![],
-    }, Some("admin".into())).await.unwrap();
+    let user = user_app
+        .create_user(
+            CreateUserRequest {
+                username: "admin".into(),
+                password: "password123".into(),
+                nickname: "管理员".into(),
+                email: None,
+                mobile: None,
+                sex: None,
+                remark: None,
+                role_ids: vec![],
+                dept_ids: vec![],
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
 
     // 锁定用户
-    user_app.change_status(user.id, UserStatus::Locked, Some("admin".into()))
-        .await.unwrap();
+    user_app
+        .change_status(user.id, UserStatus::Locked, Some("admin".into()))
+        .await
+        .unwrap();
 
-    let r = auth_app.login(LoginRequest {
-        username: "admin".into(),
-        password: "password123".into(),
-        login_ip: "127.0.0.1".into(),
-    }).await;
+    let r = auth_app
+        .login(LoginRequest {
+            username: "admin".into(),
+            password: "password123".into(),
+            login_ip: "127.0.0.1".into(),
+        })
+        .await;
     assert!(r.is_err());
 }
 
@@ -208,33 +297,79 @@ async fn get_user_info() {
     let (auth_app, user_app, role_app, menu_app, user_repo, role_repo) =
         create_auth_test_env().await;
 
-    let user = user_app.create_user(CreateUserRequest {
-        username: "admin".into(),
-        password: "pwd".into(),
-        nickname: "管理员".into(),
-        email: None, mobile: None, sex: None, remark: None,
-        role_ids: vec![], dept_ids: vec![],
-    }, Some("admin".into())).await.unwrap();
+    let user = user_app
+        .create_user(
+            CreateUserRequest {
+                username: "admin".into(),
+                password: "pwd".into(),
+                nickname: "管理员".into(),
+                email: None,
+                mobile: None,
+                sex: None,
+                remark: None,
+                role_ids: vec![],
+                dept_ids: vec![],
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
 
-    let role = role_app.create_role(CreateRoleRequest {
-        name: "管理员".into(), code: "admin".into(), sort: 1,
-        remark: None, menu_ids: vec![],
-    }, Some("admin".into())).await.unwrap();
+    let role = role_app
+        .create_role(
+            CreateRoleRequest {
+                name: "管理员".into(),
+                code: "admin".into(),
+                sort: 1,
+                remark: None,
+                menu_ids: vec![],
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
 
     // 创建权限菜单
-    let menu1 = menu_app.create_menu(CreateMenuRequest {
-        name: "用户列表".into(), permission: "system:user:list".into(),
-        types: 2, sort: 1, parent_id: 0,
-        path: None, icon: None, component: None, component_name: None,
-    }, Some("admin".into())).await.unwrap();
-    let menu2 = menu_app.create_menu(CreateMenuRequest {
-        name: "角色列表".into(), permission: "system:role:list".into(),
-        types: 2, sort: 2, parent_id: 0,
-        path: None, icon: None, component: None, component_name: None,
-    }, Some("admin".into())).await.unwrap();
+    let menu1 = menu_app
+        .create_menu(
+            CreateMenuRequest {
+                name: "用户列表".into(),
+                permission: "system:user:list".into(),
+                types: 2,
+                sort: 1,
+                parent_id: 0,
+                path: None,
+                icon: None,
+                component: None,
+                component_name: None,
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
+    let menu2 = menu_app
+        .create_menu(
+            CreateMenuRequest {
+                name: "角色列表".into(),
+                permission: "system:role:list".into(),
+                types: 2,
+                sort: 2,
+                parent_id: 0,
+                path: None,
+                icon: None,
+                component: None,
+                component_name: None,
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
 
     user_repo.bind_roles(user.id, &[role.id]).await.unwrap();
-    role_repo.bind_menus(role.id, &[menu1.id, menu2.id]).await.unwrap();
+    role_repo
+        .bind_menus(role.id, &[menu1.id, menu2.id])
+        .await
+        .unwrap();
 
     let info = auth_app.get_user_info(user.id).await.unwrap();
     assert_eq!(info.user_id, user.id);
@@ -256,13 +391,26 @@ async fn get_user_info_not_found() {
 async fn logout_success() {
     let (auth_app, user_app, _, _, _, _) = create_auth_test_env().await;
 
-    let user = user_app.create_user(CreateUserRequest {
-        username: "admin".into(),
-        password: "pwd".into(),
-        nickname: "管理员".into(),
-        email: None, mobile: None, sex: None, remark: None,
-        role_ids: vec![], dept_ids: vec![],
-    }, Some("admin".into())).await.unwrap();
+    let user = user_app
+        .create_user(
+            CreateUserRequest {
+                username: "admin".into(),
+                password: "pwd".into(),
+                nickname: "管理员".into(),
+                email: None,
+                mobile: None,
+                sex: None,
+                remark: None,
+                role_ids: vec![],
+                dept_ids: vec![],
+            },
+            Some("admin".into()),
+        )
+        .await
+        .unwrap();
 
-    auth_app.logout(LogoutRequest { user_id: user.id }).await.unwrap();
+    auth_app
+        .logout(LogoutRequest { user_id: user.id })
+        .await
+        .unwrap();
 }

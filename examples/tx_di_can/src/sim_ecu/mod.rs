@@ -14,8 +14,8 @@ use crate::adapter::CanAdapter;
 use crate::db::DescDb;
 use crate::isotp::{IsoTpChannel, IsoTpConfig};
 use state::SimEcuState;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::task::JoinHandle;
 
 /// ECU 仿真配置

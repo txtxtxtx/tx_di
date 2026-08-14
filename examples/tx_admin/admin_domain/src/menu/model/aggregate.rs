@@ -1,9 +1,9 @@
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
-use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent};
-use crate::shared::model::value_object::DeletedStatus;
 use crate::AggregateRoot;
+use crate::shared::model::value_object::DeletedStatus;
+use crate::shared::model::{AggregateRoot, AuditFields, DomainEvent};
 
 /// Menu aggregate root
 #[derive(Debug, Clone, Serialize, Deserialize, AggregateRoot)]

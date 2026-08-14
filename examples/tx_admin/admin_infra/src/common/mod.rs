@@ -34,8 +34,7 @@ pub enum Status {
     #[column(variant = 1)]
     Disabled,
     #[column(variant = 2)]
-    Locked
-
+    Locked,
 }
 
 impl Default for Status {

@@ -1,15 +1,15 @@
-use async_trait::async_trait;
 use crate::err::JobResult;
+use async_trait::async_trait;
 
 // 执行器模块
 pub mod internal;
-pub mod shell;
 pub mod python;
+pub mod shell;
 
 // 重新导出
 pub use internal::InternalJobExecutor;
-pub use shell::ShellJobExecutor;
 pub use python::PythonJobExecutor;
+pub use shell::ShellJobExecutor;
 
 /// 任务执行器 trait
 #[async_trait]
@@ -21,9 +21,9 @@ pub trait JobExecutor: Send + Sync {
 /// 任务执行器类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExecutorType {
-    Internal,  // 内部函数
-    Shell,      // Shell 脚本
-    Python,     // Python 脚本
+    Internal, // 内部函数
+    Shell,    // Shell 脚本
+    Python,   // Python 脚本
 }
 
 impl ExecutorType {

@@ -3,10 +3,11 @@ use crate::event::{self, Gb28181Event};
 use crate::media::{OpenRtpRequest, PlayUrls};
 use crate::plugin::{Gb28181Server, SessionInfo};
 use crate::sdp::{
-    build_audio_invite_sdp, build_invite_sdp, build_snapshot_sdp, parse_audio_sdp,
-    parse_snapshot_sdp, AudioCodec, SessionType,
+    AudioCodec, SessionType, build_audio_invite_sdp, build_invite_sdp, build_snapshot_sdp,
+    parse_audio_sdp, parse_snapshot_sdp,
 };
 use crate::xml::{
+    ConfigType, GuardMode, PlaybackControl, PtzCommand, PtzPreciseParam, ZoomRect,
     build_alarm_reset_xml, build_alarm_subscribe_xml, build_broadcast_cancel_xml,
     build_broadcast_invite_xml, build_catalog_query_xml, build_config_download_query_xml,
     build_cruise_list_query_xml, build_cruise_start_xml, build_cruise_stop_xml,
@@ -17,8 +18,7 @@ use crate::xml::{
     build_ptz_precise_status_query_xml, build_ptz_precise_xml, build_record_control_xml,
     build_record_info_query_xml, build_storage_format_xml, build_storage_status_query_xml,
     build_target_track_xml, build_teleboot_xml, build_time_sync_query_xml,
-    build_time_sync_response_xml, build_zoom_in_xml, build_zoom_out_xml, ConfigType,
-    GuardMode, PlaybackControl, PtzCommand, PtzPreciseParam, ZoomRect,
+    build_time_sync_response_xml, build_zoom_in_xml, build_zoom_out_xml,
 };
 use rsipstack::dialog::dialog::DialogState;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -443,7 +443,11 @@ impl Gb28181Server {
             String::new()
         };
 
-        let media_clone = self.media.get().expect("MediaBackend not initialized").clone();
+        let media_clone = self
+            .media
+            .get()
+            .expect("MediaBackend not initialized")
+            .clone();
         let call_id_clone = call_id.clone();
         let handle_clone = handle.clone();
         let _device_id_owned = device_id.to_string();
@@ -647,7 +651,11 @@ impl Gb28181Server {
         };
         self.sessions.insert(call_id.clone(), session);
 
-        let media_clone = self.media.get().expect("MediaBackend not initialized").clone();
+        let media_clone = self
+            .media
+            .get()
+            .expect("MediaBackend not initialized")
+            .clone();
         let sessions_clone = self.sessions.clone();
         let call_id_clone = call_id.clone();
         let device_id_owned = device_id.to_string();
@@ -1011,7 +1019,8 @@ impl Gb28181Server {
         download_speed: Option<u32>,
     ) -> anyhow::Result<(String, PlayUrls)> {
         let _ = download_speed;
-        self.invite_internal(device_id, channel_id, false, None, None).await
+        self.invite_internal(device_id, channel_id, false, None, None)
+            .await
     }
 
     // ── Group F: 移动位置主动查询 ──────────────────────────────────────────
@@ -1041,21 +1050,24 @@ impl Gb28181Server {
     pub async fn ptz_lock(&self, device_id: &str, channel_id: &str) -> anyhow::Result<()> {
         let sn = self.next_sn_for(device_id);
         let xml = crate::xml::build_ptz_lock_xml(channel_id, sn);
-        self.send_device_control(device_id, channel_id, sn, &xml, "PTZ锁定").await
+        self.send_device_control(device_id, channel_id, sn, &xml, "PTZ锁定")
+            .await
     }
 
     /// PTZ 云台解锁（A.2.3.1.12）
     pub async fn ptz_unlock(&self, device_id: &str, channel_id: &str) -> anyhow::Result<()> {
         let sn = self.next_sn_for(device_id);
         let xml = crate::xml::build_ptz_unlock_xml(channel_id, sn);
-        self.send_device_control(device_id, channel_id, sn, &xml, "PTZ解锁").await
+        self.send_device_control(device_id, channel_id, sn, &xml, "PTZ解锁")
+            .await
     }
 
     /// 手动抓拍（DeviceControl 方式，非 INVITE 模式）
     pub async fn snapshot_control(&self, device_id: &str, channel_id: &str) -> anyhow::Result<()> {
         let sn = self.next_sn_for(device_id);
         let xml = crate::xml::build_snapshot_control_xml(channel_id, sn);
-        self.send_device_control(device_id, channel_id, sn, &xml, "手动抓拍").await
+        self.send_device_control(device_id, channel_id, sn, &xml, "手动抓拍")
+            .await
     }
 
     /// 推送配置参数到设备（A.2.3.2）
@@ -1218,7 +1230,11 @@ impl Gb28181Server {
         let call_id_clone = call_id.clone();
         let device_id_owned = device_id.to_string();
         let channel_id_owned = channel_id.to_string();
-        let media_clone = self.media.get().expect("MediaBackend not initialized").clone();
+        let media_clone = self
+            .media
+            .get()
+            .expect("MediaBackend not initialized")
+            .clone();
         let sessions_clone = self.sessions.clone();
         let rtp_port_clone = rtp_port;
         let ssrc_clone = ssrc.clone();
@@ -1257,8 +1273,7 @@ impl Gb28181Server {
 
                             // 若已通过 hangup 主动挂断并清理，则跳过避免重复处理
                             if sessions_clone.contains_key(&call_id_clone) {
-                                if let Err(e) =
-                                    media_clone.close_rtp_server(&stream_id_clone).await
+                                if let Err(e) = media_clone.close_rtp_server(&stream_id_clone).await
                                 {
                                     warn!(call_id = %call_id_clone, error = %e, "关闭 RTP 端口失败");
                                 }
@@ -1302,7 +1317,8 @@ impl Gb28181Server {
         desc: &str,
     ) -> anyhow::Result<()> {
         let device = self.get_dev_or_err(device_id)?;
-        self.send_message_to_device(&device.contact, xml_body, sn).await
+        self.send_message_to_device(&device.contact, xml_body, sn)
+            .await
     }
 
     /// 向指定设备 Contact URI 发送 MESSAGE

@@ -1,4 +1,4 @@
-﻿//! Tauri 命令：封装 `tx_di_can` 的公开 API 供前端调用
+//! Tauri 命令：封装 `tx_di_can` 的公开 API 供前端调用
 //!
 //! 每个命令返回 `Result<T, String>`：成功值经 serde 序列化给前端，
 //! 错误统一转为字符串消息。所有底层错误（`anyhow::Error` / `UdsError`）均 `.to_string()`。
@@ -6,8 +6,9 @@
 use serde::Deserialize;
 use std::sync::Arc;
 use tx_di_can::{
-    audit, dbc::Dbc, report, BusStats, CanConfig, CanFdFrame, CanFrame, CanPlugin, CsvAnalysis,
-    FlashConfig, FrameFilter,     ProjectConfig, SessionType, UdsClient, A2l, A2lType, XcpMaster, parse_a2l,
+    audit, dbc::Dbc, parse_a2l, report, A2l, A2lType, BusStats, CanConfig, CanFdFrame, CanFrame,
+    CanPlugin, CsvAnalysis, FlashConfig, FrameFilter, ProjectConfig, SessionType, UdsClient,
+    XcpMaster,
 };
 
 /// 描述库 DID 摘要（供前端描述面板展示）
@@ -194,8 +195,15 @@ pub async fn send_fd_frame(frame: FrameInput) -> Result<(), String> {
 pub async fn read_data(tx_id: u32, did: u16) -> Result<String, String> {
     let r = CanPlugin::read_data(tx_id, did).await;
     match &r {
-        Ok(d) => audit::ok("read_did", &format!("tx=0x{:X} did=0x{:X} len={}", tx_id, did, d.len())),
-        Err(e) => audit::fail("read_did", &format!("tx=0x{:X} did=0x{:X}", tx_id, did), &e.to_string()),
+        Ok(d) => audit::ok(
+            "read_did",
+            &format!("tx=0x{:X} did=0x{:X} len={}", tx_id, did, d.len()),
+        ),
+        Err(e) => audit::fail(
+            "read_did",
+            &format!("tx=0x{:X} did=0x{:X}", tx_id, did),
+            &e.to_string(),
+        ),
     }
     r.map(|data| hex_encode(&data)).map_err(|e| e.to_string())
 }
@@ -204,8 +212,15 @@ pub async fn read_data(tx_id: u32, did: u16) -> Result<String, String> {
 pub async fn write_data(tx_id: u32, did: u16, data: Vec<u8>) -> Result<(), String> {
     let r = CanPlugin::write_data(tx_id, did, &data).await;
     match &r {
-        Ok(()) => audit::ok("write_did", &format!("tx=0x{:X} did=0x{:X} len={}", tx_id, did, data.len())),
-        Err(e) => audit::fail("write_did", &format!("tx=0x{:X} did=0x{:X}", tx_id, did), &e.to_string()),
+        Ok(()) => audit::ok(
+            "write_did",
+            &format!("tx=0x{:X} did=0x{:X} len={}", tx_id, did, data.len()),
+        ),
+        Err(e) => audit::fail(
+            "write_did",
+            &format!("tx=0x{:X} did=0x{:X}", tx_id, did),
+            &e.to_string(),
+        ),
     }
     r.map_err(|e| e.to_string())
 }
@@ -220,7 +235,10 @@ pub async fn session_control(tx_id: u32, session: u8) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn ecu_reset(tx_id: u32, reset_type: u8) -> Result<(), String> {
-    uds(tx_id).ecu_reset(reset_type).await.map_err(|e| e.to_string())
+    uds(tx_id)
+        .ecu_reset(reset_type)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -239,7 +257,10 @@ pub async fn security_access(tx_id: u32, level: u8, key_algo: String) -> Result<
 
 #[tauri::command]
 pub async fn read_dtc(tx_id: u32, status_mask: u8) -> Result<Vec<String>, String> {
-    let dtcs = uds(tx_id).read_dtc(status_mask).await.map_err(|e| e.to_string())?;
+    let dtcs = uds(tx_id)
+        .read_dtc(status_mask)
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(dtcs
         .into_iter()
         .map(|d| format!("DTC {:04X} status {:02X}", d.dtc_code, d.status_mask))
@@ -261,8 +282,15 @@ pub async fn flash(
     let key_fn = make_key_fn(&key_algo);
     let r = CanPlugin::flash(firmware_path.clone(), fc, key_fn).await;
     match &r {
-        Ok(_) => audit::ok("flash", &format!("fw={} target=0x{:X}", firmware_path, config.target_id)),
-        Err(e) => audit::fail("flash", &format!("fw={} target=0x{:X}", firmware_path, config.target_id), &e.to_string()),
+        Ok(_) => audit::ok(
+            "flash",
+            &format!("fw={} target=0x{:X}", firmware_path, config.target_id),
+        ),
+        Err(e) => audit::fail(
+            "flash",
+            &format!("fw={} target=0x{:X}", firmware_path, config.target_id),
+            &e.to_string(),
+        ),
     }
     r.map(|_| ()).map_err(|e| e.to_string())
 }
@@ -297,8 +325,15 @@ pub async fn send_isotp(tx_id: u32, rx_id: u32, data: Vec<u8>) -> Result<(), Str
     let ch = CanPlugin::create_isotp_channel(tx_id, rx_id);
     let r = ch.send(&data).await;
     match &r {
-        Ok(()) => audit::ok("isotp", &format!("tx=0x{:X} rx=0x{:X} len={}", tx_id, rx_id, data.len())),
-        Err(e) => audit::fail("isotp", &format!("tx=0x{:X} rx=0x{:X}", tx_id, rx_id), &e.to_string()),
+        Ok(()) => audit::ok(
+            "isotp",
+            &format!("tx=0x{:X} rx=0x{:X} len={}", tx_id, rx_id, data.len()),
+        ),
+        Err(e) => audit::fail(
+            "isotp",
+            &format!("tx=0x{:X} rx=0x{:X}", tx_id, rx_id),
+            &e.to_string(),
+        ),
     }
     r.map_err(|e| e.to_string())
 }
@@ -626,8 +661,7 @@ pub fn export_report(path: String, format: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn analyze_csv(path: String, bitrate: u32) -> Result<CsvAnalysis, String> {
-    tx_di_can::record::analyze_csv(&path, bitrate)
-        .map_err(|e| e.to_string())
+    tx_di_can::record::analyze_csv(&path, bitrate).map_err(|e| e.to_string())
 }
 
 // ── D. 工程管理（.canproj） ───────────────────────────────────────────────
@@ -641,5 +675,3 @@ pub fn save_project(path: String, cfg: ProjectConfig) -> Result<(), String> {
 pub fn load_project(path: String) -> Result<ProjectConfig, String> {
     ProjectConfig::load(&path).map_err(|e| e.to_string())
 }
-
-

@@ -17,7 +17,8 @@ use tx_di_nacos::{NacosClient, Protocol, RegistryConfig, ServiceEndpoint};
 fn registry_config() -> RegistryConfig {
     RegistryConfig {
         enabled: true,
-        nacos_addr: std::env::var("NACOS_ADDR").unwrap_or_else(|_| "http://192.168.0.91:8848".into()),
+        nacos_addr: std::env::var("NACOS_ADDR")
+            .unwrap_or_else(|_| "http://192.168.0.91:8848".into()),
         namespace: std::env::var("NACOS_NS").unwrap_or_else(|_| "yc_dev".into()),
         group: std::env::var("NACOS_GROUP").unwrap_or_else(|_| "DEFAULT_GROUP".into()),
         service_name: "tx_admin_smoke".into(),
@@ -33,7 +34,10 @@ fn registry_config() -> RegistryConfig {
 async fn main() {
     println!("═══ Nacos 冒烟测试开始 ═══");
     let cfg = registry_config();
-    println!("连接: {} ns={} group={}", cfg.nacos_addr, cfg.namespace, cfg.group);
+    println!(
+        "连接: {} ns={} group={}",
+        cfg.nacos_addr, cfg.namespace, cfg.group
+    );
 
     // 1. 连接
     let client = match NacosClient::connect(&cfg).await {
@@ -101,7 +105,10 @@ message = "hello from nacos 3.2"
         Ok(instances) => {
             println!("✅ 服务发现成功，实例数={}", instances.len());
             for inst in instances {
-                println!("   - {} healthy={} eps={:?}", inst.instance_id, inst.healthy, inst.endpoints);
+                println!(
+                    "   - {} healthy={} eps={:?}",
+                    inst.instance_id, inst.healthy, inst.endpoints
+                );
             }
         }
         Err(e) => {

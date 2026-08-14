@@ -5,18 +5,18 @@
 
 #[cfg(test)]
 mod file_service_tests {
-    use std::sync::Arc;
-    use async_trait::async_trait;
-    use tx_common::page::Page;
-    use tx_error::AppResult;
-    use crate::shared::model::{AggregateRoot, AuditFields};
-    use crate::shared::model::value_object::DeletedStatus;
-    use crate::shared::model::DomainEvent;
     use crate::file::model::aggregate::{File, FileConfig};
     use crate::file::model::value_object::{FileQuery, FileUploadCommand};
     use crate::file::repository::{FileConfigRepository, FileRepository};
     use crate::file::service::FileService;
+    use crate::shared::model::DomainEvent;
+    use crate::shared::model::value_object::DeletedStatus;
+    use crate::shared::model::{AggregateRoot, AuditFields};
+    use async_trait::async_trait;
     use pretty_assertions::assert_eq;
+    use std::sync::Arc;
+    use tx_common::page::Page;
+    use tx_error::AppResult;
 
     // ----------------------------------------------------------
     // TestFileRepo: function-closure based mock
@@ -144,7 +144,11 @@ mod file_service_tests {
 
     fn make_file_config() -> FileConfig {
         FileConfig::restore(
-            1, "Default".into(), 1, Some("备注".into()), 0,
+            1,
+            "Default".into(),
+            1,
+            Some("备注".into()),
+            0,
             r#"{"allowed_extensions":["pdf","txt"]}"#.into(),
             AuditFields::default(),
         )
@@ -152,7 +156,11 @@ mod file_service_tests {
 
     fn make_master_config() -> FileConfig {
         FileConfig::restore(
-            1, "Master".into(), 1, None, 1,
+            1,
+            "Master".into(),
+            1,
+            None,
+            1,
             r#"{"allowed_extensions":["jpg","png"]}"#.into(),
             AuditFields::default(),
         )
@@ -160,7 +168,11 @@ mod file_service_tests {
 
     fn make_alt_config() -> FileConfig {
         FileConfig::restore(
-            2, "Alt".into(), 2, None, 0,
+            2,
+            "Alt".into(),
+            2,
+            None,
+            0,
             "{}".into(),
             AuditFields::default(),
         )
@@ -178,7 +190,9 @@ mod file_service_tests {
         let config_repo = TestFileConfigRepo::new();
 
         let svc = FileService::new(Arc::new(file_repo), Arc::new(config_repo));
-        let result = svc.upload_file(make_upload_cmd(), Some("admin".into())).await;
+        let result = svc
+            .upload_file(make_upload_cmd(), Some("admin".into()))
+            .await;
         assert!(result.is_ok());
         let file = result.unwrap();
         assert_eq!(file.name, "test.txt");
@@ -190,7 +204,8 @@ mod file_service_tests {
     #[tokio::test]
     async fn test_upload_file_insert_error() {
         let mut file_repo = TestFileRepo::new();
-        file_repo.insert_fn = Box::new(|_| Err(crate::shared::repository::RepositoryError::DatabaseFile.into()));
+        file_repo.insert_fn =
+            Box::new(|_| Err(crate::shared::repository::RepositoryError::DatabaseFile.into()));
         let config_repo = TestFileConfigRepo::new();
 
         let svc = FileService::new(Arc::new(file_repo), Arc::new(config_repo));
@@ -233,14 +248,13 @@ mod file_service_tests {
         let config_repo = TestFileConfigRepo::new();
 
         let svc = FileService::new(Arc::new(file_repo), Arc::new(config_repo));
-        let result = svc.upload_file(make_upload_cmd(), Some("admin".into())).await;
+        let result = svc
+            .upload_file(make_upload_cmd(), Some("admin".into()))
+            .await;
         assert!(result.is_ok());
         let file = result.unwrap();
         assert_eq!(file.events().len(), 1);
-        assert!(matches!(
-            file.events()[0],
-            DomainEvent::FileUploaded { .. }
-        ));
+        assert!(matches!(file.events()[0], DomainEvent::FileUploaded { .. }));
     }
 
     // ==========================================================
@@ -287,7 +301,16 @@ mod file_service_tests {
 
         let svc = FileService::new(Arc::new(file_repo), Arc::new(config_repo));
         svc.delete_file(1, Some("admin".into())).await.unwrap();
-        assert_eq!(captured_file.lock().unwrap().as_ref().unwrap().audit.deleted, DeletedStatus::Deleted);
+        assert_eq!(
+            captured_file
+                .lock()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .audit
+                .deleted,
+            DeletedStatus::Deleted
+        );
     }
 
     // ==========================================================
@@ -299,9 +322,7 @@ mod file_service_tests {
     async fn test_get_file_page_success() {
         let mut file_repo = TestFileRepo::new();
         let items = vec![make_file()];
-        file_repo.find_page_fn = Box::new(move |_, _| {
-            Ok(Page::new(items.clone(), 1, 10, 1))
-        });
+        file_repo.find_page_fn = Box::new(move |_, _| Ok(Page::new(items.clone(), 1, 10, 1)));
         let config_repo = TestFileConfigRepo::new();
 
         let svc = FileService::new(Arc::new(file_repo), Arc::new(config_repo));
@@ -317,9 +338,7 @@ mod file_service_tests {
     #[tokio::test]
     async fn test_get_file_page_empty() {
         let mut file_repo = TestFileRepo::new();
-        file_repo.find_page_fn = Box::new(|_, _| {
-            Ok(Page::new(vec![], 1, 10, 0))
-        });
+        file_repo.find_page_fn = Box::new(|_, _| Ok(Page::new(vec![], 1, 10, 0)));
         let config_repo = TestFileConfigRepo::new();
 
         let svc = FileService::new(Arc::new(file_repo), Arc::new(config_repo));
@@ -357,13 +376,14 @@ mod file_service_tests {
     #[tokio::test]
     async fn test_get_file_page_error() {
         let mut file_repo = TestFileRepo::new();
-        file_repo.find_page_fn = Box::new(|_, _| {
-            Err(crate::shared::repository::RepositoryError::DatabaseFile.into())
-        });
+        file_repo.find_page_fn =
+            Box::new(|_, _| Err(crate::shared::repository::RepositoryError::DatabaseFile.into()));
         let config_repo = TestFileConfigRepo::new();
 
         let svc = FileService::new(Arc::new(file_repo), Arc::new(config_repo));
-        let result = svc.get_file_page(&FileQuery::default(), Page::request(1, 10)).await;
+        let result = svc
+            .get_file_page(&FileQuery::default(), Page::request(1, 10))
+            .await;
         assert!(result.is_err());
     }
 
@@ -399,9 +419,8 @@ mod file_service_tests {
     #[tokio::test]
     async fn test_get_file_db_error() {
         let mut file_repo = TestFileRepo::new();
-        file_repo.find_by_id_fn = Box::new(|_| {
-            Err(crate::shared::repository::RepositoryError::DatabaseFile.into())
-        });
+        file_repo.find_by_id_fn =
+            Box::new(|_| Err(crate::shared::repository::RepositoryError::DatabaseFile.into()));
         let config_repo = TestFileConfigRepo::new();
 
         let svc = FileService::new(Arc::new(file_repo), Arc::new(config_repo));
@@ -434,8 +453,13 @@ mod file_service_tests {
         let mut file_repo = TestFileRepo::new();
         file_repo.find_by_id_fn = Box::new(|_| {
             Ok(Some(File::restore(
-                1, Some(1), "doc.pdf".into(), "/uploads/doc.pdf".into(),
-                "https://example.com/doc.pdf".into(), None, 2048,
+                1,
+                Some(1),
+                "doc.pdf".into(),
+                "/uploads/doc.pdf".into(),
+                "https://example.com/doc.pdf".into(),
+                None,
+                2048,
                 AuditFields::default(),
             )))
         });
@@ -453,8 +477,13 @@ mod file_service_tests {
         let mut file_repo = TestFileRepo::new();
         file_repo.find_by_id_fn = Box::new(|_| {
             Ok(Some(File::restore(
-                1, Some(1), "img.png".into(), "/uploads/img.png".into(),
-                "https://example.com/img.png".into(), None, 512,
+                1,
+                Some(1),
+                "img.png".into(),
+                "/uploads/img.png".into(),
+                "https://example.com/img.png".into(),
+                None,
+                512,
                 AuditFields::default(),
             )))
         });
@@ -472,8 +501,13 @@ mod file_service_tests {
         let mut file_repo = TestFileRepo::new();
         file_repo.find_by_id_fn = Box::new(|_| {
             Ok(Some(File::restore(
-                1, Some(1), "data.xyz".into(), "/uploads/data.xyz".into(),
-                "https://example.com/data.xyz".into(), None, 256,
+                1,
+                Some(1),
+                "data.xyz".into(),
+                "/uploads/data.xyz".into(),
+                "https://example.com/data.xyz".into(),
+                None,
+                256,
                 AuditFields::default(),
             )))
         });
@@ -502,8 +536,13 @@ mod file_service_tests {
         let mut file_repo = TestFileRepo::new();
         file_repo.find_by_id_fn = Box::new(|_| {
             Ok(Some(File::restore(
-                1, Some(1), "photo.jpg".into(), "/uploads/photo.jpg".into(),
-                "https://example.com/photo.jpg".into(), None, 1024,
+                1,
+                Some(1),
+                "photo.jpg".into(),
+                "/uploads/photo.jpg".into(),
+                "https://example.com/photo.jpg".into(),
+                None,
+                1024,
                 AuditFields::default(),
             )))
         });
@@ -521,8 +560,13 @@ mod file_service_tests {
         let mut file_repo = TestFileRepo::new();
         file_repo.find_by_id_fn = Box::new(|_| {
             Ok(Some(File::restore(
-                1, Some(1), "page.html".into(), "/uploads/page.html".into(),
-                "https://example.com/page.html".into(), None, 512,
+                1,
+                Some(1),
+                "page.html".into(),
+                "/uploads/page.html".into(),
+                "https://example.com/page.html".into(),
+                None,
+                512,
                 AuditFields::default(),
             )))
         });
@@ -540,8 +584,13 @@ mod file_service_tests {
         let mut file_repo = TestFileRepo::new();
         file_repo.find_by_id_fn = Box::new(|_| {
             Ok(Some(File::restore(
-                1, Some(1), "data.json".into(), "/uploads/data.json".into(),
-                "https://example.com/data.json".into(), None, 256,
+                1,
+                Some(1),
+                "data.json".into(),
+                "/uploads/data.json".into(),
+                "https://example.com/data.json".into(),
+                None,
+                256,
                 AuditFields::default(),
             )))
         });
@@ -559,8 +608,13 @@ mod file_service_tests {
         let mut file_repo = TestFileRepo::new();
         file_repo.find_by_id_fn = Box::new(|_| {
             Ok(Some(File::restore(
-                1, Some(1), "archive.zip".into(), "/uploads/archive.zip".into(),
-                "https://example.com/archive.zip".into(), None, 4096,
+                1,
+                Some(1),
+                "archive.zip".into(),
+                "/uploads/archive.zip".into(),
+                "https://example.com/archive.zip".into(),
+                None,
+                4096,
                 AuditFields::default(),
             )))
         });
@@ -578,8 +632,13 @@ mod file_service_tests {
         let mut file_repo = TestFileRepo::new();
         file_repo.find_by_id_fn = Box::new(|_| {
             Ok(Some(File::restore(
-                1, Some(1), "Makefile".into(), "/uploads/Makefile".into(),
-                "https://example.com/Makefile".into(), None, 128,
+                1,
+                Some(1),
+                "Makefile".into(),
+                "/uploads/Makefile".into(),
+                "https://example.com/Makefile".into(),
+                None,
+                128,
                 AuditFields::default(),
             )))
         });
@@ -597,8 +656,13 @@ mod file_service_tests {
         let mut file_repo = TestFileRepo::new();
         file_repo.find_by_id_fn = Box::new(|_| {
             Ok(Some(File::restore(
-                1, Some(1), "backup.tar.gz".into(), "/uploads/backup.tar.gz".into(),
-                "https://example.com/backup.tar.gz".into(), None, 8192,
+                1,
+                Some(1),
+                "backup.tar.gz".into(),
+                "/uploads/backup.tar.gz".into(),
+                "https://example.com/backup.tar.gz".into(),
+                None,
+                8192,
                 AuditFields::default(),
             )))
         });
@@ -619,8 +683,13 @@ mod file_service_tests {
         let mut file_repo = TestFileRepo::new();
         file_repo.find_by_id_fn = Box::new(|_| {
             Ok(Some(File::restore(
-                1, Some(1), "doc.pdf".into(), "/store/files/doc.pdf".into(),
-                "https://cdn.example.com/doc.pdf".into(), None, 1024,
+                1,
+                Some(1),
+                "doc.pdf".into(),
+                "/store/files/doc.pdf".into(),
+                "https://cdn.example.com/doc.pdf".into(),
+                None,
+                1024,
                 AuditFields::default(),
             )))
         });
@@ -679,9 +748,8 @@ mod file_service_tests {
     async fn test_resolve_config_id_db_error() {
         let file_repo = TestFileRepo::new();
         let mut config_repo = TestFileConfigRepo::new();
-        config_repo.find_master_fn = Box::new(|| {
-            Err(crate::shared::repository::RepositoryError::DatabaseFile.into())
-        });
+        config_repo.find_master_fn =
+            Box::new(|| Err(crate::shared::repository::RepositoryError::DatabaseFile.into()));
 
         let svc = FileService::new(Arc::new(file_repo), Arc::new(config_repo));
         assert!(svc.resolve_config_id(None).await.is_err());
@@ -750,7 +818,11 @@ mod file_service_tests {
         let mut config_repo = TestFileConfigRepo::new();
         config_repo.find_by_id_fn = Box::new(|_| {
             Ok(Some(FileConfig::restore(
-                1, "Bad".into(), 1, None, 0,
+                1,
+                "Bad".into(),
+                1,
+                None,
+                0,
                 "not-valid-json".into(),
                 AuditFields::default(),
             )))
@@ -770,7 +842,11 @@ mod file_service_tests {
         let mut config_repo = TestFileConfigRepo::new();
         config_repo.find_by_id_fn = Box::new(|_| {
             Ok(Some(FileConfig::restore(
-                1, "Other".into(), 1, None, 0,
+                1,
+                "Other".into(),
+                1,
+                None,
+                0,
                 r#"{"bucket":"my-bucket","region":"us-east-1"}"#.into(),
                 AuditFields::default(),
             )))
@@ -791,9 +867,7 @@ mod file_service_tests {
     async fn test_get_config_all_success() {
         let file_repo = TestFileRepo::new();
         let mut config_repo = TestFileConfigRepo::new();
-        config_repo.find_all_fn = Box::new(|| {
-            Ok(vec![make_file_config(), make_alt_config()])
-        });
+        config_repo.find_all_fn = Box::new(|| Ok(vec![make_file_config(), make_alt_config()]));
 
         let svc = FileService::new(Arc::new(file_repo), Arc::new(config_repo));
         let result = svc.get_config_all().await;
@@ -822,9 +896,8 @@ mod file_service_tests {
     async fn test_get_config_all_db_error() {
         let file_repo = TestFileRepo::new();
         let mut config_repo = TestFileConfigRepo::new();
-        config_repo.find_all_fn = Box::new(|| {
-            Err(crate::shared::repository::RepositoryError::DatabaseFile.into())
-        });
+        config_repo.find_all_fn =
+            Box::new(|| Err(crate::shared::repository::RepositoryError::DatabaseFile.into()));
 
         let svc = FileService::new(Arc::new(file_repo), Arc::new(config_repo));
         assert!(svc.get_config_all().await.is_err());
@@ -870,10 +943,15 @@ mod file_service_tests {
         config_repo.insert_fn = Box::new(|_| Ok(()));
 
         let svc = FileService::new(Arc::new(file_repo), Arc::new(config_repo));
-        let result = svc.create_config(
-            "S3".into(), 1, Some("AWS存储".into()),
-            r#"{"bucket":"my-bucket"}"#.into(), Some("admin".into()),
-        ).await;
+        let result = svc
+            .create_config(
+                "S3".into(),
+                1,
+                Some("AWS存储".into()),
+                r#"{"bucket":"my-bucket"}"#.into(),
+                Some("admin".into()),
+            )
+            .await;
         assert!(result.is_ok());
         let fc = result.unwrap();
         assert_eq!(fc.name, "S3");
@@ -887,14 +965,13 @@ mod file_service_tests {
     async fn test_create_config_insert_error() {
         let file_repo = TestFileRepo::new();
         let mut config_repo = TestFileConfigRepo::new();
-        config_repo.insert_fn = Box::new(|_| {
-            Err(crate::shared::repository::RepositoryError::DatabaseFile.into())
-        });
+        config_repo.insert_fn =
+            Box::new(|_| Err(crate::shared::repository::RepositoryError::DatabaseFile.into()));
 
         let svc = FileService::new(Arc::new(file_repo), Arc::new(config_repo));
-        let result = svc.create_config(
-            "S3".into(), 1, None, "{}".into(), None,
-        ).await;
+        let result = svc
+            .create_config("S3".into(), 1, None, "{}".into(), None)
+            .await;
         assert!(result.is_err());
     }
 
@@ -911,10 +988,16 @@ mod file_service_tests {
         config_repo.update_fn = Box::new(|_| Ok(()));
 
         let svc = FileService::new(Arc::new(file_repo), Arc::new(config_repo));
-        let result = svc.update_config(
-            1, "Updated".into(), 2, Some("新备注".into()),
-            r#"{"allowed_extensions":["xls"]}"#.into(), Some("editor".into()),
-        ).await;
+        let result = svc
+            .update_config(
+                1,
+                "Updated".into(),
+                2,
+                Some("新备注".into()),
+                r#"{"allowed_extensions":["xls"]}"#.into(),
+                Some("editor".into()),
+            )
+            .await;
         assert!(result.is_ok());
         let fc = result.unwrap();
         assert_eq!(fc.name, "Updated");
@@ -929,9 +1012,9 @@ mod file_service_tests {
         config_repo.find_by_id_fn = Box::new(|_| Ok(None));
 
         let svc = FileService::new(Arc::new(file_repo), Arc::new(config_repo));
-        let result = svc.update_config(
-            999, "X".into(), 0, None, "{}".into(), None,
-        ).await;
+        let result = svc
+            .update_config(999, "X".into(), 0, None, "{}".into(), None)
+            .await;
         assert!(result.is_err());
     }
 

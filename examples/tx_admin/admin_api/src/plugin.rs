@@ -1,42 +1,42 @@
+use admin_app::log::app_service::OperateLogAppService;
+use admin_proto::CreateOperateLogRequest;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::info;
-use tx_di_axum::{WebPlugin, WebConfig, add_layer, MetricsLayer};
+use tx_di_axum::{MetricsLayer, WebConfig, WebPlugin, add_layer};
 use tx_di_core::{App, AppAllConfig, Component, DepsTuple, RIE};
-use tx_di_sa_token::{SaTokenPlugin, SaTokenLayer, SaCheckLoginLayer};
-use admin_app::log::app_service::OperateLogAppService;
-use admin_proto::CreateOperateLogRequest;
+use tx_di_sa_token::{SaCheckLoginLayer, SaTokenLayer, SaTokenPlugin};
 
 use crate::interfaces::api;
 use crate::interfaces::grpc;
-use crate::operate_log::{OperateLogLayer, OperateLogEntry, OPERATE_LOG_CHANNEL_CAP};
+use crate::operate_log::{OPERATE_LOG_CHANNEL_CAP, OperateLogEntry, OperateLogLayer};
 
 use grpc::auth_service::AuthGrpcService;
-use grpc::user_service::UserGrpcService;
-use grpc::role_service::RoleGrpcService;
-use grpc::menu_service::MenuGrpcService;
-use grpc::dept_service::DeptGrpcService;
 use grpc::config_service::ConfigGrpcService;
+use grpc::dept_service::DeptGrpcService;
 use grpc::dict_service::DictGrpcService;
-use grpc::log_service::LogGrpcService;
 use grpc::file_service::FileGrpcService;
-use grpc::monitor_service::MonitorGrpcService;
-use grpc::tool_service::ToolGrpcService;
 use grpc::job_service::{JobGrpcService, JobLogGrpcService};
+use grpc::log_service::LogGrpcService;
+use grpc::menu_service::MenuGrpcService;
+use grpc::monitor_service::MonitorGrpcService;
+use grpc::role_service::RoleGrpcService;
+use grpc::tool_service::ToolGrpcService;
+use grpc::user_service::UserGrpcService;
 
 use admin_proto::admin::auth::auth_service_server::AuthServiceServer;
-use admin_proto::admin::user::user_service_server::UserServiceServer;
-use admin_proto::admin::role::role_service_server::RoleServiceServer;
-use admin_proto::admin::menu::menu_service_server::MenuServiceServer;
-use admin_proto::admin::dept::department_service_server::DepartmentServiceServer;
 use admin_proto::admin::config::config_service_server::ConfigServiceServer;
+use admin_proto::admin::dept::department_service_server::DepartmentServiceServer;
 use admin_proto::admin::dict::dict_service_server::DictServiceServer;
-use admin_proto::admin::log::log_service_server::LogServiceServer;
 use admin_proto::admin::file::file_service_server::FileServiceServer;
-use admin_proto::admin::monitor::monitor_service_server::MonitorServiceServer;
-use admin_proto::admin::tool::tool_service_server::ToolServiceServer;
-use admin_proto::admin::job::job_service_server::JobServiceServer;
 use admin_proto::admin::job::job_log_service_server::JobLogServiceServer;
+use admin_proto::admin::job::job_service_server::JobServiceServer;
+use admin_proto::admin::log::log_service_server::LogServiceServer;
+use admin_proto::admin::menu::menu_service_server::MenuServiceServer;
+use admin_proto::admin::monitor::monitor_service_server::MonitorServiceServer;
+use admin_proto::admin::role::role_service_server::RoleServiceServer;
+use admin_proto::admin::tool::tool_service_server::ToolServiceServer;
+use admin_proto::admin::user::user_service_server::UserServiceServer;
 
 /// gRPC 默认端口（可被 `GRPC_PORT` 环境变量或 `[grpc_config] port` 配置覆盖）
 const DEFAULT_GRPC_PORT: u16 = 50051;
@@ -95,7 +95,8 @@ async fn app_async_init(_comp: Arc<AdminPlugin>, app: Arc<App>) -> RIE<()> {
                     "user_ip": entry.user_ip,
                     "user_name": user_name,
                     "user_agent": entry.user_agent,
-                }).to_string(),
+                })
+                .to_string(),
             };
             let _ = op_log_svc_clone.create_log(req).await;
         }
@@ -111,7 +112,11 @@ async fn app_async_init(_comp: Arc<AdminPlugin>, app: Arc<App>) -> RIE<()> {
             if let admin_domain::shared::model::DomainEvent::UserCreated { user_id, username } =
                 event
             {
-                tracing::info!("[domain-event] 用户创建: id={} username={}", user_id, username);
+                tracing::info!(
+                    "[domain-event] 用户创建: id={} username={}",
+                    user_id,
+                    username
+                );
             }
         });
         info!("领域事件总线订阅已注册");
@@ -121,13 +126,11 @@ async fn app_async_init(_comp: Arc<AdminPlugin>, app: Arc<App>) -> RIE<()> {
     let open = api::open_router();
     let protected = api::router(max_body_size);
 
-    let router = tx_di_axum::Router::new()
-        .merge(open)
-        .merge(
-            protected
-                .layer(SaCheckLoginLayer::new())
-                .layer(SaTokenLayer::new(sa_state))
-        );
+    let router = tx_di_axum::Router::new().merge(open).merge(
+        protected
+            .layer(SaCheckLoginLayer::new())
+            .layer(SaTokenLayer::new(sa_state)),
+    );
 
     WebPlugin::add_router(router);
     info!("admin HTTP 路由已注册（含认证）");
@@ -135,7 +138,8 @@ async fn app_async_init(_comp: Arc<AdminPlugin>, app: Arc<App>) -> RIE<()> {
     // ════════════════════ gRPC Server ════════════════════
 
     let grpc_port = resolve_grpc_port(&app.inject::<AppAllConfig>());
-    let grpc_addr: std::net::SocketAddr = format!("0.0.0.0:{}", grpc_port).parse()
+    let grpc_addr: std::net::SocketAddr = format!("0.0.0.0:{}", grpc_port)
+        .parse()
         .map_err(|e: std::net::AddrParseError| anyhow::anyhow!("gRPC 地址解析失败: {}", e))?;
 
     // ════════════════════ 注册中心端点注册（微服务化预留）════════════════
@@ -144,8 +148,7 @@ async fn app_async_init(_comp: Arc<AdminPlugin>, app: Arc<App>) -> RIE<()> {
     {
         let http_port = web_config.port;
         tx_di_nacos::register_endpoints(std::sync::Arc::new(crate::nacos::AdminEndpoints::new(
-            http_port,
-            grpc_port,
+            http_port, grpc_port,
         )));
         info!("已注册服务端点: HTTP={} gRPC={}", http_port, grpc_port);
     }
@@ -176,15 +179,23 @@ async fn app_async_init(_comp: Arc<AdminPlugin>, app: Arc<App>) -> RIE<()> {
         .add_service(UserServiceServer::new(UserGrpcService { app: app.clone() }))
         .add_service(RoleServiceServer::new(RoleGrpcService { app: app.clone() }))
         .add_service(MenuServiceServer::new(MenuGrpcService { app: app.clone() }))
-        .add_service(DepartmentServiceServer::new(DeptGrpcService { app: app.clone() }))
-        .add_service(ConfigServiceServer::new(ConfigGrpcService { app: app.clone() }))
+        .add_service(DepartmentServiceServer::new(DeptGrpcService {
+            app: app.clone(),
+        }))
+        .add_service(ConfigServiceServer::new(ConfigGrpcService {
+            app: app.clone(),
+        }))
         .add_service(DictServiceServer::new(DictGrpcService { app: app.clone() }))
         .add_service(LogServiceServer::new(LogGrpcService { app: app.clone() }))
         .add_service(FileServiceServer::new(FileGrpcService { app: app.clone() }))
-        .add_service(MonitorServiceServer::new(MonitorGrpcService { app: app.clone() }))
+        .add_service(MonitorServiceServer::new(MonitorGrpcService {
+            app: app.clone(),
+        }))
         .add_service(ToolServiceServer::new(ToolGrpcService))
         .add_service(JobServiceServer::new(JobGrpcService { app: app.clone() }))
-        .add_service(JobLogServiceServer::new(JobLogGrpcService { app: app.clone() }));
+        .add_service(JobLogServiceServer::new(JobLogGrpcService {
+            app: app.clone(),
+        }));
 
     tokio::spawn(async move {
         info!("gRPC server listening on {}", grpc_addr);

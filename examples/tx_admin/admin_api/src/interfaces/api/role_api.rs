@@ -1,16 +1,18 @@
 //! 角色管理 HTTP API
 
-use axum::Json;
-use tx_di_sa_token::StpUtil;
-use tx_di_axum::Router;
-use axum::routing::{get, post, put, delete};
-use tx_di_axum::bound::DiComp;
-use admin_app::role::app_service::RoleAppService;
-use admin_proto::{CreateRoleRequest, UpdateRoleRequest, AssignMenusRequest, ListRolesRequest, RoleResponse, Empty};
-use admin_proto::UserResponse;
-use tx_common::{ApiR, ApiRes, Page};
 use crate::auth::ensure_permission;
 use crate::error::ApiErr;
+use admin_app::role::app_service::RoleAppService;
+use admin_proto::UserResponse;
+use admin_proto::{
+    AssignMenusRequest, CreateRoleRequest, Empty, ListRolesRequest, RoleResponse, UpdateRoleRequest,
+};
+use axum::Json;
+use axum::routing::{delete, get, post, put};
+use tx_common::{ApiR, ApiRes, Page};
+use tx_di_axum::Router;
+use tx_di_axum::bound::DiComp;
+use tx_di_sa_token::StpUtil;
 
 pub fn router() -> Router {
     Router::new()

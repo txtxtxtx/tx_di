@@ -7,9 +7,8 @@
 //! 调用方可通过 `err.domain()` / `err.code()` 判定错误大类，
 //! 通过 `err.context()` 取得详细描述。
 
-
-pub use tx_error::{AppError, AppResult};
 use crate::CodeMsg;
+pub use tx_error::{AppError, AppResult};
 
 /// DI 框架自身的业务错误码。
 #[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]

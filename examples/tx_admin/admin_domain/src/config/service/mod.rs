@@ -5,10 +5,10 @@ use crate::config::model::aggregate::Config;
 use crate::config::model::value_object::ConfigQuery;
 use crate::config::repository::ConfigRepository;
 use crate::shared::repository::RepositoryError;
+use tx_common::id;
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
-use tx_common::id;
 
 #[derive(Component)]
 pub struct ConfigService {
@@ -60,7 +60,15 @@ impl ConfigService {
         }
 
         let config_id = id::next_id();
-        let config = Config::create(config_id, category, config_type, name, config_key, value, creator);
+        let config = Config::create(
+            config_id,
+            category,
+            config_type,
+            name,
+            config_key,
+            value,
+            creator,
+        );
         self.config_repo.insert(&config).await?;
         Ok(config)
     }
@@ -116,7 +124,16 @@ impl ConfigService {
             }
         }
 
-        config.update_info(category, config_type, name, config_key, value, visible, remark, updater);
+        config.update_info(
+            category,
+            config_type,
+            name,
+            config_key,
+            value,
+            visible,
+            remark,
+            updater,
+        );
         self.config_repo.update(&config).await?;
         Ok(config)
     }
@@ -189,7 +206,8 @@ impl ConfigService {
     /// - `NotFoundConfig` - 当指定 config_id 的配置不存在时
     /// - 数据库操作错误 - 仓储查询失败时
     pub async fn get_config(&self, config_id: u64) -> AppResult<Config> {
-        Ok(self.config_repo
+        Ok(self
+            .config_repo
             .find_by_id(config_id)
             .await?
             .ok_or_else(|| RepositoryError::NotFoundConfig)?)
@@ -211,7 +229,8 @@ impl ConfigService {
     /// - `NotFoundConfig` - 当指定 key 的配置不存在时
     /// - 数据库操作错误 - 仓储查询失败时
     pub async fn get_by_key(&self, key: &str) -> AppResult<Config> {
-        Ok(self.config_repo
+        Ok(self
+            .config_repo
             .find_by_key(key)
             .await?
             .ok_or_else(|| RepositoryError::NotFoundConfig)?)
@@ -233,7 +252,8 @@ impl ConfigService {
     /// - 数据库操作错误 - 仓储查询失败时
     pub async fn get_by_keys(&self, keys: &[String]) -> AppResult<HashMap<String, String>> {
         let configs = self.config_repo.find_by_keys(keys).await?;
-        let map = configs.into_iter()
+        let map = configs
+            .into_iter()
             .map(|c| (c.config_key, c.value))
             .collect();
         Ok(map)

@@ -4,17 +4,17 @@
 
 #[cfg(test)]
 mod menu_service_tests {
-    use std::collections::HashSet;
-    use std::sync::Arc;
-    use async_trait::async_trait;
-    use tx_error::AppResult;
-    use crate::shared::model::value_object::DeletedStatus;
-    use crate::shared::repository::RepositoryError;
     use crate::menu::model::aggregate::Menu;
     use crate::menu::model::value_object::MenuQuery;
     use crate::menu::repository::MenuRepository;
     use crate::menu::service::MenuService;
+    use crate::shared::model::value_object::DeletedStatus;
+    use crate::shared::repository::RepositoryError;
+    use async_trait::async_trait;
     use pretty_assertions::assert_eq;
+    use std::collections::HashSet;
+    use std::sync::Arc;
+    use tx_error::AppResult;
 
     struct TestMenuRepo {
         find_by_id_fn: Box<dyn Fn(u64) -> AppResult<Option<Menu>> + Send + Sync>,
@@ -23,7 +23,8 @@ mod menu_service_tests {
         insert_fn: Box<dyn Fn(&Menu) -> AppResult<()> + Send + Sync>,
         update_fn: Box<dyn Fn(&Menu) -> AppResult<()> + Send + Sync>,
         has_children_fn: Box<dyn Fn(u64) -> AppResult<bool> + Send + Sync>,
-        find_permission_codes_by_user_id_fn: Box<dyn Fn(u64) -> AppResult<HashSet<String>> + Send + Sync>,
+        find_permission_codes_by_user_id_fn:
+            Box<dyn Fn(u64) -> AppResult<HashSet<String>> + Send + Sync>,
     }
 
     impl TestMenuRepo {
@@ -42,26 +43,61 @@ mod menu_service_tests {
 
     #[async_trait]
     impl MenuRepository for TestMenuRepo {
-        async fn find_by_id(&self, id: u64) -> AppResult<Option<Menu>> { (self.find_by_id_fn)(id) }
-        async fn find_all(&self, query: &MenuQuery) -> AppResult<Vec<Menu>> { (self.find_all_fn)(query) }
-        async fn find_by_ids(&self, ids: &[u64]) -> AppResult<Vec<Menu>> { (self.find_by_ids_fn)(ids) }
-        async fn find_by_parent_id(&self, _: u64) -> AppResult<Vec<Menu>> { Ok(vec![]) }
-        async fn insert(&self, menu: &Menu) -> AppResult<()> { (self.insert_fn)(menu) }
-        async fn update(&self, menu: &Menu) -> AppResult<()> { (self.update_fn)(menu) }
-        async fn soft_delete(&self, _: u64) -> AppResult<()> { Ok(()) }
-        async fn has_children(&self, parent_id: u64) -> AppResult<bool> { (self.has_children_fn)(parent_id) }
+        async fn find_by_id(&self, id: u64) -> AppResult<Option<Menu>> {
+            (self.find_by_id_fn)(id)
+        }
+        async fn find_all(&self, query: &MenuQuery) -> AppResult<Vec<Menu>> {
+            (self.find_all_fn)(query)
+        }
+        async fn find_by_ids(&self, ids: &[u64]) -> AppResult<Vec<Menu>> {
+            (self.find_by_ids_fn)(ids)
+        }
+        async fn find_by_parent_id(&self, _: u64) -> AppResult<Vec<Menu>> {
+            Ok(vec![])
+        }
+        async fn insert(&self, menu: &Menu) -> AppResult<()> {
+            (self.insert_fn)(menu)
+        }
+        async fn update(&self, menu: &Menu) -> AppResult<()> {
+            (self.update_fn)(menu)
+        }
+        async fn soft_delete(&self, _: u64) -> AppResult<()> {
+            Ok(())
+        }
+        async fn has_children(&self, parent_id: u64) -> AppResult<bool> {
+            (self.has_children_fn)(parent_id)
+        }
 
-        async fn find_permission_codes_by_user_id(&self, user_id: u64) -> AppResult<HashSet<String>> {
+        async fn find_permission_codes_by_user_id(
+            &self,
+            user_id: u64,
+        ) -> AppResult<HashSet<String>> {
             (self.find_permission_codes_by_user_id_fn)(user_id)
         }
     }
 
     fn make_menu() -> Menu {
-        Menu::create(1, "Dashboard".into(), "dashboard:view".into(), 1, 1, 0, Some("admin".into()))
+        Menu::create(
+            1,
+            "Dashboard".into(),
+            "dashboard:view".into(),
+            1,
+            1,
+            0,
+            Some("admin".into()),
+        )
     }
 
     fn make_root_menu(id: u64, name: &str, parent_id: u64) -> Menu {
-        Menu::create(id, name.into(), format!("{}:view", name.to_lowercase()), 1, 1, parent_id, Some("admin".into()))
+        Menu::create(
+            id,
+            name.into(),
+            format!("{}:view", name.to_lowercase()),
+            1,
+            1,
+            parent_id,
+            Some("admin".into()),
+        )
     }
 
     // ---- create_menu ----
@@ -72,10 +108,20 @@ mod menu_service_tests {
         repo.insert_fn = Box::new(|_| Ok(()));
 
         let svc = MenuService::new(Arc::new(repo));
-        let r = svc.create_menu(
-            "System".into(), "system:view".into(), 0, 1, 0,
-            Some("/system".into()), Some("setting".into()), None, None, Some("admin".into()),
-        ).await;
+        let r = svc
+            .create_menu(
+                "System".into(),
+                "system:view".into(),
+                0,
+                1,
+                0,
+                Some("/system".into()),
+                Some("setting".into()),
+                None,
+                None,
+                Some("admin".into()),
+            )
+            .await;
         assert!(r.is_ok());
         let menu = r.unwrap();
         assert_eq!(menu.name, "System");
@@ -90,10 +136,22 @@ mod menu_service_tests {
         repo.insert_fn = Box::new(|_| Err(RepositoryError::DatabaseMenu.into()));
 
         let svc = MenuService::new(Arc::new(repo));
-        assert!(svc.create_menu(
-            "Fail".into(), "fail:view".into(), 0, 1, 0,
-            None, None, None, None, None,
-        ).await.is_err());
+        assert!(
+            svc.create_menu(
+                "Fail".into(),
+                "fail:view".into(),
+                0,
+                1,
+                0,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .await
+            .is_err()
+        );
     }
 
     // ---- update_menu ----
@@ -105,10 +163,23 @@ mod menu_service_tests {
         repo.update_fn = Box::new(|_| Ok(()));
 
         let svc = MenuService::new(Arc::new(repo));
-        let r = svc.update_menu(
-            1, "NewName".into(), "new:perm".into(), 1, 2, 0,
-            Some("/new".into()), None, None, None, 1, 1, Some("updater".into()),
-        ).await;
+        let r = svc
+            .update_menu(
+                1,
+                "NewName".into(),
+                "new:perm".into(),
+                1,
+                2,
+                0,
+                Some("/new".into()),
+                None,
+                None,
+                None,
+                1,
+                1,
+                Some("updater".into()),
+            )
+            .await;
         assert!(r.is_ok());
         assert_eq!(r.unwrap().name, "NewName");
     }
@@ -119,10 +190,25 @@ mod menu_service_tests {
         repo.find_by_id_fn = Box::new(|_| Ok(None));
 
         let svc = MenuService::new(Arc::new(repo));
-        assert!(svc.update_menu(
-            999, "X".into(), "x".into(), 0, 0, 0,
-            None, None, None, None, 0, 0, None,
-        ).await.is_err());
+        assert!(
+            svc.update_menu(
+                999,
+                "X".into(),
+                "x".into(),
+                0,
+                0,
+                0,
+                None,
+                None,
+                None,
+                None,
+                0,
+                0,
+                None,
+            )
+            .await
+            .is_err()
+        );
     }
 
     #[tokio::test]
@@ -132,10 +218,25 @@ mod menu_service_tests {
 
         let svc = MenuService::new(Arc::new(repo));
         // parent_id == menu_id should fail
-        assert!(svc.update_menu(
-            1, "Name".into(), "perm".into(), 0, 0, 1,
-            None, None, None, None, 0, 0, None,
-        ).await.is_err());
+        assert!(
+            svc.update_menu(
+                1,
+                "Name".into(),
+                "perm".into(),
+                0,
+                0,
+                1,
+                None,
+                None,
+                None,
+                None,
+                0,
+                0,
+                None,
+            )
+            .await
+            .is_err()
+        );
     }
 
     // ---- delete_menu ----
@@ -241,10 +342,7 @@ mod menu_service_tests {
         repo.find_all_fn = Box::new(|_| {
             let mut deleted_menu = make_root_menu(2, "Deleted", 0);
             deleted_menu.audit.deleted = DeletedStatus::Deleted;
-            Ok(vec![
-                make_root_menu(1, "Active", 0),
-                deleted_menu,
-            ])
+            Ok(vec![make_root_menu(1, "Active", 0), deleted_menu])
         });
 
         let svc = MenuService::new(Arc::new(repo));

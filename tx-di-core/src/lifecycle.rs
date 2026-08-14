@@ -17,14 +17,14 @@ use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
 
+use crate::RIE;
 use crate::component::Component;
 use crate::config::AppAllConfig;
 use crate::error::{AppError, DiErr};
-use crate::registry::{ComponentMeta, COMPONENT_REGISTRY};
+use crate::registry::{COMPONENT_REGISTRY, ComponentMeta};
 use crate::scope::Scope;
 use crate::store::{CompRef, Store, TraitImplEntry};
 use crate::topology::{all_metas, topo_sort};
-use crate::RIE;
 
 /// 内部上下文类型别名
 pub type InnerContext = DashMap<TypeId, CompRef>;
@@ -117,10 +117,8 @@ impl BuildContext {
         let sorted_ids = topo_sort(&metas, &self.store.trait_impls)?;
 
         // 3. 按拓扑顺序注册工厂（预建 HashMap 避免 O(n²)）
-        let meta_map: std::collections::HashMap<TypeId, &ComponentMeta> = metas
-            .iter()
-            .map(|m| ((m.type_id)(), *m))
-            .collect();
+        let meta_map: std::collections::HashMap<TypeId, &ComponentMeta> =
+            metas.iter().map(|m| ((m.type_id)(), *m)).collect();
         for tid in &sorted_ids {
             if let Some(meta) = meta_map.get(tid) {
                 self.register_factory(meta);
@@ -147,14 +145,13 @@ impl BuildContext {
                 self.store.inner().insert(type_id, CompRef::Cached(arc));
             }
             Scope::Prototype => {
-                let closure =
-                    move |store: &Store| -> Arc<dyn Any + Send + Sync> {
-                        let boxed = factory(store);
-                        let arc: Arc<dyn Any + Send + Sync> = Arc::from(boxed);
-                        // 追踪 Prototype 实例，以便 shutdown 时通知
-                        store.track_prototype_raw(&arc);
-                        arc
-                    };
+                let closure = move |store: &Store| -> Arc<dyn Any + Send + Sync> {
+                    let boxed = factory(store);
+                    let arc: Arc<dyn Any + Send + Sync> = Arc::from(boxed);
+                    // 追踪 Prototype 实例，以便 shutdown 时通知
+                    store.track_prototype_raw(&arc);
+                    arc
+                };
                 self.store
                     .inner()
                     .insert(type_id, CompRef::Factory(Arc::new(closure)));
@@ -405,7 +402,8 @@ impl App {
         // 仅长期后台任务（async_run）放入独立 task 运行，直到 token 触发退出
         let app_clone = app.clone();
         let app_handler = tokio::spawn(async move {
-            if let Err(e) = App::comp_run(app_clone.clone(), app_clone.shutdown_token.clone()).await {
+            if let Err(e) = App::comp_run(app_clone.clone(), app_clone.shutdown_token.clone()).await
+            {
                 tracing::error!("[di] App 运行失败: {:?}，将执行 shutdown", e);
                 app_clone.shutdown().await;
             }
@@ -457,7 +455,10 @@ impl App {
                     tracing::error!("后台任务退出时发生错误: {:?}", e);
                 }
                 Err(_) => {
-                    tracing::warn!("后台任务关闭超时（{}秒），强制退出", self.shutdown_timeout_secs);
+                    tracing::warn!(
+                        "后台任务关闭超时（{}秒），强制退出",
+                        self.shutdown_timeout_secs
+                    );
                 }
             }
         }

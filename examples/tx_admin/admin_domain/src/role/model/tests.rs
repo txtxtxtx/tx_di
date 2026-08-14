@@ -6,14 +6,20 @@
 
 #[cfg(test)]
 mod role_tests {
-    use crate::shared::model::value_object::DeletedStatus;
-    use crate::shared::model::AggregateRoot;
     use crate::role::model::aggregate::Role;
+    use crate::shared::model::AggregateRoot;
     use crate::shared::model::DomainEvent;
+    use crate::shared::model::value_object::DeletedStatus;
     use pretty_assertions::assert_eq;
 
     fn make_role() -> Role {
-        Role::create(100, "Admin".into(), "admin".into(), 1, Some("system".into()))
+        Role::create(
+            100,
+            "Admin".into(),
+            "admin".into(),
+            1,
+            Some("system".into()),
+        )
     }
 
     #[test]
@@ -33,13 +39,23 @@ mod role_tests {
     fn test_create_role_raises_event() {
         let role = make_role();
         assert_eq!(role.events().len(), 1);
-        assert!(matches!(role.events()[0], DomainEvent::RoleCreated { role_id: 100 }));
+        assert!(matches!(
+            role.events()[0],
+            DomainEvent::RoleCreated { role_id: 100 }
+        ));
     }
 
     #[test]
     fn test_update_info_changes_all_fields() {
         let mut role = make_role();
-        role.update_info("SuperAdmin".into(), "super_admin".into(), 0, 2, Some("remark".into()), Some("updater".into()));
+        role.update_info(
+            "SuperAdmin".into(),
+            "super_admin".into(),
+            0,
+            2,
+            Some("remark".into()),
+            Some("updater".into()),
+        );
 
         assert_eq!(role.name, "SuperAdmin");
         assert_eq!(role.code, "super_admin");
@@ -55,7 +71,10 @@ mod role_tests {
         let before = role.events().len();
         role.update_info("X".into(), "x".into(), 1, 1, None, None);
         assert_eq!(role.events().len(), before + 1);
-        assert!(matches!(role.events().last(), Some(DomainEvent::RoleUpdated { role_id: 100 })));
+        assert!(matches!(
+            role.events().last(),
+            Some(DomainEvent::RoleUpdated { role_id: 100 })
+        ));
     }
 
     #[test]
@@ -78,7 +97,10 @@ mod role_tests {
         let before = role.events().len();
         role.set_menus(vec![1]);
         assert_eq!(role.events().len(), before + 1);
-        assert!(matches!(role.events().last(), Some(DomainEvent::RolePermissionsChanged { role_id: 100 })));
+        assert!(matches!(
+            role.events().last(),
+            Some(DomainEvent::RolePermissionsChanged { role_id: 100 })
+        ));
     }
 
     #[test]
@@ -94,7 +116,10 @@ mod role_tests {
         let before = role.events().len();
         role.soft_delete(None);
         assert_eq!(role.events().len(), before + 1);
-        assert!(matches!(role.events().last(), Some(DomainEvent::RoleDeleted { role_id: 100 })));
+        assert!(matches!(
+            role.events().last(),
+            Some(DomainEvent::RoleDeleted { role_id: 100 })
+        ));
     }
 
     #[test]
@@ -125,8 +150,17 @@ mod role_tests {
     fn test_restore_does_not_raise_events() {
         use crate::shared::model::AuditFields;
         let role = Role::restore(
-            1, "R".into(), "r".into(), 0, 4, None, 0, None, 0,
-            AuditFields::default(), vec![],
+            1,
+            "R".into(),
+            "r".into(),
+            0,
+            4,
+            None,
+            0,
+            None,
+            0,
+            AuditFields::default(),
+            vec![],
         );
         assert!(role.events().is_empty());
     }

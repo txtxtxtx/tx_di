@@ -93,70 +93,75 @@ pub use admin::common::{Empty, PageRequest, PageResponse};
 
 // --- Auth ---
 pub use admin::auth::{
-    LoginRequest, LoginResponse, GetUserInfoRequest, UserInfoResponse, LogoutRequest,
+    GetUserInfoRequest, LoginRequest, LoginResponse, LogoutRequest, UserInfoResponse,
 };
 // --- User ---
 pub use admin::user::{
-    CreateUserRequest, UpdateUserRequest, ChangeUserStatusRequest, DeleteUserRequest, GetUserRequest,
-    ListUsersRequest, ChangePasswordRequest, AssignRolesRequest, AssignDeptsRequest,
-    UserResponse, ListUsersResponse, UserIdRequest,
+    AssignDeptsRequest, AssignRolesRequest, ChangePasswordRequest, ChangeUserStatusRequest,
+    CreateUserRequest, DeleteUserRequest, GetUserRequest, ListUsersRequest, ListUsersResponse,
+    UpdateUserRequest, UserIdRequest, UserResponse,
 };
 // --- Role ---
 pub use admin::role::{
-    CreateRoleRequest, UpdateRoleRequest, DeleteRoleRequest, GetRoleRequest,
-    ListRolesRequest, AssignMenusRequest, RoleResponse, ListRolesResponse,
-    GetRoleUsersRequest, GetRoleUsersResponse, AddUsersToRoleRequest, RemoveUsersFromRoleRequest,
+    AddUsersToRoleRequest, AssignMenusRequest, CreateRoleRequest, DeleteRoleRequest,
+    GetRoleRequest, GetRoleUsersRequest, GetRoleUsersResponse, ListRolesRequest, ListRolesResponse,
+    RemoveUsersFromRoleRequest, RoleResponse, UpdateRoleRequest,
 };
 // --- Menu ---
 pub use admin::menu::{
-    CreateMenuRequest, UpdateMenuRequest, DeleteMenuRequest, GetMenuRequest,
-    ListMenusRequest, MenuResponse, ListMenusResponse,
+    CreateMenuRequest, DeleteMenuRequest, GetMenuRequest, ListMenusRequest, ListMenusResponse,
+    MenuResponse, UpdateMenuRequest,
 };
 // --- Department ---
 pub use admin::dept::{
-    CreateDeptRequest, UpdateDeptRequest, DeleteDeptRequest, GetDeptRequest,
-    ListDeptsRequest, DeptResponse, ListDeptsResponse,
+    CreateDeptRequest, DeleteDeptRequest, DeptResponse, GetDeptRequest, ListDeptsRequest,
+    ListDeptsResponse, UpdateDeptRequest,
 };
 // --- Config ---
 pub use admin::config::{
-    CreateConfigRequest, UpdateConfigRequest, DeleteConfigRequest, GetConfigRequest,
-    ListConfigsRequest, ConfigResponse, ListConfigsResponse,
-    GetByKeysRequest, GetByKeysResponse,
+    ConfigResponse, CreateConfigRequest, DeleteConfigRequest, GetByKeysRequest, GetByKeysResponse,
+    GetConfigRequest, ListConfigsRequest, ListConfigsResponse, UpdateConfigRequest,
 };
 // --- Dictionary ---
 pub use admin::dict::{
-    CreateDictTypeRequest, UpdateDictTypeRequest, DeleteDictTypeRequest, GetDictTypeRequest,
-    ListDictTypesRequest, DictTypeResponse, ListDictTypesResponse,
-    CreateDictDataRequest, UpdateDictDataRequest, DeleteDictDataRequest, GetDictDataRequest,
-    ListDictDataRequest, DictDataResponse, ListDictDataResponse,
-    GetByDictTypesRequest, GetByDictTypesResponse,
+    CreateDictDataRequest, CreateDictTypeRequest, DeleteDictDataRequest, DeleteDictTypeRequest,
+    DictDataResponse, DictTypeResponse, GetByDictTypesRequest, GetByDictTypesResponse,
+    GetDictDataRequest, GetDictTypeRequest, ListDictDataRequest, ListDictDataResponse,
+    ListDictTypesRequest, ListDictTypesResponse, UpdateDictDataRequest, UpdateDictTypeRequest,
 };
 // --- Log ---
 pub use admin::log::{
-    CreateOperateLogRequest, ListOperateLogsRequest, OperateLogResponse, ListOperateLogsResponse,
-    CreateLoginLogRequest, ListLoginLogsRequest, LoginLogResponse, ListLoginLogsResponse,
-    DeleteLogsRequest,
+    CreateLoginLogRequest, CreateOperateLogRequest, DeleteLogsRequest, ListLoginLogsRequest,
+    ListLoginLogsResponse, ListOperateLogsRequest, ListOperateLogsResponse, LoginLogResponse,
+    OperateLogResponse,
 };
 // --- File ---
 pub use admin::file::{
-    UploadFileRequest, DeleteFileRequest, GetFileRequest, ListFilesRequest,
-    FileResponse, ListFilesResponse,
-    DownloadFileRequest, DownloadFileResponse,
+    CreateFileConfigRequest,
+    DeleteFileConfigRequest,
+    DeleteFileRequest,
+    DownloadFileRequest,
+    DownloadFileResponse,
     // 文件配置
-    FileConfigResponse, ListFileConfigsResponse,
-    GetFileConfigRequest, CreateFileConfigRequest, UpdateFileConfigRequest,
-    DeleteFileConfigRequest, SetMasterFileConfigRequest,
+    FileConfigResponse,
+    FileResponse,
+    GetFileConfigRequest,
+    GetFileRequest,
+    ListFileConfigsResponse,
+    ListFilesRequest,
+    ListFilesResponse,
+    SetMasterFileConfigRequest,
+    UpdateFileConfigRequest,
+    UploadFileRequest,
 };
 // --- Job ---
 pub use admin::job::{
-    JobResponse, CreateJobRequest, UpdateJobRequest, DeleteJobRequest,
-    GetJobRequest, ListJobsRequest, ListJobsResponse,
-    ChangeJobStatusRequest, RunJobRequest,
-    JobLogResponse, ListJobLogsRequest, ListJobLogsResponse,
-    GetJobLogRequest, CleanJobLogsRequest,
+    ChangeJobStatusRequest, CleanJobLogsRequest, CreateJobRequest, DeleteJobRequest,
+    GetJobLogRequest, GetJobRequest, JobLogResponse, JobResponse, ListJobLogsRequest,
+    ListJobLogsResponse, ListJobsRequest, ListJobsResponse, RunJobRequest, UpdateJobRequest,
 };
 // --- Monitor ---
-pub use admin::monitor::{ServerInfo, DiskInfo, NetworkInfo, OnlineUser, OnlineUserListResponse};
+pub use admin::monitor::{DiskInfo, NetworkInfo, OnlineUser, OnlineUserListResponse, ServerInfo};
 // --- Tool ---
 pub use admin::tool::{CacheInfo, CacheStatsResponse};
 
@@ -188,8 +193,14 @@ mod tests {
             json.contains("\"userId\":\"9007199254740993\""),
             "userId 应序列化为字符串，实际: {json}"
         );
-        assert!(json.contains("\"roleIds\":[\"1\",\"2\"]"), "roleIds 应序列化为字符串数组: {json}");
-        assert!(json.contains("\"tenantId\":\"1\""), "tenantId 应为字符串: {json}");
+        assert!(
+            json.contains("\"roleIds\":[\"1\",\"2\"]"),
+            "roleIds 应序列化为字符串数组: {json}"
+        );
+        assert!(
+            json.contains("\"tenantId\":\"1\""),
+            "tenantId 应为字符串: {json}"
+        );
     }
 
     #[test]
@@ -208,9 +219,15 @@ mod tests {
         };
         let json = serde_json::to_string(&resp).unwrap();
         for key in ["userId", "tenantId", "roleIds", "deptIds", "roleCodes"] {
-            assert!(json.contains(&format!("\"{key}\"")), "缺少 camelCase 字段 {key}: {json}");
+            assert!(
+                json.contains(&format!("\"{key}\"")),
+                "缺少 camelCase 字段 {key}: {json}"
+            );
         }
-        assert!(!json.contains("user_id"), "不应出现 snake_case 字段: {json}");
+        assert!(
+            !json.contains("user_id"),
+            "不应出现 snake_case 字段: {json}"
+        );
     }
 
     #[test]
@@ -227,7 +244,10 @@ mod tests {
 
         // 序列化契约：始终输出字符串
         let json = serde_json::to_string(&from_number).unwrap();
-        assert!(json.contains("\"page\":\"1\""), "page 应序列化为字符串: {json}");
+        assert!(
+            json.contains("\"page\":\"1\""),
+            "page 应序列化为字符串: {json}"
+        );
     }
 
     #[test]

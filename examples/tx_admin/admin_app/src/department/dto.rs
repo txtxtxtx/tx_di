@@ -1,7 +1,7 @@
 use admin_domain::department::model::aggregate::Department;
 
 // Re-export proto types directly (no hand-written DTOs)
-pub use admin_proto::{CreateDeptRequest, UpdateDeptRequest, ListDeptsRequest, DeptResponse};
+pub use admin_proto::{CreateDeptRequest, DeptResponse, ListDeptsRequest, UpdateDeptRequest};
 
 /// 将领域层的 Department 聚合根转换为 proto 的 DeptResponse
 pub fn dept_to_response(dept: Department) -> DeptResponse {

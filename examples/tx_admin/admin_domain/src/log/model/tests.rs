@@ -5,8 +5,8 @@
 
 #[cfg(test)]
 mod log_tests {
+    use crate::log::model::aggregate::{LoginLog, OperateLog};
     use crate::shared::model::AggregateRoot;
-    use crate::log::model::aggregate::{OperateLog, LoginLog};
     use crate::shared::model::DomainEvent;
     use pretty_assertions::assert_eq;
 
@@ -14,8 +14,16 @@ mod log_tests {
 
     fn make_operate_log() -> OperateLog {
         OperateLog::create(
-            1, "trace_001".into(), 42, 1, "user".into(), "create".into(),
-            100, "created".into(), 1, "{}".into(),
+            1,
+            "trace_001".into(),
+            42,
+            1,
+            "user".into(),
+            "create".into(),
+            100,
+            "created".into(),
+            1,
+            "{}".into(),
         )
     }
 
@@ -44,9 +52,12 @@ mod log_tests {
 
     #[test]
     fn test_operate_log_with_request() {
-        let log = make_operate_log()
-            .with_request(Some("POST".into()), Some("/api/user".into()),
-                Some("192.168.1.1".into()), Some("Mozilla".into()));
+        let log = make_operate_log().with_request(
+            Some("POST".into()),
+            Some("/api/user".into()),
+            Some("192.168.1.1".into()),
+            Some("Mozilla".into()),
+        );
 
         assert_eq!(log.request_method.as_deref(), Some("POST"));
         assert_eq!(log.request_url.as_deref(), Some("/api/user"));
@@ -58,13 +69,24 @@ mod log_tests {
     fn test_create_operate_log_raises_event() {
         let log = make_operate_log();
         assert_eq!(log.events().len(), 1);
-        assert!(matches!(log.events()[0], DomainEvent::OperateLogCreated { log_id: 1 }));
+        assert!(matches!(
+            log.events()[0],
+            DomainEvent::OperateLogCreated { log_id: 1 }
+        ));
     }
 
     // ── LoginLog ──────────────────────────────────────
 
     fn make_login_log() -> LoginLog {
-        LoginLog::create(1, 42, 1, "admin".into(), "192.168.1.1".into(), "password".into(), 1)
+        LoginLog::create(
+            1,
+            42,
+            1,
+            "admin".into(),
+            "192.168.1.1".into(),
+            "password".into(),
+            1,
+        )
     }
 
     #[test]
@@ -98,7 +120,10 @@ mod log_tests {
     fn test_create_login_log_raises_event() {
         let log = LoginLog::create(2, 1, 0, "user".into(), "10.0.0.1".into(), "token".into(), 0);
         assert_eq!(log.events().len(), 1);
-        assert!(matches!(log.events()[0], DomainEvent::LoginLogCreated { log_id: 2 }));
+        assert!(matches!(
+            log.events()[0],
+            DomainEvent::LoginLogCreated { log_id: 2 }
+        ));
     }
 
     // ============================================================
@@ -109,8 +134,22 @@ mod log_tests {
     fn test_operate_log_restore_no_events() {
         use crate::shared::model::AuditFields;
         let log = OperateLog::restore(
-            1, "t".into(), 1, 1, "l".into(), "s".into(), 1, "a".into(), 1, "{}".into(),
-            None, None, None, None, 0, AuditFields::default(),
+            1,
+            "t".into(),
+            1,
+            1,
+            "l".into(),
+            "s".into(),
+            1,
+            "a".into(),
+            1,
+            "{}".into(),
+            None,
+            None,
+            None,
+            None,
+            0,
+            AuditFields::default(),
         );
         assert!(log.events().is_empty());
     }
@@ -120,8 +159,20 @@ mod log_tests {
         use crate::shared::model::AuditFields;
         use jiff::Timestamp;
         let log = LoginLog::restore(
-            1, 1, 0, "u".into(), "127.0.0.1".into(), None, None, None,
-            "pwd".into(), 1, None, Timestamp::now(), 0, AuditFields::default(),
+            1,
+            1,
+            0,
+            "u".into(),
+            "127.0.0.1".into(),
+            None,
+            None,
+            None,
+            "pwd".into(),
+            1,
+            None,
+            Timestamp::now(),
+            0,
+            AuditFields::default(),
         );
         assert!(log.events().is_empty());
     }
@@ -132,13 +183,12 @@ mod log_tests {
 
     #[test]
     fn test_operate_log_with_request_chaining() {
-        let log = make_operate_log()
-            .with_request(
-                Some("PUT".into()),
-                Some("/api/update".into()),
-                Some("10.0.0.1".into()),
-                Some("curl/7.0".into()),
-            );
+        let log = make_operate_log().with_request(
+            Some("PUT".into()),
+            Some("/api/update".into()),
+            Some("10.0.0.1".into()),
+            Some("curl/7.0".into()),
+        );
         assert_eq!(log.request_method.as_deref(), Some("PUT"));
         assert_eq!(log.request_url.as_deref(), Some("/api/update"));
         assert_eq!(log.user_ip.as_deref(), Some("10.0.0.1"));
@@ -147,8 +197,7 @@ mod log_tests {
 
     #[test]
     fn test_operate_log_with_request_none_values() {
-        let log = make_operate_log()
-            .with_request(None, None, None, None);
+        let log = make_operate_log().with_request(None, None, None, None);
         assert!(log.request_method.is_none());
         assert!(log.request_url.is_none());
         assert!(log.user_ip.is_none());

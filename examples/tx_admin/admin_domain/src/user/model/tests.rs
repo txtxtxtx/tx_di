@@ -7,11 +7,11 @@
 
 #[cfg(test)]
 mod user_tests {
+    use crate::shared::model::DomainEvent;
     use crate::shared::model::value_object::{DeletedStatus, TenantId};
     use crate::shared::model::{AggregateRoot, AuditFields};
     use crate::user::model::aggregate::User;
     use crate::user::model::value_object::{Sex, UserStatus};
-    use crate::shared::model::DomainEvent;
     use pretty_assertions::assert_eq;
 
     // ---- Helpers / Fixtures --------------------------------
@@ -31,7 +31,13 @@ mod user_tests {
 
     #[test]
     fn test_create_user_sets_all_fields_correctly() {
-        let user = User::create(42, "alice".into(), "pwd".into(), "Alice".into(), Some("creator".into()));
+        let user = User::create(
+            42,
+            "alice".into(),
+            "pwd".into(),
+            "Alice".into(),
+            Some("creator".into()),
+        );
 
         assert_eq!(user.id, 42);
         assert_eq!(user.username, "alice");
@@ -108,7 +114,10 @@ mod user_tests {
         user.set_basic_info("Nick".into(), None, None, Sex::Female, None, None);
 
         assert_eq!(user.events().len(), before_len + 1);
-        assert!(matches!(user.events().last(), Some(DomainEvent::UserUpdated { user_id: 1 })));
+        assert!(matches!(
+            user.events().last(),
+            Some(DomainEvent::UserUpdated { user_id: 1 })
+        ));
     }
 
     #[test]
@@ -196,7 +205,10 @@ mod user_tests {
         user.change_password("new_pwd".into(), None);
 
         assert_eq!(user.events().len(), before + 1);
-        assert!(matches!(user.events().last(), Some(DomainEvent::UserPasswordChanged { user_id: 1 })));
+        assert!(matches!(
+            user.events().last(),
+            Some(DomainEvent::UserPasswordChanged { user_id: 1 })
+        ));
     }
 
     // ============================================================
@@ -251,7 +263,10 @@ mod user_tests {
         user.soft_delete(None);
 
         assert_eq!(user.events().len(), before + 1);
-        assert!(matches!(user.events().last(), Some(DomainEvent::UserDeleted { user_id: 1 })));
+        assert!(matches!(
+            user.events().last(),
+            Some(DomainEvent::UserDeleted { user_id: 1 })
+        ));
     }
 
     // ============================================================
@@ -364,9 +379,9 @@ mod user_tests {
         let mut user = make_user();
         user.clear_events(); // 清除 create 事件
 
-        user.change_status(UserStatus::Disabled, None);   // StatusChanged
-        user.change_password("pwd2".into(), None);        // PasswordChanged
-        user.record_login("1.1.1.1".into());              // LoggedIn
+        user.change_status(UserStatus::Disabled, None); // StatusChanged
+        user.change_password("pwd2".into(), None); // PasswordChanged
+        user.record_login("1.1.1.1".into()); // LoggedIn
 
         assert_eq!(user.events().len(), 3);
     }
@@ -506,10 +521,22 @@ mod user_tests {
     #[test]
     fn test_restore_does_not_raise_events() {
         let user = User::restore(
-            1, "u".into(), "p".into(), "N".into(), None,
-            None, None, Sex::Unknown, None, UserStatus::Active,
-            None, None, TenantId::default(), AuditFields::default(),
-            vec![], vec![],
+            1,
+            "u".into(),
+            "p".into(),
+            "N".into(),
+            None,
+            None,
+            None,
+            Sex::Unknown,
+            None,
+            UserStatus::Active,
+            None,
+            None,
+            TenantId::default(),
+            AuditFields::default(),
+            vec![],
+            vec![],
         );
         assert!(user.events().is_empty());
     }

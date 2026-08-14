@@ -208,7 +208,15 @@ impl RtcpReport {
 
         for report in reports {
             match report {
-                RtcpReport::Sr { ssrc, packets, octets, ntp_msw, ntp_lsw, reports: rbs, .. } => {
+                RtcpReport::Sr {
+                    ssrc,
+                    packets,
+                    octets,
+                    ntp_msw,
+                    ntp_lsw,
+                    reports: rbs,
+                    ..
+                } => {
                     // 更新发送端统计
                     apply_sr_to_stats(*ssrc, *packets, *octets, now, collector);
 
@@ -217,8 +225,10 @@ impl RtcpReport {
                         // RTT = NTP_now - LSR - DLSR
                         // LSR 是 NTP 中32位，DLSR 是 1/65536 秒
                         if rb.lsr > 0 && rb.dlsr > 0 {
-                            let ntp_now_mid = ((*ntp_msw as u64) << 32 | *ntp_lsw as u64 >> 32) as u32;
-                            let rtt = ntp_now_mid.wrapping_sub(rb.lsr) as f64 - (rb.dlsr as f64 / 65536.0);
+                            let ntp_now_mid =
+                                ((*ntp_msw as u64) << 32 | *ntp_lsw as u64 >> 32) as u32;
+                            let rtt = ntp_now_mid.wrapping_sub(rb.lsr) as f64
+                                - (rb.dlsr as f64 / 65536.0);
                             if rtt < 60.0 && rtt > 0.0 {
                                 // 合理范围：0 ~ 60 秒
                                 collector.stats.rtt_ms = Some((rtt * 1000.0).max(0.0));
@@ -436,7 +446,9 @@ mod tests {
 
         let reports = RtcpReport::parse(&packet).unwrap();
         match &reports[0] {
-            RtcpReport::Sr { packets, octets, .. } => {
+            RtcpReport::Sr {
+                packets, octets, ..
+            } => {
                 assert_eq!(*packets, 1000);
                 assert_eq!(*octets, 100000);
             }

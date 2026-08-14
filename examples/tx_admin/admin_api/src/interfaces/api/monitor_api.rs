@@ -12,8 +12,8 @@ use ringbuf::traits::{Consumer, RingBuffer};
 use serde::Deserialize;
 use tokio::sync::RwLock;
 use tx_common::ApiR;
-use tx_di_axum::bound::DiComp;
 use tx_di_axum::Router;
+use tx_di_axum::bound::DiComp;
 
 use admin_app::user::app_service::UserAppService;
 use admin_proto::{DiskInfo, NetworkInfo, OnlineUser, OnlineUserListResponse, ServerInfo};
@@ -84,7 +84,11 @@ fn collect_server_info() -> ServerInfo {
         let used = total - available;
         total_disk += total;
         used_disk += used;
-        let usage = if total > 0 { (used as f64 / total as f64) * 100.0 } else { 0.0 };
+        let usage = if total > 0 {
+            (used as f64 / total as f64) * 100.0
+        } else {
+            0.0
+        };
         disk_infos.push(DiskInfo {
             name: format!(
                 "{}\n{}\n{}",
@@ -219,7 +223,10 @@ async fn get_online_users(
             mobile: None,
             status: status.map(|s| s as i32),
             dept_id: None,
-            page_info: Some(admin_proto::PageRequest { page: page_num, size: ONLINE_BATCH_SIZE }),
+            page_info: Some(admin_proto::PageRequest {
+                page: page_num,
+                size: ONLINE_BATCH_SIZE,
+            }),
         };
         let page_result = user_svc.get_user_page(req).await?;
         let is_last = page_result.list.len() < ONLINE_BATCH_SIZE as usize;

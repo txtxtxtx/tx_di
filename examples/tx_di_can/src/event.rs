@@ -23,22 +23,15 @@ use std::sync::{LazyLock, Mutex};
 #[derive(Debug, Clone, Serialize)]
 pub enum CanEvent {
     /// 总线初始化完成
-    BusReady {
-        interface: String,
-    },
+    BusReady { interface: String },
     /// 总线错误（被动/主动错误、Bus Off 等）
-    BusError {
-        description: String,
-    },
+    BusError { description: String },
     /// 接收到标准 CAN 帧（经过接收过滤器后推送）
     FrameReceived(CanFrame),
     /// 接收到 CANFD 帧
     FdFrameReceived(CanFdFrame),
     /// 发送帧完成
-    FrameSent {
-        id: u32,
-        len: usize,
-    },
+    FrameSent { id: u32, len: usize },
     /// ISO-TP 收到完整的多帧消息（已重组）
     IsoTpReceived {
         tx_id: u32,
@@ -46,24 +39,13 @@ pub enum CanEvent {
         data: Vec<u8>,
     },
     /// UDS 请求已发出
-    UdsRequest {
-        service: u8,
-        payload: Vec<u8>,
-    },
+    UdsRequest { service: u8, payload: Vec<u8> },
     /// UDS 正响应
-    UdsResponse {
-        service: u8,
-        payload: Vec<u8>,
-    },
+    UdsResponse { service: u8, payload: Vec<u8> },
     /// UDS 负响应（NRC）
-    UdsNegativeResponse {
-        service: u8,
-        nrc: u8,
-    },
+    UdsNegativeResponse { service: u8, nrc: u8 },
     /// UDS 超时
-    UdsTimeout {
-        service: u8,
-    },
+    UdsTimeout { service: u8 },
     /// 刷写进度更新
     FlashProgress {
         /// 当前已传输块序号
@@ -83,19 +65,14 @@ pub enum CanEvent {
         elapsed_ms: u64,
     },
     /// 刷写失败
-    FlashError {
-        reason: String,
-    },
+    FlashError { reason: String },
 }
 
 pub type AsyncHandler = Box<
-    dyn Fn(CanEvent) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>>
-        + Send
-        + Sync,
+    dyn Fn(CanEvent) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'static>> + Send + Sync,
 >;
 
-static HANDLERS: LazyLock<Mutex<Vec<AsyncHandler>>> =
-    LazyLock::new(|| Mutex::new(Vec::new()));
+static HANDLERS: LazyLock<Mutex<Vec<AsyncHandler>>> = LazyLock::new(|| Mutex::new(Vec::new()));
 
 /// 注册事件处理器（可在 `BuildContext::build()` 之前调用）
 pub fn on_event<F, Fut>(handler: F)

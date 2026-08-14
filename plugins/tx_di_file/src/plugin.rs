@@ -6,10 +6,10 @@
 use crate::config::FileConfig;
 use crate::error::FilePluginErr;
 use crate::storage::{FileStorage, OpendalStorage};
-use crate::{sys_key, SYS_PREFIX};
+use crate::{SYS_PREFIX, sys_key};
 use dashmap::DashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tx_di_core::App;
 use tx_di_core::{Component, DepsTuple, RIE};
 use tx_error::{AppError, AppResult};
@@ -61,18 +61,20 @@ impl FilePlugin {
 
     /// 获取默认存储后端（`sys:local`）
     pub fn default_storage(&self) -> AppResult<Arc<dyn FileStorage>> {
-        self.get_storage(&sys_key("local"))
-            .ok_or_else(|| AppError::with_context(
-                FilePluginErr::DefaultStorageNotFound,
-                "sys:local",
-            ))
+        self.get_storage(&sys_key("local")).ok_or_else(|| {
+            AppError::with_context(FilePluginErr::DefaultStorageNotFound, "sys:local")
+        })
     }
 
     /// 添加一个存储后端
     ///
     /// - `key` 建议使用 `sys_key()` 或 `user_key()` 辅助方法构造
     /// - 如果 key 已存在，返回旧值
-    pub fn add_storage(&self, key: String, storage: Arc<dyn FileStorage>) -> Option<Arc<dyn FileStorage>> {
+    pub fn add_storage(
+        &self,
+        key: String,
+        storage: Arc<dyn FileStorage>,
+    ) -> Option<Arc<dyn FileStorage>> {
         self.backends.insert(key, storage).map(|r| r.clone())
     }
 
@@ -91,9 +93,7 @@ impl FilePlugin {
         self.backends
             .remove(key)
             .map(|(_, v)| v)
-            .ok_or_else(|| {
-                AppError::with_context(FilePluginErr::StorageNotFound, key.to_string())
-            })
+            .ok_or_else(|| AppError::with_context(FilePluginErr::StorageNotFound, key.to_string()))
     }
 
     /// 列出所有存储后端 key

@@ -1,7 +1,7 @@
 use admin_domain::menu::model::aggregate::Menu;
 
 // Re-export proto types directly (no hand-written DTOs)
-pub use admin_proto::{CreateMenuRequest, UpdateMenuRequest, ListMenusRequest, MenuResponse};
+pub use admin_proto::{CreateMenuRequest, ListMenusRequest, MenuResponse, UpdateMenuRequest};
 
 /// 将领域层的 Menu 聚合根转换为 proto 的 MenuResponse
 pub fn menu_to_response(menu: Menu) -> MenuResponse {

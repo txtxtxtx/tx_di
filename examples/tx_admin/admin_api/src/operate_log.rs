@@ -149,11 +149,7 @@ impl Service<Request<Body>> for OperateLogMiddleware {
             .headers()
             .get("x-forwarded-for")
             .and_then(|v| v.to_str().ok())
-            .or_else(|| {
-                req.headers()
-                    .get("x-real-ip")
-                    .and_then(|v| v.to_str().ok())
-            })
+            .or_else(|| req.headers().get("x-real-ip").and_then(|v| v.to_str().ok()))
             .unwrap_or("")
             .to_string();
         let user_agent = req
@@ -173,8 +169,7 @@ impl Service<Request<Body>> for OperateLogMiddleware {
             let latency_ms = start.elapsed().as_secs_f64() * 1000.0;
 
             // 提取当前登录用户信息（仅已认证路由有效）
-            let (user_id, user_name, tenant_id) =
-                extract_user_info().await;
+            let (user_id, user_name, tenant_id) = extract_user_info().await;
 
             let entry = OperateLogEntry {
                 method,
@@ -195,7 +190,9 @@ impl Service<Request<Body>> for OperateLogMiddleware {
                     // channel 已关闭，消费者已退出，静默忽略
                 }
                 Err(_) => {
-                    warn!("操作日志 channel 积压超过 {OPERATE_LOG_SEND_TIMEOUT:?}，丢弃 1 条日志（消费者处理过慢）");
+                    warn!(
+                        "操作日志 channel 积压超过 {OPERATE_LOG_SEND_TIMEOUT:?}，丢弃 1 条日志（消费者处理过慢）"
+                    );
                 }
             }
 

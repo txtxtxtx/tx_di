@@ -127,9 +127,7 @@ impl CanConfig {
         // 取 [can_config] section
         let table: Option<&toml::map::Map<String, toml::Value>> =
             value.get("can_config").and_then(|v| v.as_table());
-        let table = table.ok_or_else(|| {
-            anyhow::anyhow!("配置缺少 [can_config] 段")
-        })?;
+        let table = table.ok_or_else(|| anyhow::anyhow!("配置缺少 [can_config] 段"))?;
         let config: CanConfig = toml::from_str(&toml::to_string(table)?)?;
         Ok(config)
     }

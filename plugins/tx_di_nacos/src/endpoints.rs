@@ -5,8 +5,8 @@
 
 use std::sync::{Arc, LazyLock, RwLock};
 
-pub use crate::traits::EndpointProvider;
 use crate::model::ServiceEndpoint;
+pub use crate::traits::EndpointProvider;
 
 /// 全局端点提供者注册表
 ///

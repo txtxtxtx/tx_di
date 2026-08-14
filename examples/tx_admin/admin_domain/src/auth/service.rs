@@ -11,9 +11,9 @@ use std::sync::Arc;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::{AppError, AppResult};
 
+use crate::auth::error::AuthError;
 use crate::user::model::aggregate::User;
 use crate::user::service::UserService;
-use crate::auth::error::AuthError;
 
 /// 认证领域服务
 ///

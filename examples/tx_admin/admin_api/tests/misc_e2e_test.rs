@@ -11,7 +11,7 @@
 mod common;
 
 use common::*;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// 生成唯一后缀（时间戳纳秒），避免并行用例冲突
@@ -49,8 +49,14 @@ async fn config_create_and_get_by_key_ok() {
     assert_eq!(resp.status(), 200, "创建配置应返回 HTTP 200: {resp:?}");
     let body: Value = resp.json().await.expect("创建配置响应 JSON 解析失败");
     assert_eq!(body["code"], 200, "创建配置业务码应为 200: {body}");
-    assert_eq!(body["data"]["configKey"], key, "返回 configKey 应一致: {body}");
-    assert_eq!(body["data"]["value"], "AdminSystem", "返回 value 应一致: {body}");
+    assert_eq!(
+        body["data"]["configKey"], key,
+        "返回 configKey 应一致: {body}"
+    );
+    assert_eq!(
+        body["data"]["value"], "AdminSystem",
+        "返回 value 应一致: {body}"
+    );
 
     // 按 key 回查确认落库
     let resp = client
@@ -60,7 +66,10 @@ async fn config_create_and_get_by_key_ok() {
         .expect("按 key 查询请求失败");
     let body: Value = resp.json().await.expect("按 key 查询响应 JSON 解析失败");
     assert_eq!(body["code"], 200, "按 key 查询应成功: {body}");
-    assert_eq!(body["data"]["value"], "AdminSystem", "按 key 查询应命中配置值: {body}");
+    assert_eq!(
+        body["data"]["value"], "AdminSystem",
+        "按 key 查询应命中配置值: {body}"
+    );
 }
 
 /// 创建重复 key → 业务失败（非 200 业务码）
@@ -156,7 +165,10 @@ async fn dict_create_type_and_data_by_code_ok() {
     assert_eq!(resp.status(), 200, "创建字典类型应返回 HTTP 200: {resp:?}");
     let body: Value = resp.json().await.expect("创建字典类型响应 JSON 解析失败");
     assert_eq!(body["code"], 200, "创建字典类型业务码应为 200: {body}");
-    assert_eq!(body["data"]["dictType"], dict_type, "返回 dictType 应一致: {body}");
+    assert_eq!(
+        body["data"]["dictType"], dict_type,
+        "返回 dictType 应一致: {body}"
+    );
 
     // 创建字典数据
     let resp = client
@@ -179,7 +191,10 @@ async fn dict_create_type_and_data_by_code_ok() {
 
     // 按 type 查询数据，验证落库关联
     let resp = client
-        .get(format!("{}/api/v1/dict/data/type/{dict_type}", srv.base_url))
+        .get(format!(
+            "{}/api/v1/dict/data/type/{dict_type}",
+            srv.base_url
+        ))
         .send()
         .await
         .expect("按 type 查询字典数据请求失败");
@@ -229,7 +244,10 @@ async fn dict_data_list_filter_by_type() {
     assert_eq!(resp.status(), 200, "分页查询应返回 HTTP 200: {resp:?}");
     let body: Value = resp.json().await.expect("分页查询响应 JSON 解析失败");
     assert_eq!(body["code"], 200, "分页查询业务码应为 200: {body}");
-    assert_eq!(body["data"]["total"], 2, "按 dictType 过滤应命中 2 条: {body}");
+    assert_eq!(
+        body["data"]["total"], 2,
+        "按 dictType 过滤应命中 2 条: {body}"
+    );
 }
 
 // ═══════════════════════════════ Log ══════════════════════════════════════
@@ -269,13 +287,26 @@ async fn log_operate_create_and_list_ok() {
         .send()
         .await
         .expect("操作日志列表查询请求失败");
-    assert_eq!(resp.status(), 200, "操作日志列表查询应返回 HTTP 200: {resp:?}");
-    let body: Value = resp.json().await.expect("操作日志列表查询响应 JSON 解析失败");
+    assert_eq!(
+        resp.status(),
+        200,
+        "操作日志列表查询应返回 HTTP 200: {resp:?}"
+    );
+    let body: Value = resp
+        .json()
+        .await
+        .expect("操作日志列表查询响应 JSON 解析失败");
     assert_eq!(body["code"], 200, "操作日志列表查询业务码应为 200: {body}");
-    assert_eq!(body["data"]["total"], 1, "按 subType 过滤应命中 1 条: {body}");
+    assert_eq!(
+        body["data"]["total"], 1,
+        "按 subType 过滤应命中 1 条: {body}"
+    );
     let list = body["data"]["list"].as_array().expect("list 应为数组");
     assert_eq!(list.len(), 1, "list 应包含 1 条: {body}");
-    assert_eq!(list[0]["action"], "创建操作日志", "操作日志 action 应一致: {body}");
+    assert_eq!(
+        list[0]["action"], "创建操作日志",
+        "操作日志 action 应一致: {body}"
+    );
 }
 
 /// 未登录访问 Config/Dict/Log 接口 → HTTP 401（鉴权链路）

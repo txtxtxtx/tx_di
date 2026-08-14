@@ -1,11 +1,11 @@
-use dashmap::DashMap;
+use crate::err::JobResult;
+use crate::executors::JobExecutor;
+use crate::models::ExecutionStatus;
 use async_trait::async_trait;
+use dashmap::DashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::timeout;
-use crate::err::JobResult;
-use crate::models::ExecutionStatus;
-use crate::executors::JobExecutor;
 
 /// 内部函数执行器
 ///
@@ -85,9 +85,10 @@ impl JobExecutor for InternalJobExecutor {
 
         // 在阻塞线程池中执行，防止同步函数阻塞异步运行时
         // 并受超时保护，防止死循环/长耗时任务卡死调度器
-        let result = timeout(self.timeout, tokio::task::spawn_blocking(move || {
-            handler_arc(owned_param.as_deref())
-        }))
+        let result = timeout(
+            self.timeout,
+            tokio::task::spawn_blocking(move || handler_arc(owned_param.as_deref())),
+        )
         .await;
 
         match result {

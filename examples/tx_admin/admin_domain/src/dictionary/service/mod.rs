@@ -5,10 +5,10 @@ use crate::dictionary::model::aggregate::{DictData, DictType};
 use crate::dictionary::model::value_object::{DictDataQuery, DictTypeQuery};
 use crate::dictionary::repository::{DictDataRepository, DictTypeRepository};
 use crate::shared::repository::RepositoryError;
+use tx_common::id;
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
-use tx_common::id;
 
 #[derive(Component)]
 pub struct DictTypeService {
@@ -161,10 +161,7 @@ impl DictTypeService {
     ///
     /// # 错误
     /// - 数据库操作错误 - 仓储查询失败时
-    pub async fn get_all_dict_types(
-        &self,
-        query: &DictTypeQuery,
-    ) -> AppResult<Vec<DictType>> {
+    pub async fn get_all_dict_types(&self, query: &DictTypeQuery) -> AppResult<Vec<DictType>> {
         self.dict_type_repo.find_all(query).await
     }
 }
@@ -257,7 +254,9 @@ impl DictDataService {
             .find_by_id(id)
             .await?
             .ok_or_else(|| RepositoryError::NotFoundDict)?;
-        dd.update_info(sort, label, value, dict_type, color_type, css_class, remark, updater);
+        dd.update_info(
+            sort, label, value, dict_type, color_type, css_class, remark, updater,
+        );
         self.dict_data_repo.update(&dd).await?;
         Ok(dd)
     }
@@ -346,7 +345,10 @@ impl DictDataService {
     ///
     /// # 错误
     /// - 数据库操作错误 - 仓储查询失败时
-    pub async fn get_by_dict_types(&self, dict_types: &[String]) -> AppResult<HashMap<String, Vec<DictData>>> {
+    pub async fn get_by_dict_types(
+        &self,
+        dict_types: &[String],
+    ) -> AppResult<HashMap<String, Vec<DictData>>> {
         let all_data = self.dict_data_repo.find_by_types(dict_types).await?;
         let mut map: HashMap<String, Vec<DictData>> = HashMap::new();
         for data in all_data {

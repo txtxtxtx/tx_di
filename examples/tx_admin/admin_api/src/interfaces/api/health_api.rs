@@ -6,9 +6,9 @@
 //!
 //! 全部为公开路由（无需认证），供 LB / K8s / r-nacos 等外部探活使用。
 
-use axum::http::StatusCode;
 use axum::Json;
-use serde_json::{json, Value};
+use axum::http::StatusCode;
+use serde_json::{Value, json};
 use tx_di_axum::Router;
 use tx_di_axum::bound::DiComp;
 use tx_di_toasty::ToastyPlugin;

@@ -1,19 +1,18 @@
 //! 定时任务 HTTP API
 
-use axum::Json;
-use tx_di_sa_token::StpUtil;
-use tx_di_axum::Router;
-use axum::routing::{get, post, put, delete};
-use tx_di_axum::bound::DiComp;
-use admin_app::job::app_service::JobAppService;
-use admin_proto::{
-    CreateJobRequest, UpdateJobRequest, ListJobsRequest, JobResponse,
-    ChangeJobStatusRequest, Empty,
-    ListJobLogsRequest, JobLogResponse, CleanJobLogsRequest,
-};
-use tx_common::{ApiR, ApiRes, Page};
 use crate::auth::ensure_permission;
 use crate::error::ApiErr;
+use admin_app::job::app_service::JobAppService;
+use admin_proto::{
+    ChangeJobStatusRequest, CleanJobLogsRequest, CreateJobRequest, Empty, JobLogResponse,
+    JobResponse, ListJobLogsRequest, ListJobsRequest, UpdateJobRequest,
+};
+use axum::Json;
+use axum::routing::{delete, get, post, put};
+use tx_common::{ApiR, ApiRes, Page};
+use tx_di_axum::Router;
+use tx_di_axum::bound::DiComp;
+use tx_di_sa_token::StpUtil;
 
 pub fn router() -> Router {
     let job_routes = Router::new()
@@ -97,7 +96,9 @@ async fn change_job_status(
     ensure_permission("job:status").await?;
     req.id = id;
     let login_id = StpUtil::get_login_id_as_string().await?;
-    let r = job_svc.change_status(req.id, req.status, Some(login_id)).await?;
+    let r = job_svc
+        .change_status(req.id, req.status, Some(login_id))
+        .await?;
     Ok(ApiR::success(r))
 }
 

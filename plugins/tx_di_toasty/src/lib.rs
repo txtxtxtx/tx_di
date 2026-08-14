@@ -34,7 +34,7 @@ mod plugin;
 
 pub use config::ToastyConfig;
 pub use err::ToastyErr;
-pub use plugin::{ToastyPlugin, ToastyDb};
+pub use plugin::{ToastyDb, ToastyPlugin};
 
 /// 事务类型（toasty ORM 原生的数据库事务）
 ///
@@ -86,11 +86,7 @@ macro_rules! toasty_page {
     ($db:expr, $page:expr, $body:block, $err:expr) => {{
         let mut __db = $db;
         // COUNT（SQL 层）
-        let __total = { $body }
-            .count()
-            .exec(&mut __db)
-            .await
-            .map_err($err)?;
+        let __total = { $body }.count().exec(&mut __db).await.map_err($err)?;
         // 列表（SQL LIMIT/OFFSET）
         let __offset = $page.offset() as usize;
         let __size = $page.size as usize;

@@ -1,5 +1,5 @@
-mod config;
 mod comp;
+mod config;
 mod otel;
 
 pub use comp::*;

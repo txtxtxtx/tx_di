@@ -1,12 +1,12 @@
-use std::collections::HashMap;
-use std::sync::Arc;
 use crate::config::dto::config_to_response;
 use admin_domain::config::model::value_object::ConfigQuery;
 use admin_domain::config::service::ConfigService;
-use admin_proto::{CreateConfigRequest, UpdateConfigRequest, ListConfigsRequest, ConfigResponse};
+use admin_proto::{ConfigResponse, CreateConfigRequest, ListConfigsRequest, UpdateConfigRequest};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
-use tx_common::page::Page;
 
 #[derive(Component)]
 pub struct ConfigAppService {
@@ -27,7 +27,14 @@ impl ConfigAppService {
     ) -> AppResult<ConfigResponse> {
         let config = self
             .config_service
-            .create_config(req.category, req.config_type, req.name, req.config_key, req.value, creator)
+            .create_config(
+                req.category,
+                req.config_type,
+                req.name,
+                req.config_key,
+                req.value,
+                creator,
+            )
             .await?;
         Ok(config_to_response(config))
     }

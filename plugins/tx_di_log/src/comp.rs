@@ -1,12 +1,12 @@
 use crate::LogConfig;
 use std::sync::{Arc, OnceLock};
 use std::{fs, panic};
-use tracing::{debug,error};
+use tracing::{debug, error};
 use tracing_appender::non_blocking::NonBlocking;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::{fmt, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt};
 use tx_di_core::{Component, DepsTuple, RIE, Store};
 
 // 全局变量存储 日志 guard
@@ -19,7 +19,7 @@ fn is_log_initialized() -> bool {
 
 #[derive(Component)]
 #[component(init, init_sort = i32::MIN)]
-pub struct LogPlugins{
+pub struct LogPlugins {
     /// 日志配置
     pub config: Arc<LogConfig>,
 }
@@ -71,16 +71,19 @@ fn init(this: &mut LogPlugins, _store: &Store) -> RIE<()> {
         return Ok(());
     }
 
-    let timer = this.config.time_format.to_timer(&this.config.time_format_str)?;
+    let timer = this
+        .config
+        .time_format
+        .to_timer(&this.config.time_format_str)?;
     let file_layer = fmt::layer()
-        .with_writer( non_blocking_appender)
+        .with_writer(non_blocking_appender)
         .with_ansi(false)
         .with_thread_ids(true)
-        .with_thread_names( true)
+        .with_thread_names(true)
         .with_level(true)
-        .with_file( true)
-        .with_line_number( true)
-        .with_target( false)
+        .with_file(true)
+        .with_line_number(true)
+        .with_target(false)
         .with_timer(timer.clone())
         .compact();
 
@@ -114,7 +117,10 @@ fn init(this: &mut LogPlugins, _store: &Store) -> RIE<()> {
                     filter = filter.add_directive(directive);
                 }
                 Err(e) => {
-                    error!("无效的日志指令 '{}': {}，已跳过该模块配置", directive_str, e);
+                    error!(
+                        "无效的日志指令 '{}': {}，已跳过该模块配置",
+                        directive_str, e
+                    );
                 }
             }
         }
@@ -168,10 +174,8 @@ fn init(this: &mut LogPlugins, _store: &Store) -> RIE<()> {
         .with(env_filter)
         .with(file_layer);
     if this.config.console_output {
-        let _ = subscriber
-            .with(console_layer)
-            .try_init();
-    }else {
+        let _ = subscriber.with(console_layer).try_init();
+    } else {
         let _ = subscriber.try_init();
     }
 

@@ -75,7 +75,10 @@ pub trait Component: Send + Sync + 'static {
 
     /// 异步运行（在独立 task 里调用，直到 CancellationToken 触发）
     #[allow(unused_variables)]
-    fn async_run(app: &Arc<crate::App>, token: crate::CancellationToken) -> BoxFuture<crate::RIE<()>> {
+    fn async_run(
+        app: &Arc<crate::App>,
+        token: crate::CancellationToken,
+    ) -> BoxFuture<crate::RIE<()>> {
         Box::pin(async { Ok(()) })
     }
 

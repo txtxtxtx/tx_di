@@ -6,10 +6,10 @@ use std::future::Future;
 use std::pin::Pin;
 use tokio::time::Instant;
 use tower::{Layer, Service};
-use tracing::{info, warn, Span};
+use tracing::{Span, info, warn};
 
 /// API 日志中间件 Layer
-/// 
+///
 /// 用于记录 HTTP 请求和响应的详细信息，包括：
 /// - 请求方法、URI、查询参数
 /// - 请求体（仅 JSON 和文本类型）
@@ -27,7 +27,7 @@ impl<S> Layer<S> for ApiLogLayer {
 }
 
 /// API 日志中间件
-/// 
+///
 /// 包装内部服务，在请求处理前后记录日志信息
 #[derive(Clone)]
 pub struct ApiLogMiddleware<S> {
@@ -41,7 +41,8 @@ where
 {
     type Response = S::Response;
     type Error = S::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
+    type Future =
+        Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
 
     /// 检查服务是否准备好接收请求
     fn poll_ready(
@@ -75,12 +76,12 @@ where
 
             // 判断是否需要读取请求体内容（仅文本和 JSON 类型）
             let need_log_request_body = should_log_body(&content_type);
-            
+
             let (parts, body) = req.into_parts();
-            
+
             let request_body;
             let rebuilt_req;
-            
+
             if need_log_request_body {
                 // 仅在需要记录时才读取并消耗 body
                 let body_bytes = to_bytes(body, usize::MAX).await.unwrap_or_default();
@@ -112,7 +113,7 @@ where
 
             // 先分离响应的头部和身体，避免借用冲突
             let (response_parts, response_body) = response.into_parts();
-            
+
             // 从已分离的头部中提取 Content-Type（转换为 owned String 避免借用问题）
             let response_content_type = response_parts
                 .headers
@@ -120,18 +121,20 @@ where
                 .and_then(|v| v.to_str().ok())
                 .unwrap_or("")
                 .to_string();
-            
+
             // 判断是否需要读取响应体内容（仅文本和 JSON 类型）
             let need_log_response_body = should_log_body(&response_content_type);
-            
+
             let response_body_str;
             let final_response;
-            
+
             if need_log_response_body {
                 // 仅在需要记录时才读取并消耗响应 body
-                let response_bytes = to_bytes(response_body, usize::MAX).await.unwrap_or_default();
+                let response_bytes = to_bytes(response_body, usize::MAX)
+                    .await
+                    .unwrap_or_default();
                 response_body_str = String::from_utf8_lossy(&response_bytes).to_string();
-                
+
                 // 重建响应
                 final_response = Response::from_parts(response_parts, Body::from(response_bytes));
             } else {
@@ -183,16 +186,15 @@ where
 }
 
 /// 判断是否应该记录完整的 body 内容
-/// 
+///
 /// 仅对以下 Content-Type 记录完整内容：
 /// - application/json
 /// - text/* (如 text/plain, text/html 等)
 /// - application/xml
-/// 
+///
 /// 其他类型（如图片、二进制文件等）只记录大小和类型，避免日志过大
 fn should_log_body(content_type: &str) -> bool {
     content_type.contains("application/json")
         || content_type.contains("text/")
         || content_type.contains("application/xml")
 }
-

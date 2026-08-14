@@ -10,8 +10,8 @@
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, OnceLock, RwLock};
 
-use tx_di_toasty::ToastyPlugin;
 use toasty::ModelSet;
+use tx_di_toasty::ToastyPlugin;
 
 use admin_app::config::app_service::ConfigAppService;
 use admin_app::department::app_service::DepartmentAppService;
@@ -31,36 +31,42 @@ use admin_domain::menu::service::MenuService;
 use admin_domain::role::service::RoleService;
 use admin_domain::user::service::UserService;
 
-use admin_infra::user::repository::ToastyUserRepository;
-use admin_infra::role::repository::ToastyRoleRepository;
-use admin_infra::menu::repository::ToastyMenuRepository;
-use admin_infra::department::repository::ToastyDepartmentRepository;
 use admin_infra::config::repository::ToastyConfigRepository;
-use admin_infra::dictionary::repository::{ToastyDictTypeRepository, ToastyDictDataRepository};
-use admin_infra::file::repository::{ToastyFileRepository, ToastyFileConfigRepository};
-use admin_infra::log::repository::{ToastyOperateLogRepository, ToastyLoginLogRepository};
+use admin_infra::department::repository::ToastyDepartmentRepository;
+use admin_infra::dictionary::repository::{ToastyDictDataRepository, ToastyDictTypeRepository};
+use admin_infra::file::repository::{ToastyFileConfigRepository, ToastyFileRepository};
+use admin_infra::log::repository::{ToastyLoginLogRepository, ToastyOperateLogRepository};
+use admin_infra::menu::repository::ToastyMenuRepository;
+use admin_infra::role::repository::ToastyRoleRepository;
+use admin_infra::user::repository::ToastyUserRepository;
 
-use admin_infra::user::model::{SysUser, SysUserRole, SysUserDept};
-use admin_infra::role::model::{SysRole, SysRoleMenu};
-use admin_infra::menu::model::SysMenu;
-use admin_infra::department::model::SysDepartment;
-use admin_infra::file::model::{SysFile, SysFileConfig};
 use admin_infra::config::model::SysConfig;
-use admin_infra::dictionary::model::{SysDictType, SysDictData};
-use admin_infra::log::model::{SysOperateLog, SysLoginLog};
+use admin_infra::department::model::SysDepartment;
+use admin_infra::dictionary::model::{SysDictData, SysDictType};
+use admin_infra::file::model::{SysFile, SysFileConfig};
+use admin_infra::log::model::{SysLoginLog, SysOperateLog};
+use admin_infra::menu::model::SysMenu;
+use admin_infra::role::model::{SysRole, SysRoleMenu};
+use admin_infra::user::model::{SysUser, SysUserDept, SysUserRole};
 
 /// 创建内存 SQLite 数据库插件
 pub async fn create_db_plugin() -> Arc<ToastyPlugin> {
     let mut builder = toasty::Db::builder();
     builder.models(toasty::models!(
-        SysUser, SysUserRole, SysUserDept,
-        SysRole, SysRoleMenu,
+        SysUser,
+        SysUserRole,
+        SysUserDept,
+        SysRole,
+        SysRoleMenu,
         SysMenu,
         SysDepartment,
-        SysFile, SysFileConfig,
+        SysFile,
+        SysFileConfig,
         SysConfig,
-        SysDictType, SysDictData,
-        SysOperateLog, SysLoginLog
+        SysDictType,
+        SysDictData,
+        SysOperateLog,
+        SysLoginLog
     ));
     let db = builder.connect("sqlite::memory:").await.unwrap();
     db.push_schema().await.unwrap();
@@ -134,7 +140,11 @@ pub async fn create_dept_service() -> (Arc<DepartmentService>, Arc<ToastyDepartm
     (dept_service, dept_repo)
 }
 
-pub async fn create_dept_app() -> (DepartmentAppService, Arc<DepartmentService>, Arc<ToastyDepartmentRepository>) {
+pub async fn create_dept_app() -> (
+    DepartmentAppService,
+    Arc<DepartmentService>,
+    Arc<ToastyDepartmentRepository>,
+) {
     let (svc, repo) = create_dept_service().await;
     let app = DepartmentAppService::new(svc.clone());
     (app, svc, repo)
@@ -149,7 +159,11 @@ pub async fn create_config_service() -> (Arc<ConfigService>, Arc<ToastyConfigRep
     (config_service, config_repo)
 }
 
-pub async fn create_config_app() -> (ConfigAppService, Arc<ConfigService>, Arc<ToastyConfigRepository>) {
+pub async fn create_config_app() -> (
+    ConfigAppService,
+    Arc<ConfigService>,
+    Arc<ToastyConfigRepository>,
+) {
     let (svc, repo) = create_config_service().await;
     let app = ConfigAppService::new(svc.clone());
     (app, svc, repo)
@@ -164,7 +178,11 @@ pub async fn create_dict_type_service() -> (Arc<DictTypeService>, Arc<ToastyDict
     (dict_type_service, dict_type_repo)
 }
 
-pub async fn create_dict_type_app() -> (DictTypeAppService, Arc<DictTypeService>, Arc<ToastyDictTypeRepository>) {
+pub async fn create_dict_type_app() -> (
+    DictTypeAppService,
+    Arc<DictTypeService>,
+    Arc<ToastyDictTypeRepository>,
+) {
     let (svc, repo) = create_dict_type_service().await;
     let app = DictTypeAppService::new(svc.clone());
     (app, svc, repo)
@@ -177,7 +195,11 @@ pub async fn create_dict_data_service() -> (Arc<DictDataService>, Arc<ToastyDict
     (dict_data_service, dict_data_repo)
 }
 
-pub async fn create_dict_data_app() -> (DictDataAppService, Arc<DictDataService>, Arc<ToastyDictDataRepository>) {
+pub async fn create_dict_data_app() -> (
+    DictDataAppService,
+    Arc<DictDataService>,
+    Arc<ToastyDictDataRepository>,
+) {
     let (svc, repo) = create_dict_data_service().await;
     let app = DictDataAppService::new(svc.clone());
     (app, svc, repo)
@@ -186,25 +208,35 @@ pub async fn create_dict_data_app() -> (DictDataAppService, Arc<DictDataService>
 // ── File helpers ───────────────────────────────────────────────────────────
 
 use dashmap::DashMap;
-use tx_di_file::sys_key;
-use tx_di_file::FilePlugin;
 use tx_di_file::FileConfig;
+use tx_di_file::FilePlugin;
 use tx_di_file::storage::{FileStorage, OpendalStorage};
+use tx_di_file::sys_key;
 
 pub async fn create_file_service() -> (
-    Arc<FileService>, Arc<ToastyFileRepository>, Arc<ToastyFileConfigRepository>,
+    Arc<FileService>,
+    Arc<ToastyFileRepository>,
+    Arc<ToastyFileConfigRepository>,
 ) {
     let plugin = create_db_plugin().await;
     let file_repo = Arc::new(ToastyFileRepository::new(plugin.clone()));
     let file_config_repo = Arc::new(ToastyFileConfigRepository::new(plugin));
-    let file_service = Arc::new(FileService::new(file_repo.clone(), file_config_repo.clone()));
+    let file_service = Arc::new(FileService::new(
+        file_repo.clone(),
+        file_config_repo.clone(),
+    ));
     (file_service, file_repo, file_config_repo)
 }
 
 /// 创建带真实本地文件存储的 FileAppService，适用于集成测试
 ///
 /// 返回的 `TempDir` 必须被调用方持有（否则目录会被删除导致读取失败）。
-pub async fn create_file_app() -> (FileAppService, Arc<FileService>, Arc<ToastyFileRepository>, tempfile::TempDir) {
+pub async fn create_file_app() -> (
+    FileAppService,
+    Arc<FileService>,
+    Arc<ToastyFileRepository>,
+    tempfile::TempDir,
+) {
     let (svc, repo, file_config_repo) = create_file_service().await;
 
     let temp_dir = tempfile::tempdir().expect("无法创建临时目录");
@@ -214,11 +246,10 @@ pub async fn create_file_app() -> (FileAppService, Arc<FileService>, Arc<ToastyF
         ..Default::default()
     });
 
-    let storage: Arc<dyn FileStorage> =
-        Arc::new(OpendalStorage::new_local(
-            &temp_dir.path().to_string_lossy(),
-            "",
-        ).expect("无法创建测试文件存储"));
+    let storage: Arc<dyn FileStorage> = Arc::new(
+        OpendalStorage::new_local(&temp_dir.path().to_string_lossy(), "")
+            .expect("无法创建测试文件存储"),
+    );
 
     let backends = DashMap::new();
     backends.insert(sys_key("local"), storage);
@@ -236,14 +267,19 @@ pub async fn create_file_app() -> (FileAppService, Arc<FileService>, Arc<ToastyF
 
 // ── Log helpers ────────────────────────────────────────────────────────────
 
-pub async fn create_operate_log_service() -> (Arc<OperateLogService>, Arc<ToastyOperateLogRepository>) {
+pub async fn create_operate_log_service()
+-> (Arc<OperateLogService>, Arc<ToastyOperateLogRepository>) {
     let plugin = create_db_plugin().await;
     let log_repo = Arc::new(ToastyOperateLogRepository::new(plugin));
     let log_service = Arc::new(OperateLogService::new(log_repo.clone()));
     (log_service, log_repo)
 }
 
-pub async fn create_operate_log_app() -> (OperateLogAppService, Arc<OperateLogService>, Arc<ToastyOperateLogRepository>) {
+pub async fn create_operate_log_app() -> (
+    OperateLogAppService,
+    Arc<OperateLogService>,
+    Arc<ToastyOperateLogRepository>,
+) {
     let (svc, repo) = create_operate_log_service().await;
     let app = OperateLogAppService::new(svc.clone());
     (app, svc, repo)
@@ -256,7 +292,11 @@ pub async fn create_login_log_service() -> (Arc<LoginLogService>, Arc<ToastyLogi
     (log_service, log_repo)
 }
 
-pub async fn create_login_log_app() -> (LoginLogAppService, Arc<LoginLogService>, Arc<ToastyLoginLogRepository>) {
+pub async fn create_login_log_app() -> (
+    LoginLogAppService,
+    Arc<LoginLogService>,
+    Arc<ToastyLoginLogRepository>,
+) {
     let (svc, repo) = create_login_log_service().await;
     let app = LoginLogAppService::new(svc.clone());
     (app, svc, repo)
@@ -293,21 +333,19 @@ pub async fn create_user_app_with_shared() -> (
 
 // ── Job helpers ─────────────────────────────────────────────────────────────
 
+use admin_app::job::app_service::JobAppService;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::sync::Semaphore;
 use tx_di_job::{
-    JobConfig, InternalJobExecutor, JobPlugin, JobRepository, PythonJobExecutor,
-    ShellJobExecutor, InfrustJob, InfrustJobLog,
+    InfrustJob, InfrustJobLog, InternalJobExecutor, JobConfig, JobPlugin, JobRepository,
+    PythonJobExecutor, ShellJobExecutor,
 };
-use admin_app::job::app_service::JobAppService;
 
 /// 创建定时任务测试用 DB 插件（含 Job 模型）
 pub async fn create_job_db_plugin() -> Arc<ToastyPlugin> {
     let mut builder = toasty::Db::builder();
-    builder.models(toasty::models!(
-        InfrustJob, InfrustJobLog
-    ));
+    builder.models(toasty::models!(InfrustJob, InfrustJobLog));
     let db = builder.connect("sqlite::memory:").await.unwrap();
     db.push_schema().await.unwrap();
     Arc::new(ToastyPlugin {
@@ -323,10 +361,13 @@ pub async fn create_job_app() -> (JobAppService, Arc<JobPlugin>) {
     let job_plugin = Arc::new(JobPlugin {
         config: Arc::new(JobConfig::default()),
         repository: OnceLock::from(Arc::new(JobRepository::new(tp.clone()))),
-        internal_executor: OnceLock::from(Arc::new(InternalJobExecutor::new(Duration::from_secs(60)))),
+        internal_executor: OnceLock::from(Arc::new(InternalJobExecutor::new(Duration::from_secs(
+            60,
+        )))),
         shell_executor: OnceLock::from(Arc::new(ShellJobExecutor::new(Duration::from_secs(60)))),
         python_executor: OnceLock::from(Arc::new(PythonJobExecutor::new(
-            PathBuf::from("python3"), Duration::from_secs(60),
+            PathBuf::from("python3"),
+            Duration::from_secs(60),
         ))),
         semaphore: OnceLock::from(Arc::new(Semaphore::new(4))),
         cache: None,

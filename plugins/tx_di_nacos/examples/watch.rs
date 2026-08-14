@@ -14,7 +14,8 @@ async fn main() {
     println!("═══ 配置变更监听测试 ═══");
     let cfg = tx_di_nacos::RegistryConfig {
         enabled: true,
-        nacos_addr: std::env::var("NACOS_ADDR").unwrap_or_else(|_| "http://192.168.0.91:8848".into()),
+        nacos_addr: std::env::var("NACOS_ADDR")
+            .unwrap_or_else(|_| "http://192.168.0.91:8848".into()),
         namespace: std::env::var("NACOS_NS").unwrap_or_else(|_| "yc_dev".into()),
         group: std::env::var("NACOS_GROUP").unwrap_or_else(|_| "DEFAULT_GROUP".into()),
         service_name: "tx_admin_watch".into(),
@@ -41,7 +42,11 @@ async fn main() {
 
     // 发布配置 A
     let content_a = "[watch]\nversion = 1\n";
-    if let Err(e) = client.config.publish_config(data_id, group, content_a).await {
+    if let Err(e) = client
+        .config
+        .publish_config(data_id, group, content_a)
+        .await
+    {
         eprintln!("❌ 发布配置 A 失败: {e}");
         std::process::exit(1);
     }
@@ -57,7 +62,11 @@ async fn main() {
     // 稍等，然后发布配置 B（version=2）
     tokio::time::sleep(Duration::from_secs(2)).await;
     let content_b = "[watch]\nversion = 2\n";
-    if let Err(e) = client.config.publish_config(data_id, group, content_b).await {
+    if let Err(e) = client
+        .config
+        .publish_config(data_id, group, content_b)
+        .await
+    {
         eprintln!("❌ 发布配置 B 失败: {e}");
         std::process::exit(1);
     }

@@ -1,6 +1,6 @@
 use toasty::Model;
 
-use crate::common::{Sex, Status, Deleted};
+use crate::common::{Deleted, Sex, Status};
 
 /// 系统用户表
 #[derive(Debug, Clone, Model)]

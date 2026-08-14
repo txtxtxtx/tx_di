@@ -1,10 +1,9 @@
-use std::collections::HashMap;
+use crate::layers::add_layer_by_name;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use tx_di_core::{Component, RIE, Store};
-use crate::layers::{add_layer_by_name};
-
 
 /// Web 服务器配置结构体
 ///
@@ -68,7 +67,7 @@ pub struct WebConfig {
     #[serde(default = "default_static_dir")]
     pub static_dir: String,
     /// SPA 应用列表
-    pub spa_apps: Option<HashMap<String,String>>,
+    pub spa_apps: Option<HashMap<String, String>>,
     /// 请求超时时间（秒）
     ///
     /// 默认为 `30` 秒。
@@ -77,8 +76,7 @@ pub struct WebConfig {
     #[serde(default = "default_timeout_secs")]
     pub timeout_secs: u64,
     /// 中间件列表
-    pub layers: Option<Vec<(i32,String)>>,
-
+    pub layers: Option<Vec<(i32, String)>>,
 }
 
 impl Default for WebConfig {
@@ -116,10 +114,6 @@ fn init(this: &mut WebConfig, _store: &Store) -> RIE<()> {
     Ok(())
 }
 
-
-
-
-
 impl WebConfig {
     /// 获取完整的监听地址
     ///
@@ -143,13 +137,14 @@ impl WebConfig {
     /// # Errors
     ///
     /// 如果地址格式不正确，将返回错误
-    pub fn socket_addr(&self) -> RIE<SocketAddr>{
-        let addr = self.address()
+    pub fn socket_addr(&self) -> RIE<SocketAddr> {
+        let addr = self
+            .address()
             .parse()
             .map_err(|e| anyhow::anyhow!("无效的地址格式 '{}': {}", self.address(), e))?;
         Ok(addr)
     }
-    
+
     pub fn static_dir(&self) -> PathBuf {
         PathBuf::from(self.static_dir.clone())
     }
@@ -178,4 +173,3 @@ fn default_static_dir() -> String {
 fn default_timeout_secs() -> u64 {
     30
 }
-

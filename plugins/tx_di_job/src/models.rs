@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use toasty::{Model, Embed};
+use toasty::{Embed, Model};
 
 /// 审计字段（创建者、创建时间、更新者、更新时间）
 ///
@@ -51,7 +51,6 @@ pub enum ExecutionStatus {
     Retrying = 3,
 }
 
-
 /// 定时任务表
 /// 定时任务实体，表示一个可调度执行的作业单元。
 ///
@@ -85,7 +84,6 @@ pub struct InfrustJob {
     pub audit: AuditFields,
     pub soft_delete: SoftDelete,
 }
-
 
 impl InfrustJob {
     pub fn is_deleted(&self) -> bool {

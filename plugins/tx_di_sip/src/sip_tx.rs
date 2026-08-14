@@ -15,8 +15,8 @@
 //!
 //! 设计目标：强绑定 rsipstack（内部即真实 `Transaction`），同时可共享、可测试。
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use rsipstack::sip::Header;
 use rsipstack::sip::Request;
@@ -126,7 +126,8 @@ impl SipTx {
     /// 透传真实 `Transaction`（需要完整 API 时使用，如 in-dialog 请求）
     pub async fn with_transaction<R>(&self, f: impl FnOnce(&mut Transaction) -> R) -> R {
         let mut g = self.inner.lock().await;
-        f(g.as_mut().expect("真实 Transaction 已被取出（仅测试桩模式下发生）"))
+        f(g.as_mut()
+            .expect("真实 Transaction 已被取出（仅测试桩模式下发生）"))
     }
 
     /// 取出真实 `Transaction`
