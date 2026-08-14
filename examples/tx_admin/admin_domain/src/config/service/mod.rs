@@ -56,7 +56,7 @@ impl ConfigService {
         creator: Option<String>,
     ) -> AppResult<Config> {
         if self.config_repo.exists_by_key(&config_key).await? {
-            return Err(RepositoryError::DuplicateConfigKey.into());
+            Err(RepositoryError::DuplicateConfigKey)?;
         }
 
         let config_id = id::next_id();
@@ -73,6 +73,7 @@ impl ConfigService {
         Ok(config)
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// 更新已有配置项的信息
     ///
     /// # 参数
@@ -122,7 +123,7 @@ impl ConfigService {
         if let Some(existing) = self.config_repo.find_by_key(&config_key).await?
             && existing.id != config_id
         {
-            return Err(RepositoryError::DuplicateConfigKey.into());
+            Err(RepositoryError::DuplicateConfigKey)?;
         }
 
         config.update_info(

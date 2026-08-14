@@ -7,7 +7,7 @@
 ///
 /// `Singleton` 单例作用域，默认
 /// `Prototype` 原型作用域
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum Scope {
     /// 全局单例：首次注入时构建并缓存，后续返回同一个 `Arc<T>`
     #[default]

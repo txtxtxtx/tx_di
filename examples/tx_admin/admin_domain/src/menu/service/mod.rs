@@ -24,6 +24,7 @@ impl MenuService {
         Self { menu_repo }
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// 创建新菜单
     ///
     /// # 参数
@@ -73,6 +74,7 @@ impl MenuService {
         Ok(menu)
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// 更新菜单信息
     ///
     /// # 参数
@@ -128,7 +130,7 @@ impl MenuService {
 
         // Cannot set self as parent
         if parent_id == menu_id {
-            return Err(RepositoryError::ValidationMenuSelfParent.into());
+            Err(RepositoryError::ValidationMenuSelfParent)?;
         }
 
         menu.update_info(
@@ -170,7 +172,7 @@ impl MenuService {
     /// - 数据库更新操作失败时返回仓储层错误
     pub async fn delete_menu(&self, menu_id: u64, updater: Option<String>) -> AppResult<()> {
         if self.menu_repo.has_children(menu_id).await? {
-            return Err(RepositoryError::ValidationMenuHasChildren.into());
+            Err(RepositoryError::ValidationMenuHasChildren)?;
         }
 
         let mut menu = self

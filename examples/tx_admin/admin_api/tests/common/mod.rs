@@ -15,7 +15,7 @@ use tokio::sync::OnceCell;
 use tx_di_core::App;
 
 // 空导入：触发 admin_api lib 链接（AdminPlugin 等组件 linkme 注册）
-#[allow(unused_imports)]
+#[allow(unused_imports, clippy::single_component_path_imports)]
 use admin_api;
 
 /// 测试服务器句柄
@@ -33,7 +33,7 @@ static SERVER: OnceCell<TestServer> = OnceCell::const_new();
 /// 获取共享测试服务器实例（进程内全局唯一，只启动一次）
 pub async fn server() -> &'static TestServer {
     SERVER
-        .get_or_try_init(|| start_server())
+        .get_or_try_init(start_server)
         .await
         .expect("E2E 测试服务器启动失败")
 }
@@ -101,7 +101,11 @@ time_format = "local"
 token_name = "Authorization"
 timeout = 86400
 is_concurrent = true
-is_share = true
+# is_share=true 时同一账号(admin)的所有登录共享同一个 token，
+# 并行运行下 logout 用例会连带失效 admin_token() 的共享 token，
+# 导致 user_info_with_token_ok 偶发 401。测试中关闭共享，
+# 使各用例独立 token 互不干扰（与设计文档示例 is_share:false 一致）。
+is_share = false
 token_style = "simple-uuid"
 is_read_header = true
 is_read_cookie = false
@@ -144,12 +148,25 @@ async fn pick_free_port() -> anyhow::Result<u16> {
     Ok(addr.port())
 }
 
-/// 轮询健康接口直到服务就绪（默认 15s 超时）
+/// 创建不经过系统代理的 HTTP 客户端。
+///
+/// CI 环境常设置 `HTTP_PROXY`/`HTTPS_PROXY`，reqwest 默认会把这些
+/// localhost 回环请求也路由到代理，导致测试服务器明明已启动却连不上
+/// （表现为「服务在 Ns 内未就绪」）。显式 `.no_proxy()` 让所有请求直连。
+pub fn http_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .expect("创建 HTTP 客户端失败")
+}
+
+/// 轮询健康接口直到服务就绪（默认 60s 超时，兼容慢速 CI）
 async fn wait_for_ready(base_url: &str) -> anyhow::Result<()> {
     let client = reqwest::Client::builder()
+        .no_proxy()
         .timeout(std::time::Duration::from_secs(2))
         .build()?;
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
     loop {
         if client
             .get(format!("{base_url}/health/live"))
@@ -160,7 +177,7 @@ async fn wait_for_ready(base_url: &str) -> anyhow::Result<()> {
             return Ok(());
         }
         if std::time::Instant::now() > deadline {
-            anyhow::bail!("服务在 15s 内未就绪: {base_url}");
+            anyhow::bail!("服务在 60s 内未就绪: {base_url}");
         }
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     }
@@ -204,7 +221,7 @@ pub async fn admin_token() -> &'static str {
     ADMIN_TOKEN
         .get_or_try_init(|| async {
             let srv = server().await;
-            let client = reqwest::Client::new();
+            let client = http_client();
             login(&client, &srv.base_url).await
         })
         .await
@@ -219,6 +236,7 @@ pub fn authed_client(token: &str) -> reqwest::Client {
         reqwest::header::HeaderValue::from_str(token).expect("非法 token"),
     );
     reqwest::Client::builder()
+        .no_proxy()
         .default_headers(headers)
         .build()
         .expect("创建 HTTP 客户端失败")

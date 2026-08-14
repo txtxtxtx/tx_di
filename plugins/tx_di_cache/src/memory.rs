@@ -645,10 +645,13 @@ impl CacheService for MemoryCache {
                         stop.min(len - 1)
                     };
                     let mut result = Vec::new();
-                    for item in &vec[s as usize..=(e as usize).min(vec.len().saturating_sub(1))] {
-                        result.push(item.member.clone());
-                        if with_scores {
-                            result.push(item.score.to_le_bytes().to_vec());
+                    let end = (e as usize).min(vec.len().saturating_sub(1));
+                    if let Some(items) = vec.get(s as usize..=end) {
+                        for item in items {
+                            result.push(item.member.clone());
+                            if with_scores {
+                                result.push(item.score.to_le_bytes().to_vec());
+                            }
                         }
                     }
                     Ok(result)

@@ -264,7 +264,7 @@ async fn app_async_init(comp: Arc<ToastyPlugin>, _app: Arc<App>) -> RIE<()> {
     // 写入 OnceLock
     comp.db
         .set(db)
-        .unwrap_or_else(|_| panic!("{}", ToastyErr::AlreadyInitialized));
+        .unwrap_or_else(|_| panic!("{}", ToastyErr::AlreadyInitialized.to_string()));
     tracing::info!("数据库初始化完成");
     Ok(())
 }

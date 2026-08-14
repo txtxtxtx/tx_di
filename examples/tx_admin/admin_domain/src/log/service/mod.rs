@@ -22,6 +22,7 @@ impl OperateLogService {
         Self { log_repo }
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// 创建新的操作日志记录
     ///
     /// # 参数

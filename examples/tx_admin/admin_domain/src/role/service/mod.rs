@@ -56,7 +56,7 @@ impl RoleService {
         creator: Option<String>,
     ) -> AppResult<Role> {
         if self.role_repo.exists_by_code(&code).await? {
-            return Err(RepositoryError::DuplicateRoleCode.into());
+            Err(RepositoryError::DuplicateRoleCode)?;
         }
 
         let role_id = id::next_id();
@@ -80,12 +80,13 @@ impl RoleService {
         creator: Option<String>,
     ) -> AppResult<Role> {
         if self.role_repo.exists_by_code(&code).await? {
-            return Err(RepositoryError::DuplicateRoleCode.into());
+            Err(RepositoryError::DuplicateRoleCode)?;
         }
         let role_id = id::next_id();
         Ok(Role::create(role_id, name, code, sort, creator))
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// 更新角色信息
     ///
     /// # 参数
@@ -131,7 +132,7 @@ impl RoleService {
         if let Some(existing) = self.role_repo.find_by_code(&code).await?
             && existing.id != role_id
         {
-            return Err(RepositoryError::DuplicateRoleCode.into());
+            Err(RepositoryError::DuplicateRoleCode)?;
         }
 
         role.update_info(name, code, sort, data_scope, remark, updater);
@@ -232,7 +233,7 @@ impl RoleService {
 
         // 角色必须为启用状态才能分配菜单
         if role.status != 0 {
-            return Err(RepositoryError::ValidationRoleDisabled.into());
+            Err(RepositoryError::ValidationRoleDisabled)?;
         }
 
         role.set_menus(menu_ids.clone());
@@ -374,7 +375,7 @@ impl RoleService {
             .ok_or(RepositoryError::NotFoundRole)?;
 
         if role.status != 0 {
-            return Err(RepositoryError::ValidationRoleDisabled.into());
+            Err(RepositoryError::ValidationRoleDisabled)?;
         }
 
         self.role_repo.bind_users(role_id, &user_ids).await

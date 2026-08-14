@@ -14,7 +14,7 @@ use admin_domain::shared::model::DomainEvent;
 use tx_di_core::{Component, DepsTuple};
 
 /// 领域事件订阅者回调类型
-type Subscriber = Arc<dyn Fn(DomainEvent) + Send + Sync>;
+pub type Subscriber = Arc<dyn Fn(DomainEvent) + Send + Sync>;
 
 /// 进程内领域事件总线
 #[derive(Component)]

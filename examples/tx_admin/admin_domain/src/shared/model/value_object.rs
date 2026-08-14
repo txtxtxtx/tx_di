@@ -14,7 +14,7 @@ pub enum DeletedStatus {
 }
 
 /// 租户ID
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct TenantId(u64);
 
 impl TenantId {
@@ -191,7 +191,7 @@ mod tests {
         let tid = TenantId::new(7);
         let tid2 = tid;
         assert_eq!(tid, tid2); // Copy
-        let tid3 = tid.clone();
+        let tid3 = tid;
         assert_eq!(tid, tid3); // Clone
     }
 

@@ -53,6 +53,7 @@ impl DepartmentService {
         Ok(dept)
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// 更新部门信息
     ///
     /// # 参数
@@ -97,7 +98,7 @@ impl DepartmentService {
             .ok_or(RepositoryError::NotFoundDept)?;
 
         if parent_id == dept_id {
-            return Err(RepositoryError::ValidationDeptSelfParent.into());
+            Err(RepositoryError::ValidationDeptSelfParent)?;
         }
 
         dept.update_info(name, parent_id, sort, leader_user_id, phone, email, updater);
@@ -128,10 +129,10 @@ impl DepartmentService {
     /// - 数据库更新操作失败时返回仓储层错误
     pub async fn delete_dept(&self, dept_id: u64, updater: Option<String>) -> AppResult<()> {
         if self.dept_repo.has_children(dept_id).await? {
-            return Err(RepositoryError::ValidationDeptHasChildren.into());
+            Err(RepositoryError::ValidationDeptHasChildren)?;
         }
         if self.dept_repo.has_users(dept_id).await? {
-            return Err(RepositoryError::ValidationDeptHasUsers.into());
+            Err(RepositoryError::ValidationDeptHasUsers)?;
         }
 
         let mut dept = self

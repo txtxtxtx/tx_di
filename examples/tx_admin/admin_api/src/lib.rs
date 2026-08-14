@@ -13,6 +13,7 @@ pub mod auth;
 pub mod error;
 pub mod interfaces;
 pub mod nacos;
+#[allow(clippy::empty_line_after_doc_comments, clippy::doc_lazy_continuation)]
 pub mod operate_log;
 pub mod plugin;
 

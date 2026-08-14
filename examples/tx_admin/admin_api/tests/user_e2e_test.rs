@@ -386,7 +386,7 @@ async fn delete_user_then_not_found() {
 #[tokio::test]
 async fn user_api_requires_auth() {
     let srv = server().await;
-    let client = reqwest::Client::new();
+    let client = http_client();
 
     let resp = client
         .get(format!("{}/api/v1/user/1", srv.base_url))

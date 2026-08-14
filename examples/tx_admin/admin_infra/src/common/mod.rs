@@ -5,11 +5,11 @@
 use toasty::Embed;
 
 /// 性别
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Embed)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Embed, Default)]
 pub enum Sex {
     /// 未知
-    #[column(variant = 0)]
     #[default]
+    #[column(variant = 0)]
     Unknown,
     /// 男
     #[column(variant = 1)]
@@ -20,11 +20,11 @@ pub enum Sex {
 }
 
 /// 通用启用状态
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Embed)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Embed, Default)]
 pub enum Status {
     /// 启用
-    #[column(variant = 0)]
     #[default]
+    #[column(variant = 0)]
     Enabled,
     /// 停用
     #[column(variant = 1)]
@@ -34,11 +34,11 @@ pub enum Status {
 }
 
 /// 软删除标记
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Embed)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Embed, Default)]
 pub enum Deleted {
     /// 未删除
-    #[column(variant = 0)]
     #[default]
+    #[column(variant = 0)]
     No,
     /// 已删除
     #[column(variant = 1)]
@@ -46,11 +46,11 @@ pub enum Deleted {
 }
 
 /// 文件存储后端类型
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Embed)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Embed, Default)]
 pub enum StorageType {
     /// 本地文件系统
-    #[column(variant = 0)]
     #[default]
+    #[column(variant = 0)]
     Local,
     /// S3 对象存储
     #[column(variant = 1)]

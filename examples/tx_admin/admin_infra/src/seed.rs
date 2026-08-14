@@ -28,13 +28,10 @@ pub fn resolve_admin_password() -> String {
         .unwrap_or_else(|| DEFAULT_ADMIN_PASSWORD.to_string())
 }
 
-/// 字典种子数据项：(
-/// sort, label, value, color_type)
-type DictSeedItem = (i32, &'static str, &'static str, &'static str);
-
 /// 字典种子数据：(dict_type, type_name, data_items)
+/// data_items: (sort, label, value, color_type)
+type DictSeedItem = (i32, &'static str, &'static str, &'static str);
 type DictSeed = (&'static str, &'static str, &'static [DictSeedItem]);
-
 const DICT_SEEDS: &[DictSeed] = &[
     (
         "sys_status",
@@ -150,7 +147,6 @@ type MenuSeed = (
     i32,
     i32,
 );
-
 const MENU_SEEDS: &[MenuSeed] = &[
     // ── 目录 (2位) ──
     (

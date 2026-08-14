@@ -94,7 +94,7 @@ impl UserService {
     ) -> AppResult<User> {
         // Check if username already exists
         if self.user_repo.exists_by_username(&username).await? {
-            return Err(RepositoryError::DuplicateUsername.into());
+            Err(RepositoryError::DuplicateUsername)?;
         }
 
         // Hash password with Argon2id
@@ -122,7 +122,7 @@ impl UserService {
         creator: Option<String>,
     ) -> AppResult<User> {
         if self.user_repo.exists_by_username(&username).await? {
-            return Err(RepositoryError::DuplicateUsername.into());
+            Err(RepositoryError::DuplicateUsername)?;
         }
         let hashed_password = password::hash_password(&password)?;
         let user_id = id::next_id();
@@ -135,6 +135,7 @@ impl UserService {
         ))
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// 更新用户基本信息
     ///
     /// # 参数

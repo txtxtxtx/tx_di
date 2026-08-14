@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use tx_di_core::{Component, RIE, Store};
 
 /// 存储后端类型
-#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum StorageBackend {
     /// 本地文件系统

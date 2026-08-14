@@ -50,7 +50,7 @@ impl DictTypeService {
         creator: Option<String>,
     ) -> AppResult<DictType> {
         if self.dict_type_repo.exists_by_type(&dict_type).await? {
-            return Err(RepositoryError::DuplicateDictType.into());
+            Err(RepositoryError::DuplicateDictType)?;
         }
         let id = id::next_id();
         let dt = DictType::create(id, name, dict_type, creator);
@@ -213,6 +213,7 @@ impl DictDataService {
         Ok(dd)
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// 更新已有字典数据项的信息
     ///
     /// # 参数
