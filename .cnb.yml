@@ -30,7 +30,10 @@
         rustup component add rustfmt
         cargo fmt --check
     - name: clippy
-      script: cargo clippy -p tx-di-core -p tx-di-macros -p admin_domain -p admin_app -p admin_api -- -D warnings
+      # rust:*-slim 镜像默认不含 clippy，需先安装再执行 lint
+      script: |
+        rustup component add clippy
+        cargo clippy -p tx-di-core -p tx-di-macros -p admin_domain -p admin_app -p admin_api -- -D warnings
     - name: test-core
       # 框架层核心测试（串行，避免全局状态竞态）
       script: cargo test -p tx-di-core -- --test-threads=1
@@ -101,7 +104,10 @@ main:
             rustup component add rustfmt
             cargo fmt --check
         - name: clippy
-          script: cargo clippy -p tx-di-core -p tx-di-macros -p admin_domain -p admin_app -p admin_api -- -D warnings
+          # rust:*-slim 镜像默认不含 clippy，需先安装再执行 lint
+          script: |
+            rustup component add clippy
+            cargo clippy -p tx-di-core -p tx-di-macros -p admin_domain -p admin_app -p admin_api -- -D warnings
         - name: test-core
           script: cargo test -p tx-di-core -- --test-threads=1
         - name: test-domain
