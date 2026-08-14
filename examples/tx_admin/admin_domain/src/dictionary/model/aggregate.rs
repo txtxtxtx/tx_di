@@ -146,6 +146,7 @@ impl AggregateRoot for DictData {
 
 impl DictData {
     /// 从持久化层恢复字典数据（不触发领域事件）
+    #[allow(clippy::too_many_arguments)]
     pub fn restore(
         id: u64,
         sort: i32,
@@ -204,6 +205,7 @@ impl DictData {
         dd
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn update_info(
         &mut self,
         sort: i32,

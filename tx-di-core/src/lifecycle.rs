@@ -248,7 +248,7 @@ impl BuildContext {
     /// 构建 App 实例，将 store 转移到 App
     pub fn build(mut self) -> RIE<App> {
         let shutdown_token = CancellationToken::new();
-        let store = std::mem::replace(&mut self.store, Store::new());
+        let store = std::mem::take(&mut self.store);
         let metas = std::mem::take(&mut self.metas);
         Ok(App {
             store,

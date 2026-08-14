@@ -69,7 +69,7 @@ impl Default for JobConfig {
 /// `#[component(init)]` 回调：验证配置
 fn init(this: &mut JobConfig, _store: &Store) -> RIE<()> {
     // 验证配置
-    if this.poll_interval_secs <= 0 {
+    if this.poll_interval_secs == 0 {
         tracing::warn!("poll_interval_secs 不能为 0，已重置为默认值 1");
         this.poll_interval_secs = default_poll_interval();
     }

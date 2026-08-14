@@ -75,7 +75,7 @@ impl FilePlugin {
         key: String,
         storage: Arc<dyn FileStorage>,
     ) -> Option<Arc<dyn FileStorage>> {
-        self.backends.insert(key, storage).map(|r| r.clone())
+        self.backends.insert(key, storage)
     }
 
     /// 移除一个用户自定义存储后端

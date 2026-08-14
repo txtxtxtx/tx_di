@@ -118,7 +118,7 @@ impl ToastyRoleRepository {
             } else {
                 Some(u.login_ip.clone())
             },
-            (u.login_date != jiff::Timestamp::UNIX_EPOCH).then(|| u.login_date),
+            (u.login_date != jiff::Timestamp::UNIX_EPOCH).then_some(u.login_date),
             admin_domain::shared::model::value_object::TenantId::new(u.tenant_id),
             AuditFields {
                 creator: if u.creator.is_empty() {
@@ -229,20 +229,20 @@ impl RoleRepository for ToastyRoleRepository {
 
         let mut roles = Vec::new();
         for r in all.into_iter().filter(|r| r.deleted == Deleted::No) {
-            if let Some(ref name) = query.name {
-                if !r.name.contains(name.as_str()) {
-                    continue;
-                }
+            if let Some(ref name) = query.name
+                && !r.name.contains(name.as_str())
+            {
+                continue;
             }
-            if let Some(ref code) = query.code {
-                if !r.code.contains(code.as_str()) {
-                    continue;
-                }
+            if let Some(ref code) = query.code
+                && !r.code.contains(code.as_str())
+            {
+                continue;
             }
-            if let Some(status) = query.status {
-                if i32::from(r.status) != status {
-                    continue;
-                }
+            if let Some(status) = query.status
+                && i32::from(r.status) != status
+            {
+                continue;
             }
             roles.push(self.to_full_domain(&r).await?);
         }
@@ -412,10 +412,10 @@ impl RoleRepository for ToastyRoleRepository {
 
         let mut users = Vec::new();
         for ur in user_roles {
-            if let Ok(u) = SysUser::get_by_id(&mut db, ur.user_id).await {
-                if u.deleted == Deleted::No {
-                    users.push(Self::sys_user_to_domain(&u));
-                }
+            if let Ok(u) = SysUser::get_by_id(&mut db, ur.user_id).await
+                && u.deleted == Deleted::No
+            {
+                users.push(Self::sys_user_to_domain(&u));
             }
         }
         Ok(users)

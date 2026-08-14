@@ -49,6 +49,7 @@ impl MenuService {
     ///
     /// # 错误
     /// - 数据库插入操作失败时返回仓储层错误
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_menu(
         &self,
         name: String,
@@ -102,6 +103,7 @@ impl MenuService {
     /// - `NotFoundMenu` - 指定菜单 ID 不存在
     /// - `ValidationMenuSelfParent` - 尝试将菜单的父级设为自身
     /// - 数据库更新操作失败时返回仓储层错误
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_menu(
         &self,
         menu_id: u64,
@@ -122,11 +124,11 @@ impl MenuService {
             .menu_repo
             .find_by_id(menu_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundMenu)?;
+            .ok_or(RepositoryError::NotFoundMenu)?;
 
         // Cannot set self as parent
         if parent_id == menu_id {
-            return Err(RepositoryError::ValidationMenuSelfParent)?;
+            return Err(RepositoryError::ValidationMenuSelfParent.into());
         }
 
         menu.update_info(
@@ -168,14 +170,14 @@ impl MenuService {
     /// - 数据库更新操作失败时返回仓储层错误
     pub async fn delete_menu(&self, menu_id: u64, updater: Option<String>) -> AppResult<()> {
         if self.menu_repo.has_children(menu_id).await? {
-            return Err(RepositoryError::ValidationMenuHasChildren)?;
+            return Err(RepositoryError::ValidationMenuHasChildren.into());
         }
 
         let mut menu = self
             .menu_repo
             .find_by_id(menu_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundMenu)?;
+            .ok_or(RepositoryError::NotFoundMenu)?;
 
         menu.soft_delete(updater);
         self.menu_repo.update(&menu).await?;

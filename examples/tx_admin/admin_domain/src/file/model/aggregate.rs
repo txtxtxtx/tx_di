@@ -39,6 +39,7 @@ impl AggregateRoot for File {
 
 impl File {
     /// 从持久化层恢复文件（不触发领域事件）
+    #[allow(clippy::too_many_arguments)]
     pub fn restore(
         id: u64,
         config_id: Option<u64>,
@@ -62,6 +63,7 @@ impl File {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn create(
         id: u64,
         config_id: Option<u64>,

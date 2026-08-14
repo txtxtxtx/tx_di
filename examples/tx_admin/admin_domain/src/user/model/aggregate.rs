@@ -50,6 +50,7 @@ pub struct User {
 
 impl User {
     /// 从持久化层恢复用户（不触发领域事件）
+    #[allow(clippy::too_many_arguments)]
     pub fn restore(
         id: u64,
         username: String,

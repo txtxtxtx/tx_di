@@ -1,3 +1,5 @@
+#![allow(clippy::empty_line_after_doc_comments, clippy::doc_lazy_continuation)]
+
 /// 有界 channel 容量，缓冲 4096 条日志条目。
 ///
 /// 当 channel 满时，新产生的日志会被丢弃并输出 warn 级别告警，

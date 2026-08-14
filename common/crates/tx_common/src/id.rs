@@ -15,6 +15,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 /// - 时钟回拨采用指数退避算法，避免忙等待
 /// - 添加闰秒容忍处理机制，防止闰秒插入导致的ID重复或回拨错误
 /// - 支持批量生成ID，减少原子操作开销
+///
 /// ID生成器结构体，用于生成唯一的ID
 pub struct IdGenerator {
     /// 工作节点ID，用于标识不同的工作节点

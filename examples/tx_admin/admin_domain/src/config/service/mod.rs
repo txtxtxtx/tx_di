@@ -56,7 +56,7 @@ impl ConfigService {
         creator: Option<String>,
     ) -> AppResult<Config> {
         if self.config_repo.exists_by_key(&config_key).await? {
-            return Err(RepositoryError::DuplicateConfigKey);
+            return Err(RepositoryError::DuplicateConfigKey.into());
         }
 
         let config_id = id::next_id();
@@ -122,7 +122,7 @@ impl ConfigService {
         if let Some(existing) = self.config_repo.find_by_key(&config_key).await?
             && existing.id != config_id
         {
-            return Err(RepositoryError::DuplicateConfigKey);
+            return Err(RepositoryError::DuplicateConfigKey.into());
         }
 
         config.update_info(

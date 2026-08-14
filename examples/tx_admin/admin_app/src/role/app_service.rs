@@ -150,7 +150,7 @@ impl RoleAppService {
                 .await?
                 .ok_or(RepositoryError::NotFoundUser)?;
             if user.status != UserStatus::Active {
-                return Err(RepositoryError::ValidationUserStatus)?;
+                return Err(RepositoryError::ValidationUserStatus.into());
             }
         }
 

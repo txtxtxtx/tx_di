@@ -16,6 +16,12 @@ use tx_error::{AppError, AppResult};
 #[derive(Component)]
 pub struct AuthSessionService;
 
+impl Default for AuthSessionService {
+    fn default() -> Self {
+        Self
+    }
+}
+
 impl AuthSessionService {
     pub fn new() -> Self {
         Self

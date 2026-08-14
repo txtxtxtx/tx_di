@@ -5,10 +5,11 @@
 use toasty::Embed;
 
 /// 性别
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Embed)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Embed)]
 pub enum Sex {
     /// 未知
     #[column(variant = 0)]
+    #[default]
     Unknown,
     /// 男
     #[column(variant = 1)]
@@ -18,17 +19,12 @@ pub enum Sex {
     Female,
 }
 
-impl Default for Sex {
-    fn default() -> Self {
-        Sex::Unknown
-    }
-}
-
 /// 通用启用状态
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Embed)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Embed)]
 pub enum Status {
     /// 启用
     #[column(variant = 0)]
+    #[default]
     Enabled,
     /// 停用
     #[column(variant = 1)]
@@ -37,34 +33,24 @@ pub enum Status {
     Locked,
 }
 
-impl Default for Status {
-    fn default() -> Self {
-        Status::Enabled
-    }
-}
-
 /// 软删除标记
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Embed)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Embed)]
 pub enum Deleted {
     /// 未删除
     #[column(variant = 0)]
+    #[default]
     No,
     /// 已删除
     #[column(variant = 1)]
     Yes,
 }
 
-impl Default for Deleted {
-    fn default() -> Self {
-        Deleted::No
-    }
-}
-
 /// 文件存储后端类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Embed)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Embed)]
 pub enum StorageType {
     /// 本地文件系统
     #[column(variant = 0)]
+    #[default]
     Local,
     /// S3 对象存储
     #[column(variant = 1)]
@@ -72,12 +58,6 @@ pub enum StorageType {
     /// 数据库存储
     #[column(variant = 2)]
     Database,
-}
-
-impl Default for StorageType {
-    fn default() -> Self {
-        StorageType::Local
-    }
 }
 
 // ── i32 互转 ──

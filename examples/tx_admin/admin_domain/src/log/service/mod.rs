@@ -45,6 +45,7 @@ impl OperateLogService {
     ///
     /// # 错误
     /// - 数据库操作错误 - 仓储插入失败时
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_log(
         &self,
         trace_id: String,

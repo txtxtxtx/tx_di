@@ -6,7 +6,7 @@
 //! 优雅关闭 App（进程不退出）并用新配置重启。
 
 // 引用 lib：触发 `AdminPlugin` 等组件 linkme 注册（见 src/lib.rs）
-#[allow(unused_imports)]
+#[allow(unused_imports, clippy::single_component_path_imports)]
 use admin_api;
 use tx_error::AppResult;
 
@@ -39,10 +39,10 @@ async fn main() -> AppResult<()> {
 /// 仓库约定路径 `examples/tx_admin/config/config.toml`（向后兼容开发习惯）。
 /// 生产部署推荐显式设置 `CONFIG_PATH`（绝对路径），避免依赖进程工作目录。
 fn resolve_config_path() -> &'static str {
-    if let Ok(p) = std::env::var("CONFIG_PATH") {
-        if !p.trim().is_empty() {
-            return Box::leak(p.into_boxed_str());
-        }
+    if let Ok(p) = std::env::var("CONFIG_PATH")
+        && !p.trim().is_empty()
+    {
+        return Box::leak(p.into_boxed_str());
     }
     if std::path::Path::new("config/config.toml").exists() {
         return "config/config.toml";

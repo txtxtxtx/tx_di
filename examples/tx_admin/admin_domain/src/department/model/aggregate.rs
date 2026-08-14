@@ -24,6 +24,7 @@ pub struct Department {
 
 impl Department {
     /// 从持久化层恢复部门（不触发领域事件）
+    #[allow(clippy::too_many_arguments)]
     pub fn restore(
         id: u64,
         name: String,
@@ -83,6 +84,7 @@ impl Department {
         dept
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn update_info(
         &mut self,
         name: String,

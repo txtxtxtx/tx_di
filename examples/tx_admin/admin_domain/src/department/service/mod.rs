@@ -78,6 +78,7 @@ impl DepartmentService {
     /// - `NotFoundDept` - 指定部门 ID 不存在
     /// - `ValidationDeptSelfParent` - 尝试将部门的父级设为自身
     /// - 数据库更新操作失败时返回仓储层错误
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_dept(
         &self,
         dept_id: u64,
@@ -93,10 +94,10 @@ impl DepartmentService {
             .dept_repo
             .find_by_id(dept_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundDept)?;
+            .ok_or(RepositoryError::NotFoundDept)?;
 
         if parent_id == dept_id {
-            return Err(RepositoryError::ValidationDeptSelfParent)?;
+            return Err(RepositoryError::ValidationDeptSelfParent.into());
         }
 
         dept.update_info(name, parent_id, sort, leader_user_id, phone, email, updater);
@@ -127,17 +128,17 @@ impl DepartmentService {
     /// - 数据库更新操作失败时返回仓储层错误
     pub async fn delete_dept(&self, dept_id: u64, updater: Option<String>) -> AppResult<()> {
         if self.dept_repo.has_children(dept_id).await? {
-            return Err(RepositoryError::ValidationDeptHasChildren)?;
+            return Err(RepositoryError::ValidationDeptHasChildren.into());
         }
         if self.dept_repo.has_users(dept_id).await? {
-            return Err(RepositoryError::ValidationDeptHasUsers)?;
+            return Err(RepositoryError::ValidationDeptHasUsers.into());
         }
 
         let mut dept = self
             .dept_repo
             .find_by_id(dept_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundDept)?;
+            .ok_or(RepositoryError::NotFoundDept)?;
 
         dept.soft_delete(updater);
         self.dept_repo.update(&dept).await?;
@@ -200,7 +201,7 @@ impl DepartmentService {
             .dept_repo
             .find_by_id(dept_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundDept)?)
+            .ok_or(RepositoryError::NotFoundDept)?)
     }
 
     /// 递归构建部门树（内部方法）

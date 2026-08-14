@@ -14,7 +14,7 @@ pub enum DeletedStatus {
 }
 
 /// 租户ID
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TenantId(u64);
 
 impl TenantId {
@@ -24,11 +24,6 @@ impl TenantId {
 
     pub fn into_inner(self) -> u64 {
         self.0
-    }
-}
-impl Default for TenantId {
-    fn default() -> Self {
-        Self(0)
     }
 }
 impl From<u64> for TenantId {
