@@ -46,6 +46,7 @@ impl AggregateRoot for OperateLog {
 
 impl OperateLog {
     /// 从持久化层恢复操作日志（不触发领域事件）
+    #[allow(clippy::too_many_arguments)]
     pub fn restore(
         id: u64,
         trace_id: String,
@@ -85,6 +86,7 @@ impl OperateLog {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn create(
         id: u64,
         trace_id: String,
@@ -176,6 +178,7 @@ impl AggregateRoot for LoginLog {
 
 impl LoginLog {
     /// 从持久化层恢复登录日志（不触发领域事件）
+    #[allow(clippy::too_many_arguments)]
     pub fn restore(
         id: u64,
         user_id: u64,

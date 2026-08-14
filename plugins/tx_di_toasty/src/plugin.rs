@@ -157,7 +157,7 @@ impl ToastyPlugin {
     ///
     /// `Transaction` 由 `lib.rs` re-export；`ToastyErr::TxBeginFailed/TxCommitFailed`
     /// 提供标准错误码。
-
+    ///
     /// 将配置文件的 `auto_schema = true` 改为 `false`（按行替换，保留注释与格式）
     fn change_auto_schema_closed(path: PathBuf) {
         let content = match std::fs::read_to_string(&path) {
@@ -265,7 +265,7 @@ async fn app_async_init(comp: Arc<ToastyPlugin>, _app: Arc<App>) -> RIE<()> {
     // 写入 OnceLock
     comp.db
         .set(db)
-        .expect(&ToastyErr::AlreadyInitialized.to_string());
+        .unwrap_or_else(|_| panic!("{}", ToastyErr::AlreadyInitialized.to_string()));
     tracing::info!("数据库初始化完成");
     Ok(())
 }

@@ -94,7 +94,7 @@ impl UserService {
     ) -> AppResult<User> {
         // Check if username already exists
         if self.user_repo.exists_by_username(&username).await? {
-            return Err(RepositoryError::DuplicateUsername)?;
+            Err(RepositoryError::DuplicateUsername)?;
         }
 
         // Hash password with Argon2id
@@ -122,7 +122,7 @@ impl UserService {
         creator: Option<String>,
     ) -> AppResult<User> {
         if self.user_repo.exists_by_username(&username).await? {
-            return Err(RepositoryError::DuplicateUsername)?;
+            Err(RepositoryError::DuplicateUsername)?;
         }
         let hashed_password = password::hash_password(&password)?;
         let user_id = id::next_id();
@@ -157,6 +157,7 @@ impl UserService {
     /// # 错误
     /// - `NotFoundUser` - 指定用户不存在
     /// - 数据库更新失败时返回错误
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_user(
         &self,
         user_id: u64,
@@ -171,7 +172,7 @@ impl UserService {
             .user_repo
             .find_by_id(user_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundUser)?;
+            .ok_or(RepositoryError::NotFoundUser)?;
 
         user.set_basic_info(nickname, email, mobile, sex, remark, updater);
         self.user_repo.update(&user).await?;
@@ -200,7 +201,7 @@ impl UserService {
             .user_repo
             .find_by_id(user_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundUser)?;
+            .ok_or(RepositoryError::NotFoundUser)?;
 
         user.soft_delete(updater);
         self.user_repo.update(&user).await?;
@@ -235,7 +236,7 @@ impl UserService {
             .user_repo
             .find_by_id(user_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundUser)?;
+            .ok_or(RepositoryError::NotFoundUser)?;
 
         user.change_status(status, updater);
         self.user_repo.update(&user).await?;
@@ -272,7 +273,7 @@ impl UserService {
             .user_repo
             .find_by_id(user_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundUser)?;
+            .ok_or(RepositoryError::NotFoundUser)?;
 
         // Hash new password with Argon2id
         let hashed_password = password::hash_password(&password)?;
@@ -325,7 +326,7 @@ impl UserService {
             .user_repo
             .find_by_id(user_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundUser)?;
+            .ok_or(RepositoryError::NotFoundUser)?;
         user.role_ids = self.user_repo.get_role_ids(user.id).await?;
         user.dept_ids = self.user_repo.get_dept_ids(user.id).await?;
         Ok(user)
@@ -370,7 +371,7 @@ impl UserService {
             .user_repo
             .find_by_id(user_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundUser)?;
+            .ok_or(RepositoryError::NotFoundUser)?;
 
         user.record_login(ip);
         self.user_repo.update(&user).await?;

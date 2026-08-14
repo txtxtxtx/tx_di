@@ -119,8 +119,7 @@ async fn upload_files(
                     .unwrap_or("application/octet-stream")
                     .to_string();
 
-                let byte_stream =
-                    field.map(|r| r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)));
+                let byte_stream = field.map(|r| r.map_err(std::io::Error::other));
                 let mut reader = tokio_util::io::StreamReader::new(byte_stream);
 
                 let r = file_svc

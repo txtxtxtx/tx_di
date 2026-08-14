@@ -14,10 +14,12 @@ use crate::error::{AppError, DiErr};
 /// 存储单元：
 /// - `Factory(Arc<dyn Fn>)` → 存工厂闭包，prototype 每次注入时调用
 /// - `Cached(Arc<dyn Any>)` → 已实例化的单例（擦除类型）
+type FactoryFn = dyn Fn(&Store) -> Arc<dyn Any + Send + Sync> + Send + Sync;
+
 #[derive(Clone)]
 pub enum CompRef {
     /// 工厂闭包：Prototype 作用域，每次注入调用
-    Factory(Arc<dyn Fn(&Store) -> Arc<dyn Any + Send + Sync> + Send + Sync>),
+    Factory(Arc<FactoryFn>),
     /// 已缓存的实例：Singleton 作用域
     Cached(Arc<dyn Any + Send + Sync>),
 }
@@ -54,7 +56,7 @@ impl Store {
     ///
     /// 每次工厂创建新实例后调用，将 `Arc` 转为 `Weak` 存储，便于 shutdown 时通知存活实例。
     pub(crate) fn track_prototype_raw(&self, instance: &Arc<dyn Any + Send + Sync>) {
-        let tid = (&**instance).type_id();
+        let tid = (**instance).type_id();
         let weak = Arc::downgrade(instance);
         self.prototype_instances.entry(tid).or_default().push(weak);
     }
@@ -134,7 +136,7 @@ impl Store {
                     CompRef::Factory(f) => f(self),
                 };
                 any_arc.downcast::<T>().map_err(|bad_arc| {
-                    let actual = (&*bad_arc).type_id();
+                    let actual = (*bad_arc).type_id();
                     AppError::with_context(
                         DiErr::InjectError,
                         format!(

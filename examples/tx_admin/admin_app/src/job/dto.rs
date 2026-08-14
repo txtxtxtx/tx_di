@@ -9,7 +9,7 @@ pub use admin_proto::{
 /// 将 InfrustJob 转换为 proto JobResponse
 pub fn job_to_response(job: InfrustJob) -> JobResponse {
     JobResponse {
-        id: job.id as u64,
+        id: job.id,
         name: job.name,
         status: job.status as i32,
         handler_name: job.handler_name,
@@ -24,8 +24,8 @@ pub fn job_to_response(job: InfrustJob) -> JobResponse {
 /// 将 InfrustJobLog 转换为 proto JobLogResponse
 pub fn job_log_to_response(log: InfrustJobLog) -> JobLogResponse {
     JobLogResponse {
-        id: log.id as u64,
-        job_id: log.job_id as u64,
+        id: log.id,
+        job_id: log.job_id,
         handler_name: log.handler_name,
         handler_param: log.handler_param,
         execute_index: log.execute_index as i32,

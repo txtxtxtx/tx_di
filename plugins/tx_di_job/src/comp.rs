@@ -118,7 +118,7 @@ impl JobPlugin {
         handler_name: &str,
         handler_param: Option<&str>,
     ) -> JobResult {
-        let executor_type = ExecutorType::from_handler_name(&handler_name);
+        let executor_type = ExecutorType::from_handler_name(handler_name);
         match executor_type {
             ExecutorType::Internal => {
                 self.internal_exec()
@@ -558,17 +558,16 @@ impl JobPlugin {
                                 );
                             }
                             // 执行完成释放分布式锁（仅释放自己持有的锁）
-                            if let Some((cache, lock_key, token)) = &release_lock {
-                                if let Err(e) = cache
+                            if let Some((cache, lock_key, token)) = &release_lock
+                                && let Err(e) = cache
                                     .compare_and_del(lock_key, token.as_bytes())
                                     .await
-                                {
-                                    error!(
-                                        job_id = job.id,
-                                        error = %e,
-                                        "释放分布式锁失败（将由 TTL 兜底）"
-                                    );
-                                }
+                            {
+                                error!(
+                                    job_id = job.id,
+                                    error = %e,
+                                    "释放分布式锁失败（将由 TTL 兜底）"
+                                );
                             }
                         });
 

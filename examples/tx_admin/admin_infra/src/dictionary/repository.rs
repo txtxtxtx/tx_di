@@ -132,20 +132,20 @@ impl DictTypeRepository for ToastyDictTypeRepository {
             .iter()
             .filter(|d| d.deleted == Deleted::No)
             .filter(|d| {
-                if let Some(ref name) = query.name {
-                    if !d.name.contains(name.as_str()) {
-                        return false;
-                    }
+                if let Some(ref name) = query.name
+                    && !d.name.contains(name.as_str())
+                {
+                    return false;
                 }
-                if let Some(ref dict_type) = query.dict_type {
-                    if !d.dict_type.contains(dict_type.as_str()) {
-                        return false;
-                    }
+                if let Some(ref dict_type) = query.dict_type
+                    && !d.dict_type.contains(dict_type.as_str())
+                {
+                    return false;
                 }
-                if let Some(status) = query.status {
-                    if i32::from(d.status) != status {
-                        return false;
-                    }
+                if let Some(status) = query.status
+                    && i32::from(d.status) != status
+                {
+                    return false;
                 }
                 true
             })

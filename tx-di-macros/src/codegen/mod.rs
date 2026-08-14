@@ -80,17 +80,17 @@ fn derive_component_impl(input: ItemStruct) -> SynResult<TokenStream2> {
     // 非配置组件：校验 Inject 类型的字段是否确实是 Arc<T> 形式
     if !comp_attr.is_config_component() {
         for (ident, kind) in &fields_info {
-            if let FieldKind::Inject { ty } = kind {
-                if !is_arc_like(ty) {
-                    return Err(syn::Error::new_spanned(
-                        ty,
-                        format!(
-                            "字段 `{}` 的类型不是 Arc<Component> / Option<Component> / trait object 形式，\
-                             请使用 #[tx_cst(expr)] 指定值表达式，或 #[tx_cst(skip)] 跳过注入",
-                            ident
-                        ),
-                    ));
-                }
+            if let FieldKind::Inject { ty } = kind
+                && !is_arc_like(ty)
+            {
+                return Err(syn::Error::new_spanned(
+                    ty,
+                    format!(
+                        "字段 `{}` 的类型不是 Arc<Component> / Option<Component> / trait object 形式，\
+                         请使用 #[tx_cst(expr)] 指定值表达式，或 #[tx_cst(skip)] 跳过注入",
+                        ident
+                    ),
+                ));
             }
         }
     }

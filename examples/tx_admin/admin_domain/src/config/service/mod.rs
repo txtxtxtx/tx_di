@@ -56,7 +56,7 @@ impl ConfigService {
         creator: Option<String>,
     ) -> AppResult<Config> {
         if self.config_repo.exists_by_key(&config_key).await? {
-            return Err(RepositoryError::DuplicateConfigKey)?;
+            Err(RepositoryError::DuplicateConfigKey)?;
         }
 
         let config_id = id::next_id();
@@ -99,6 +99,7 @@ impl ConfigService {
     /// - `NotFoundConfig` - 当指定 config_id 的配置不存在时
     /// - `DuplicateConfigKey` - 当新的 config_key 已被其他配置占用时
     /// - 数据库操作错误 - 仓储查询或更新失败时
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_config(
         &self,
         config_id: u64,
@@ -115,13 +116,13 @@ impl ConfigService {
             .config_repo
             .find_by_id(config_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundConfig)?;
+            .ok_or(RepositoryError::NotFoundConfig)?;
 
         // 检查 config_key 是否被其他配置占用
-        if let Some(existing) = self.config_repo.find_by_key(&config_key).await? {
-            if existing.id != config_id {
-                return Err(RepositoryError::DuplicateConfigKey)?;
-            }
+        if let Some(existing) = self.config_repo.find_by_key(&config_key).await?
+            && existing.id != config_id
+        {
+            Err(RepositoryError::DuplicateConfigKey)?;
         }
 
         config.update_info(
@@ -160,7 +161,7 @@ impl ConfigService {
             .config_repo
             .find_by_id(config_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundConfig)?;
+            .ok_or(RepositoryError::NotFoundConfig)?;
 
         config.soft_delete(updater);
         self.config_repo.update(&config).await?;
@@ -210,7 +211,7 @@ impl ConfigService {
             .config_repo
             .find_by_id(config_id)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundConfig)?)
+            .ok_or(RepositoryError::NotFoundConfig)?)
     }
 
     /// 根据配置键名获取单个配置
@@ -233,7 +234,7 @@ impl ConfigService {
             .config_repo
             .find_by_key(key)
             .await?
-            .ok_or_else(|| RepositoryError::NotFoundConfig)?)
+            .ok_or(RepositoryError::NotFoundConfig)?)
     }
 
     /// 批量根据配置键名获取配置值映射

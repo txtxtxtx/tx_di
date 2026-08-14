@@ -2,7 +2,7 @@
 ///
 /// 当 channel 满时，新产生的日志会被丢弃并输出 warn 级别告警，
 /// 以确保 HTTP 响应不被阻塞。
-
+///
 /// HTTP 请求的操作日志条目，由中间件在请求完成后通过有界 channel 发送给消费者。
 ///
 /// # Fields
@@ -13,7 +13,7 @@
 /// - `latency_ms` — 请求耗时（毫秒）
 /// - `user_ip` — 客户端 IP，优先取 `x-forwarded-for`，其次 `x-real-ip`
 /// - `user_agent` — User-Agent 头部值
-
+///
 /// 操作日志 Layer，将 HTTP 请求元数据通过有界 channel 异步发送给消费者。
 ///
 /// 包装 `axum::routing::Route`，提取每次请求的方法、URI、状态码、耗时、IP、UA，
@@ -36,13 +36,13 @@
 /// # Panics
 ///
 /// 不会 panic；channel 满时丢弃日志而非阻塞。
-
+///
 /// 创建操作日志 Layer，传入有界 channel 的发送端。
 ///
 /// # Panics
 ///
 /// 不会 panic。
-
+///
 /// 操作日志中间件，在 HTTP 请求完成后提取元数据并通过有界 channel 发送。
 ///
 /// 内部委托 `axum::routing::Route` 处理请求，响应完成后构造 [`OperateLogEntry`]

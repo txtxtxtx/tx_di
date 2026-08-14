@@ -105,20 +105,20 @@ impl MenuRepository for ToastyMenuRepository {
             .iter()
             .filter(|m| m.deleted == Deleted::No)
             .filter(|m| {
-                if let Some(ref name) = query.name {
-                    if !m.name.contains(name.as_str()) {
-                        return false;
-                    }
+                if let Some(ref name) = query.name
+                    && !m.name.contains(name.as_str())
+                {
+                    return false;
                 }
-                if let Some(status) = query.status {
-                    if i32::from(m.status) != status {
-                        return false;
-                    }
+                if let Some(status) = query.status
+                    && i32::from(m.status) != status
+                {
+                    return false;
                 }
-                if let Some(types) = query.types {
-                    if m.types != types {
-                        return false;
-                    }
+                if let Some(types) = query.types
+                    && m.types != types
+                {
+                    return false;
                 }
                 true
             })
@@ -254,11 +254,12 @@ impl MenuRepository for ToastyMenuRepository {
                 .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
 
             for rm in role_menus {
-                if let Ok(menu) = SysMenu::get_by_id(&mut db, rm.menu_id).await {
-                    if menu.types == 2 && menu.deleted == Deleted::No && !menu.permission.is_empty()
-                    {
-                        codes.insert(menu.permission.clone());
-                    }
+                if let Ok(menu) = SysMenu::get_by_id(&mut db, rm.menu_id).await
+                    && menu.types == 2
+                    && menu.deleted == Deleted::No
+                    && !menu.permission.is_empty()
+                {
+                    codes.insert(menu.permission.clone());
                 }
             }
         }

@@ -79,26 +79,24 @@ where
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         // ── 仅 Content-Length 明确超限时提前拒绝 ──
-        if self.max_bytes > 0 {
-            if let Some(cl) = req
+        if self.max_bytes > 0
+            && let Some(cl) = req
                 .headers()
                 .get(header::CONTENT_LENGTH)
                 .and_then(|v| v.to_str().ok())
                 .and_then(|v| v.parse::<u64>().ok())
-            {
-                if cl > self.max_bytes {
-                    warn!(
-                        "BodySizeLimit: 拒绝请求 (Content-Length={cl} > max={})",
-                        self.max_bytes
-                    );
-                    let resp = (
-                        StatusCode::PAYLOAD_TOO_LARGE,
-                        Json(ApiRes::error(self.error_code, self.error_msg.clone())),
-                    )
-                        .into_response();
-                    return Box::pin(async move { Ok(resp) });
-                }
-            }
+            && cl > self.max_bytes
+        {
+            warn!(
+                "BodySizeLimit: 拒绝请求 (Content-Length={cl} > max={})",
+                self.max_bytes
+            );
+            let resp = (
+                StatusCode::PAYLOAD_TOO_LARGE,
+                Json(ApiRes::error(self.error_code, self.error_msg.clone())),
+            )
+                .into_response();
+            return Box::pin(async move { Ok(resp) });
         }
 
         // ── 放行（无 Content-Length 或未超限） ──
