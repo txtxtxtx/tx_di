@@ -18,9 +18,12 @@
     cpus: 8
   docker:
     image: rust:1.97-slim
+    # CARGO_HOME 指向工作区内 target-cache 数据卷，规避共享 cargo-registry 命名卷
+    # 在 /usr/local/cargo/registry 上的属主/权限不一致导致的 Permission denied(13)。
     volumes:
-      - cargo-registry:/usr/local/cargo/registry:rw
       - target-cache:/workspace/target:rw
+  env:
+    CARGO_HOME: /workspace/target/cargo-home
 
 .regression-stages: &regression-stages
   stages:
