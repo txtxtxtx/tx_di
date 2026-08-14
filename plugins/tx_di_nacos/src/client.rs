@@ -80,7 +80,7 @@ impl NacosClient {
                 &did,
                 &grp,
                 Box::new(move |_| {
-                    let _ = tx.send_modify(|v| *v += 1);
+                    tx.send_modify(|v| *v += 1);
                 }),
             )
             .await;
