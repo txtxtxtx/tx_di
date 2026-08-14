@@ -21,6 +21,7 @@ use crate::service::CacheService;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// 缓存值的内部表示（区分数据类型）
+#[allow(clippy::enum_variant_names)]
 enum CacheValue {
     StringValue {
         data: Vec<u8>,
@@ -113,19 +114,19 @@ impl MemoryCache {
         if let Some(entry) = self.store.get(key) {
             let expired = match entry.value() {
                 CacheValue::StringValue { expires_at, .. } => {
-                    expires_at.map_or(false, |e| Instant::now() >= e)
+                    expires_at.is_some_and(|e| Instant::now() >= e)
                 }
                 CacheValue::HashValue { expires_at, .. } => {
-                    expires_at.map_or(false, |e| Instant::now() >= e)
+                    expires_at.is_some_and(|e| Instant::now() >= e)
                 }
                 CacheValue::ListValue { expires_at, .. } => {
-                    expires_at.map_or(false, |e| Instant::now() >= e)
+                    expires_at.is_some_and(|e| Instant::now() >= e)
                 }
                 CacheValue::SetValue { expires_at, .. } => {
-                    expires_at.map_or(false, |e| Instant::now() >= e)
+                    expires_at.is_some_and(|e| Instant::now() >= e)
                 }
                 CacheValue::SortedSetValue { expires_at, .. } => {
-                    expires_at.map_or(false, |e| Instant::now() >= e)
+                    expires_at.is_some_and(|e| Instant::now() >= e)
                 }
             };
             if expired {
@@ -299,13 +300,13 @@ impl CacheService for MemoryCache {
 
     async fn hdel(&self, key: &str, field: &str) -> AppResult<()> {
         let pk = self.prefixed(key);
-        if let Some(mut entry) = self.store.get_mut(&pk) {
-            if let CacheValue::HashValue { fields, .. } = entry.value_mut() {
-                fields.remove(field);
-                if fields.is_empty() {
-                    drop(entry);
-                    self.store.remove(&pk);
-                }
+        if let Some(mut entry) = self.store.get_mut(&pk)
+            && let CacheValue::HashValue { fields, .. } = entry.value_mut()
+        {
+            fields.remove(field);
+            if fields.is_empty() {
+                drop(entry);
+                self.store.remove(&pk);
             }
         }
         Ok(())
@@ -496,17 +497,17 @@ impl CacheService for MemoryCache {
     async fn srem(&self, key: &str, members: &[&[u8]]) -> AppResult<usize> {
         let pk = self.prefixed(key);
         let mut removed = 0;
-        if let Some(mut entry) = self.store.get_mut(&pk) {
-            if let CacheValue::SetValue { members: m, .. } = entry.value_mut() {
-                for val in members {
-                    if m.remove(&val.to_vec()) {
-                        removed += 1;
-                    }
+        if let Some(mut entry) = self.store.get_mut(&pk)
+            && let CacheValue::SetValue { members: m, .. } = entry.value_mut()
+        {
+            for val in members {
+                if m.remove(&val.to_vec()) {
+                    removed += 1;
                 }
-                if m.is_empty() {
-                    drop(entry);
-                    self.store.remove(&pk);
-                }
+            }
+            if m.is_empty() {
+                drop(entry);
+                self.store.remove(&pk);
             }
         }
         Ok(removed)
@@ -588,23 +589,23 @@ impl CacheService for MemoryCache {
     async fn zrem(&self, key: &str, members: &[&[u8]]) -> AppResult<usize> {
         let pk = self.prefixed(key);
         let mut removed = 0;
-        if let Some(mut entry) = self.store.get_mut(&pk) {
-            if let CacheValue::SortedSetValue { members: m, .. } = entry.value_mut() {
-                for member in members {
-                    let to_remove: Vec<ZMember> = m
-                        .iter()
-                        .filter(|zm| zm.member == member.to_vec())
-                        .cloned()
-                        .collect();
-                    for zm in to_remove {
-                        m.remove(&zm);
-                        removed += 1;
-                    }
+        if let Some(mut entry) = self.store.get_mut(&pk)
+            && let CacheValue::SortedSetValue { members: m, .. } = entry.value_mut()
+        {
+            for member in members {
+                let to_remove: Vec<ZMember> = m
+                    .iter()
+                    .filter(|zm| zm.member == member.to_vec())
+                    .cloned()
+                    .collect();
+                for zm in to_remove {
+                    m.remove(&zm);
+                    removed += 1;
                 }
-                if m.is_empty() {
-                    drop(entry);
-                    self.store.remove(&pk);
-                }
+            }
+            if m.is_empty() {
+                drop(entry);
+                self.store.remove(&pk);
             }
         }
         Ok(removed)
@@ -621,10 +622,10 @@ impl CacheService for MemoryCache {
                     let s = if start < 0 { (len + start).max(0) } else { start.min(len - 1).max(0) };
                     let e = if stop < 0 { len + stop } else { stop.min(len - 1) };
                     let mut result = Vec::new();
-                    for i in s as usize..=(e as usize).min(vec.len().saturating_sub(1)) {
-                        result.push(vec[i].member.clone());
+                    for item in &vec[s as usize..=(e as usize).min(vec.len().saturating_sub(1))] {
+                        result.push(item.member.clone());
                         if with_scores {
-                            result.push(vec[i].score.to_le_bytes().to_vec());
+                            result.push(item.score.to_le_bytes().to_vec());
                         }
                     }
                     Ok(result)
