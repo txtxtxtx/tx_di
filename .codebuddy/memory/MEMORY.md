@@ -47,14 +47,19 @@
 - 行为：enabled=false 退化为本地启动；Nacos 不可达降级本地启动 warn 不阻塞；新配置启动失败由进程管理器拉起
 - 注册 IP：容器需 `SERVICE_IP` 环境变量（默认 127.0.0.1 仅单机）
 
-## tx_admin 架构（2026-08-10，已编写 docs/09-软件架构设计说明书-从需求到SA模型.md）
-- 四层 DDD：admin_api（HTTP axum 12 模块 + gRPC tonic 13 服务）/ admin_app（11 AppService + EventBus）/ admin_domain（10 子域 + shared）/ admin_infra（toasty Repository + DbInitPlugin + seed）
+## tx_admin 架构（2026-08-15，DDD 战略重构完成并全量测试通过）
+- 四层 DDD：admin_api（HTTP axum + gRPC tonic）/ admin_app（AppService + EventBus）/ admin_domain / admin_infra（toasty Repository）
+- admin_domain 战略重组为四大边界：`identity`（user/role/menu/department/auth）、`system`（config/dictionary/log/file）、`job`（新增域：Job/JobLog 聚合 + JobRepository trait + JobService）、`shared`（Event trait / Entity / AggregateRoot<E> / AuditFields / DomainEventPublisher / security::password）；顶层 `password` 为向后兼容 re-export
 - 领域层仅依赖 admin_macros/tx_error/tx_common，仓储 trait 在领域层、实现在 infra（依赖倒置）
-- DI 生命周期：build → inner_init → init → async_init → comp_run；DbInitPlugin(i32::MAX-200) → AdminPlugin(i32::MAX-100) → WebPlugin
-- `AdminPlugin.app_async_init` 注册：MetricsLayer(sort=5) + OperateLogLayer(sort=15, mpsc 异步落库) + HTTP/gRPC 路由 + gRPC 启动(:50051) + EventBus 事件订阅示例
-- 事件驱动已落地：聚合根 add_event → AppService 事务后 publish → EventBus（`as_trait = dyn DomainEventPublisher`，进程内，异常隔离）
-- 密码 Argon2id；用户/Job 分页均 SQL 层（toasty_page! / find_job_page）
-- 启动：main.rs 用 `tx_di_nacos::app_loop!`，config = examples/tx_admin/config/config.toml
+- 强类型事件：删除巨型 DomainEvent 枚举，各域定义独立事件枚举（UserEvent 等）实现 `Event` trait（Any+Send+Sync+Clone）；`DomainEventPublisher::publish(Vec<Arc<dyn Event>>)`，EventBus 按 TypeId 路由 + downcast 分发
+- 错误拆分：删除巨型 RepositoryError，各域定义自己的 RepositoryError（`#[err("REPOSITORY")]` 前缀不变，错误码数值不变防前端回归）
+- `AggregateRoot` 宏改为 `#[aggregate_root(event = path)]` 属性指定事件类型，聚合根字段 `events: Vec<E>`
+- auth 归入 identity 并改为依赖 `UserRepository`（而非跨域 UserService）
+- DI 生命周期：build → inner_init → init → async_init → comp_run
+- 密码 Argon2id（shared/security/password）；用户/Job 分页均 SQL 层
+- 启动：main.rs 用 `tx_di_nacos::app_loop!`
+- 测试全绿（2026-08-15）：admin_domain 382、admin_macros 2、admin_app 多文件、admin_api 57 均通过
+- 注意：admin_app/admin_infra/admin_api 的**源码目录未移动**（仍在 user/role/... 子目录），仅 admin_domain 内部重组；测试中跨 crate 引用统一用 `admin_domain::identity::*` / `admin_domain::system::*`
 
 ## 已知问题
 - `examples/` 部分 crate 引用不存在的 `tx_di_core::tx_comp` 宏（预先存在错误）

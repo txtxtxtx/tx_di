@@ -7,7 +7,7 @@ mod common;
 use admin_app::department::dto::*;
 use admin_app::menu::dto::*;
 use admin_app::role::dto::*;
-use admin_domain::user::model::value_object::Sex;
+use admin_domain::identity::user::model::value_object::Sex;
 use admin_proto::{
     CreateConfigRequest, CreateDictDataRequest, CreateDictTypeRequest, ListConfigsRequest,
 };

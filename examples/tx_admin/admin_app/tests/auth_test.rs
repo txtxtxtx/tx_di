@@ -8,14 +8,14 @@ mod common;
 use admin_app::auth::app_service::AuthAppService;
 use admin_app::auth::session_service::AuthSessionService;
 use admin_app::log::app_service::LoginLogAppService;
-use admin_domain::auth::service::AuthService;
-use admin_domain::log::service::LoginLogService;
-use admin_domain::menu::service::MenuService;
-use admin_domain::role::repository::RoleRepository;
-use admin_domain::role::service::RoleService;
-use admin_domain::user::model::value_object::UserStatus;
-use admin_domain::user::repository::UserRepository;
-use admin_domain::user::service::UserService;
+use admin_domain::identity::auth::service::AuthService;
+use admin_domain::system::log::service::LoginLogService;
+use admin_domain::identity::menu::service::MenuService;
+use admin_domain::identity::role::repository::RoleRepository;
+use admin_domain::identity::role::service::RoleService;
+use admin_domain::identity::user::model::value_object::UserStatus;
+use admin_domain::identity::user::repository::UserRepository;
+use admin_domain::identity::user::service::UserService;
 use admin_infra::department::repository::ToastyDepartmentRepository;
 use admin_infra::log::repository::ToastyLoginLogRepository;
 use admin_infra::menu::repository::ToastyMenuRepository;
@@ -73,7 +73,7 @@ async fn create_auth_test_env() -> (
         admin_app::role::app_service::RoleAppService::new(role_svc.clone(), user_repo.clone());
     let menu_app = admin_app::menu::app_service::MenuAppService::new(menu_svc.clone());
 
-    let auth_svc = Arc::new(AuthService::new(user_svc.clone()));
+    let auth_svc = Arc::new(AuthService::new(user_repo.clone()));
     let session_svc = Arc::new(AuthSessionService::new());
     let auth_app = AuthAppService::new(
         auth_svc,

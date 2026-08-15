@@ -22,14 +22,14 @@ use admin_app::menu::app_service::MenuAppService;
 use admin_app::role::app_service::RoleAppService;
 use admin_app::user::app_service::UserAppService;
 
-use admin_domain::config::service::ConfigService;
-use admin_domain::department::service::DepartmentService;
-use admin_domain::dictionary::service::{DictDataService, DictTypeService};
-use admin_domain::file::service::FileService;
-use admin_domain::log::service::{LoginLogService, OperateLogService};
-use admin_domain::menu::service::MenuService;
-use admin_domain::role::service::RoleService;
-use admin_domain::user::service::UserService;
+use admin_domain::system::config::service::ConfigService;
+use admin_domain::identity::department::service::DepartmentService;
+use admin_domain::system::dictionary::service::{DictDataService, DictTypeService};
+use admin_domain::system::file::service::FileService;
+use admin_domain::system::log::service::{LoginLogService, OperateLogService};
+use admin_domain::identity::menu::service::MenuService;
+use admin_domain::identity::role::service::RoleService;
+use admin_domain::identity::user::service::UserService;
 
 use admin_infra::config::repository::ToastyConfigRepository;
 use admin_infra::department::repository::ToastyDepartmentRepository;

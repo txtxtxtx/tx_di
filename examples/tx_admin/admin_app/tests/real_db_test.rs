@@ -7,7 +7,7 @@ mod common;
 
 use std::sync::Arc;
 
-use admin_domain::user::repository::UserRepository;
+use admin_domain::identity::user::repository::UserRepository;
 use admin_proto::CreateRoleRequest;
 use admin_proto::{ChangePasswordRequest, CreateUserRequest};
 use admin_proto::{CreateConfigRequest, CreateDictDataRequest, CreateDictTypeRequest};
@@ -31,7 +31,7 @@ async fn test_change_password() {
     let menu_repo = Arc::new(admin_infra::menu::repository::ToastyMenuRepository::new(
         plugin.clone(),
     ));
-    let user_svc = Arc::new(admin_domain::user::service::UserService::new(
+    let user_svc = Arc::new(admin_domain::identity::user::service::UserService::new(
         user_repo.clone(),
     ));
     let app = admin_app::user::app_service::UserAppService::new(
@@ -183,10 +183,10 @@ async fn test_add_users_to_role_and_get_role_users() {
     let menu_repo = Arc::new(admin_infra::menu::repository::ToastyMenuRepository::new(
         plugin.clone(),
     ));
-    let user_svc = Arc::new(admin_domain::user::service::UserService::new(
+    let user_svc = Arc::new(admin_domain::identity::user::service::UserService::new(
         user_repo.clone(),
     ));
-    let role_svc = Arc::new(admin_domain::role::service::RoleService::new(
+    let role_svc = Arc::new(admin_domain::identity::role::service::RoleService::new(
         role_repo.clone(),
     ));
     let user_app = admin_app::user::app_service::UserAppService::new(
@@ -282,10 +282,10 @@ async fn test_remove_users_from_role() {
     let menu_repo = Arc::new(admin_infra::menu::repository::ToastyMenuRepository::new(
         plugin.clone(),
     ));
-    let user_svc = Arc::new(admin_domain::user::service::UserService::new(
+    let user_svc = Arc::new(admin_domain::identity::user::service::UserService::new(
         user_repo.clone(),
     ));
-    let role_svc = Arc::new(admin_domain::role::service::RoleService::new(
+    let role_svc = Arc::new(admin_domain::identity::role::service::RoleService::new(
         role_repo.clone(),
     ));
     let user_app = admin_app::user::app_service::UserAppService::new(
@@ -449,14 +449,14 @@ async fn test_dict_data_get_by_dict_types() {
     let dict_type_repo = Arc::new(
         admin_infra::dictionary::repository::ToastyDictTypeRepository::new(plugin.clone()),
     );
-    let dict_type_svc = Arc::new(admin_domain::dictionary::service::DictTypeService::new(
+    let dict_type_svc = Arc::new(admin_domain::system::dictionary::service::DictTypeService::new(
         dict_type_repo,
     ));
     let dict_type_app = admin_app::dictionary::app_service::DictTypeAppService::new(dict_type_svc);
 
     let dict_data_repo =
         Arc::new(admin_infra::dictionary::repository::ToastyDictDataRepository::new(plugin));
-    let dict_data_svc = Arc::new(admin_domain::dictionary::service::DictDataService::new(
+    let dict_data_svc = Arc::new(admin_domain::system::dictionary::service::DictDataService::new(
         dict_data_repo,
     ));
     let dict_data_app = admin_app::dictionary::app_service::DictDataAppService::new(dict_data_svc);

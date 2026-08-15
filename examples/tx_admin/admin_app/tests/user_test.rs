@@ -9,8 +9,8 @@
 
 mod common;
 use admin_domain::shared::model::value_object::DeletedStatus;
-use admin_domain::user::model::value_object::{Sex, UserStatus};
-use admin_domain::user::repository::UserRepository;
+use admin_domain::identity::user::model::value_object::{Sex, UserStatus};
+use admin_domain::identity::user::repository::UserRepository;
 use admin_proto::{
     CreateDeptRequest, CreateRoleRequest, CreateUserRequest, ListUsersRequest, PageRequest,
     UpdateUserRequest,
