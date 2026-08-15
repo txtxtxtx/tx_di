@@ -8,6 +8,7 @@ pub mod config;
 pub mod department;
 pub mod dictionary;
 pub mod file;
+pub mod job;
 pub mod log;
 pub mod menu;
 pub mod plugin;

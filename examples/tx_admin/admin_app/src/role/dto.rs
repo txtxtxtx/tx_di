@@ -1,4 +1,4 @@
-use admin_domain::role::model::aggregate::Role;
+use admin_domain::identity::role::model::aggregate::Role;
 
 // Re-export proto types directly (no hand-written DTOs)
 pub use admin_proto::{

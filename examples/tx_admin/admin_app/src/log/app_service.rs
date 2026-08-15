@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use admin_domain::log::model::value_object::{LoginLogQuery, OperateLogQuery};
-use admin_domain::log::service::{LoginLogService, OperateLogService};
+use admin_domain::system::log::model::value_object::{LoginLogQuery, OperateLogQuery};
+use admin_domain::system::log::service::{LoginLogService, OperateLogService};
 use admin_proto::{
     CreateLoginLogRequest, CreateOperateLogRequest, ListLoginLogsRequest, ListOperateLogsRequest,
     LoginLogResponse, OperateLogResponse,

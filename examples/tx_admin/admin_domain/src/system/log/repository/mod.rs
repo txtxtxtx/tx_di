@@ -1,0 +1,43 @@
+use async_trait::async_trait;
+use std::any::Any;
+
+use crate::system::log::model::aggregate::{LoginLog, OperateLog};
+use crate::system::log::model::value_object::{LoginLogQuery, OperateLogQuery};
+use tx_common::page::Page;
+use tx_error::{AppResult, CodeMsg};
+
+/// Log 仓储错误类型
+#[derive(Debug, Copy, Clone, PartialEq, Eq, CodeMsg)]
+#[err("REPOSITORY")]
+pub enum LogRepositoryError {
+    #[err(10009, "数据库异常")]
+    DatabaseLog,
+    #[err(10109, "记录不存在")]
+    NotFoundLog,
+}
+
+#[async_trait]
+pub trait OperateLogRepository: Any + Send + Sync {
+    async fn find_by_id(&self, id: u64) -> AppResult<Option<OperateLog>>;
+    async fn find_page(
+        &self,
+        query: &OperateLogQuery,
+        page: Page<OperateLog>,
+    ) -> AppResult<Page<OperateLog>>;
+    async fn insert(&self, log: &OperateLog) -> AppResult<()>;
+    async fn delete_by_ids(&self, ids: &[u64]) -> AppResult<()>;
+    async fn clean_all(&self) -> AppResult<()>;
+}
+
+#[async_trait]
+pub trait LoginLogRepository: Any + Send + Sync {
+    async fn find_by_id(&self, id: u64) -> AppResult<Option<LoginLog>>;
+    async fn find_page(
+        &self,
+        query: &LoginLogQuery,
+        page: Page<LoginLog>,
+    ) -> AppResult<Page<LoginLog>>;
+    async fn insert(&self, log: &LoginLog) -> AppResult<()>;
+    async fn delete_by_ids(&self, ids: &[u64]) -> AppResult<()>;
+    async fn clean_all(&self) -> AppResult<()>;
+}

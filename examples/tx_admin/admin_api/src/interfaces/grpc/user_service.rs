@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
-use admin_domain::user::model::value_object::UserStatus;
+use admin_domain::identity::user::model::value_object::UserStatus;
 use admin_proto::Empty;
 use admin_proto::admin::common::PageResponse;
 use admin_proto::admin::user::user_service_server::UserService;

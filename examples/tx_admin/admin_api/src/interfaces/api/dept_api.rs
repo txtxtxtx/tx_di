@@ -4,7 +4,7 @@ use crate::auth::ensure_permission;
 use crate::error::ApiErr;
 use admin_app::department::app_service::DepartmentAppService;
 use admin_app::empty_string::opt_filter;
-use admin_domain::department::model::value_object::DeptTreeNode;
+use admin_domain::identity::department::model::value_object::DeptTreeNode;
 use admin_proto::{CreateDeptRequest, DeptResponse, Empty, ListDeptsRequest, UpdateDeptRequest};
 use axum::Json;
 use axum::routing::{delete, get, post, put};

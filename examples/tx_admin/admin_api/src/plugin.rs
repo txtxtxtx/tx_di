@@ -108,8 +108,8 @@ async fn app_async_init(_comp: Arc<AdminPlugin>, app: Arc<App>) -> RIE<()> {
     // 此处为验证机制的示例订阅；生产场景可在此接入缓存失效、审计、通知等。
     {
         let event_bus = app.inject::<admin_app::event_bus::EventBus>();
-        event_bus.subscribe(|event| {
-            if let admin_domain::shared::model::DomainEvent::UserCreated { user_id, username } =
+        event_bus.on::<admin_domain::identity::user::model::event::UserEvent>(|event| {
+            if let admin_domain::identity::user::model::event::UserEvent::UserCreated { user_id, username } =
                 event
             {
                 tracing::info!(

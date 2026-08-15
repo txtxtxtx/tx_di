@@ -212,7 +212,7 @@ async fn get_online_users(
 ) -> Result<ApiR<OnlineUserListResponse>, ApiErr> {
     ensure_permission("system:view").await?;
 
-    let status = Some(admin_domain::user::model::value_object::UserStatus::Active);
+    let status = Some(admin_domain::identity::user::model::value_object::UserStatus::Active);
     let mut online_users: Vec<OnlineUser> = Vec::new();
     let mut page_num: i64 = 1;
 

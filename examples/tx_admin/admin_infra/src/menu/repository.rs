@@ -2,12 +2,13 @@ use async_trait::async_trait;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use admin_domain::menu::model::aggregate::Menu;
-use admin_domain::menu::model::value_object::MenuQuery;
-use admin_domain::menu::repository::MenuRepository;
+use admin_domain::identity::menu::model::aggregate::Menu;
+use admin_domain::identity::menu::model::value_object::MenuQuery;
+use admin_domain::identity::menu::repository::MenuRepository;
 use admin_domain::shared::model::AuditFields;
 use admin_domain::shared::model::value_object::DeletedStatus;
-use admin_domain::shared::repository::{RepositoryError, db_err};
+use admin_domain::shared::repository::db_err;
+use admin_domain::identity::menu::repository::MenuRepositoryError;
 use tx_di_core::{Component, DepsTuple};
 use tx_di_toasty::ToastyPlugin;
 use tx_error::AppResult;
@@ -99,7 +100,7 @@ impl MenuRepository for ToastyMenuRepository {
         let all = SysMenu::all()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
+            .map_err(|e| db_err(e, MenuRepositoryError::DatabaseMenu))?;
 
         Ok(all
             .iter()
@@ -131,7 +132,7 @@ impl MenuRepository for ToastyMenuRepository {
         let all = SysMenu::all()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
+            .map_err(|e| db_err(e, MenuRepositoryError::DatabaseMenu))?;
 
         Ok(all
             .iter()
@@ -145,7 +146,7 @@ impl MenuRepository for ToastyMenuRepository {
         let all = SysMenu::all()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
+            .map_err(|e| db_err(e, MenuRepositoryError::DatabaseMenu))?;
 
         Ok(all
             .iter()
@@ -176,7 +177,7 @@ impl MenuRepository for ToastyMenuRepository {
             .deleted(Deleted::from(menu.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
+            .map_err(|e| db_err(e, MenuRepositoryError::DatabaseMenu))?;
         Ok(())
     }
 
@@ -184,7 +185,7 @@ impl MenuRepository for ToastyMenuRepository {
         let mut db = self.plugin.db().clone();
         let mut existing = SysMenu::get_by_id(&mut db, menu.id)
             .await
-            .map_err(|_| RepositoryError::NotFoundMenu)?;
+            .map_err(|_| MenuRepositoryError::NotFoundMenu)?;
 
         existing
             .update()
@@ -205,7 +206,7 @@ impl MenuRepository for ToastyMenuRepository {
             .deleted(Deleted::from(menu.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
+            .map_err(|e| db_err(e, MenuRepositoryError::DatabaseMenu))?;
         Ok(())
     }
 
@@ -213,13 +214,13 @@ impl MenuRepository for ToastyMenuRepository {
         let mut db = self.plugin.db().clone();
         let mut menu = SysMenu::get_by_id(&mut db, id)
             .await
-            .map_err(|_| RepositoryError::NotFoundMenu)?;
+            .map_err(|_| MenuRepositoryError::NotFoundMenu)?;
 
         menu.update()
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
+            .map_err(|e| db_err(e, MenuRepositoryError::DatabaseMenu))?;
         Ok(())
     }
 
@@ -228,7 +229,7 @@ impl MenuRepository for ToastyMenuRepository {
         let all = SysMenu::all()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
+            .map_err(|e| db_err(e, MenuRepositoryError::DatabaseMenu))?;
 
         Ok(all
             .iter()
@@ -243,7 +244,7 @@ impl MenuRepository for ToastyMenuRepository {
         let user_roles = SysUserRole::filter_by_user_id(user_id)
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
+            .map_err(|e| db_err(e, MenuRepositoryError::DatabaseMenu))?;
         let role_ids: Vec<u64> = user_roles.into_iter().map(|ur| ur.role_id).collect();
 
         // 2. 遍历角色，从关联菜单中提取 types==2 的 permission 字段
@@ -251,7 +252,7 @@ impl MenuRepository for ToastyMenuRepository {
             let role_menus = SysRoleMenu::filter_by_role_id(role_id)
                 .exec(&mut db)
                 .await
-                .map_err(|e| db_err(e, RepositoryError::DatabaseMenu))?;
+                .map_err(|e| db_err(e, MenuRepositoryError::DatabaseMenu))?;
 
             for rm in role_menus {
                 if let Ok(menu) = SysMenu::get_by_id(&mut db, rm.menu_id).await

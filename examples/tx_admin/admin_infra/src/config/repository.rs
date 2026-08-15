@@ -1,12 +1,13 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 
-use admin_domain::config::model::aggregate::Config;
-use admin_domain::config::model::value_object::ConfigQuery;
-use admin_domain::config::repository::ConfigRepository;
+use admin_domain::system::config::model::aggregate::Config;
+use admin_domain::system::config::model::value_object::ConfigQuery;
+use admin_domain::system::config::repository::ConfigRepository;
 use admin_domain::shared::model::AuditFields;
 use admin_domain::shared::model::value_object::DeletedStatus;
-use admin_domain::shared::repository::{RepositoryError, db_err};
+use admin_domain::shared::repository::db_err;
+use admin_domain::system::config::repository::ConfigRepositoryError;
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_di_toasty::ToastyPlugin;
@@ -80,7 +81,7 @@ impl ConfigRepository for ToastyConfigRepository {
             .first()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseConfig))?;
+            .map_err(|e| db_err(e, ConfigRepositoryError::DatabaseConfig))?;
         match config {
             Some(c) if c.deleted == Deleted::No => Ok(Some(Self::to_domain(&c))),
             _ => Ok(None),
@@ -92,7 +93,7 @@ impl ConfigRepository for ToastyConfigRepository {
         let all = SysConfig::all()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseConfig))?;
+            .map_err(|e| db_err(e, ConfigRepositoryError::DatabaseConfig))?;
 
         Ok(all
             .iter()
@@ -129,7 +130,7 @@ impl ConfigRepository for ToastyConfigRepository {
                 }
                 q
             },
-            |e| db_err(e, RepositoryError::DatabaseConfig)
+            |e| db_err(e, ConfigRepositoryError::DatabaseConfig)
         );
 
         let list: Vec<Config> = rows.iter().map(Self::to_domain).collect();
@@ -141,7 +142,7 @@ impl ConfigRepository for ToastyConfigRepository {
         let all = SysConfig::all()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseConfig))?;
+            .map_err(|e| db_err(e, ConfigRepositoryError::DatabaseConfig))?;
 
         Ok(all
             .iter()
@@ -179,7 +180,7 @@ impl ConfigRepository for ToastyConfigRepository {
             .deleted(Deleted::from(config.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseConfig))?;
+            .map_err(|e| db_err(e, ConfigRepositoryError::DatabaseConfig))?;
         Ok(())
     }
 
@@ -187,7 +188,7 @@ impl ConfigRepository for ToastyConfigRepository {
         let mut db = self.plugin.db().clone();
         let mut existing = SysConfig::get_by_id(&mut db, config.id)
             .await
-            .map_err(|_| RepositoryError::NotFoundConfig)?;
+            .map_err(|_| ConfigRepositoryError::NotFoundConfig)?;
 
         existing
             .update()
@@ -202,7 +203,7 @@ impl ConfigRepository for ToastyConfigRepository {
             .deleted(Deleted::from(config.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseConfig))?;
+            .map_err(|e| db_err(e, ConfigRepositoryError::DatabaseConfig))?;
         Ok(())
     }
 
@@ -210,14 +211,14 @@ impl ConfigRepository for ToastyConfigRepository {
         let mut db = self.plugin.db().clone();
         let mut config = SysConfig::get_by_id(&mut db, id)
             .await
-            .map_err(|_| RepositoryError::NotFoundConfig)?;
+            .map_err(|_| ConfigRepositoryError::NotFoundConfig)?;
 
         config
             .update()
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseConfig))?;
+            .map_err(|e| db_err(e, ConfigRepositoryError::DatabaseConfig))?;
         Ok(())
     }
 
@@ -227,7 +228,7 @@ impl ConfigRepository for ToastyConfigRepository {
             .first()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseConfig))?;
+            .map_err(|e| db_err(e, ConfigRepositoryError::DatabaseConfig))?;
         Ok(config.map(|c| c.deleted == Deleted::No).unwrap_or(false))
     }
 }

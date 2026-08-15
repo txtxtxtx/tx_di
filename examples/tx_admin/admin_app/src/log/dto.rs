@@ -2,7 +2,7 @@ use admin_proto::{LoginLogResponse, OperateLogResponse};
 
 /// 领域模型 → Proto 响应：操作日志
 pub fn operate_log_to_response(
-    log: admin_domain::log::model::aggregate::OperateLog,
+    log: admin_domain::system::log::model::aggregate::OperateLog,
 ) -> OperateLogResponse {
     OperateLogResponse {
         id: log.id,
@@ -24,7 +24,7 @@ pub fn operate_log_to_response(
 
 /// 领域模型 → Proto 响应：登录日志
 pub fn login_log_to_response(
-    log: admin_domain::log::model::aggregate::LoginLog,
+    log: admin_domain::system::log::model::aggregate::LoginLog,
 ) -> LoginLogResponse {
     LoginLogResponse {
         id: log.id,

@@ -1,4 +1,4 @@
-use admin_domain::department::model::aggregate::Department;
+use admin_domain::identity::department::model::aggregate::Department;
 
 // Re-export proto types directly (no hand-written DTOs)
 pub use admin_proto::{CreateDeptRequest, DeptResponse, ListDeptsRequest, UpdateDeptRequest};

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use crate::department::dto::*;
-use admin_domain::department::model::value_object::{DeptQuery, DeptTreeNode};
-use admin_domain::department::service::DepartmentService;
+use admin_domain::identity::department::model::value_object::{DeptQuery, DeptTreeNode};
+use admin_domain::identity::department::service::DepartmentService;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
 

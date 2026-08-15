@@ -1,4 +1,4 @@
-use admin_domain::dictionary::model::aggregate::{DictData, DictType};
+use admin_domain::system::dictionary::model::aggregate::{DictData, DictType};
 use admin_proto::{DictDataResponse, DictTypeResponse};
 
 /// Convert a domain DictType aggregate into a proto DictTypeResponse

@@ -1,12 +1,13 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 
-use admin_domain::log::model::aggregate::{LoginLog, OperateLog};
-use admin_domain::log::model::value_object::{LoginLogQuery, OperateLogQuery};
-use admin_domain::log::repository::{LoginLogRepository, OperateLogRepository};
+use admin_domain::system::log::model::aggregate::{LoginLog, OperateLog};
+use admin_domain::system::log::model::value_object::{LoginLogQuery, OperateLogQuery};
+use admin_domain::system::log::repository::{LoginLogRepository, OperateLogRepository};
 use admin_domain::shared::model::AuditFields;
 use admin_domain::shared::model::value_object::DeletedStatus;
-use admin_domain::shared::repository::{RepositoryError, db_err};
+use admin_domain::shared::repository::db_err;
+use admin_domain::system::log::repository::LogRepositoryError;
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_di_toasty::ToastyPlugin;
@@ -120,7 +121,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
                 }
                 q
             },
-            |e| db_err(e, RepositoryError::DatabaseLog)
+            |e| db_err(e, LogRepositoryError::DatabaseLog)
         );
 
         let list: Vec<OperateLog> = rows.iter().map(Self::to_domain).collect();
@@ -150,7 +151,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
             .deleted(Deleted::from(log.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
+            .map_err(|e| db_err(e, LogRepositoryError::DatabaseLog))?;
         Ok(())
     }
 
@@ -161,7 +162,7 @@ impl OperateLogRepository for ToastyOperateLogRepository {
                 log.delete()
                     .exec(&mut db)
                     .await
-                    .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
+                    .map_err(|e| db_err(e, LogRepositoryError::DatabaseLog))?;
             }
         }
         Ok(())
@@ -172,13 +173,13 @@ impl OperateLogRepository for ToastyOperateLogRepository {
         let all = SysOperateLog::all()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
+            .map_err(|e| db_err(e, LogRepositoryError::DatabaseLog))?;
 
         for log in all {
             log.delete()
                 .exec(&mut db)
                 .await
-                .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
+                .map_err(|e| db_err(e, LogRepositoryError::DatabaseLog))?;
         }
         Ok(())
     }
@@ -296,7 +297,7 @@ impl LoginLogRepository for ToastyLoginLogRepository {
                 }
                 q
             },
-            |e| db_err(e, RepositoryError::DatabaseLog)
+            |e| db_err(e, LogRepositoryError::DatabaseLog)
         );
 
         let list: Vec<LoginLog> = rows.iter().map(Self::to_domain).collect();
@@ -324,7 +325,7 @@ impl LoginLogRepository for ToastyLoginLogRepository {
             .deleted(Deleted::from(log.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
+            .map_err(|e| db_err(e, LogRepositoryError::DatabaseLog))?;
         Ok(())
     }
 
@@ -335,7 +336,7 @@ impl LoginLogRepository for ToastyLoginLogRepository {
                 log.delete()
                     .exec(&mut db)
                     .await
-                    .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
+                    .map_err(|e| db_err(e, LogRepositoryError::DatabaseLog))?;
             }
         }
         Ok(())
@@ -346,13 +347,13 @@ impl LoginLogRepository for ToastyLoginLogRepository {
         let all = SysLoginLog::all()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
+            .map_err(|e| db_err(e, LogRepositoryError::DatabaseLog))?;
 
         for log in all {
             log.delete()
                 .exec(&mut db)
                 .await
-                .map_err(|e| db_err(e, RepositoryError::DatabaseLog))?;
+                .map_err(|e| db_err(e, LogRepositoryError::DatabaseLog))?;
         }
         Ok(())
     }

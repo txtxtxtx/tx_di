@@ -1,0 +1,145 @@
+use jiff::Timestamp; // 引入时间处理库
+use serde::{Deserialize, Serialize}; // 引入序列化和反序列化库
+
+use crate::AggregateRoot;
+use crate::shared::model::value_object::DeletedStatus;
+use crate::shared::model::{AggregateRoot, AuditFields};
+use crate::identity::role::model::event::RoleEvent;
+
+/// Role aggregate root
+#[derive(Debug, Clone, Serialize, Deserialize, AggregateRoot)]
+#[aggregate_root(event = crate::identity::role::model::event::RoleEvent)]
+/// 角色实体结构体，用于存储角色相关的信息
+/// 包含角色的基本属性、权限范围、审计信息等
+pub struct Role {
+    /// 角色ID，使用u64类型保证唯一性
+    pub id: u64,
+    /// 角色名称，使用String类型存储
+    pub name: String,
+    /// 角色代码，使用String类型存储，通常用于系统标识
+    pub code: String,
+    /// 角色排序，使用i32类型，用于控制显示顺序
+    pub sort: i32,
+    /// 数据范围，使用i32类型，控制角色的数据访问权限
+    pub data_scope: i32,
+    /// 数据范围部门ID列表，使用Option<String>，可能为空
+    pub data_scope_dept_ids: Option<String>,
+    /// 状态，使用i32类型，表示角色是否启用/禁用等
+    pub status: i32,
+    /// 备注，使用Option<String>，可能为空
+    pub remark: Option<String>,
+    /// 租户ID，使用i32类型，用于多租户系统
+    pub tenant_id: i32,
+    /// 审计字段，包含创建时间、更新时间等信息
+    pub audit: AuditFields,
+    /// 菜单ID列表，使用Vec<u64>存储角色关联的菜单权限
+    pub menu_ids: Vec<u64>,
+    // 领域事件列表，使用Vec<RoleEvent>存储，用于领域事件处理，不对外暴露
+    events: Vec<RoleEvent>,
+}
+
+impl Role {
+    /// 从持久化层恢复角色（不触发领域事件）
+    #[allow(clippy::too_many_arguments)]
+    pub fn restore(
+        id: u64,
+        name: String,
+        code: String,
+        sort: i32,
+        data_scope: i32,
+        data_scope_dept_ids: Option<String>,
+        status: i32,
+        remark: Option<String>,
+        tenant_id: i32,
+        audit: AuditFields,
+        menu_ids: Vec<u64>,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            code,
+            sort,
+            data_scope,
+            data_scope_dept_ids,
+            status,
+            remark,
+            tenant_id,
+            audit,
+            menu_ids,
+            events: Vec::new(),
+        }
+    }
+
+    /// Create a new role
+    pub fn create(id: u64, name: String, code: String, sort: i32, creator: Option<String>) -> Self {
+        let mut role = Self {
+            id,
+            name,
+            code,
+            sort,
+            data_scope: 4,
+            data_scope_dept_ids: None,
+            status: 0,
+            remark: None,
+            tenant_id: 0,
+            audit: AuditFields {
+                creator: creator.clone(),
+                create_time: Timestamp::now(),
+                updater: creator,
+                update_time: Timestamp::now(),
+                deleted: DeletedStatus::Normal,
+            },
+            menu_ids: Vec::new(),
+            events: Vec::new(),
+        };
+        role.add_event(RoleEvent::RoleCreated { role_id: id });
+        role
+    }
+
+    /// Update basic info
+    pub fn update_info(
+        &mut self,
+        name: String,
+        code: String,
+        sort: i32,
+        data_scope: i32,
+        remark: Option<String>,
+        updater: Option<String>,
+    ) {
+        self.name = name;
+        self.code = code;
+        self.sort = sort;
+        self.data_scope = data_scope;
+        self.remark = remark;
+        self.audit.updater = updater;
+        self.audit.update_time = Timestamp::now();
+        self.add_event(RoleEvent::RoleUpdated { role_id: self.id });
+    }
+
+    /// Change status
+    pub fn change_status(&mut self, status: i32, updater: Option<String>) {
+        self.status = status;
+        self.audit.updater = updater;
+        self.audit.update_time = Timestamp::now();
+    }
+
+    /// Set menu permissions
+    pub fn set_menus(&mut self, menu_ids: Vec<u64>) {
+        self.menu_ids = menu_ids;
+        self.audit.update_time = Timestamp::now();
+        self.add_event(RoleEvent::RolePermissionsChanged { role_id: self.id });
+    }
+
+    /// Soft delete
+    pub fn soft_delete(&mut self, updater: Option<String>) {
+        self.audit.deleted = DeletedStatus::Deleted;
+        self.audit.updater = updater;
+        self.audit.update_time = Timestamp::now();
+        self.add_event(RoleEvent::RoleDeleted { role_id: self.id });
+    }
+
+    /// Check if role is active
+    pub fn is_active(&self) -> bool {
+        self.status == 0 && self.audit.deleted == DeletedStatus::Normal
+    }
+}

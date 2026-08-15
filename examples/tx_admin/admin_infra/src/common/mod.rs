@@ -143,42 +143,42 @@ impl From<i32> for StorageType {
 
 // ── domain 层枚举互转 ──
 
-impl From<admin_domain::user::model::value_object::Sex> for Sex {
-    fn from(v: admin_domain::user::model::value_object::Sex) -> Self {
+impl From<admin_domain::identity::user::model::value_object::Sex> for Sex {
+    fn from(v: admin_domain::identity::user::model::value_object::Sex) -> Self {
         match v {
-            admin_domain::user::model::value_object::Sex::Unknown => Sex::Unknown,
-            admin_domain::user::model::value_object::Sex::Male => Sex::Male,
-            admin_domain::user::model::value_object::Sex::Female => Sex::Female,
+            admin_domain::identity::user::model::value_object::Sex::Unknown => Sex::Unknown,
+            admin_domain::identity::user::model::value_object::Sex::Male => Sex::Male,
+            admin_domain::identity::user::model::value_object::Sex::Female => Sex::Female,
         }
     }
 }
 
-impl From<Sex> for admin_domain::user::model::value_object::Sex {
+impl From<Sex> for admin_domain::identity::user::model::value_object::Sex {
     fn from(v: Sex) -> Self {
         match v {
-            Sex::Unknown => admin_domain::user::model::value_object::Sex::Unknown,
-            Sex::Male => admin_domain::user::model::value_object::Sex::Male,
-            Sex::Female => admin_domain::user::model::value_object::Sex::Female,
+            Sex::Unknown => admin_domain::identity::user::model::value_object::Sex::Unknown,
+            Sex::Male => admin_domain::identity::user::model::value_object::Sex::Male,
+            Sex::Female => admin_domain::identity::user::model::value_object::Sex::Female,
         }
     }
 }
 
-impl From<admin_domain::user::model::value_object::UserStatus> for Status {
-    fn from(v: admin_domain::user::model::value_object::UserStatus) -> Self {
+impl From<admin_domain::identity::user::model::value_object::UserStatus> for Status {
+    fn from(v: admin_domain::identity::user::model::value_object::UserStatus) -> Self {
         match v {
-            admin_domain::user::model::value_object::UserStatus::Active => Status::Enabled,
-            admin_domain::user::model::value_object::UserStatus::Disabled => Status::Disabled,
-            admin_domain::user::model::value_object::UserStatus::Locked => Status::Locked,
+            admin_domain::identity::user::model::value_object::UserStatus::Active => Status::Enabled,
+            admin_domain::identity::user::model::value_object::UserStatus::Disabled => Status::Disabled,
+            admin_domain::identity::user::model::value_object::UserStatus::Locked => Status::Locked,
         }
     }
 }
 
-impl From<Status> for admin_domain::user::model::value_object::UserStatus {
+impl From<Status> for admin_domain::identity::user::model::value_object::UserStatus {
     fn from(v: Status) -> Self {
         match v {
-            Status::Enabled => admin_domain::user::model::value_object::UserStatus::Active,
-            Status::Disabled => admin_domain::user::model::value_object::UserStatus::Disabled,
-            Status::Locked => admin_domain::user::model::value_object::UserStatus::Locked,
+            Status::Enabled => admin_domain::identity::user::model::value_object::UserStatus::Active,
+            Status::Disabled => admin_domain::identity::user::model::value_object::UserStatus::Disabled,
+            Status::Locked => admin_domain::identity::user::model::value_object::UserStatus::Locked,
         }
     }
 }

@@ -1,4 +1,4 @@
-use admin_domain::config::model::aggregate::Config;
+use admin_domain::system::config::model::aggregate::Config;
 use admin_proto::ConfigResponse;
 
 /// Convert a domain Config aggregate into a proto ConfigResponse

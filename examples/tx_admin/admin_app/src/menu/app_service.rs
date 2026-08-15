@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use crate::menu::dto::*;
-use admin_domain::menu::model::value_object::{MenuQuery, MenuTreeNode};
-use admin_domain::menu::service::MenuService;
+use admin_domain::identity::menu::model::value_object::{MenuQuery, MenuTreeNode};
+use admin_domain::identity::menu::service::MenuService;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
 

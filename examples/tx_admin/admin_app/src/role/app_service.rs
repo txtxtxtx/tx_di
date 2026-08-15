@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use crate::role::dto::*;
 use crate::user::dto::user_to_response;
-use admin_domain::role::model::value_object::RoleQuery;
-use admin_domain::role::service::RoleService;
-use admin_domain::shared::repository::RepositoryError;
-use admin_domain::user::model::value_object::UserStatus;
-use admin_domain::user::repository::UserRepository;
+use admin_domain::identity::role::model::value_object::RoleQuery;
+use admin_domain::identity::role::service::RoleService;
+use admin_domain::identity::user::repository::UserRepositoryError;
+use admin_domain::identity::user::model::value_object::UserStatus;
+use admin_domain::identity::user::repository::UserRepository;
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_error::AppResult;
@@ -148,9 +148,9 @@ impl RoleAppService {
                 .user_repo
                 .find_by_id(uid)
                 .await?
-                .ok_or(RepositoryError::NotFoundUser)?;
+                .ok_or(UserRepositoryError::NotFoundUser)?;
             if user.status != UserStatus::Active {
-                Err(RepositoryError::ValidationUserStatus)?;
+                Err(UserRepositoryError::ValidationUserStatus)?;
             }
         }
 

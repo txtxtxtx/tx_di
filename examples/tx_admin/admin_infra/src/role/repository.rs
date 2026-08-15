@@ -1,13 +1,14 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 
-use admin_domain::role::model::aggregate::Role;
-use admin_domain::role::model::value_object::RoleQuery;
-use admin_domain::role::repository::RoleRepository;
+use admin_domain::identity::role::model::aggregate::Role;
+use admin_domain::identity::role::model::value_object::RoleQuery;
+use admin_domain::identity::role::repository::RoleRepository;
 use admin_domain::shared::model::AuditFields;
 use admin_domain::shared::model::value_object::DeletedStatus;
-use admin_domain::shared::repository::{RepositoryError, db_err};
-use admin_domain::user::model::aggregate::User;
+use admin_domain::shared::repository::db_err;
+use admin_domain::identity::role::repository::RoleRepositoryError;
+use admin_domain::identity::user::model::aggregate::User;
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
 use tx_di_toasty::ToastyPlugin;
@@ -76,7 +77,7 @@ impl ToastyRoleRepository {
         let menus = SysRoleMenu::filter_by_role_id(role_id)
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+            .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
         Ok(menus.into_iter().map(|m| m.menu_id).collect())
     }
 
@@ -106,13 +107,13 @@ impl ToastyRoleRepository {
             } else {
                 Some(u.mobile.clone())
             },
-            admin_domain::user::model::value_object::Sex::from(u.sex),
+            admin_domain::identity::user::model::value_object::Sex::from(u.sex),
             if u.avatar.is_empty() {
                 None
             } else {
                 Some(u.avatar.clone())
             },
-            admin_domain::user::model::value_object::UserStatus::from(u.status),
+            admin_domain::identity::user::model::value_object::UserStatus::from(u.status),
             if u.login_ip.is_empty() {
                 None
             } else {
@@ -161,7 +162,7 @@ impl RoleRepository for ToastyRoleRepository {
             .first()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+            .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
         match role {
             Some(r) if r.deleted == Deleted::No => Ok(Some(self.to_full_domain(&r).await?)),
             _ => Ok(None),
@@ -173,7 +174,7 @@ impl RoleRepository for ToastyRoleRepository {
         let all = SysRole::all()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+            .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
 
         let mut roles = Vec::new();
         for r in all {
@@ -209,7 +210,7 @@ impl RoleRepository for ToastyRoleRepository {
                     }
                     q
                 },
-                |e| db_err(e, RepositoryError::DatabaseRole)
+                |e| db_err(e, RoleRepositoryError::DatabaseRole)
             );
 
         let mut roles = Vec::new();
@@ -225,7 +226,7 @@ impl RoleRepository for ToastyRoleRepository {
         let all = SysRole::all()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+            .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
 
         let mut roles = Vec::new();
         for r in all.into_iter().filter(|r| r.deleted == Deleted::No) {
@@ -267,7 +268,7 @@ impl RoleRepository for ToastyRoleRepository {
                 .deleted(Deleted::from(role.audit.deleted))
                 .exec(&mut *tx)
                 .await
-                .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+                .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
 
             for &menu_id in menu_ids {
                 SysRoleMenu::create()
@@ -275,7 +276,7 @@ impl RoleRepository for ToastyRoleRepository {
                     .menu_id(menu_id)
                     .exec(&mut *tx)
                     .await
-                    .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+                    .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
             }
             Ok(())
         })
@@ -298,7 +299,7 @@ impl RoleRepository for ToastyRoleRepository {
             .deleted(Deleted::from(role.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+            .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
 
         for &menu_id in &role.menu_ids {
             SysRoleMenu::create()
@@ -306,7 +307,7 @@ impl RoleRepository for ToastyRoleRepository {
                 .menu_id(menu_id)
                 .exec(&mut db)
                 .await
-                .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+                .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
         }
 
         Ok(())
@@ -316,7 +317,7 @@ impl RoleRepository for ToastyRoleRepository {
         let mut db = self.plugin.db().clone();
         let mut existing = SysRole::get_by_id(&mut db, role.id)
             .await
-            .map_err(|_| RepositoryError::NotFoundRole)?;
+            .map_err(|_| RoleRepositoryError::NotFoundRole)?;
 
         existing
             .update()
@@ -332,7 +333,7 @@ impl RoleRepository for ToastyRoleRepository {
             .deleted(Deleted::from(role.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+            .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
 
         Ok(())
     }
@@ -341,13 +342,13 @@ impl RoleRepository for ToastyRoleRepository {
         let mut db = self.plugin.db().clone();
         let mut role = SysRole::get_by_id(&mut db, id)
             .await
-            .map_err(|_| RepositoryError::NotFoundRole)?;
+            .map_err(|_| RoleRepositoryError::NotFoundRole)?;
 
         role.update()
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+            .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
 
         Ok(())
     }
@@ -358,7 +359,7 @@ impl RoleRepository for ToastyRoleRepository {
             .first()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+            .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
         Ok(role.map(|r| r.deleted == Deleted::No).unwrap_or(false))
     }
 
@@ -368,13 +369,13 @@ impl RoleRepository for ToastyRoleRepository {
             let old = SysRoleMenu::filter_by_role_id(role_id)
                 .exec(&mut *tx)
                 .await
-                .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+                .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
 
             for rm in old {
                 rm.delete()
                     .exec(&mut *tx)
                     .await
-                    .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+                    .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
             }
 
             for &menu_id in menu_ids {
@@ -383,7 +384,7 @@ impl RoleRepository for ToastyRoleRepository {
                     .menu_id(menu_id)
                     .exec(&mut *tx)
                     .await
-                    .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+                    .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
             }
 
             Ok(())
@@ -399,7 +400,7 @@ impl RoleRepository for ToastyRoleRepository {
         let user_roles = SysUserRole::filter_by_role_id(role_id)
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+            .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
         Ok(user_roles.into_iter().map(|ur| ur.user_id).collect())
     }
 
@@ -408,7 +409,7 @@ impl RoleRepository for ToastyRoleRepository {
         let user_roles = SysUserRole::filter_by_role_id(role_id)
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+            .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
 
         let mut users = Vec::new();
         for ur in user_roles {
@@ -430,7 +431,7 @@ impl RoleRepository for ToastyRoleRepository {
                     .role_id(role_id)
                     .exec(&mut *tx)
                     .await
-                    .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+                    .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
             }
             Ok(())
         })
@@ -442,14 +443,14 @@ impl RoleRepository for ToastyRoleRepository {
             let user_roles = SysUserRole::filter_by_role_id(role_id)
                 .exec(&mut *tx)
                 .await
-                .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+                .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
 
             for ur in user_roles {
                 if user_ids.contains(&ur.user_id) {
                     ur.delete()
                         .exec(&mut *tx)
                         .await
-                        .map_err(|e| db_err(e, RepositoryError::DatabaseRole))?;
+                        .map_err(|e| db_err(e, RoleRepositoryError::DatabaseRole))?;
                 }
             }
             Ok(())

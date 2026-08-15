@@ -55,7 +55,7 @@ impl MonitorService for MonitorGrpcService {
 
         let user_svc: Arc<admin_app::user::app_service::UserAppService> = self.app.inject();
 
-        let status = Some(admin_domain::user::model::value_object::UserStatus::Active);
+        let status = Some(admin_domain::identity::user::model::value_object::UserStatus::Active);
         let mut online_users = Vec::new();
         let mut page_num: i64 = 1;
         let batch_size: i64 = 100;

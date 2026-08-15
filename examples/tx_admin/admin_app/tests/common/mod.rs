@@ -334,6 +334,8 @@ pub async fn create_user_app_with_shared() -> (
 // ── Job helpers ─────────────────────────────────────────────────────────────
 
 use admin_app::job::app_service::JobAppService;
+use admin_domain::job::service::JobService;
+use admin_infra::job::repository::ToastyJobRepository;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::sync::Semaphore;
@@ -372,6 +374,8 @@ pub async fn create_job_app() -> (JobAppService, Arc<JobPlugin>) {
         semaphore: OnceLock::from(Arc::new(Semaphore::new(4))),
         cache: None,
     });
-    let app = JobAppService::new(tp, job_plugin.clone());
+    let job_repo = Arc::new(ToastyJobRepository::new(tp.clone()));
+    let job_service = Arc::new(JobService::new(job_repo));
+    let app = JobAppService::new(job_service, job_plugin.clone());
     (app, job_plugin)
 }

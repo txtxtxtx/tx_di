@@ -1,4 +1,4 @@
-use admin_domain::file::model::aggregate::{File, FileConfig};
+use admin_domain::system::file::model::aggregate::{File, FileConfig};
 use admin_proto::{FileConfigResponse, FileResponse};
 use std::pin::Pin;
 use tokio::io::AsyncRead;

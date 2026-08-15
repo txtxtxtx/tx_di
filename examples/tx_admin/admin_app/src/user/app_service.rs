@@ -1,15 +1,17 @@
 use std::sync::Arc;
 
 use crate::user::dto::*;
-use admin_domain::department::repository::DepartmentRepository;
-use admin_domain::menu::repository::MenuRepository;
-use admin_domain::role::repository::RoleRepository;
+use admin_domain::identity::department::repository::DepartmentRepository;
+use admin_domain::identity::menu::repository::MenuRepository;
+use admin_domain::identity::role::repository::RoleRepository;
 use admin_domain::shared::event_publisher::DomainEventPublisher;
 use admin_domain::shared::model::AggregateRoot;
-use admin_domain::shared::repository::RepositoryError;
-use admin_domain::user::model::aggregate::User;
-use admin_domain::user::model::value_object::{LoginUser, Sex, UserQuery, UserStatus};
-use admin_domain::user::service::UserService;
+use admin_domain::identity::department::repository::DepartmentRepositoryError;
+use admin_domain::identity::role::repository::RoleRepositoryError;
+use admin_domain::identity::user::repository::UserRepositoryError;
+use admin_domain::identity::user::model::aggregate::User;
+use admin_domain::identity::user::model::value_object::{LoginUser, Sex, UserQuery, UserStatus};
+use admin_domain::identity::user::service::UserService;
 use admin_proto::{ChangePasswordRequest, CreateUserRequest, ListUsersRequest, UpdateUserRequest};
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};
@@ -57,7 +59,7 @@ impl UserAppService {
         let events = aggregate.events().to_vec();
         aggregate.clear_events();
         if let Some(publisher) = &self.event_publisher {
-            publisher.publish(events);
+            admin_domain::shared::event_publisher::publish_typed(publisher.as_ref(), events);
         }
     }
 
@@ -81,14 +83,14 @@ impl UserAppService {
         if let Some(ref e) = email
             && self.user_service.exists_by_email(e).await?
         {
-            Err(RepositoryError::DuplicateEmail)?;
+            Err(UserRepositoryError::DuplicateEmail)?;
         }
 
         // Check mobile uniqueness
         if let Some(ref m) = mobile
             && self.user_service.exists_by_mobile(m).await?
         {
-            Err(RepositoryError::DuplicateMobile)?;
+            Err(UserRepositoryError::DuplicateMobile)?;
         }
 
         // 构建领域对象（密码哈希等，不落库）
@@ -183,18 +185,18 @@ impl UserAppService {
 
         // 用户必须为 Active 状态
         if user.status != UserStatus::Active {
-            Err(RepositoryError::ValidationUserStatus)?;
+            Err(UserRepositoryError::ValidationUserStatus)?;
         }
 
         // 校验每个角色存在且为启用状态（status == 0 即 Enabled）
         let roles = self.role_repo.find_by_ids(&role_ids).await?;
         // 数据完整性校验：输入 ID 与命中记录数必须一致，防止悬空引用
         if roles.len() != role_ids.len() {
-            Err(RepositoryError::NotFoundRole)?;
+            Err(RoleRepositoryError::NotFoundRole)?;
         }
         for r in &roles {
             if r.status != 0 {
-                Err(RepositoryError::ValidationUserStatus)?;
+                Err(UserRepositoryError::ValidationUserStatus)?;
             }
         }
 
@@ -211,18 +213,18 @@ impl UserAppService {
 
         // 用户必须为 Active 状态
         if user.status != UserStatus::Active {
-            Err(RepositoryError::ValidationUserStatus)?;
+            Err(UserRepositoryError::ValidationUserStatus)?;
         }
 
         // 校验每个部门存在且为启用状态
         let depts = self.dept_repo.find_by_ids(&dept_ids).await?;
         // 数据完整性校验：输入 ID 与命中记录数必须一致，防止悬空引用
         if depts.len() != dept_ids.len() {
-            Err(RepositoryError::NotFoundDept)?;
+            Err(DepartmentRepositoryError::NotFoundDept)?;
         }
         for d in &depts {
             if d.status != 0 {
-                Err(RepositoryError::ValidationDeptDisabled)?;
+                Err(DepartmentRepositoryError::ValidationDeptDisabled)?;
             }
         }
 

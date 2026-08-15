@@ -1,6 +1,6 @@
 use crate::config::dto::config_to_response;
-use admin_domain::config::model::value_object::ConfigQuery;
-use admin_domain::config::service::ConfigService;
+use admin_domain::system::config::model::value_object::ConfigQuery;
+use admin_domain::system::config::service::ConfigService;
 use admin_proto::{ConfigResponse, CreateConfigRequest, ListConfigsRequest, UpdateConfigRequest};
 use std::collections::HashMap;
 use std::sync::Arc;

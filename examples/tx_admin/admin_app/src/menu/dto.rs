@@ -1,4 +1,4 @@
-use admin_domain::menu::model::aggregate::Menu;
+use admin_domain::identity::menu::model::aggregate::Menu;
 
 // Re-export proto types directly (no hand-written DTOs)
 pub use admin_proto::{CreateMenuRequest, ListMenusRequest, MenuResponse, UpdateMenuRequest};

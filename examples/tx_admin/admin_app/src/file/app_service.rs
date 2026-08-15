@@ -4,10 +4,10 @@ use std::task::{Context, Poll};
 
 use tokio::io::{AsyncRead, ReadBuf};
 
-use admin_domain::file::model::aggregate::FileConfig;
-use admin_domain::file::model::value_object::{FileQuery, FileUploadCommand};
-use admin_domain::file::repository::FileConfigRepository;
-use admin_domain::file::service::FileService;
+use admin_domain::system::file::model::aggregate::FileConfig;
+use admin_domain::system::file::model::value_object::{FileQuery, FileUploadCommand};
+use admin_domain::system::file::repository::FileConfigRepository;
+use admin_domain::system::file::service::FileService;
 use admin_proto::{FileResponse, ListFilesRequest};
 use tx_common::page::Page;
 use tx_di_core::{Component, DepsTuple};

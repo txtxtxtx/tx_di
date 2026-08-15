@@ -1,4 +1,4 @@
-use admin_domain::user::model::aggregate::User;
+use admin_domain::identity::user::model::aggregate::User;
 
 // 统一使用 proto 定义的 UserResponse，无需中间层转换
 pub type UserResponse = admin_proto::admin::user::UserResponse;

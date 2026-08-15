@@ -6,7 +6,7 @@
 use crate::error::ApiErr;
 use admin_app::auth::app_service::AuthAppService;
 use admin_app::auth::session_service::AuthSessionService;
-use admin_domain::menu::model::value_object::MenuTreeNode;
+use admin_domain::identity::menu::model::value_object::MenuTreeNode;
 use admin_proto::{Empty, LoginRequest, LogoutRequest, UserInfoResponse};
 use axum::Json;
 use axum::http::HeaderValue;

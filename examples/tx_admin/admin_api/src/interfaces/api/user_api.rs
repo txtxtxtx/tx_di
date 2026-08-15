@@ -9,7 +9,7 @@ use tx_di_axum::bound::DiComp;
 use tx_di_sa_token::LoginIdExtractor;
 
 use crate::error::ApiErr;
-use admin_domain::user::model::value_object::UserStatus;
+use admin_domain::identity::user::model::value_object::UserStatus;
 use admin_proto::{
     AssignDeptsRequest, AssignRolesRequest, ChangePasswordRequest, ChangeUserStatusRequest,
     CreateUserRequest, Empty, ListUsersRequest, UpdateUserRequest, UserIdRequest, UserResponse,

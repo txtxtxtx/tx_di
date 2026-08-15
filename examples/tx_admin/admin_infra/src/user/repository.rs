@@ -1,9 +1,10 @@
 use admin_domain::shared::model::AuditFields;
 use admin_domain::shared::model::value_object::{DeletedStatus, TenantId};
-use admin_domain::shared::repository::{RepositoryError, db_err};
-use admin_domain::user::model::aggregate::User;
-use admin_domain::user::model::value_object::{UserQuery, UserStatus};
-use admin_domain::user::repository::UserRepository;
+use admin_domain::shared::repository::db_err;
+use admin_domain::identity::user::repository::UserRepositoryError;
+use admin_domain::identity::user::model::aggregate::User;
+use admin_domain::identity::user::model::value_object::{UserQuery, UserStatus};
+use admin_domain::identity::user::repository::UserRepository;
 use async_trait::async_trait;
 use std::sync::Arc;
 use tx_common::page::Page;
@@ -48,7 +49,7 @@ impl ToastyUserRepository {
             } else {
                 Some(u.mobile.clone())
             },
-            admin_domain::user::model::value_object::Sex::from(u.sex),
+            admin_domain::identity::user::model::value_object::Sex::from(u.sex),
             if u.avatar.is_empty() {
                 None
             } else {
@@ -93,7 +94,7 @@ impl ToastyUserRepository {
             .select(SysUserRole::fields().role_id()) // 只选择 role_id 列
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
         Ok(roles)
     }
 
@@ -103,7 +104,7 @@ impl ToastyUserRepository {
         let depts = SysUserDept::filter_by_user_id(user_id)
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
         Ok(depts.into_iter().map(|d| d.dept_id).collect())
     }
 
@@ -132,7 +133,7 @@ impl UserRepository for ToastyUserRepository {
             .first()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
         match user {
             Some(u) if u.deleted == Deleted::No => Ok(Some(self.to_full_domain(&u).await?)),
             _ => Ok(None),
@@ -169,7 +170,7 @@ impl UserRepository for ToastyUserRepository {
                 }
                 q
             },
-            |e| db_err(e, RepositoryError::DatabaseUser)
+            |e| db_err(e, UserRepositoryError::DatabaseUser)
         );
 
         // 转 domain（角色/部门关联按需懒加载）
@@ -186,7 +187,7 @@ impl UserRepository for ToastyUserRepository {
         let all = SysUser::all()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
 
         let mut users = Vec::new();
         for u in all.into_iter().filter(|u| u.deleted == Deleted::No) {
@@ -236,7 +237,7 @@ impl UserRepository for ToastyUserRepository {
             .deleted(Deleted::from(user.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
 
         // 插入角色关联
         for &role_id in &user.role_ids {
@@ -245,7 +246,7 @@ impl UserRepository for ToastyUserRepository {
                 .role_id(role_id)
                 .exec(&mut db)
                 .await
-                .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+                .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
         }
 
         // 插入部门关联
@@ -255,7 +256,7 @@ impl UserRepository for ToastyUserRepository {
                 .dept_id(dept_id)
                 .exec(&mut db)
                 .await
-                .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+                .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
         }
 
         Ok(())
@@ -265,7 +266,7 @@ impl UserRepository for ToastyUserRepository {
         let mut db = self.plugin.db().clone();
         let mut existing = SysUser::get_by_id(&mut db, user.id)
             .await
-            .map_err(|_| RepositoryError::NotFoundUser)?;
+            .map_err(|_| UserRepositoryError::NotFoundUser)?;
 
         existing
             .update()
@@ -285,7 +286,7 @@ impl UserRepository for ToastyUserRepository {
             .deleted(Deleted::from(user.audit.deleted))
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
 
         Ok(())
     }
@@ -294,13 +295,13 @@ impl UserRepository for ToastyUserRepository {
         let mut db = self.plugin.db().clone();
         let mut user = SysUser::get_by_id(&mut db, id)
             .await
-            .map_err(|_| RepositoryError::NotFoundUser)?;
+            .map_err(|_| UserRepositoryError::NotFoundUser)?;
 
         user.update()
             .deleted(Deleted::Yes)
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
 
         Ok(())
     }
@@ -311,7 +312,7 @@ impl UserRepository for ToastyUserRepository {
             .first()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
         Ok(user.map(|u| u.deleted == Deleted::No).unwrap_or(false))
     }
 
@@ -320,7 +321,7 @@ impl UserRepository for ToastyUserRepository {
         let all = SysUser::all()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
         Ok(all
             .iter()
             .any(|u| u.deleted == Deleted::No && u.email == email))
@@ -331,7 +332,7 @@ impl UserRepository for ToastyUserRepository {
         let all = SysUser::all()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
         Ok(all
             .iter()
             .any(|u| u.deleted == Deleted::No && u.mobile == mobile))
@@ -342,7 +343,7 @@ impl UserRepository for ToastyUserRepository {
         let all = SysUser::all()
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
 
         let count = all
             .iter()
@@ -380,7 +381,7 @@ impl UserRepository for ToastyUserRepository {
         let user_roles = SysUserRole::filter_by_role_id(role_id)
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
 
         let mut users = Vec::new();
         for ur in user_roles {
@@ -398,7 +399,7 @@ impl UserRepository for ToastyUserRepository {
         let user_depts = SysUserDept::filter_by_dept_id(dept_id)
             .exec(&mut db)
             .await
-            .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+            .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
 
         let mut users = Vec::new();
         for ud in user_depts {
@@ -440,7 +441,7 @@ impl UserRepository for ToastyUserRepository {
                 .deleted(Deleted::from(user.audit.deleted))
                 .exec(&mut *tx)
                 .await
-                .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+                .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
 
             // 绑定角色（同一事务）
             for &role_id in role_ids {
@@ -449,7 +450,7 @@ impl UserRepository for ToastyUserRepository {
                     .role_id(role_id)
                     .exec(&mut *tx)
                     .await
-                    .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+                    .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
             }
 
             // 绑定部门（同一事务）
@@ -459,7 +460,7 @@ impl UserRepository for ToastyUserRepository {
                     .dept_id(dept_id)
                     .exec(&mut *tx)
                     .await
-                    .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+                    .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
             }
 
             Ok(())
@@ -472,13 +473,13 @@ impl UserRepository for ToastyUserRepository {
             let old = SysUserRole::filter_by_user_id(user_id)
                 .exec(&mut *tx)
                 .await
-                .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+                .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
 
             for ur in old {
                 ur.delete()
                     .exec(&mut *tx)
                     .await
-                    .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+                    .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
             }
 
             // 插入新的关联
@@ -488,7 +489,7 @@ impl UserRepository for ToastyUserRepository {
                     .role_id(role_id)
                     .exec(&mut *tx)
                     .await
-                    .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+                    .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
             }
 
             Ok(())
@@ -501,13 +502,13 @@ impl UserRepository for ToastyUserRepository {
             let old = SysUserDept::filter_by_user_id(user_id)
                 .exec(&mut *tx)
                 .await
-                .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+                .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
 
             for ud in old {
                 ud.delete()
                     .exec(&mut *tx)
                     .await
-                    .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+                    .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
             }
 
             // 插入新的关联
@@ -517,7 +518,7 @@ impl UserRepository for ToastyUserRepository {
                     .dept_id(dept_id)
                     .exec(&mut *tx)
                     .await
-                    .map_err(|e| db_err(e, RepositoryError::DatabaseUser))?;
+                    .map_err(|e| db_err(e, UserRepositoryError::DatabaseUser))?;
             }
 
             Ok(())

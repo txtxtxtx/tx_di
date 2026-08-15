@@ -3,7 +3,7 @@
 use crate::auth::ensure_permission;
 use crate::error::ApiErr;
 use admin_app::menu::app_service::MenuAppService;
-use admin_domain::menu::model::value_object::MenuTreeNode;
+use admin_domain::identity::menu::model::value_object::MenuTreeNode;
 use admin_proto::{CreateMenuRequest, Empty, ListMenusRequest, MenuResponse, UpdateMenuRequest};
 use axum::Json;
 use axum::routing::{delete, get, post, put};

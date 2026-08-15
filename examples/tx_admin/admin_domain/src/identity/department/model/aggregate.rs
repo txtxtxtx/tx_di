@@ -1,0 +1,127 @@
+use jiff::Timestamp;
+use serde::{Deserialize, Serialize};
+
+use crate::AggregateRoot;
+use crate::shared::model::value_object::DeletedStatus;
+use crate::shared::model::{AggregateRoot, AuditFields};
+use crate::identity::department::model::event::DepartmentEvent;
+
+/// Department aggregate root
+#[derive(Debug, Clone, Serialize, Deserialize, AggregateRoot)]
+#[aggregate_root(event = crate::identity::department::model::event::DepartmentEvent)]
+pub struct Department {
+    pub id: u64,
+    pub name: String,
+    pub parent_id: u64,
+    pub sort: i32,
+    pub leader_user_id: Option<u64>,
+    pub phone: Option<String>,
+    pub email: Option<String>,
+    pub status: i32,
+    pub tenant_id: i32,
+    pub audit: AuditFields,
+    pub children: Vec<Department>,
+    events: Vec<DepartmentEvent>,
+}
+
+impl Department {
+    /// 从持久化层恢复部门（不触发领域事件）
+    #[allow(clippy::too_many_arguments)]
+    pub fn restore(
+        id: u64,
+        name: String,
+        parent_id: u64,
+        sort: i32,
+        leader_user_id: Option<u64>,
+        phone: Option<String>,
+        email: Option<String>,
+        status: i32,
+        tenant_id: i32,
+        audit: AuditFields,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            parent_id,
+            sort,
+            leader_user_id,
+            phone,
+            email,
+            status,
+            tenant_id,
+            audit,
+            children: Vec::new(),
+            events: Vec::new(),
+        }
+    }
+
+    pub fn create(
+        id: u64,
+        name: String,
+        parent_id: u64,
+        sort: i32,
+        creator: Option<String>,
+    ) -> Self {
+        let mut dept = Self {
+            id,
+            name,
+            parent_id,
+            sort,
+            leader_user_id: None,
+            phone: None,
+            email: None,
+            status: 0,
+            tenant_id: 0,
+            audit: AuditFields {
+                creator: creator.clone(),
+                create_time: Timestamp::now(),
+                updater: creator,
+                update_time: Timestamp::now(),
+                deleted: DeletedStatus::Normal,
+            },
+            children: Vec::new(),
+            events: Vec::new(),
+        };
+        dept.add_event(DepartmentEvent::DepartmentCreated { dept_id: id });
+        dept
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_info(
+        &mut self,
+        name: String,
+        parent_id: u64,
+        sort: i32,
+        leader_user_id: Option<u64>,
+        phone: Option<String>,
+        email: Option<String>,
+        updater: Option<String>,
+    ) {
+        self.name = name;
+        self.parent_id = parent_id;
+        self.sort = sort;
+        self.leader_user_id = leader_user_id;
+        self.phone = phone;
+        self.email = email;
+        self.audit.updater = updater;
+        self.audit.update_time = Timestamp::now();
+        self.add_event(DepartmentEvent::DepartmentUpdated { dept_id: self.id });
+    }
+
+    pub fn change_status(&mut self, status: i32, updater: Option<String>) {
+        self.status = status;
+        self.audit.updater = updater;
+        self.audit.update_time = Timestamp::now();
+    }
+
+    pub fn soft_delete(&mut self, updater: Option<String>) {
+        self.audit.deleted = DeletedStatus::Deleted;
+        self.audit.updater = updater;
+        self.audit.update_time = Timestamp::now();
+        self.add_event(DepartmentEvent::DepartmentDeleted { dept_id: self.id });
+    }
+
+    pub fn is_root(&self) -> bool {
+        self.parent_id == 0
+    }
+}

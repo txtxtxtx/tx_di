@@ -3,11 +3,11 @@ use std::sync::Arc;
 use crate::auth::session_service::AuthSessionService;
 use crate::log::app_service::LoginLogAppService;
 use crate::user::app_service::UserAppService;
-use admin_domain::auth::service::AuthService;
-use admin_domain::menu::model::value_object::MenuQuery;
-use admin_domain::menu::model::value_object::MenuTreeNode;
-use admin_domain::menu::service::MenuService;
-use admin_domain::role::service::RoleService;
+use admin_domain::identity::auth::service::AuthService;
+use admin_domain::identity::menu::model::value_object::MenuQuery;
+use admin_domain::identity::menu::model::value_object::MenuTreeNode;
+use admin_domain::identity::menu::service::MenuService;
+use admin_domain::identity::role::service::RoleService;
 use admin_domain::shared::model::value_object::SessionEctData;
 use admin_proto::{
     CreateLoginLogRequest, LoginRequest, LoginResponse, LogoutRequest, UserInfoResponse,

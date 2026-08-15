@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::dictionary::dto::{dict_data_to_response, dict_type_to_response};
-use admin_domain::dictionary::model::value_object::{DictDataQuery, DictTypeQuery};
-use admin_domain::dictionary::service::{DictDataService, DictTypeService};
+use admin_domain::system::dictionary::model::value_object::{DictDataQuery, DictTypeQuery};
+use admin_domain::system::dictionary::service::{DictDataService, DictTypeService};
 use admin_proto::{
     CreateDictDataRequest, CreateDictTypeRequest, DictDataResponse, DictTypeResponse,
     ListDictDataRequest, ListDictTypesRequest, UpdateDictDataRequest, UpdateDictTypeRequest,
