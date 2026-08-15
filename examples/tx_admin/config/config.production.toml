@@ -6,82 +6,140 @@
 #   # 或本地运行：
 #   CONFIG_PATH=examples/tx_admin/config/config.production.toml cargo run -p admin_api
 #
+# 环境变量说明（TOML 不支持 ${ENV_VAR} 插值，以下由代码显式读取）：
+#   - CONFIG_PATH    选择配置文件路径
+#   - GRPC_PORT      覆盖 gRPC 端口
+#   - APP_HOME       锚定相对路径：文件上传目录 / 静态资源
+#   - DATABASE_URL   覆盖数据库连接串（优先于 [toasty].database_url）
+#   - REDIS_URL      覆盖 sa-token 会话存储连接串
+#   - SERVICE_IP     Nacos 服务注册 IP（容器/多网卡必设）
+#
 # 与 config.toml（SQLite 开发版）的区别：
 #   - 数据库改用 PostgreSQL（多实例共享）
 #   - sa-token 会话 + Job 分布式锁改 Redis（多实例共享）
-# ============================================================
 
-[file_config]
-backend = "local"
+# ── 文件存储（tx_di_file）──────────────────────────────────────────────────
+[file]
 base_path = "./uploads"
-base_url = "http://localhost:8888/files"
-max_file_size = 10485760
+base_url = "http://localhost:8888/files"   # 与 [web_config].port 保持一致
+max_file_size = 10485760                    # 10MB，0 表示不限制
+allowed_extensions = []                     # 空列表表示不限制
 
-[file_config.s3]
-access_key = ""
-bucket = ""
-endpoint = ""
-force_path_style = false
-region = "ap-southeast-1"
-secret_key = ""
+# 对象存储后端（S3 / MinIO；未启用 s3 feature 时该后端会被跳过）
+# [[file.extra_storages]]
+# name = "s3-main"
+# backend = "s3"
+# base_path = ""
+# base_url = ""
+# [file.extra_storages.s3]
+# bucket = "my-bucket"
+# region = "ap-southeast-1"
+# endpoint = "http://minio:9000"
+# access_key = ""
+# secret_key = ""
+# force_path_style = true
 
-[log_config]
+# ── 日志（tx_di_log）───────────────────────────────────────────────────────
+[log]
+level = "info"
 console_output = true
 dir = "./logs"
 prefix = "tx_admin"
 retention_days = 7
 time_format = "local"
+# format = ""
+# modules = { "sqlx" = "warn" }
+# OpenTelemetry 链路导出（OTLP HTTP，对接 Jaeger / OTel Collector）
+# otlp_endpoint = "http://jaeger:4318"
+# service_name = "tx-admin"
 
+# ── 认证（tx_di_sa_token）──────────────────────────────────────────────────
 [sa_token]
-redis_url = "redis://127.0.0.1:6379/0"
+redis_url = "redis://127.0.0.1:6379/0"     # 会话跨实例共享，多实例必配（可被 REDIS_URL 覆盖）
+token_name = "Authorization"
+timeout = 86400
 active_timeout = 1800
 auto_renew = true
-enable_refresh_token = true
 is_concurrent = true
-is_read_cookie = true
-is_read_header = true
 is_share = true
-refresh_token_timeout = 604800
-timeout = 86400
-token_name = "Authorization"
+is_read_header = true
+is_read_cookie = true
+is_read_body = false
+is_log = false
 token_style = "simple-uuid"
+enable_refresh_token = true
+refresh_token_timeout = 604800
+# jwt_secret_key = ""                        # 使用 JWT 风格时必填
+# jwt_algorithm = "HS256"
+# enable_nonce = false                       # 防重放攻击
+# nonce_timeout = -1
 
-[toasty_config]
+# ── 数据库（tx_di_toasty）──────────────────────────────────────────────────
+[toasty]
+database_url = "postgres://tx_admin:tx_admin_pwd_change_me@127.0.0.1:5432/tx_admin"
 auto_schema = false
 migrate_on_start = true
-database_url = "postgres://tx_admin:tx_admin_pwd_change_me@127.0.0.1:5432/tx_admin"
 max_pool_size = 10
+default_admin_password = "admin123"          # 空库时自动创建 admin 账号的初始密码
+# table_name_prefix = ""
+# pool_wait_timeout_secs = 30
+# pool_create_timeout_secs = 10
+# pool_health_check_interval_secs = 60
+# pool_max_connection_lifetime_secs = 1800   # 建议对齐负载均衡器空闲超时
+# pool_max_connection_idle_time_secs = 300
+# pool_pre_ping = true                       # 要求零失败查询时开启
 
-# 注册中心（Nacos）：生产多实例部署开启；本地无 Nacos 时保持 false
-[registry_config]
-enabled = false
-nacos_addr = "http://127.0.0.1:8848"
-namespace = "public"
-group = "DEFAULT_GROUP"
-service_name = "tx_admin"
-auto_register = true
-
-[job_config]
+# ── 定时任务（tx_di_job）────────────────────────────────────────────────────
+[job]
 enabled = true
 poll_interval_secs = 1
 shell_timeout_secs = 300
 python_timeout_secs = 300
 python_path = "/usr/bin/python3"
 thread_pool_size = 4
-# 多实例部署必须开启，避免同一 cron 任务被重复执行
+internal_timeout_secs = 300
+# 多实例部署必须开启，避免同一 cron 任务被重复执行。
+# 注意：distributed_lock 依赖 tx_di_cache 注册的 Arc<dyn CacheService>（RedisCache）。
+# 若未在应用入口 `use tx_di_cache;` 并配置 [cache_config]，此处会被忽略（退化为单实例调度）。
 distributed_lock = true
 lock_timeout_secs = 300
 
+# ── 缓存（tx_di_cache，job 分布式锁依赖）───────────────────────────────────
+# 启用方式：应用入口 `use tx_di_cache;` 并取消本节点注释。
+# [cache_config]
+# default_ttl_secs = 3600
+# key_prefix = "tx-admin:"
+# memory_max_capacity = 10000
+# redis_url = "redis://127.0.0.1:6379"
+# redis_pool_size = 10
+# redis_timeout_secs = 5
+
+# ── 注册中心（tx_di_nacos）─────────────────────────────────────────────────
+[registry_config]
+enabled = false                              # 多实例部署设为 true
+nacos_addr = "http://127.0.0.1:8848"
+namespace = "public"
+group = "DEFAULT_GROUP"
+service_name = "tx_admin"
+auto_register = true
+heartbeat_secs = 5
+# config_data_id = "tx-admin.toml"           # 默认 "{service_name}.toml"
+# username = "nacos"                          # Nacos 服务端开启鉴权时必填
+# password = ""                              # 注意：TOML 不支持 ${ENV_VAR} 插值
+
+# ── gRPC（admin_api 自有配置，可被环境变量 GRPC_PORT 覆盖）─────────────────
 [grpc_config]
 port = 50051
 
+# ── Web（tx_di_axum）───────────────────────────────────────────────────────
 [web_config]
-enable_cors = true
 host = "::"
-layers = [[5, "timeout"], [5, "security"], [10, "api_log"], [100, "compression"], [10000, "cors"]]
-max_body_size = 104857600
 port = 8888
+enable_cors = true
+max_body_size = 104857600
 timeout_secs = 30
+static_dir = "./static"
+layers = [[5, "timeout"], [5, "security"], [10, "api_log"], [100, "compression"], [10000, "cors"]]
 
 [web_config.spa_apps]
 "/web" = "examples/tx_admin/web/dist"

@@ -1,84 +1,129 @@
-[file_config]
-backend = "local"
+# ============================================================
+# tx_admin 开发配置（SQLite + 内存会话，单实例本地调试）
+# ============================================================
+#
+# 环境变量说明：
+#   TOML 配置本身不支持 `${ENV_VAR}` 插值，以下环境变量由代码显式读取：
+#   - CONFIG_PATH    选择配置文件路径（admin_api/src/main.rs）
+#   - GRPC_PORT      覆盖 gRPC 端口（admin_api/src/plugin.rs）
+#   - APP_HOME       锚定相对路径：文件上传目录 / 静态资源 / SQLite 路径
+#   - DATABASE_URL   覆盖数据库连接串（[toasty].database_url）
+#   - REDIS_URL      覆盖 sa-token 会话存储连接串（[sa_token].redis_url）
+#   - SERVICE_IP     Nacos 服务注册 IP（默认 127.0.0.1，仅单机）
+#
+# 与 config.production.toml（PostgreSQL + Redis 多实例）的区别见该文件头注释。
+
+# ── 文件存储（tx_di_file）──────────────────────────────────────────────────
+[file]
 base_path = "./uploads"
-base_url = "http://localhost:8080/files"
-max_file_size = 10485760
+base_url = "http://localhost:8888/files"   # 与 [web_config].port 保持一致
+max_file_size = 10485760                    # 10MB，0 表示不限制
+allowed_extensions = []                     # 空列表表示不限制
 
-[file_config.s3]
-access_key = ""
-bucket = ""
-endpoint = ""
-force_path_style = false
-region = "ap-southeast-1"
-secret_key = ""
+# 额外存储后端（可选，S3 / MinIO 等；未启用 s3 feature 时该后端会被跳过）
+# [[file.extra_storages]]
+# name = "s3-main"
+# backend = "s3"
+# base_path = ""
+# base_url = ""
+# [file.extra_storages.s3]
+# bucket = "my-bucket"
+# region = "ap-southeast-1"
+# endpoint = "http://localhost:9000"
+# access_key = ""
+# secret_key = ""
+# force_path_style = true                   # MinIO 通常需要 true
 
-[log_config]
+# ── 日志（tx_di_log）───────────────────────────────────────────────────────
+[log]
+level = "info"
 console_output = true
 dir = "./logs"
-# level = "debug"
 prefix = "tx_admin"
 retention_days = 7
-time_format = "local"
-# 阶段 E-3：OpenTelemetry 链路导出（OTLP HTTP，对接 Jaeger/OTel Collector）。
+time_format = "local"                        # "local" | "utc"
+# format = ""                                # 自定义时间格式，空用默认
+# modules = { "sqlx" = "warn" }              # 模块级日志级别覆盖
+# OpenTelemetry 链路导出（OTLP HTTP，对接 Jaeger / OTel Collector）。
 # 配置后自动启用；为空则不启用。示例：otlp_endpoint = "http://127.0.0.1:4318"
 # otlp_endpoint = ""
 # service_name = "tx-admin"
 
+# ── 认证（tx_di_sa_token）──────────────────────────────────────────────────
 [sa_token]
-# Redis 连接串（会话跨实例共享，水平扩容必需；本地无 Redis 时注释掉并改用内存 feature）
-# redis_url = "redis://127.0.0.1:6379/0"
-active_timeout = 1800
-auto_renew = true
-enable_refresh_token = true
-is_concurrent = true
-is_read_cookie = false
-is_read_header = true
-is_share = true
-refresh_token_timeout = 604800
-timeout = 86400
 token_name = "Authorization"
-token_style = "simple-uuid"
+timeout = 86400                              # Token 有效期（秒），-1 永不过期
+active_timeout = 1800                        # 活跃频率 / 自动续签时长（秒）
+auto_renew = true
+is_concurrent = true                         # 允许同账号并发登录
+is_share = true                              # 多人登录同账号共享 Token
+is_read_header = true
+is_read_cookie = false
+is_read_body = false
+is_log = false
+token_style = "simple-uuid"                  # uuid/simple-uuid/random-*/jwt/hash/tik
+enable_refresh_token = true
+refresh_token_timeout = 604800               # 7 天
+# 会话存储：不配置 redis_url 时使用内存存储（仅单实例）。
+# 多实例水平扩容必须配置 Redis（需开启 tx_di_sa_token 的 redis feature）。
+# redis_url = "redis://127.0.0.1:6379/0"
 
-[toasty_config]
+# ── 数据库（tx_di_toasty）──────────────────────────────────────────────────
+[toasty]
+database_url = "sqlite:examples/tx_admin/data/tx_admin.db"
 auto_schema = false
 # 生产迁移模式：受控 push_schema（diff 增量）+ 版本审计表 _schema_migrations
 migrate_on_start = true
-database_url = "sqlite:examples/tx_admin/data/tx_admin.db"
 max_pool_size = 10
+default_admin_password = "admin123"          # 空库时自动创建 admin 账号的初始密码
+# table_name_prefix = ""
+# pool_wait_timeout_secs = 30
+# pool_create_timeout_secs = 10
+# pool_health_check_interval_secs = 60
+# pool_max_connection_lifetime_secs = 1800
+# pool_max_connection_idle_time_secs = 300
+# pool_pre_ping = false
 
-# 注册中心（Nacos）：enabled=true 时注册 HTTP/gRPC 端点并支持配置中心
-# 生产多实例部署开启；本地无 Nacos 时保持 false
-[registry_config]
-enabled = false
-nacos_addr = "http://192.168.0.91:8848"
-namespace = "724add82-6b07-4bc6-aed5-b6d9425db423"
-group = "DEFAULT_GROUP"
-service_name = "tx_admin"
-auto_register = true
-username = "nacos"
-password = "${NACOS_PASSWORD}"
-# 主配置 data_id（默认 "{service_name}.toml"）：启动拉取 + 合并本地，变更时优雅重启生效
-# config_data_id = "tx-admin.toml"
-
-[job_config]
+# ── 定时任务（tx_di_job）────────────────────────────────────────────────────
+[job]
 enabled = true
 poll_interval_secs = 1
 shell_timeout_secs = 300
 python_timeout_secs = 300
-python_path = "/usr/bin/python3"
+python_path = "/usr/bin/python3"             # Windows 本地可改为 "python"
 thread_pool_size = 4
+internal_timeout_secs = 300
+# 分布式锁：多实例部署防止同任务重复执行，需同时启用 tx_di_cache 并注册 CacheService
+# distributed_lock = false
+# lock_timeout_secs = 300
 
-# gRPC 服务监听端口（可被环境变量 GRPC_PORT 覆盖）
+# ── 注册中心（tx_di_nacos）─────────────────────────────────────────────────
+# enabled=true 时：启动拉取远程配置 + 注册 HTTP/gRPC 端点 + 配置变更优雅重启
+[registry_config]
+enabled = false
+nacos_addr = "http://127.0.0.1:8848"
+namespace = "public"
+group = "DEFAULT_GROUP"
+service_name = "tx_admin"
+auto_register = true
+heartbeat_secs = 5
+# config_data_id = "tx-admin.toml"           # 默认 "{service_name}.toml"
+# username = "nacos"                          # Nacos 服务端开启鉴权时必填
+# password = ""                              # 注意：TOML 不支持 ${ENV_VAR} 插值
+
+# ── gRPC（admin_api 自有配置，可被环境变量 GRPC_PORT 覆盖）─────────────────
 [grpc_config]
 port = 50051
 
+# ── Web（tx_di_axum）───────────────────────────────────────────────────────
 [web_config]
-enable_cors = true
-host = "::"
-layers = [[5, "timeout"], [5, "security"], [10, "api_log"], [100, "compression"], [10000, "cors"]]
-max_body_size = 104857600
+host = "::"                                  # "::" 监听所有 IPv6（含 IPv4 映射）
 port = 8888
+enable_cors = true
+max_body_size = 104857600                    # 100MB
 timeout_secs = 30
+static_dir = "./static"
+layers = [[5, "timeout"], [5, "security"], [10, "api_log"], [100, "compression"], [10000, "cors"]]
 
 [web_config.spa_apps]
 "/web" = "examples/tx_admin/web/dist"
