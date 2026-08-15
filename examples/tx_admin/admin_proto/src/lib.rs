@@ -15,72 +15,73 @@ pub mod flexible_serde;
 ///
 /// `tonic_reflection` 依赖此字节集向客户端暴露服务与方法定义，
 /// 供 `grpcurl` / `grpcui` 等工具动态发现接口。
-pub const FILE_DESCRIPTOR_SET: &[u8] = include_bytes!("pb/admin_descriptor.bin");
+pub const FILE_DESCRIPTOR_SET: &[u8] =
+    include_bytes!(concat!(env!("OUT_DIR"), "/pb/admin_descriptor.bin"));
 
 pub mod admin {
     /// 通用类型（PageRequest, Empty, PageResponse 等）
     pub mod common {
-        include!("pb/admin.common.rs");
+        include!(concat!(env!("OUT_DIR"), "/pb/admin.common.rs"));
     }
 
     /// 认证
     pub mod auth {
-        include!("pb/admin.auth.rs");
+        include!(concat!(env!("OUT_DIR"), "/pb/admin.auth.rs"));
     }
 
     /// 用户
     pub mod user {
-        include!("pb/admin.user.rs");
+        include!(concat!(env!("OUT_DIR"), "/pb/admin.user.rs"));
     }
 
     /// 角色
     pub mod role {
-        include!("pb/admin.role.rs");
+        include!(concat!(env!("OUT_DIR"), "/pb/admin.role.rs"));
     }
 
     /// 菜单
     pub mod menu {
-        include!("pb/admin.menu.rs");
+        include!(concat!(env!("OUT_DIR"), "/pb/admin.menu.rs"));
     }
 
     /// 部门
     pub mod dept {
-        include!("pb/admin.dept.rs");
+        include!(concat!(env!("OUT_DIR"), "/pb/admin.dept.rs"));
     }
 
     /// 配置
     pub mod config {
-        include!("pb/admin.config.rs");
+        include!(concat!(env!("OUT_DIR"), "/pb/admin.config.rs"));
     }
 
     /// 字典
     pub mod dict {
-        include!("pb/admin.dict.rs");
+        include!(concat!(env!("OUT_DIR"), "/pb/admin.dict.rs"));
     }
 
     /// 日志
     pub mod log {
-        include!("pb/admin.log.rs");
+        include!(concat!(env!("OUT_DIR"), "/pb/admin.log.rs"));
     }
 
     /// 文件
     pub mod file {
-        include!("pb/admin.file.rs");
+        include!(concat!(env!("OUT_DIR"), "/pb/admin.file.rs"));
     }
 
     /// 定时任务
     pub mod job {
-        include!("pb/admin.job.rs");
+        include!(concat!(env!("OUT_DIR"), "/pb/admin.job.rs"));
     }
 
     /// 系统监控
     pub mod monitor {
-        include!("pb/admin.monitor.rs");
+        include!(concat!(env!("OUT_DIR"), "/pb/admin.monitor.rs"));
     }
 
     /// 系统工具
     pub mod tool {
-        include!("pb/admin.tool.rs");
+        include!(concat!(env!("OUT_DIR"), "/pb/admin.tool.rs"));
     }
 }
 

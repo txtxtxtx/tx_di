@@ -1,5 +1,6 @@
 use std::io::{Read, Result, Write};
 use std::path::Path;
+use std::path::PathBuf;
 
 fn main() -> Result<()> {
     // 使用 vendored protoc，无需系统安装
@@ -9,8 +10,18 @@ fn main() -> Result<()> {
         std::env::set_var("PROTOC", protoc_path);
     }
 
-    // 确保生成目录存在（首次 clone 构建时需要）
-    std::fs::create_dir_all("src/pb")?;
+    // 生成文件统一放入 OUT_DIR（Rust 官方推荐的生成文件位置）。
+    // 切勿写入 src/ 下的源码树（如 src/pb/）：该目录被 .gitignore 排除、
+    // 不进入版本控制，在 CI 增量编译 / target 缓存复用场景下可能缺失，
+    // 导致 lib.rs 中的 include!/include_bytes! 宏展开时读不到文件而编译失败。
+    let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
+    let pb_dir = out_dir.join("pb");
+    std::fs::create_dir_all(&pb_dir)?;
+
+    // 告知 cargo 生成结果依赖 proto 源文件与 build.rs 自身，
+    // 任一变化都会触发重新运行本构建脚本，避免陈旧缓存。
+    println!("cargo:rerun-if-changed=protos");
+    println!("cargo:rerun-if-changed=build.rs");
 
     let proto_dir = "protos";
 
@@ -36,7 +47,7 @@ fn main() -> Result<()> {
         .collect();
 
     tonic_build::configure()
-        .out_dir("src/pb")
+        .out_dir(&pb_dir)
         // 顺序很重要（serde_with 硬性要求）：
         // 1. `#[serde_with::serde_as]` 属性宏必须**先于** derive 出现，
         //    它才能把字段上的 `#[serde_as(as = "...")]` 注解改写为
@@ -51,12 +62,11 @@ fn main() -> Result<()> {
             "#[serde(skip_serializing_if = \"Option::is_none\")]",
         )
         // 生成文件描述符集合（供 gRPC 服务反射使用）
-        .file_descriptor_set_path("src/pb/admin_descriptor.bin")
+        .file_descriptor_set_path(pb_dir.join("admin_descriptor.bin"))
         .compile_protos(&proto_paths, &[proto_dir])?;
 
     // 后处理：为 i64/u64 字段添加 serde_as 属性
-    let pb_dir = Path::new("src/pb");
-    for entry in std::fs::read_dir(pb_dir)? {
+    for entry in std::fs::read_dir(&pb_dir)? {
         let entry = entry?;
         let path = entry.path();
         if path.extension().is_some_and(|e| e == "rs") {
