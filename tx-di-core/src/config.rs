@@ -11,6 +11,7 @@ use toml::Value::Table;
 
 use crate::RIE;
 use crate::component::Component;
+use crate::config_env::{ensure_dotenv, interpolate_env};
 use crate::error::{AppError, DiErr};
 use crate::scope::Scope;
 
@@ -79,6 +80,9 @@ impl AppAllConfig {
             return Ok(Table(toml::map::Map::new()));
         }
 
+        // 先加载 .env，再读取并替换配置中的 `${VAR}` 占位符
+        ensure_dotenv();
+
         let content = fs::read_to_string(path).map_err(|e| {
             AppError::with_context(
                 DiErr::ConfigError,
@@ -86,6 +90,13 @@ impl AppAllConfig {
                     "配置文件读取失败: {:?}\n错误: {}\n请检查文件权限和路径是否正确。",
                     path, e
                 ),
+            )
+        })?;
+
+        let content = interpolate_env(&content).map_err(|e| {
+            AppError::with_context(
+                DiErr::ConfigError,
+                format!("配置文件环境变量替换失败: {:?}\n{}", path, e),
             )
         })?;
 

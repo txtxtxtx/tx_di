@@ -20,7 +20,8 @@
 - 注意：使用方需 `use tx_di_core::DepsTuple`；异步回调 app 参数须 `Arc<App>`（'static）
 - 插件必须显式 `use tx_di_xxx;` 触发 linkme 注册
 - `ins_run()` 返回前已完成 init + async_init
-- 测试：`cargo test -p tx-di-core`（64+ 测试）
+- 配置环境变量插值（2026-08-15）：配置文件任意字符串值支持 `${VAR}`（未定义报错）/`${VAR:-default}`（未定义用默认）；`ensure_dotenv()` 幂等加载 `.env`（路径优先级 `DOTENV_PATH` > CWD/`.env`，dotenvy crate）；在 `AppAllConfig::load_config` 与 `tx_di_nacos::load_local_toml` 两处解析前替换
+- 测试：`cargo test -p tx-di-core`（64+ 测试，集成测试需 `--test-threads=1` 避免全局状态竞争）
 
 ## rsipstack 0.5.x 要点
 - 仅 `Via/From/To/CSeq` 在 `rsipstack::sip::typed`；其余头（CallId/Expires/MaxForwards 等）在 `rsipstack::sip` 根

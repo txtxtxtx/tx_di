@@ -6,13 +6,16 @@
 #   # 或本地运行：
 #   CONFIG_PATH=examples/tx_admin/config/config.production.toml cargo run -p admin_api
 #
-# 环境变量说明（TOML 不支持 ${ENV_VAR} 插值，以下由代码显式读取）：
-#   - CONFIG_PATH    选择配置文件路径
-#   - GRPC_PORT      覆盖 gRPC 端口
-#   - APP_HOME       锚定相对路径：文件上传目录 / 静态资源
-#   - DATABASE_URL   覆盖数据库连接串（优先于 [toasty].database_url）
-#   - REDIS_URL      覆盖 sa-token 会话存储连接串
-#   - SERVICE_IP     Nacos 服务注册 IP（容器/多网卡必设）
+# 环境变量支持：
+#   1) `${VAR}` 插值：任意字符串值可用 `${VAR}`（未定义报错）或 `${VAR:-默认值}`（未定义用默认）。
+#      启动时从进程环境变量或 .env 文件（dotenvy，路径可用 DOTENV_PATH 指定）替换。
+#   2) 代码显式读取的环境变量（优先级高于配置项）：
+#      - CONFIG_PATH    选择配置文件路径
+#      - GRPC_PORT      覆盖 gRPC 端口
+#      - APP_HOME       锚定相对路径：文件上传目录 / 静态资源
+#      - DATABASE_URL   覆盖数据库连接串（优先于 [toasty].database_url）
+#      - REDIS_URL      覆盖 sa-token 会话存储连接串
+#      - SERVICE_IP     Nacos 服务注册 IP（容器/多网卡必设）
 #
 # 与 config.toml（SQLite 开发版）的区别：
 #   - 数据库改用 PostgreSQL（多实例共享）
@@ -124,8 +127,8 @@ service_name = "tx_admin"
 auto_register = true
 heartbeat_secs = 5
 # config_data_id = "tx-admin.toml"           # 默认 "{service_name}.toml"
-# username = "nacos"                          # Nacos 服务端开启鉴权时必填
-# password = ""                              # 注意：TOML 不支持 ${ENV_VAR} 插值
+# username = "${NACOS_USERNAME:-nacos}"       # Nacos 服务端开启鉴权时必填
+# password = "${NACOS_PASSWORD:-}"            # 未定义时为空
 
 # ── gRPC（admin_api 自有配置，可被环境变量 GRPC_PORT 覆盖）─────────────────
 [grpc_config]

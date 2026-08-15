@@ -2,14 +2,16 @@
 # tx_admin 开发配置（SQLite + 内存会话，单实例本地调试）
 # ============================================================
 #
-# 环境变量说明：
-#   TOML 配置本身不支持 `${ENV_VAR}` 插值，以下环境变量由代码显式读取：
-#   - CONFIG_PATH    选择配置文件路径（admin_api/src/main.rs）
-#   - GRPC_PORT      覆盖 gRPC 端口（admin_api/src/plugin.rs）
-#   - APP_HOME       锚定相对路径：文件上传目录 / 静态资源 / SQLite 路径
-#   - DATABASE_URL   覆盖数据库连接串（[toasty].database_url）
-#   - REDIS_URL      覆盖 sa-token 会话存储连接串（[sa_token].redis_url）
-#   - SERVICE_IP     Nacos 服务注册 IP（默认 127.0.0.1，仅单机）
+# 环境变量支持：
+#   1) `${VAR}` 插值：任意字符串值可用 `${VAR}`（未定义报错）或 `${VAR:-默认值}`（未定义用默认）。
+#      启动时从进程环境变量或 .env 文件（dotenvy，路径可用 DOTENV_PATH 指定）替换。
+#   2) 代码显式读取的环境变量（优先级高于配置项）：
+#      - CONFIG_PATH    选择配置文件路径（admin_api/src/main.rs）
+#      - GRPC_PORT      覆盖 gRPC 端口（admin_api/src/plugin.rs）
+#      - APP_HOME       锚定相对路径：文件上传目录 / 静态资源 / SQLite 路径
+#      - DATABASE_URL   覆盖数据库连接串（[toasty].database_url）
+#      - REDIS_URL      覆盖 sa-token 会话存储连接串（[sa_token].redis_url）
+#      - SERVICE_IP     Nacos 服务注册 IP（默认 127.0.0.1，仅单机）
 #
 # 与 config.production.toml（PostgreSQL + Redis 多实例）的区别见该文件头注释。
 
@@ -108,8 +110,8 @@ service_name = "tx_admin"
 auto_register = true
 heartbeat_secs = 5
 # config_data_id = "tx-admin.toml"           # 默认 "{service_name}.toml"
-# username = "nacos"                          # Nacos 服务端开启鉴权时必填
-# password = ""                              # 注意：TOML 不支持 ${ENV_VAR} 插值
+# username = "${NACOS_USERNAME:-nacos}"       # Nacos 服务端开启鉴权时必填
+# password = "${NACOS_PASSWORD:-}"            # 未定义时为空（本地 enabled=false 不报错）
 
 # ── gRPC（admin_api 自有配置，可被环境变量 GRPC_PORT 覆盖）─────────────────
 [grpc_config]
