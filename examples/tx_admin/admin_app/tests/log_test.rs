@@ -25,6 +25,10 @@ async fn create_operate_log() {
             action: "新增用户".into(),
             success: 1,
             extra: r#"{"username":"test"}"#.into(),
+            request_method: Some("POST".into()),
+            request_url: Some("/api/v1/users".into()),
+            user_ip: Some("127.0.0.1".into()),
+            user_agent: Some("curl/8.0".into()),
         })
         .await
         .unwrap();
@@ -34,6 +38,9 @@ async fn create_operate_log() {
     assert_eq!(log.sub_type, "用户管理");
     assert_eq!(log.action, "新增用户");
     assert_eq!(log.success, 1);
+    assert_eq!(log.request_method.as_deref(), Some("POST"));
+    assert_eq!(log.request_url.as_deref(), Some("/api/v1/users"));
+    assert_eq!(log.user_ip.as_deref(), Some("127.0.0.1"));
 }
 
 #[tokio::test]
@@ -50,10 +57,15 @@ async fn create_operate_log_failure() {
             action: "删除角色".into(),
             success: 0,
             extra: r#"{"error":"角色不存在"}"#.into(),
+            request_method: Some("DELETE".into()),
+            request_url: Some("/api/v1/roles/200".into()),
+            user_ip: Some("10.0.0.2".into()),
+            user_agent: None,
         })
         .await
         .unwrap();
     assert_eq!(log.success, 0);
+    assert_eq!(log.request_method.as_deref(), Some("DELETE"));
 }
 
 #[tokio::test]
@@ -70,6 +82,10 @@ async fn paginate_operate_logs() {
             action: "操作".into(),
             success: 1,
             extra: "{}".into(),
+            request_method: Some("GET".into()),
+            request_url: Some(format!("/api/v1/logs?page={}", i)),
+            user_ip: Some("127.0.0.1".into()),
+            user_agent: None,
         })
         .await
         .unwrap();
@@ -104,6 +120,10 @@ async fn query_operate_logs_by_sub_type() {
         action: "创建".into(),
         success: 1,
         extra: "".into(),
+        request_method: None,
+        request_url: None,
+        user_ip: None,
+        user_agent: None,
     })
     .await
     .unwrap();
@@ -117,6 +137,10 @@ async fn query_operate_logs_by_sub_type() {
         action: "创建".into(),
         success: 1,
         extra: "".into(),
+        request_method: None,
+        request_url: None,
+        user_ip: None,
+        user_agent: None,
     })
     .await
     .unwrap();
@@ -152,6 +176,10 @@ async fn delete_operate_logs() {
             action: "op".into(),
             success: 1,
             extra: "".into(),
+            request_method: None,
+            request_url: None,
+            user_ip: None,
+            user_agent: None,
         })
         .await
         .unwrap();
@@ -188,6 +216,10 @@ async fn clean_operate_logs() {
             action: "op".into(),
             success: 1,
             extra: "".into(),
+            request_method: None,
+            request_url: None,
+            user_ip: None,
+            user_agent: None,
         })
         .await
         .unwrap();

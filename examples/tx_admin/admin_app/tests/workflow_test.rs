@@ -224,10 +224,15 @@ async fn full_crud_workflow() {
             action: "创建用户".into(),
             success: 1,
             extra: format!(r#"{{"username":"{}"}}"#, user.username),
+            request_method: Some("POST".into()),
+            request_url: Some("/api/v1/users".into()),
+            user_ip: Some("127.0.0.1".into()),
+            user_agent: Some("workflow-test".into()),
         })
         .await
         .unwrap();
     assert_eq!(log.user_id, user.id);
+    assert_eq!(log.request_method.as_deref(), Some("POST"));
 
     // 9. 验证配置管理分页
     let cfg_page = config_app
