@@ -261,7 +261,7 @@ impl FileAppService {
 
     /// 获取文件预览地址
     ///
-    /// - 本地存储 (storage=0): 返回永久 URL → `/api/file/pre/serve/{path}`
+    /// - 本地存储 (storage=0): 返回永久 URL → `/api/v1/file/pre/serve/{path}`
     /// - S3 存储   (storage=1): 返回预签名临时 URL + 过期时间
     /// - 数据库     (storage=2): 暂存到本地 → 同本地
     pub async fn get_preview_url(&self, file_id: u64) -> AppResult<PreviewUrlResponse> {
@@ -303,9 +303,9 @@ impl FileAppService {
                 // 本地 / 数据库: 永久 URL，走 serve 路由（带 cid 定位正确的 base_path）
                 let safe_path = file.path.trim_start_matches('/');
                 let url = if let Some(cid) = file.config_id {
-                    format!("/api/file/pre/serve/{}?cid={}", safe_path, cid)
+                    format!("/api/v1/file/pre/serve/{}?cid={}", safe_path, cid)
                 } else {
-                    format!("/api/file/pre/serve/{}", safe_path)
+                    format!("/api/v1/file/pre/serve/{}", safe_path)
                 };
                 Ok(PreviewUrlResponse {
                     url,
