@@ -35,6 +35,10 @@ message CreateOperateLogRequest {
   string action = 7;     // 操作描述（如 "删除用户"）
   int32 success = 8;     // 是否成功：0=失败, 1=成功
   string extra = 9;      // 扩展信息（JSON 字符串）
+  optional string request_method = 10; // 请求方法（GET/POST/...）
+  optional string request_url = 11;    // 请求 URL
+  optional string user_ip = 12;        // 来源 IP
+  optional string user_agent = 13;     // 客户端 User-Agent
 }
 
 // 分页查询操作日志请求

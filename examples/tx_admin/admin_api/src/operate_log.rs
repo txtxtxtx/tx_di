@@ -56,6 +56,7 @@ use axum::{
     body::Body,
     http::{Request, Response, header},
 };
+use sa_token_core::token::TokenValue;
 use std::{
     convert::Infallible,
     future::Future,
@@ -66,6 +67,7 @@ use tokio::sync::mpsc;
 use tokio::time::Instant;
 use tower::{Layer, Service};
 use tracing::{debug, warn};
+use tx_common::id;
 use tx_di_sa_token::StpUtil;
 
 /// 有界 channel 容量：缓冲 65536 条日志。
@@ -79,6 +81,8 @@ const OPERATE_LOG_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_
 /// 操作日志条目，在请求完成后通过 channel 发送给消费者
 #[derive(Debug, Clone)]
 pub struct OperateLogEntry {
+    /// 链路追踪 ID（中间件生成）
+    pub trace_id: String,
     pub method: String,
     pub uri: String,
     pub status: u16,
@@ -103,11 +107,16 @@ pub struct OperateLogEntry {
 #[derive(Clone)]
 pub struct OperateLogLayer {
     tx: mpsc::Sender<OperateLogEntry>,
+    /// sa-token 的 token 名（用于从请求头/ Cookie 中解析用户）
+    token_name: String,
 }
 
 impl OperateLogLayer {
-    pub fn new(tx: mpsc::Sender<OperateLogEntry>) -> Self {
-        Self { tx }
+    pub fn new(tx: mpsc::Sender<OperateLogEntry>, token_name: impl Into<String>) -> Self {
+        Self {
+            tx,
+            token_name: token_name.into(),
+        }
     }
 }
 
@@ -118,6 +127,7 @@ impl Layer<axum::routing::Route> for OperateLogLayer {
         OperateLogMiddleware {
             inner,
             tx: self.tx.clone(),
+            token_name: self.token_name.clone(),
         }
     }
 }
@@ -127,6 +137,7 @@ impl Layer<axum::routing::Route> for OperateLogLayer {
 pub struct OperateLogMiddleware {
     inner: axum::routing::Route,
     tx: mpsc::Sender<OperateLogEntry>,
+    token_name: String,
 }
 
 impl Service<Request<Body>> for OperateLogMiddleware {
@@ -140,6 +151,7 @@ impl Service<Request<Body>> for OperateLogMiddleware {
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
+        let trace_id = id::next_id().to_string();
         let method = req.method().to_string();
         let uri = req.uri().to_string();
         let user_ip = req
@@ -155,6 +167,9 @@ impl Service<Request<Body>> for OperateLogMiddleware {
             .and_then(|v| v.to_str().ok())
             .unwrap_or("")
             .to_string();
+        // 在 req 移入 inner 之前，先从请求头/ Cookie 中提取 token，
+        // 用于在响应后显式查询用户信息（不依赖 SaToken task-local context）。
+        let token = extract_token(&req, &self.token_name);
 
         let mut inner = self.inner.clone();
         let tx = self.tx.clone();
@@ -166,9 +181,13 @@ impl Service<Request<Body>> for OperateLogMiddleware {
             let latency_ms = start.elapsed().as_secs_f64() * 1000.0;
 
             // 提取当前登录用户信息（仅已认证路由有效）
-            let (user_id, user_name, tenant_id) = extract_user_info().await;
+            let (user_id, user_name, tenant_id) = match token.as_deref() {
+                Some(t) => extract_user_info_from_token(t).await,
+                None => (None, None, None),
+            };
 
             let entry = OperateLogEntry {
+                trace_id,
                 method,
                 uri,
                 status,
@@ -198,16 +217,57 @@ impl Service<Request<Body>> for OperateLogMiddleware {
     }
 }
 
-/// 从 SaToken 会话中提取当前登录用户信息。
+/// 从请求头 / Cookie 中提取 sa-token token。
 ///
-/// 仅在已通过 SaTokenLayer 认证的路由上有效；公开路由（如 /api/auth/login）
-/// 未通过认证层，`get_login_id_as_string()` 会返回错误，此时返回全 `None`。
-async fn extract_user_info() -> (Option<u64>, Option<String>, Option<u64>) {
-    // 1. 获取当前 login_id
-    let login_id = match StpUtil::get_login_id_as_string().await {
+/// 提取顺序（与 sa-token 一致）：
+/// 1. Header `token_name`（Bearer 语义）
+/// 2. `Authorization` header（若 `token_name` 不是 Authorization）
+/// 3. Cookie `token_name`
+fn extract_token(req: &Request<Body>, token_name: &str) -> Option<String> {
+    // 1. Header token_name（支持 "Bearer xxx"）
+    if let Some(v) = req.headers().get(token_name) {
+        let s = v.to_str().ok()?.trim();
+        let s = s.strip_prefix("Bearer ").unwrap_or(s);
+        if !s.is_empty() {
+            return Some(s.to_string());
+        }
+    }
+    // 2. Authorization header（若 token_name 不是 Authorization）
+    if !token_name.eq_ignore_ascii_case("authorization")
+        && let Some(v) = req.headers().get("authorization")
+    {
+        let s = v.to_str().ok()?.trim();
+        let s = s.strip_prefix("Bearer ").unwrap_or(s);
+        if !s.is_empty() {
+            return Some(s.to_string());
+        }
+    }
+    // 3. Cookie token_name
+    if let Some(cookie) = req.headers().get(header::COOKIE) {
+        let cookie = cookie.to_str().ok()?;
+        for pair in cookie.split(';') {
+            let mut kv = pair.trim().splitn(2, '=');
+            if let (Some(k), Some(v)) = (kv.next(), kv.next()) {
+                if k.trim() == token_name && !v.trim().is_empty() {
+                    return Some(v.trim().to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// 通过显式传入的 token 提取当前登录用户信息。
+///
+/// 不使用 `StpUtil::get_login_id_as_string()`（它依赖 SaToken task-local context，
+/// 在操作日志中间件这类外层中间件中已失效），而是直接以 token 查询会话存储。
+async fn extract_user_info_from_token(token_str: &str) -> (Option<u64>, Option<String>, Option<u64>) {
+    // 1. 用 token 获取 login_id
+    let token = TokenValue::new(token_str.to_string());
+    let login_id = match StpUtil::get_login_id(&token).await {
         Ok(id) => id,
         Err(_) => {
-            debug!("未登录请求，跳过用户信息提取");
+            debug!("token 无效，跳过用户信息提取");
             return (None, None, None);
         }
     };
@@ -215,16 +275,7 @@ async fn extract_user_info() -> (Option<u64>, Option<String>, Option<u64>) {
     // 2. 解析 user_id
     let user_id: Option<u64> = login_id.parse().ok();
 
-    // 3. 通过 login_id 获取 token 值
-    let token = match StpUtil::get_token_by_login_id(&login_id).await {
-        Ok(t) => t,
-        Err(_) => {
-            debug!("无法获取 token (login_id={})", login_id);
-            return (user_id, None, None);
-        }
-    };
-
-    // 4. 获取 token 信息，读取 extra_data
+    // 3. 获取 token 信息，读取 extra_data
     let token_info = match StpUtil::get_token_info(&token).await {
         Ok(info) => info,
         Err(e) => {
@@ -233,7 +284,7 @@ async fn extract_user_info() -> (Option<u64>, Option<String>, Option<u64>) {
         }
     };
 
-    // 5. 反序列化 extra_data → SessionEctData
+    // 4. 反序列化 extra_data → SessionEctData
     let extra = match token_info.extra_data {
         Some(ref data) => match serde_json::from_value::<SessionEctData>(data.clone()) {
             Ok(d) => Some(d),

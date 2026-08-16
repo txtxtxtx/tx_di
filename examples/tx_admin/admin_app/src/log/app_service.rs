@@ -36,6 +36,10 @@ impl OperateLogAppService {
                 req.action,
                 req.success,
                 req.extra,
+                req.request_method,
+                req.request_url,
+                req.user_ip,
+                req.user_agent,
             )
             .await?;
         Ok(operate_log_to_response(log))

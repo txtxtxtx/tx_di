@@ -110,6 +110,10 @@ mod operate_log_service_tests {
                 "create_user".into(),
                 1,
                 "{}".into(),
+                Some("POST".into()),
+                Some("/api/v1/users".into()),
+                Some("127.0.0.1".into()),
+                Some("curl/8".into()),
             )
             .await;
         assert!(result.is_ok());
@@ -118,6 +122,10 @@ mod operate_log_service_tests {
         assert_eq!(log.user_id, 100);
         assert_eq!(log.action, "create_user");
         assert_eq!(log.success, 1);
+        assert_eq!(log.request_method.as_deref(), Some("POST"));
+        assert_eq!(log.request_url.as_deref(), Some("/api/v1/users"));
+        assert_eq!(log.user_ip.as_deref(), Some("127.0.0.1"));
+        assert_eq!(log.user_agent.as_deref(), Some("curl/8"));
     }
 
     #[tokio::test]
@@ -138,6 +146,10 @@ mod operate_log_service_tests {
                 "x".into(),
                 0,
                 "".into(),
+                None,
+                None,
+                None,
+                None,
             )
             .await;
         assert!(result.is_err());

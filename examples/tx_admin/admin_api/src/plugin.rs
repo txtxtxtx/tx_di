@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use tracing::info;
 use tx_di_axum::{MetricsLayer, WebConfig, WebPlugin, add_layer};
 use tx_di_core::{App, AppAllConfig, Component, DepsTuple, RIE};
-use tx_di_sa_token::{SaCheckLoginLayer, SaTokenLayer, SaTokenPlugin};
+use tx_di_sa_token::{SaCheckLoginLayer, SaTokenConf, SaTokenLayer, SaTokenPlugin};
 
 use crate::interfaces::api;
 use crate::interfaces::grpc;
@@ -70,8 +70,9 @@ async fn app_async_init(_comp: Arc<AdminPlugin>, app: Arc<App>) -> RIE<()> {
 
     // 注册操作日志 Layer：每次 HTTP 请求自动写入 sys_operate_log 表
     let op_log_svc: Arc<OperateLogAppService> = app.inject();
+    let sa_conf: Arc<SaTokenConf> = app.inject();
     let (op_log_tx, mut op_log_rx) = mpsc::channel::<OperateLogEntry>(OPERATE_LOG_CHANNEL_CAP);
-    let op_log_layer = OperateLogLayer::new(op_log_tx);
+    let op_log_layer = OperateLogLayer::new(op_log_tx, sa_conf.token_name.clone());
     add_layer(op_log_layer, 15); // sort=15: 紧接 api_log(10) 之后
 
     let op_log_svc_clone = op_log_svc.clone();
@@ -81,24 +82,27 @@ async fn app_async_init(_comp: Arc<AdminPlugin>, app: Arc<App>) -> RIE<()> {
             let user_name = entry.user_name.unwrap_or_default();
             let tenant_id = entry.tenant_id.unwrap_or(0);
             let req = CreateOperateLogRequest {
-                trace_id: String::new(),
+                trace_id: entry.trace_id,
                 user_id,
                 user_type: if user_id > 0 { 1 } else { 0 },
                 log_type: "http".to_string(),
-                sub_type: entry.method,
+                sub_type: entry.method.clone(),
                 biz_id: tenant_id,
-                action: entry.uri,
+                action: entry.uri.clone(),
                 success: if entry.status < 400 { 1 } else { 0 },
                 extra: serde_json::json!({
                     "status": entry.status,
                     "latency_ms": format!("{:.2}", entry.latency_ms),
-                    "user_ip": entry.user_ip,
-                    "user_name": user_name,
-                    "user_agent": entry.user_agent,
                 })
                 .to_string(),
+                request_method: Some(entry.method),
+                request_url: Some(entry.uri),
+                user_ip: Some(entry.user_ip),
+                user_agent: Some(entry.user_agent),
             };
-            let _ = op_log_svc_clone.create_log(req).await;
+            if let Err(e) = op_log_svc_clone.create_log(req).await {
+                tracing::warn!("操作日志写入失败: {e:?} (user={user_id} {user_name})");
+            }
         }
     });
     info!("操作日志 Layer 已注册 (sort=15)");

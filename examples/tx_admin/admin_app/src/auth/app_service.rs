@@ -61,10 +61,26 @@ impl AuthAppService {
     /// 成功返回 `LoginResponse`（含 token）
     pub async fn login(&self, req: LoginRequest) -> AppResult<LoginResponse> {
         // ── 1. 认证（领域层封装，返回明确的 AuthError）────────
-        let user = self
+        let user = match self
             .auth_service
             .authenticate(&req.username, &req.password)
-            .await?;
+            .await
+        {
+            Ok(u) => u,
+            Err(e) => {
+                // 认证失败也要记录登录日志（result=0），便于审计
+                let fail_cmd = CreateLoginLogRequest {
+                    user_id: 0,
+                    user_type: 0,
+                    username: req.username.clone(),
+                    login_ip: req.login_ip.clone(),
+                    login_type: "login".to_string(),
+                    result: 0,
+                };
+                let _ = self.login_log_service.create_log(fail_cmd).await;
+                return Err(e);
+            }
+        };
 
         // ── 2. 构建跨聚合 LoginUser ──────────────────────────
         let login_user = self.user_app.build_login_user(&user).await?;

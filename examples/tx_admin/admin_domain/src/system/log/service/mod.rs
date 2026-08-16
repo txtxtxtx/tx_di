@@ -35,6 +35,10 @@ impl OperateLogService {
     /// * `action` - 操作动作描述（如"创建"、"修改"、"删除"等）
     /// * `success` - 操作结果标识（成功/失败）
     /// * `extra` - 扩展信息，存储额外的上下文数据
+    /// * `request_method` - 请求方法（GET/POST/...）
+    /// * `request_url` - 请求 URL
+    /// * `user_ip` - 来源 IP
+    /// * `user_agent` - 客户端 User-Agent
     ///
     /// # 执行逻辑
     /// 1. 生成唯一日志 ID
@@ -58,12 +62,17 @@ impl OperateLogService {
         action: String,
         success: i32,
         extra: String,
+        request_method: Option<String>,
+        request_url: Option<String>,
+        user_ip: Option<String>,
+        user_agent: Option<String>,
     ) -> AppResult<OperateLog> {
         let log_id = id::next_id();
         let log = OperateLog::create(
             log_id, trace_id, user_id, user_type, log_type, sub_type, biz_id, action, success,
             extra,
-        );
+        )
+        .with_request(request_method, request_url, user_ip, user_agent);
         self.log_repo.insert(&log).await?;
         Ok(log)
     }
