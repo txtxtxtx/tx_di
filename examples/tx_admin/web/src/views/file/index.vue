@@ -189,7 +189,7 @@ async function handleUpload() {
 
 async function handleDownload(row: FileResponse) {
   try {
-    const res = await request.get(`/api/file/${row.id}/download`, { responseType: 'blob' })
+    const res = await request.get(`/api/v1/file/${row.id}/download`, { responseType: 'blob' })
     const url = URL.createObjectURL(res.data)
     const a = document.createElement('a')
     a.href = url

@@ -7,15 +7,15 @@ export function createDictType(data: CreateDictTypeRequest) {
 }
 
 export function getDictType(id: string) {
-  return request.get<ApiRes<DictTypeResponse>>(`/api/dict/type/${id}`).then(r => r.data)
+  return request.get<ApiRes<DictTypeResponse>>(`/api/v1/dict/type/${id}`).then(r => r.data)
 }
 
 export function updateDictType(id: string, data: UpdateDictTypeRequest) {
-  return request.put<ApiRes<DictTypeResponse>>(`/api/dict/type/${id}`, { ...data, id }).then(r => r.data)
+  return request.put<ApiRes<DictTypeResponse>>(`/api/v1/dict/type/${id}`, { ...data, id }).then(r => r.data)
 }
 
 export function deleteDictType(id: string) {
-  return request.delete<ApiRes<null>>(`/api/dict/type/${id}`).then(r => r.data)
+  return request.delete<ApiRes<null>>(`/api/v1/dict/type/${id}`).then(r => r.data)
 }
 
 export function listDictTypes(data: ListDictTypesRequest) {
@@ -28,15 +28,15 @@ export function createDictData(data: CreateDictDataRequest) {
 }
 
 export function getDictData(id: string) {
-  return request.get<ApiRes<DictDataResponse>>(`/api/dict/data/${id}`).then(r => r.data)
+  return request.get<ApiRes<DictDataResponse>>(`/api/v1/dict/data/${id}`).then(r => r.data)
 }
 
 export function updateDictData(id: string, data: UpdateDictDataRequest) {
-  return request.put<ApiRes<DictDataResponse>>(`/api/dict/data/${id}`, { ...data, id }).then(r => r.data)
+  return request.put<ApiRes<DictDataResponse>>(`/api/v1/dict/data/${id}`, { ...data, id }).then(r => r.data)
 }
 
 export function deleteDictData(id: string) {
-  return request.delete<ApiRes<null>>(`/api/dict/data/${id}`).then(r => r.data)
+  return request.delete<ApiRes<null>>(`/api/v1/dict/data/${id}`).then(r => r.data)
 }
 
 export function listDictData(data: ListDictDataRequest) {
@@ -44,7 +44,7 @@ export function listDictData(data: ListDictDataRequest) {
 }
 
 export function getDictDataByType(dictType: string) {
-  return request.get<ApiRes<DictDataResponse[]>>(`/api/dict/data/type/${dictType}`).then(r => r.data)
+  return request.get<ApiRes<DictDataResponse[]>>(`/api/v1/dict/data/type/${dictType}`).then(r => r.data)
 }
 
 export function getDictDataByTypes(dictTypes: string[]) {

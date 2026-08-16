@@ -6,15 +6,15 @@ export function createMenu(data: CreateMenuRequest) {
 }
 
 export function getMenu(menuId: string) {
-  return request.get<ApiRes<MenuTreeNode>>(`/api/menu/${menuId}`).then(r => r.data)
+  return request.get<ApiRes<MenuTreeNode>>(`/api/v1/menu/${menuId}`).then(r => r.data)
 }
 
 export function updateMenu(menuId: string, data: UpdateMenuRequest) {
-  return request.put<ApiRes<MenuTreeNode>>(`/api/menu/${menuId}`, { ...data, menuId }).then(r => r.data)
+  return request.put<ApiRes<MenuTreeNode>>(`/api/v1/menu/${menuId}`, { ...data, menuId }).then(r => r.data)
 }
 
 export function deleteMenu(menuId: string) {
-  return request.delete<ApiRes<null>>(`/api/menu/${menuId}`).then(r => r.data)
+  return request.delete<ApiRes<null>>(`/api/v1/menu/${menuId}`).then(r => r.data)
 }
 
 export function listMenus(data?: ListMenusRequest) {

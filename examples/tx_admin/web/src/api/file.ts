@@ -9,12 +9,12 @@ export function uploadFiles(formData: FormData) {
 
 /// 获取文件元数据
 export function getFile(fileId: string) {
-  return request.get<ApiRes<FileResponse>>(`/api/file/${fileId}`).then(r => r.data)
+  return request.get<ApiRes<FileResponse>>(`/api/v1/file/${fileId}`).then(r => r.data)
 }
 
 /// 删除文件（物理文件 + DB 软删除）
 export function deleteFile(fileId: string) {
-  return request.delete<ApiRes<null>>(`/api/file/${fileId}`).then(r => r.data)
+  return request.delete<ApiRes<null>>(`/api/v1/file/${fileId}`).then(r => r.data)
 }
 
 /// 分页查询文件列表
@@ -24,5 +24,5 @@ export function listFiles(data: ListFilesRequest) {
 
 /// 获取文件预览地址
 export function getPreviewUrl(fileId: string) {
-  return request.get<ApiRes<PreviewUrlRes>>(`/api/file/pre/url/${fileId}`).then(r => r.data)
+  return request.get<ApiRes<PreviewUrlRes>>(`/api/v1/file/pre/url/${fileId}`).then(r => r.data)
 }

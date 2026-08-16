@@ -235,7 +235,7 @@ function handleClose() {
 function downloadFile() {
   if (!props.fileId) return
   const a = document.createElement('a')
-  a.href = `/api/file/${props.fileId}/download`
+  a.href = `/api/v1/file/${props.fileId}/download`
   a.download = props.fileName || ''
   document.body.appendChild(a)
   a.click()

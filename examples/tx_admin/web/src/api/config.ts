@@ -6,15 +6,15 @@ export function createConfig(data: CreateConfigRequest) {
 }
 
 export function getConfig(configId: string) {
-  return request.get<ApiRes<ConfigResponse>>(`/api/config/${configId}`).then(r => r.data)
+  return request.get<ApiRes<ConfigResponse>>(`/api/v1/config/${configId}`).then(r => r.data)
 }
 
 export function updateConfig(configId: string, data: UpdateConfigRequest) {
-  return request.put<ApiRes<ConfigResponse>>(`/api/config/${configId}`, { ...data, configId }).then(r => r.data)
+  return request.put<ApiRes<ConfigResponse>>(`/api/v1/config/${configId}`, { ...data, configId }).then(r => r.data)
 }
 
 export function deleteConfig(configId: string) {
-  return request.delete<ApiRes<null>>(`/api/config/${configId}`).then(r => r.data)
+  return request.delete<ApiRes<null>>(`/api/v1/config/${configId}`).then(r => r.data)
 }
 
 export function listConfigs(data: ListConfigsRequest) {
@@ -22,5 +22,5 @@ export function listConfigs(data: ListConfigsRequest) {
 }
 
 export function getConfigByKey(key: string) {
-  return request.get<ApiRes<ConfigResponse>>(`/api/config/key/${key}`).then(r => r.data)
+  return request.get<ApiRes<ConfigResponse>>(`/api/v1/config/key/${key}`).then(r => r.data)
 }

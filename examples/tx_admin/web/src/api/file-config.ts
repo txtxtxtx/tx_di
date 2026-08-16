@@ -8,7 +8,7 @@ export function listFileConfigs() {
 
 /** 获取文件配置详情 */
 export function getFileConfig(id: number) {
-  return request.get<ApiRes<FileConfigResponse>>(`/api/file/config/${id}`).then(r => r.data)
+  return request.get<ApiRes<FileConfigResponse>>(`/api/v1/file/config/${id}`).then(r => r.data)
 }
 
 /** 新增文件配置 */
@@ -18,15 +18,15 @@ export function createFileConfig(data: CreateFileConfigRequest) {
 
 /** 修改文件配置 */
 export function updateFileConfig(id: number, data: UpdateFileConfigRequest) {
-  return request.put<ApiRes<FileConfigResponse>>(`/api/file/config/${id}`, data).then(r => r.data)
+  return request.put<ApiRes<FileConfigResponse>>(`/api/v1/file/config/${id}`, data).then(r => r.data)
 }
 
 /** 删除文件配置 */
 export function deleteFileConfig(id: number) {
-  return request.delete<ApiRes<null>>(`/api/file/config/${id}`).then(r => r.data)
+  return request.delete<ApiRes<null>>(`/api/v1/file/config/${id}`).then(r => r.data)
 }
 
 /** 设为主配置 */
 export function setMasterFileConfig(id: number) {
-  return request.put<ApiRes<FileConfigResponse>>(`/api/file/config/${id}/master`).then(r => r.data)
+  return request.put<ApiRes<FileConfigResponse>>(`/api/v1/file/config/${id}/master`).then(r => r.data)
 }

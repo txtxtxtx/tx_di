@@ -6,15 +6,15 @@ export function createUser(data: CreateUserRequest) {
 }
 
 export function getUser(userId: string) {
-  return request.get<ApiRes<UserResponse>>(`/api/user/${userId}`).then(r => r.data)
+  return request.get<ApiRes<UserResponse>>(`/api/v1/user/${userId}`).then(r => r.data)
 }
 
 export function updateUser(userId: string, data: UpdateUserRequest) {
-  return request.put<ApiRes<UserResponse>>(`/api/user/${userId}`, { ...data, userId }).then(r => r.data)
+  return request.put<ApiRes<UserResponse>>(`/api/v1/user/${userId}`, { ...data, userId }).then(r => r.data)
 }
 
 export function deleteUser(userId: string) {
-  return request.delete<ApiRes<null>>(`/api/user/${userId}`).then(r => r.data)
+  return request.delete<ApiRes<null>>(`/api/v1/user/${userId}`).then(r => r.data)
 }
 
 export function listUsers(data: ListUsersRequest) {

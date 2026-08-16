@@ -6,15 +6,15 @@ export function createRole(data: CreateRoleRequest) {
 }
 
 export function getRole(roleId: string) {
-  return request.get<ApiRes<RoleResponse>>(`/api/role/${roleId}`).then(r => r.data)
+  return request.get<ApiRes<RoleResponse>>(`/api/v1/role/${roleId}`).then(r => r.data)
 }
 
 export function updateRole(roleId: string, data: UpdateRoleRequest) {
-  return request.put<ApiRes<RoleResponse>>(`/api/role/${roleId}`, { ...data, roleId }).then(r => r.data)
+  return request.put<ApiRes<RoleResponse>>(`/api/v1/role/${roleId}`, { ...data, roleId }).then(r => r.data)
 }
 
 export function deleteRole(roleId: string) {
-  return request.delete<ApiRes<null>>(`/api/role/${roleId}`).then(r => r.data)
+  return request.delete<ApiRes<null>>(`/api/v1/role/${roleId}`).then(r => r.data)
 }
 
 export function listRoles(data: ListRolesRequest) {
@@ -30,13 +30,13 @@ export function getAllRoles() {
 }
 
 export function getRoleUsers(roleId: string) {
-  return request.get<ApiRes<UserResponse[]>>(`/api/role/${roleId}/users`).then(r => r.data)
+  return request.get<ApiRes<UserResponse[]>>(`/api/v1/role/${roleId}/users`).then(r => r.data)
 }
 
 export function addUsersToRole(roleId: string, userIds: string[]) {
-  return request.post<ApiRes<null>>(`/api/role/${roleId}/users`, userIds).then(r => r.data)
+  return request.post<ApiRes<null>>(`/api/v1/role/${roleId}/users`, userIds).then(r => r.data)
 }
 
 export function removeUsersFromRole(roleId: string, userIds: string[]) {
-  return request.delete<ApiRes<null>>(`/api/role/${roleId}/users`, { data: userIds }).then(r => r.data)
+  return request.delete<ApiRes<null>>(`/api/v1/role/${roleId}/users`, { data: userIds }).then(r => r.data)
 }
