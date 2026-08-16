@@ -74,11 +74,23 @@ pub fn apply_security_headers(headers: &mut axum::http::HeaderMap) {
         axum::http::HeaderName::from_static("x-content-type-options"),
         "nosniff",
     );
-    insert_if_absent(
-        headers,
-        axum::http::HeaderName::from_static("x-frame-options"),
-        "DENY",
-    );
+
+    // 若业务响应已显式声明 CSP `frame-ancestors`（如文件预览 iframe 路由），
+    // 则尊重该策略，不再追加 `X-Frame-Options: DENY` 双重限制。
+    // （两者同时存在且冲突时 X-Frame-Options 优先，会误伤显式允许嵌入的场景）
+    let has_frame_ancestors = headers
+        .get(axum::http::HeaderName::from_static("content-security-policy"))
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_ascii_lowercase().contains("frame-ancestors"))
+        .unwrap_or(false);
+    if !has_frame_ancestors {
+        insert_if_absent(
+            headers,
+            axum::http::HeaderName::from_static("x-frame-options"),
+            "DENY",
+        );
+    }
+
     insert_if_absent(
         headers,
         axum::http::HeaderName::from_static("x-xss-protection"),

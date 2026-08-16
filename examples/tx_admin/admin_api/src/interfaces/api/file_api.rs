@@ -370,6 +370,9 @@ async fn serve_local_file(
                 .header(header::CONTENT_TYPE, mime)
                 .header(header::CONTENT_LENGTH, metadata.len())
                 .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+                // 显式声明允许被 iframe 嵌入（前端文件预览弹窗）。
+                // security 中间件检测到 frame-ancestors 后不会追加 X-Frame-Options: DENY。
+                .header(header::CONTENT_SECURITY_POLICY, "frame-ancestors *")
                 .body(body)
                 .unwrap())
         }
