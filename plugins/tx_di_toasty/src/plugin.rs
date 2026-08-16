@@ -158,11 +158,18 @@ impl ToastyPlugin {
     /// `Transaction` 由 `lib.rs` re-export；`ToastyErr::TxBeginFailed/TxCommitFailed`
     /// 提供标准错误码。
     /// 将配置文件的 `auto_schema = true` 改为 `false`（按行替换，保留注释与格式）
+    ///
+    /// `path` 可能为空（内存配置启动，如 `BuildContext::with_config` / `app_loop!`），
+    /// 此时无文件可回写，直接跳过（这仅是开发期便利回写，失败不应视为错误）。
     fn change_auto_schema_closed(path: PathBuf) {
+        if path.as_os_str().is_empty() {
+            tracing::debug!("config_path 为空（内存配置启动），跳过 auto_schema 回写");
+            return;
+        }
         let content = match std::fs::read_to_string(&path) {
             Ok(c) => c,
             Err(e) => {
-                tracing::error!(path = %path.display(), error = %e, "读取配置文件失败");
+                tracing::debug!(path = %path.display(), error = %e, "读取配置文件失败，跳过 auto_schema 回写");
                 return;
             }
         };

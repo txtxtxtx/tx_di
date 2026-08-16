@@ -72,10 +72,10 @@ refresh_token_timeout = 604800               # 7 天
 
 # ── 数据库（tx_di_toasty）──────────────────────────────────────────────────
 [toasty]
-database_url = "sqlite:examples/tx_admin/data/tx_admin.db"
-auto_schema = false
+database_url = "sqlite:data/tx_admin.db"
+auto_schema = true
 # 生产迁移模式：受控 push_schema（diff 增量）+ 版本审计表 _schema_migrations
-migrate_on_start = true
+migrate_on_start = false
 max_pool_size = 10
 default_admin_password = "admin123"          # 空库时自动创建 admin 账号的初始密码
 # table_name_prefix = ""
@@ -128,4 +128,4 @@ static_dir = "./static"
 layers = [[5, "timeout"], [5, "security"], [10, "api_log"], [100, "compression"], [10000, "cors"]]
 
 [web_config.spa_apps]
-"/web" = "examples/tx_admin/web/dist"
+"/web" = "web/dist"
