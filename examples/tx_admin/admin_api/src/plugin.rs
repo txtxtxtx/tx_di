@@ -126,12 +126,13 @@ async fn app_async_init(_comp: Arc<AdminPlugin>, app: Arc<App>) -> RIE<()> {
     let open = api::open_router();
     let protected = api::router(max_body_size);
 
-    let router = tx_di_axum::Router::new().merge(open).merge(
+    let router = tx_di_axum::Router::new().merge(
         protected
             .layer(SaCheckLoginLayer::new())
             .layer(SaTokenLayer::new(sa_state)),
     );
 
+    WebPlugin::add_router(open);
     WebPlugin::add_router(router);
     info!("admin HTTP 路由已注册（含认证）");
 

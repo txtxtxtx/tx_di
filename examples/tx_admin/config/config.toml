@@ -73,7 +73,7 @@ refresh_token_timeout = 604800               # 7 天
 # ── 数据库（tx_di_toasty）──────────────────────────────────────────────────
 [toasty]
 database_url = "sqlite:data/tx_admin.db"
-auto_schema = true
+auto_schema = false
 # 生产迁移模式：受控 push_schema（diff 增量）+ 版本审计表 _schema_migrations
 migrate_on_start = false
 max_pool_size = 10
