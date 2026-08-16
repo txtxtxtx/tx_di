@@ -18,6 +18,16 @@
         <iframe v-if="mediaUrl" :src="mediaUrl" @load="loading = false"></iframe>
       </div>
 
+      <!-- HTML：iframe 直接渲染（sandbox 隔离脚本，防止同源页内执行恶意代码） -->
+      <div v-else-if="fileCategory === 'html'" class="preview-html">
+        <iframe
+          v-if="mediaUrl"
+          :src="mediaUrl"
+          sandbox="allow-scripts allow-popups allow-downloads allow-forms"
+          @load="loading = false"
+        ></iframe>
+      </div>
+
       <!-- Word -->
       <div v-else-if="fileCategory === 'word'" class="preview-office">
         <VueOfficeDocx
@@ -129,7 +139,7 @@ const VIDEO_EXTS = ['mp4', 'webm', 'ogg', 'mov', 'avi']
 const AUDIO_EXTS = ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a']
 const TEXT_EXTS = [
   'txt', 'log', 'md', 'csv', 'json', 'xml', 'yml', 'yaml', 'toml', 'ini',
-  'html', 'css', 'js', 'ts', 'vue', 'rs', 'py', 'java', 'go', 'c', 'cpp',
+  'css', 'js', 'ts', 'vue', 'rs', 'py', 'java', 'go', 'c', 'cpp',
   'sh', 'bat', 'sql'
 ]
 
@@ -138,6 +148,7 @@ const fileCategory = computed(() => {
   if (!ext) return 'unknown'
   if (IMAGE_EXTS.includes(ext)) return 'image'
   if (ext === 'pdf') return 'pdf'
+  if (ext === 'html' || ext === 'htm') return 'html'
   if (ext === 'docx') return 'word'
   if (ext === 'xlsx' || ext === 'xls') return 'excel'
   if (ext === 'pptx' || ext === 'ppt') return 'ppt'
@@ -151,6 +162,7 @@ const dialogWidth = computed(() => {
   switch (fileCategory.value) {
     case 'image': return '70vw'
     case 'pdf': return '80vw'
+    case 'html': return '90vw'
     case 'video': return '70vw'
     case 'audio': return '500px'
     case 'text': return '70vw'
@@ -184,7 +196,7 @@ watch(
       const previewRes = await getPreviewUrl(String(props.fileId))
       const url = previewRes.data.url
 
-      if (category === 'image' || category === 'video' || category === 'audio' || category === 'pdf') {
+      if (category === 'image' || category === 'video' || category === 'audio' || category === 'pdf' || category === 'html') {
         // 直接用 URL，浏览器原生渲染
         mediaUrl.value = url
         loading.value = false
@@ -283,6 +295,18 @@ function downloadFile() {
   width: 100%;
   height: 75vh;
   border: none;
+}
+
+.preview-html {
+  width: 100%;
+}
+
+.preview-html iframe {
+  width: 100%;
+  height: 75vh;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  background: #fff;
 }
 
 .preview-office {
