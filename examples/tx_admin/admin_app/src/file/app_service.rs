@@ -115,6 +115,12 @@ impl FileAppService {
                 self.file_plugin.add_storage(cache_key, storage.clone());
                 return Ok(storage);
             }
+            // 反序列化/初始化失败时给出明确日志，避免静默回退到插件默认存储造成困惑
+            tracing::warn!(
+                config_id = ?cfg.id,
+                config = %cfg.config,
+                "DB 文件存储配置解析失败，回退到插件默认存储"
+            );
         }
 
         // 3. 回退到插件默认存储

@@ -79,9 +79,14 @@ impl Default for S3Config {
 ///
 /// 用于 TOML `[[file_config.extra_storages]]` 数组配置，
 /// 也用于从 DB JSON 反序列化创建动态后端。
+///
+/// 注意：`name` 仅在 `extra_storages` 数组中有语义；
+/// DB 中的主配置 JSON（如 `{"base_path":...,"base_url":...}`）可省略 `name`，
+/// 因此该字段必须允许缺失（`#[serde(default)]`）。
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct StorageConfig {
-    /// 后端名称（映射为 `sys:<name>` 或 `user:<name>`）
+    /// 后端名称（映射为 `sys:<name>` 或 `user:<name>`；主配置可省略）
+    #[serde(default)]
     pub name: String,
     /// 存储后端类型
     #[serde(default)]
