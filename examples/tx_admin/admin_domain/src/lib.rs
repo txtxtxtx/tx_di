@@ -1,6 +1,5 @@
 pub mod identity;
 pub mod job;
-pub mod password;
 pub mod shared;
 pub mod system;
 

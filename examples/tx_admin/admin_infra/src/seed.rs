@@ -1228,7 +1228,7 @@ pub async fn seed_data(db: &ToastyDb) -> AppResult<()> {
 
     // 1. 创建默认管理员用户（密码由环境变量或默认值解析，再哈希后入库）
     let init_password = resolve_admin_password();
-    let password_hash = admin_domain::password::hash_password(&init_password)?;
+    let password_hash = admin_domain::shared::security::password::hash_password(&init_password)?;
     SysUser::create()
         .id(1)
         .username("admin".to_string())

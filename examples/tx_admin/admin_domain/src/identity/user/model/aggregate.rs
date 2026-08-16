@@ -2,7 +2,7 @@ use jiff::Timestamp; // 引入jiff库中的Timestamp类型，用于处理时间
 use serde::{Deserialize, Serialize}; // 引入serde库中的Deserialize和Serialize trait，用于序列化和反序列化
 
 use crate::AggregateRoot;
-use crate::password;
+use crate::shared::security::password;
 use crate::shared::model::value_object::{DeletedStatus, TenantId};
 use crate::shared::model::{AggregateRoot, AuditFields};
 use crate::identity::user::model::event::UserEvent;

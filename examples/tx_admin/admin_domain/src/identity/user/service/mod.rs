@@ -1,4 +1,4 @@
-use crate::password;
+use crate::shared::security::password;
 use crate::identity::user::repository::UserRepositoryError;
 use crate::identity::user::model::aggregate::User;
 use crate::identity::user::model::value_object::{Sex, UserQuery, UserStatus};
