@@ -4,6 +4,10 @@ import { getDictDataByType } from '@/api/dict'
 import type { DictDataResponse } from '@/types'
 
 const CACHE_PREFIX = 'dict_'
+// 字典缓存版本号：字典数据结构或业务映射变更时 +1，旧版本缓存会自动失效
+const CACHE_VERSION = 'v1'
+// 字典缓存有效期（毫秒）：7 天
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 export const useDictStore = defineStore('dict', () => {
   /** 内存缓存：dictType -> DictDataResponse[] */
@@ -11,7 +15,12 @@ export const useDictStore = defineStore('dict', () => {
 
   /**
    * 获取字典数据（懒加载 + localStorage 缓存）
-   * 优先级：内存 > localStorage > API
+   * 优先级：内存 > localStorage（未过期且版本一致） > API
+   *
+   * 缓存带版本号与有效期：
+   * - 版本号与当前代码 `CACHE_VERSION` 不一致时缓存失效，强制重新拉取
+   *   （解决历史遗留的 value/label 反向等旧缓存导致页面显示错误的问题）
+   * - 超过 `CACHE_TTL_MS`（7 天）自动过期，重新拉取最新数据
    */
   async function getDictData(dictType: string): Promise<DictDataResponse[]> {
     // 1. 内存有
@@ -19,23 +28,31 @@ export const useDictStore = defineStore('dict', () => {
       return dictMap.value[dictType]
     }
 
-    // 2. localStorage 有
-    const cached = localStorage.getItem(CACHE_PREFIX + dictType)
+    // 2. localStorage 有（校验版本号与有效期）
+    const cacheKey = CACHE_PREFIX + dictType
+    const cached = localStorage.getItem(cacheKey)
     if (cached) {
       try {
-        const list = JSON.parse(cached) as DictDataResponse[]
-        dictMap.value[dictType] = list
-        return list
+        const parsed = JSON.parse(cached) as { version?: string; savedAt?: number; data?: DictDataResponse[] }
+        const versionOk = !parsed.version || parsed.version === CACHE_VERSION
+        const fresh = !parsed.savedAt || Date.now() - parsed.savedAt < CACHE_TTL_MS
+        if (versionOk && fresh && Array.isArray(parsed.data)) {
+          dictMap.value[dictType] = parsed.data
+          return parsed.data
+        }
       } catch {
-        localStorage.removeItem(CACHE_PREFIX + dictType)
+        // 缓存损坏，忽略后重新拉取
       }
+      localStorage.removeItem(cacheKey)
     }
 
     // 3. 从 API 获取
     const res = await getDictDataByType(dictType)
     const list = res.data ?? []
     dictMap.value[dictType] = list
-    localStorage.setItem(CACHE_PREFIX + dictType, JSON.stringify(list))
+    // 写入带版本号与时间戳的缓存
+    const cachePayload = { version: CACHE_VERSION, savedAt: Date.now(), data: list }
+    localStorage.setItem(CACHE_PREFIX + dictType, JSON.stringify(cachePayload))
     return list
   }
 
